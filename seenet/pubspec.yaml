@@ -1,50 +1,35 @@
-name: network_diagnostic_app
-description: Aplicativo para diagnóstico de problemas de rede com gravação de vídeo
+name: seenet
+description: SeeNet Flutter App
+
+publish_to: 'none'
 
 version: 1.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
-  flutter: ">=3.10.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  
-  # Câmera e gravação
-  camera: ^0.10.5+5
-  
-  # Permissões
-  permission_handler: ^11.0.1
-  
-  # Arquivos e diretórios
-  path_provider: ^2.1.1
-  
-  # HTTP requests
-  http: ^1.1.0
-  
-  # JSON
-  json_annotation: ^4.8.1
-  
-  # UI
-  flutter_svg: ^2.0.7
-  
-  # Estado
-  provider: ^6.0.5
+  cupertino_icons: ^1.0.2
+  flutter_svg: ^2.0.10
+  get: ^4.7.2
+  google_sign_in: ^6.2.1
+  firebase_auth: ^4.17.8
+  firebase_core: ^2.30.0
 
-  cupertino_icons: ^1.0.6
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  json_serializable: ^6.7.1
-  build_runner: ^2.4.7
 
 flutter:
   uses-material-design: true
 
-assets:
-    - assets/images/
-    - assets/icons/
-    - assets/videos/
+  assets:
+    - assets/images/background.png
+    - assets/images/logo.svg
+    - assets/images/snail.svg
+    - assets/images/iptv.svg
+    - assets/images/app.svg

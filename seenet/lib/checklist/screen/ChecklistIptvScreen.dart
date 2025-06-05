@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:seenet/checklist/widgets/checklistiptv.widget.dart';
+import 'package:seenet/checklist/widgets/checkmark_enviar.widget.dart';
 
 class ChecklistIptvScreen extends StatefulWidget {
   const ChecklistIptvScreen({super.key});
@@ -86,6 +87,10 @@ class _ChecklistIptvScreenState extends State<ChecklistIptvScreen> {
                 );
               },
             ),
+          ),
+          const Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: CheckmarkEnviarWidget(),
           ),
         ],
       ),

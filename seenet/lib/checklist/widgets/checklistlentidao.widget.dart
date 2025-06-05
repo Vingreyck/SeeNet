@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 class ChecklistLentidaoWidget extends StatelessWidget {
   final String title;
@@ -30,20 +29,11 @@ class ChecklistLentidaoWidget extends StatelessWidget {
           ],
         ),
         child: ListTile(
-          leading: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFF00FF88),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Center(
-              child: SvgPicture.asset(
-                'assets/images/snail.svg',
-                width: 32,
-                height: 32,
-              ),
-            ),
+          trailing: Checkbox(
+            value: isChecked,
+            onChanged: onChanged,
+            activeColor: const Color(0xFF00FF88),
+            checkColor: Colors.black,
           ),
           title: Text(
             title,
@@ -52,12 +42,6 @@ class ChecklistLentidaoWidget extends StatelessWidget {
               fontWeight: FontWeight.bold,
               fontSize: 18,
             ),
-          ),
-          trailing: Checkbox(
-            value: isChecked,
-            onChanged: onChanged,
-            activeColor: const Color(0xFF00FF88),
-            checkColor: Colors.black,
           ),
         ),
       ),

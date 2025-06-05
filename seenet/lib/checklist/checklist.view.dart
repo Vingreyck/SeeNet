@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:seenet/checklist/widgets/checklist_categoria_card.widget.dart';
 import 'package:seenet/checklist/widgets/checklistlentidao.widget.dart';
 import 'package:seenet/checklist/widgets/checklistiptv.widget.dart';
 import 'package:seenet/checklist/widgets/checklistapps.widget.dart';
+import 'package:get/get.dart';
 
 class Checklistview extends StatelessWidget {
   const Checklistview({super.key});
@@ -121,36 +123,27 @@ class Checklistview extends StatelessWidget {
             child: Column(
               children: [
                 // Card 1 - Lentidão
-                ChecklistLentidaoWidget(
+                ChecklistCategoriaCardWidget(
+                  title: 'Lentidão',
+                  assetIcon: 'assets/images/snail.png',
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ChecklistLentidaoWidget(),
-                      ),
-                    );
+                    Get.toNamed('/checklist/lentidao');
                   },
                 ),
                 // Card 2 - IPTV
-                ChecklistiptvWidget(
+                ChecklistCategoriaCardWidget(
+                  title: 'IPTV',
+                  assetIcon: 'assets/images/iptv.png',
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ChecklistiptvWidget(), 
-                      ),
-                    );
+                    Get.toNamed('/checklist/iptv');
                   },
                 ),
-                // Card 3 - Aplicativos
-                ChecklistAppsWidget(
+                // Card 3 - Apps
+                ChecklistCategoriaCardWidget(
+                  title: 'Aplicativos',
+                  assetIcon: 'assets/images/apps.png',
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ChecklistAppsWidget(),
-                      ),
-                    );
+                    Get.toNamed('/checklist/apps');
                   },
                 ),
               ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:seenet/checklist/widgets/checklistlentidao.widget.dart';
+import 'package:seenet/checklist/widgets/checkmark_enviar.widget.dart';
 
 class ChecklistLentidaoScreen extends StatefulWidget {
   const ChecklistLentidaoScreen({super.key});
@@ -86,6 +87,10 @@ class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
                 );
               },
             ),
+          ),
+          const Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: CheckmarkEnviarWidget(),
           ),
         ],
       ),

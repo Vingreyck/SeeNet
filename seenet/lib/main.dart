@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:seenet/checklist/screen/ChecklistAppsScreen.dart';
+import 'package:seenet/checklist/screen/ChecklistIptvScreen.dart';
+import 'package:seenet/checklist/screen/ChecklistLentidaoScreen.dart';
 import 'package:seenet/registro/registro.view.dart';
 import 'splash_screen/splash_screen.dart';
 import 'package:get/get.dart';
@@ -26,6 +29,9 @@ class MyApp extends StatelessWidget {
         GetPage(name: '/login', page: () => const LoginView()),
         GetPage(name: '/registro', page: () => const RegistrarView()),
         GetPage(name: '/checklist', page: () => const Checklistview()),
+        GetPage(name: '/checklist/lentidao', page: () => const ChecklistLentidaoScreen()),
+        GetPage(name: '/checklist/iptv', page: () => const ChecklistIptvScreen()),
+        GetPage(name: '/checklist/apps', page: () => const ChecklistAppsScreen()),
       ],
     );
   }

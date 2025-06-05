@@ -7,6 +7,7 @@ import 'splash_screen/splash_screen.dart';
 import 'package:get/get.dart';
 import 'package:seenet/login/login.view.dart';
 import 'package:seenet/checklist/checklist.view.dart';
+import 'package:seenet/diagnostico/diagnostico.view.dart';
 
 void main() {
   runApp(const MyApp());
@@ -32,6 +33,7 @@ class MyApp extends StatelessWidget {
         GetPage(name: '/checklist/lentidao', page: () => const ChecklistLentidaoScreen()),
         GetPage(name: '/checklist/iptv', page: () => const ChecklistIptvScreen()),
         GetPage(name: '/checklist/apps', page: () => const ChecklistAppsScreen()),
+        GetPage(name: '/diagnostico', page: () => const Diagnosticoview()),
       ],
     );
   }

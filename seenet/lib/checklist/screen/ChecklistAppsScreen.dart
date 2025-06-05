@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:seenet/checklist/widgets/checklistapps.widget.dart';
+import 'package:seenet/checklist/widgets/checkmark_enviar.widget.dart';
 
 class ChecklistAppsScreen extends StatefulWidget {
   const ChecklistAppsScreen({super.key});
@@ -71,20 +72,30 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
           ),
           // Lista de checkboxes
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              itemCount: problemas.length,
-              itemBuilder: (context, index) {
-                return ChecklistAppsWidget(
-                  title: problemas[index],
-                  isChecked: checkStates[index],
-                  onChanged: (value) {
-                    setState(() {
-                      checkStates[index] = value ?? false;
-                    });
-                  },
-                );
-              },
+            child: Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                    itemCount: problemas.length,
+                    itemBuilder: (context, index) {
+                      return ChecklistAppsWidget(
+                        title: problemas[index],
+                        isChecked: checkStates[index],
+                        onChanged: (value) {
+                          setState(() {
+                            checkStates[index] = value ?? false;
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: CheckmarkEnviarWidget(),
+                ),
+              ],
             ),
           ),
         ],

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:seenet/checklist/widgets/checklist_categoria_card.widget.dart';
-import 'package:seenet/checklist/widgets/checklistlentidao.widget.dart';
-import 'package:seenet/checklist/widgets/checklistiptv.widget.dart';
-import 'package:seenet/checklist/widgets/checklistapps.widget.dart';
 import 'package:get/get.dart';
 
 class Checklistview extends StatelessWidget {
@@ -44,7 +41,6 @@ class Checklistview extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: Row(
-
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
@@ -120,33 +116,40 @@ class Checklistview extends StatelessWidget {
             top: 270, 
             left: 0,
             right: 0,
-            child: Column(
-              children: [
-                // Card 1 - Lentidão
-                ChecklistCategoriaCardWidget(
-                  title: 'Lentidão',
-                  assetIcon: 'assets/images/snail.png',
-                  onTap: () {
-                    Get.toNamed('/checklist/lentidao');
-                  },
-                ),
-                // Card 2 - IPTV
-                ChecklistCategoriaCardWidget(
-                  title: 'IPTV',
-                  assetIcon: 'assets/images/iptv.png',
-                  onTap: () {
-                    Get.toNamed('/checklist/iptv');
-                  },
-                ),
-                // Card 3 - Apps
-                ChecklistCategoriaCardWidget(
-                  title: 'Aplicativos',
-                  assetIcon: 'assets/images/apps.png',
-                  onTap: () {
-                    Get.toNamed('/checklist/apps');
-                  },
-                ),
-              ],
+            bottom: 0,
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Card 1 - Lentidão
+                  ChecklistCategoriaCardWidget(
+                    title: 'Lentidão',
+                    description: 'Problema de velocidade, latência alta, conexão instável',
+                    assetIcon: 'assets/images/snail.svg',
+                    onTap: () {
+                      Get.toNamed('/checklist/lentidao');
+                    },
+                  ),
+                  // Card 2 - IPTV
+                  ChecklistCategoriaCardWidget(
+                    title: 'IPTV',
+                    description: 'Travamento, buffering, canais fora do ar, qualidade baixa',
+                    assetIcon: 'assets/images/iptv.svg',
+                    onTap: () {
+                      Get.toNamed('/checklist/iptv');
+                    },
+                  ),
+                  // Card 3 - Apps
+                  ChecklistCategoriaCardWidget(
+                    title: 'Aplicativos',
+                    description: 'Apps não funcionam, erro de conexão, problemas de login',
+                    assetIcon: 'assets/images/app.svg',
+                    onTap: () {
+                      Get.toNamed('/checklist/apps');
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         ],

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:seenet/checklist/widgets/checklist_categoria_card.widget.dart';
-import 'package:seenet/checklist/widgets/checklistlentidao.widget.dart';
-import 'package:seenet/checklist/widgets/checklistiptv.widget.dart';
-import 'package:seenet/checklist/widgets/checklistapps.widget.dart';
 import 'package:get/get.dart';
 
 class Checklistview extends StatelessWidget {
@@ -125,7 +122,7 @@ class Checklistview extends StatelessWidget {
                 // Card 1 - Lentidão
                 ChecklistCategoriaCardWidget(
                   title: 'Lentidão',
-                  assetIcon: 'assets/images/snail.png',
+                  assetIcon: 'assets/images/snail.svg',
                   onTap: () {
                     Get.toNamed('/checklist/lentidao');
                   },
@@ -133,7 +130,7 @@ class Checklistview extends StatelessWidget {
                 // Card 2 - IPTV
                 ChecklistCategoriaCardWidget(
                   title: 'IPTV',
-                  assetIcon: 'assets/images/iptv.png',
+                  assetIcon: 'assets/images/iptv.svg',
                   onTap: () {
                     Get.toNamed('/checklist/iptv');
                   },
@@ -141,7 +138,7 @@ class Checklistview extends StatelessWidget {
                 // Card 3 - Apps
                 ChecklistCategoriaCardWidget(
                   title: 'Aplicativos',
-                  assetIcon: 'assets/images/apps.png',
+                  assetIcon: 'assets/images/apps.svg',
                   onTap: () {
                     Get.toNamed('/checklist/apps');
                   },

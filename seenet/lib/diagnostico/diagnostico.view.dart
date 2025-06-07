@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-
 
 class Diagnosticoview extends StatelessWidget {
   const Diagnosticoview({super.key});
@@ -10,7 +10,8 @@ class Diagnosticoview extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        backgroundColor: const Color.fromARGB(0, 255, 255, 255),
+        backgroundColor: const Color(0xFF6B7280),
+
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -38,78 +39,104 @@ class Diagnosticoview extends StatelessWidget {
         ),
         child: Column(
           children: [
-            const SizedBox(height: 24),
-            // Logo centralizada
+            const SizedBox(height: 1),
+            // Logo SVG centralizada
             Center(
               child: Container(
-                width: 160,
-                height: 160,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF00E87C), // Verde da logo
-                ),
-                child: Icon(
-                  Icons.eco_rounded, // Ícone similar à folha do print
-                  size: 140,
-                  color: Colors.black.withOpacity(0.01), // Deixe invisível, só para manter o espaço
+                width: 360,
+                height: 360,
+                padding: const EdgeInsets.all(1),
+                child: SvgPicture.asset(
+                  'assets/images/logo.svg',
+                  width: 160,
+                  height: 160,
+                  fit: BoxFit.contain,
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 1),
             // Título Diagnóstico
             Container(
               width: double.infinity,
-              color: Colors.grey[700],
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+              color: const Color(0xFF4A4A4A),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
               child: const Text(
                 'Diagnóstico',
                 style: TextStyle(
                   color: Colors.white70,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w500,
                   fontSize: 16,
                 ),
               ),
             ),
-            // Diagnóstico texto
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '1. “O problema provável é que o roteador não está atribuindo IPs automaticamente (falha no DHCP).”',
-                    style: TextStyle(color: Colors.white, fontSize: 15),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '2. “Pode ser uma falha no serviço DHCP ou problema na conexão com a WAN.”',
-                    style: TextStyle(color: Colors.white, fontSize: 15),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '3. “Verifique se o cabo de entrada da operadora está corretamente conectado e reinicie o roteador. Caso o erro persista, configure IP manualmente como solução temporária.”',
-                    style: TextStyle(color: Colors.white, fontSize: 15),
-                  ),
-                ],
+            // Área de diagnóstico vazia (como no print)
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                color: const Color(0xFF2A2A2A),
+                padding: const EdgeInsets.all(16),
+                child: const SizedBox(), // Área vazia como no print
               ),
             ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Pergunte alguma coisa',
-                  hintStyle: const TextStyle(color: Colors.white54),
-                  filled: true,
-                  fillColor: const Color(0xFF232323),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+            // Campo de input na parte inferior
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3A3A3A),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: const TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Pergunte alguma coisa',
+                          hintStyle: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 16,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 20,
+                          ),
+                        ),
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                ),
-                style: const TextStyle(color: Colors.white),
+                  const SizedBox(width: 12),
+                  // Ícone do microfone
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF3A3A3A),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.mic,
+                      color: Colors.white70,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Ícone de envio
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF3A3A3A),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.send,
+                      color: Colors.white70,
+                      size: 24,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

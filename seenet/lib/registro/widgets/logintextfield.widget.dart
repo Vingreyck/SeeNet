@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:seenet/registro/registroview.controller.dart';
 
-class LoginTextField extends StatelessWidget {
+class LoginTextField extends GetView<RegistroController> {
   const LoginTextField({super.key});
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller.emailInput,
       decoration: InputDecoration(
         hintText: 'Usuário ou Email',
         border: OutlineInputBorder( 

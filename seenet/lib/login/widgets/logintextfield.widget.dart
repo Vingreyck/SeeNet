@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:seenet/login/loginview.controller.dart';
+import 'package:get/get.dart';
 
-class LoginTextField extends StatelessWidget {
+class LoginTextField extends GetView<LoginController> {
   const LoginTextField({super.key});
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller.loginInput,
       decoration: InputDecoration(
         hintText: 'Usuário ou Email',
         border: OutlineInputBorder( 

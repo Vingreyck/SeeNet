@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/get.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -16,10 +16,8 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     // Timer para navegar para a próxima tela após 1 segundo
     Timer(const Duration(seconds: 1), () {
-      // Navega para a tela de login
-      Navigator.of(context).pushReplacementNamed('/login');
-      // Se estiver usando Get:
-      // Get.offNamed('/login');
+      // Navega para a tela de login usando Get
+      Get.offNamed('/login');
     });
   }
 
@@ -39,7 +37,7 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Align(
             alignment: Alignment.topCenter,
             child: Padding(
-              padding: EdgeInsets.only(top: 140), // distância do topo
+              padding: const EdgeInsets.only(top: 140), // distância do topo
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -49,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     width: 100,
                     height: 100,
                   ),
-                  SizedBox(width: 0),
+                  const SizedBox(width: 0),
                   const Text(
                     'SeeNet',
                     style: TextStyle(

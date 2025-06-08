@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/get.dart';
 import 'widgets/logarbutton.widget.dart';
 import 'widgets/recuperarbutton.widget.dart';
 import 'widgets/logintextfield.widget.dart';
 import 'widgets/senhatextfield.dart';
 import 'widgets/registrarbutton.widget.dart';
+import 'loginview.controller.dart';
 
-class LoginView extends StatelessWidget {
+class LoginView extends GetView<LoginController> {
   const LoginView({super.key});
 
   @override

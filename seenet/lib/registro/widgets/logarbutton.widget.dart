@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:seenet/registro/registroview.controller.dart';
 
-class LogarButton extends StatelessWidget {
+class LogarButton extends GetView<RegistroController>{
   const LogarButton({super.key});
 
   @override
@@ -16,7 +17,7 @@ class LogarButton extends StatelessWidget {
         ),
       ),
       onPressed: () {
-        Get.toNamed('/checklist');
+        controller.tryToRegister();
       },
       child: const Text('Entrar',
         style: TextStyle(

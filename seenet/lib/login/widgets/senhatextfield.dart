@@ -1,24 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:seenet/login/loginview.controller.dart';
 
-class SenhaTextField extends StatefulWidget {
+class SenhaTextField extends GetView<LoginController> {
   const SenhaTextField({super.key});
-
-  @override
-  State<SenhaTextField> createState() => _SenhaTextFieldState();
-}
-
-class _SenhaTextFieldState extends State<SenhaTextField> {
-  bool _obscureText = true;
-
-  void _toggleVisibility() {
-    setState(() {
-      _obscureText = !_obscureText;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller.senhaInput,
       obscureText: _obscureText,
       decoration: InputDecoration(
         hintText: 'Senha',
@@ -43,3 +33,10 @@ class _SenhaTextFieldState extends State<SenhaTextField> {
     );
   }
 }
+bool _obscureText = true;
+void _toggleVisibility() {
+  _obscureText = !_obscureText;
+  // Update the state to reflect the change in visibility
+  Get.forceAppUpdate();
+}
+

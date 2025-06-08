@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:seenet/login/loginview.controller.dart';
 
-
-class LogarButton extends StatelessWidget {
+class LogarButton extends GetView<LoginController> {
   const LogarButton({super.key});
 
   @override
@@ -17,7 +17,9 @@ class LogarButton extends StatelessWidget {
         ),
       ),
       onPressed: () {
-        Get.toNamed('/checklist');
+        controller.tryToLogin(
+          
+        );
       },
       child: const Text(
         'Entrar',

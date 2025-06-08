@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:seenet/login/loginview.controller.dart';
 
-class RegistrarButton extends StatelessWidget {
+class RegistrarButton extends GetView<LoginController> {
   const RegistrarButton({super.key});
 
   @override
@@ -9,8 +10,7 @@ class RegistrarButton extends StatelessWidget {
     return Center(
       child: GestureDetector(
         onTap: () {
-          // ação ao tocar no texto 
-          Get.toNamed('/registro');
+          controller.registrar(); // Chama o método de registro do controller
         },
         child: const Text(
           'Registre-se',

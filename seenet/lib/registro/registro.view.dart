@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/get.dart';
 import 'widgets/loginbutton.widget.dart';
 import 'widgets/nometextfield.dart';
 import 'widgets/logintextfield.widget.dart';
 import 'widgets/senhatextfield.dart';
 import 'widgets/logarbutton.widget.dart';
+import 'registroview.controller.dart';
 
-
-class RegistrarView extends StatelessWidget {
+class RegistrarView extends GetView<RegistroController> {
   const RegistrarView({super.key});
 
   @override

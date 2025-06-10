@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:seenet/checklist/widgets/checklist_categoria_card.widget.dart';
 import 'package:get/get.dart';
+import 'package:seenet/checklist/widgets/checklist_categoria_card.widget.dart';
+import 'checklistview.controller.dart';
 
-class Checklistview extends StatelessWidget {
-  const Checklistview({super.key});
+class ChecklistView extends StatelessWidget {
+  const ChecklistView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.put(ChecklistViewController());
+
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
@@ -117,38 +120,21 @@ class Checklistview extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: 0,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Card 1 - Lentidão
-                  ChecklistCategoriaCardWidget(
-                    title: 'Lentidão',
-                    description: 'Problema de velocidade, latência alta, conexão instável',
-                    assetIcon: 'assets/images/snail.svg',
-                    onTap: () {
-                      Get.toNamed('/checklist/lentidao');
-                    },
-                  ),
-                  // Card 2 - IPTV
-                  ChecklistCategoriaCardWidget(
-                    title: 'IPTV',
-                    description: 'Travamento, buffering, canais fora do ar, qualidade baixa',
-                    assetIcon: 'assets/images/iptv.svg',
-                    onTap: () {
-                      Get.toNamed('/checklist/iptv');
-                    },
-                  ),
-                  // Card 3 - Apps
-                  ChecklistCategoriaCardWidget(
-                    title: 'Aplicativos',
-                    description: 'Apps não funcionam, erro de conexão, problemas de login',
-                    assetIcon: 'assets/images/app.svg',
-                    onTap: () {
-                      Get.toNamed('/checklist/apps');
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                ],
+            child: Obx(
+              () => SingleChildScrollView(
+                child: Column(
+                  children: [
+                    ...controller.categories.map(
+                      (cat) => ChecklistCategoriaCardWidget(
+                        title: cat.title,
+                        description: cat.description,
+                        assetIcon: cat.assetIcon,
+                        onTap: () => Get.toNamed(cat.route),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
           ),

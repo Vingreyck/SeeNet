@@ -89,7 +89,7 @@ class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
             ),
           ),
           const Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: CheckmarkEnviarWidget(),
           ),
         ],

@@ -84,22 +84,22 @@ class LoginView extends GetView<LoginController> {
           LogarButton(),
           SizedBox(height: 20),
                     Row(
-            children: const [
-              Expanded(
+            children: [
+              const Expanded(
                 child: Divider(
                   color: Colors.white,
                   thickness: 1,
                   endIndent: 10,
                 ),
               ),
-              Text(
+              const Text(
                 'ou',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Expanded(
+              const Expanded(
                 child: Divider(
                   color: Colors.white,
                   thickness: 1,
@@ -113,7 +113,7 @@ class LoginView extends GetView<LoginController> {
                     Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
+              Text(
                 'Ainda não tem uma conta?',
                 style: TextStyle(
                   color: Colors.white,

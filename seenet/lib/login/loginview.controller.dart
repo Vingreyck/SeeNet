@@ -1,17 +1,24 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:seenet/checklist/checklist.view.dart';
+import 'package:seenet/models/user.model.dart';
 
 class LoginController extends GetxController {
   TextEditingController loginInput = TextEditingController();
   TextEditingController senhaInput = TextEditingController();
-  String login = 'admin@admin.com';
-  String password = 'admin123';
+
+  final RxList<User> userList = RxList();
+
+  @override
+  void onInit() {
+    super.onInit();
+
+  userList.add(User('teste@gmail.com', 'senha123'));
+  userList.add(User('admin@admin.com', 'admin123'));
+  }
 
   void tryToLogin() {
-    if (loginInput.text == login) {
-      checkPassoword();
-    } else if (loginInput.text == '') {
+    if (loginInput.text.isEmpty) {
       Get.snackbar(
         'Erro',
         'Usuário não pode ser vazio',
@@ -19,32 +26,27 @@ class LoginController extends GetxController {
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-    } else {
-      Get.snackbar(
-        'Erro',
-        'Usuário incorreto',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      return;
     }
-  }
-  void checkPassoword() {
-    if (senhaInput.text == password) {
-      Get.offAllNamed('/checklist'); // impede voltar para login
-    } else {
-      Get.snackbar(
-        'Erro',
-        'Senha incorreta',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+
+    for (var user in userList) {
+      if (user.email == loginInput.text && user.password == senhaInput.text) {
+        Get.offAllNamed('/checklist');
+        return;
+      }
     }
+
+    Get.snackbar(
+      'Erro',
+      'Usuário ou senha incorretos',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
   }
 
   void entrar(){
-    Get.to(const Checklistview());
+    Get.to(const ChecklistView());
   }
 
   void registrar(){

@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:seenet/checklist/checklist.view.dart';
 
+
 class RegistroController extends GetxController {
   TextEditingController nomeInput = TextEditingController();
   TextEditingController emailInput = TextEditingController();
@@ -45,7 +46,7 @@ class RegistroController extends GetxController {
   }
 
   void entrar() {
-    Get.to(const Checklistview());
+    Get.to(const ChecklistView());
   }
 
   void login() {

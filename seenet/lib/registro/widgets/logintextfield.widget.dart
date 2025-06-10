@@ -13,12 +13,12 @@ class LoginTextField extends GetView<RegistroController> {
         hintText: 'Usuário ou Email',
         border: OutlineInputBorder( 
           borderRadius: BorderRadius.circular(100),
-          borderSide: BorderSide(
+          borderSide: const BorderSide(
             color: Colors.white70,
             width: 1.0,
           ),
         ),
-        prefixIcon: Icon(Icons.person),
+        prefixIcon: const Icon(Icons.person),
         filled: true,
         fillColor: Colors.white70,
 

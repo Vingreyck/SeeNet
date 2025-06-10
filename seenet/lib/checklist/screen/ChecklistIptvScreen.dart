@@ -89,7 +89,7 @@ class _ChecklistIptvScreenState extends State<ChecklistIptvScreen> {
             ),
           ),
           const Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: CheckmarkEnviarWidget(),
           ),
         ],

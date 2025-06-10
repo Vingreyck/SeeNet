@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'diagnosticoview.controller.dart';
 
 class Diagnosticoview extends StatelessWidget {
   const Diagnosticoview({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.put(DiagnosticoviewController());
+
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
         backgroundColor: const Color(0xFF6B7280),
-
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -40,7 +42,6 @@ class Diagnosticoview extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 1),
-            // Logo SVG centralizada
             Center(
               child: Container(
                 width: 360,
@@ -55,7 +56,6 @@ class Diagnosticoview extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 1),
-            // Título Diagnóstico
             Container(
               width: double.infinity,
               color: const Color(0xFF4A4A4A),
@@ -69,16 +69,14 @@ class Diagnosticoview extends StatelessWidget {
                 ),
               ),
             ),
-            // Área de diagnóstico vazia (como no print)
             Expanded(
               child: Container(
                 width: double.infinity,
                 color: const Color(0xFF2A2A2A),
                 padding: const EdgeInsets.all(16),
-                child: const SizedBox(), // Área vazia como no print
+                child: const SizedBox(),
               ),
             ),
-            // Campo de input na parte inferior
             Container(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -107,7 +105,6 @@ class Diagnosticoview extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // Ícone do microfone
                   Container(
                     width: 48,
                     height: 48,
@@ -122,7 +119,6 @@ class Diagnosticoview extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Ícone de envio
                   Container(
                     width: 48,
                     height: 48,

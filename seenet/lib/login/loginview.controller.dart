@@ -12,7 +12,7 @@ class LoginController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-
+  
   userList.add(User('teste@gmail.com', 'senha123'));
   userList.add(User('admin@admin.com', 'admin123'));
   }

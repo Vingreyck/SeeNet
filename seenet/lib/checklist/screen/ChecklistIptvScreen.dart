@@ -12,21 +12,39 @@ class ChecklistIptvScreen extends StatefulWidget {
 
 class _ChecklistIptvScreenState extends State<ChecklistIptvScreen> {
   // Lista para controlar o estado dos checkboxes
-  List<bool> checkStates = List.generate(10, (index) => false);
+  List<bool> checkStates = List.generate(24, (index) => false);
 
-  // Lista dos problemas de IPTV
-  final List<String> problemas = [
-    'Canais travando/congelando',
-    'Buffering constante',
-    'Canal fora do ar',
-    'Qualidade fraca',
-    'Error code: xxxxx',
-    'IPTV não abre',
-    'Erro de autenticação',
-    'Velocidade abaixo do contratado',
-    'Problema de DNS',
-    'Configuração incorreta',
-  ];
+final List<String> problemas = [
+  // Problemas de streaming
+  'Canais travando/congelando',
+  'Buffering constante',
+  'Canal fora do ar',
+  'Qualidade fraca',
+  'Imagem pixelizada',
+  'Áudio dessincronizado',
+  'Tela preta',
+  'Sem áudio',
+  'Áudio cortando',
+  
+  // Problemas técnicos
+  'Error code: xxxxx',
+  'IPTV não abre',
+  'Erro de autenticação',
+  'Problema de DNS', // MOVIDO de configuração
+  'Configuração incorreta', // MOVIDO de configuração
+  'Lista de canais desatualizada',
+  'EPG não carrega',
+  'Aplicativo travando',
+  'Aplicativo não instala',
+  'Memória insuficiente no dispositivo',
+  'Codec não suportado',
+  
+  // Problemas de rede específicos para IPTV
+  'Multicast não funcionando',
+  'IGMP com problema',
+  'QoS mal configurado',
+  'Largura de banda insuficiente',
+];
 
   @override
   Widget build(BuildContext context) {

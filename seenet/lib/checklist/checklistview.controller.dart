@@ -17,10 +17,10 @@ class ChecklistCategory {
 class ChecklistViewController extends GetxController {
   final categories = <ChecklistCategory>[
     ChecklistCategory(
-      title: 'Lentidão',
-      description: 'Problema de velocidade, latência alta, conexão instável',
-      assetIcon: 'assets/images/snail.svg',
-      route: '/checklist/lentidao',
+      title: 'Manutenção e Reparo',
+      description: 'Problemas de conexão, lentidão, quedas, e reparos',
+      assetIcon: 'assets/images/repair.svg',
+      route: '/checklist/manutencao',
     ),
     ChecklistCategory(
       title: 'IPTV',
@@ -29,10 +29,10 @@ class ChecklistViewController extends GetxController {
       route: '/checklist/iptv',
     ),
     ChecklistCategory(
-      title: 'Aplicativos',
-      description: 'Apps não funcionam, erro de conexão, problemas de login',
+      title: 'Instalação e Aplicativos',
+      description: 'Configuração de roteadores, aplicativos, e configuração',
       assetIcon: 'assets/images/app.svg',
-      route: '/checklist/apps',
+      route: '/checklist/conf',
     ),
   ].obs;
 }

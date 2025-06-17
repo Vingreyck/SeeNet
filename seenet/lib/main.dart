@@ -47,6 +47,22 @@ class MyApp extends StatelessWidget {
           page: () => const RegistrarView(),
           binding: RegistroBindings(),
         ),
+        GetPage(
+          name: '/checklist/apps',
+          page: () => const ChecklistAppsScreen(),
+        ),
+        GetPage(
+          name: '/checklist/iptv',
+          page: () => const ChecklistIptvScreen(),
+        ),
+        GetPage(
+          name: '/checklist/lentidao',
+          page: () => const ChecklistLentidaoScreen(),
+        ),
+        GetPage(
+          name: '/diagnostico',
+          page: () => const Diagnosticoview(),
+        ),
       ],
     );
   }

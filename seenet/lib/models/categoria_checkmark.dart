@@ -1,4 +1,3 @@
-// lib/models/categoria_checkmark.dart
 class CategoriaCheckmark {
   final int? id;
   final String nome;

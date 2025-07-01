@@ -1,53 +1,92 @@
+// lib/login/loginview.controller.dart
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-import 'package:seenet/checklist/checklist.view.dart';
+import '../controllers/usuario_controller.dart';
 
 class LoginController extends GetxController {
   TextEditingController loginInput = TextEditingController();
   TextEditingController senhaInput = TextEditingController();
-  String login = 'admin@admin.com';
-  String password = 'admin123';
+  
+  RxBool isLoading = false.obs;
+  
+  // Instância do UsuarioController
+  final UsuarioController usuarioController = Get.find<UsuarioController>();
 
-  void tryToLogin() {
-    if (loginInput.text == login) {
-      checkPassoword();
-    } else if (loginInput.text == '') {
+  Future<void> tryToLogin() async {
+    // Validações
+    if (loginInput.text.isEmpty) {
       Get.snackbar(
         'Erro',
-        'Usuário não pode ser vazio',
+        'Email não pode ser vazio',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-    } else {
+      return;
+    }
+
+    if (senhaInput.text.isEmpty) {
       Get.snackbar(
         'Erro',
-        'Usuário incorreto',
+        'Senha não pode ser vazia',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+      
+      // Tentar fazer login no banco
+      bool loginSucesso = await usuarioController.login(
+        loginInput.text.trim(),
+        senhaInput.text
+      );
+
+      if (loginSucesso) {
+        Get.snackbar(
+          'Sucesso',
+          'Login realizado com sucesso!',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+        
+        // Navegar para checklist
+        Get.offAllNamed('/checklist');
+      } else {
+        Get.snackbar(
+          'Erro',
+          'Email ou senha incorretos',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Erro',
+        'Erro ao conectar com servidor',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      print('❌ Erro no login: $e');
+    } finally {
+      isLoading.value = false;
     }
   }
-  void checkPassoword() {
-    if (senhaInput.text == password) {
-      Get.offAllNamed('/checklist'); // impede voltar para login
-    } else {
-      Get.snackbar(
-        'Erro',
-        'Senha incorreta',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    }
-  }
 
-  void entrar(){
-    Get.to(const Checklistview());
-  }
-
-  void registrar(){
+  void registrar() {
     Get.toNamed('/registro');
+  }
+
+  @override
+  void onClose() {
+    loginInput.dispose();
+    senhaInput.dispose();
+    super.onClose();
   }
 }

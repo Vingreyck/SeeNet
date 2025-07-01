@@ -1,3 +1,4 @@
+// lib/main.dart - VERSÃO ATUALIZADA
 import 'package:flutter/material.dart';
 import 'package:seenet/checklist/screen/ChecklistAppsScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistIptvScreen.dart';
@@ -11,7 +12,19 @@ import 'package:seenet/checklist/checklist.view.dart';
 import 'package:seenet/diagnostico/diagnostico.view.dart';
 import 'package:seenet/registro/widgets/registro.bindings.dart';
 
-void main() {
+// Importar controllers
+import 'controllers/usuario_controller.dart';
+import 'controllers/checkmark_controller.dart';
+import 'controllers/diagnostico_controller.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializar controllers globais
+  Get.put(UsuarioController(), permanent: true);
+  Get.put(CheckmarkController(), permanent: true);
+  Get.put(DiagnosticoController(), permanent: true);
+  
   runApp(const MyApp());
 }
 
@@ -21,12 +34,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      initialBinding: LoginBindings(),
-      
       debugShowCheckedModeBanner: false,
       title: 'SeeNet',
       theme: ThemeData(
         primarySwatch: Colors.green,
+        useMaterial3: true,
       ),
       initialRoute: '/splash',
       getPages: [
@@ -37,6 +49,7 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/login',
           page: () => const LoginView(),
+          binding: LoginBindings(),
         ),
         GetPage(
           name: '/checklist',

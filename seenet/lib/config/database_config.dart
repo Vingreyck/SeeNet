@@ -1,15 +1,15 @@
-// lib/config/database_config.dart
+// lib/config/database_config.dart - CONFIGURAÇÃO REAL
 class DatabaseConfig {
-  // Configuração LOCAL (desenvolvimento)
+  // Configuração para desenvolvimento local
   static const bool isProduction = false;
   
-  // Configurações locais
-  static const String localHost = '127.0.0.1';
-  static const String localUsername = 'root';
-  static const String localPassword = '12345678';
+  // Configurações locais (ajuste conforme seu setup)
+  static const String localHost = '127.0.0.1';  // ou 'localhost'
+  static const String localUsername = 'root';    // seu usuário MySQL
+  static const String localPassword = '12345678'; // sua senha MySQL (ajuste aqui)
   
   // Configurações do servidor (para quando subir)
-  static const String serverHost = 'IP_DO_SERVIDOR_AQUI'; // Trocar pelo IP real
+  static const String serverHost = 'IP_DO_SERVIDOR_AQUI';
   static const String serverUsername = 'flutter_user';
   static const String serverPassword = '1524Br101';
   

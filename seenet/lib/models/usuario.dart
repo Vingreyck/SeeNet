@@ -19,6 +19,7 @@ class Usuario {
     this.dataCriacao,
     this.dataAtualizacao,
   });
+  bool get isAdmin => tipoUsuario.toLowerCase() == 'admin';
 
   // Converter para Map (para salvar no banco)
   Map<String, dynamic> toMap() {
@@ -34,6 +35,7 @@ class Usuario {
     };
   }
 
+  // ↓ ESTE MÉTODO ESTAVA FALTANDO NO SEU CÓDIGO ↓
   // Converter do Map (para ler do banco)
   factory Usuario.fromMap(Map<String, dynamic> map) {
     return Usuario(
@@ -52,9 +54,5 @@ class Usuario {
     );
   }
 
-  // Verificar se é administrador
-  bool get isAdmin => tipoUsuario == 'administrador';
-  
-  // Verificar se é técnico
-  bool get isTecnico => tipoUsuario == 'tecnico';
-}
+    // Verificar se é administrador
+  }

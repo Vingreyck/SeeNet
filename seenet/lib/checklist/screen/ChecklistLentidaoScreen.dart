@@ -1,7 +1,10 @@
+// lib/checklist/screen/ChecklistLentidaoScreen.dart - ATUALIZADA
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:seenet/checklist/widgets/checklistlentidao.widget.dart';
 import 'package:seenet/checklist/widgets/checkmark_enviar.widget.dart';
+import '../../controllers/checkmark_controller.dart';
+import '../../controllers/usuario_controller.dart';
 
 class ChecklistLentidaoScreen extends StatefulWidget {
   const ChecklistLentidaoScreen({super.key});
@@ -11,22 +14,27 @@ class ChecklistLentidaoScreen extends StatefulWidget {
 }
 
 class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
-  // Lista para controlar o estado dos checkboxes
-  List<bool> checkStates = List.generate(10, (index) => false);
+  final CheckmarkController checkmarkController = Get.put(CheckmarkController());
+  final UsuarioController usuarioController = Get.find<UsuarioController>();
 
-  // Lista dos problemas de lentidão
-  final List<String> problemas = [
-    'Velocidade abaixo do contratado',
-    'Latência alta (ping > 100ms)',
-    'Perda de pacotes',
-    'Wi-fi com sinal fraco',
-    'Problema no cabo',
-    'Roteador com defeito',
-    'Muitos dispositivos conectados',
-    'Interferência eletromagnética',
-    'Configuração incorreta',
-    'Problema na operadora',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _inicializarDados();
+  }
+
+  void _inicializarDados() async {
+    // Carregar checkmarks da categoria Lentidão (ID = 1)
+    await checkmarkController.carregarCheckmarks(1);
+    
+    // Iniciar nova avaliação
+    if (usuarioController.usuarioLogado.value != null) {
+      await checkmarkController.iniciarAvaliacao(
+        usuarioController.usuarioLogado.value!.id!,
+        'Diagnóstico - Lentidão'
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,30 +78,77 @@ class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
               ],
             ),
           ),
-          // Lista de checkboxes
+          // Lista de checkboxes dinâmica do banco
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              itemCount: problemas.length,
-              itemBuilder: (context, index) {
-                return ChecklistLentidaoWidget(
-                  title: problemas[index],
-                  isChecked: checkStates[index],
-                  onChanged: (value) {
-                    setState(() {
-                      checkStates[index] = value ?? false;
-                    });
-                  },
-                );
-              },
+            child: Column(
+              children: [
+                Expanded(
+                  child: Obx(() {
+                    if (checkmarkController.checkmarksAtivos.isEmpty) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF00FF88),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      itemCount: checkmarkController.checkmarksAtivos.length,
+                      itemBuilder: (context, index) {
+                        final checkmark = checkmarkController.checkmarksAtivos[index];
+                        
+                        return Obx(() => ChecklistLentidaoWidget(
+                          title: checkmark.titulo,
+                          isChecked: checkmarkController.respostas[checkmark.id] ?? false,
+                          onChanged: (value) {
+                            checkmarkController.toggleCheckmark(checkmark.id!, value ?? false);
+                          },
+                        ));
+                      },
+                    );
+                  }),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: CheckmarkEnviarWidget(
+                    onPressed: _enviarDiagnostico,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: CheckmarkEnviarWidget(),
           ),
         ],
       ),
     );
+  }
+
+  void _enviarDiagnostico() async {
+    // Salvar respostas
+    bool salvou = await checkmarkController.salvarRespostas();
+    
+    if (salvou) {
+      // Finalizar avaliação
+      await checkmarkController.finalizarAvaliacao();
+      
+      Get.snackbar(
+        'Sucesso',
+        'Respostas salvas! Gerando diagnóstico...',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+      
+      // Navegar para diagnóstico
+      Get.toNamed('/diagnostico');
+    } else {
+      Get.snackbar(
+        'Erro',
+        'Erro ao salvar respostas',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 }

@@ -1,0 +1,181 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\usuario.dart||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lib\\models\\usuario.dart||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\main.dart||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lib\\main.dart||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\controllers\\checkmark_controller.dart||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lib\\controllers\\checkmark_controller.dart||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\diagnostico.dart||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lib\\models\\diagnostico.dart||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\checkmark.dart||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lib\\models\\checkmark.dart||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\avaliacao.dart||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lib\\models\\avaliacao.dart||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\resposta_checkmark.dart||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lib\\models\\resposta_checkmark.dart||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\categoria_checkmark.dart||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lib\\models\\categoria_checkmark.dart||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\log_sistema.dart||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lib\\models\\log_sistema.dart||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\checklist\\checklist.view.dart||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:lib\\checklist\\checklist.view.dart||{8B382828-6202-11D1-8870-0000F87579D2}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 5,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "main.dart",
+              "DocumentMoniker": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\main.dart",
+              "RelativeDocumentMoniker": "lib\\main.dart",
+              "ToolTip": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\main.dart",
+              "RelativeToolTip": "lib\\main.dart",
+              "ViewState": "AgIAABIAAAAAAAAAAAAAACMAAAAlAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-23T20:29:31.342Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "checkmark_controller.dart",
+              "DocumentMoniker": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\controllers\\checkmark_controller.dart",
+              "RelativeDocumentMoniker": "lib\\controllers\\checkmark_controller.dart",
+              "ToolTip": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\controllers\\checkmark_controller.dart",
+              "RelativeToolTip": "lib\\controllers\\checkmark_controller.dart",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAwwCUAAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-23T20:23:01.927Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "categoria_checkmark.dart",
+              "DocumentMoniker": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\categoria_checkmark.dart",
+              "RelativeDocumentMoniker": "lib\\models\\categoria_checkmark.dart",
+              "ToolTip": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\categoria_checkmark.dart",
+              "RelativeToolTip": "lib\\models\\categoria_checkmark.dart",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACgAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-23T20:21:44.47Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "checkmark.dart",
+              "DocumentMoniker": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\checkmark.dart",
+              "RelativeDocumentMoniker": "lib\\models\\checkmark.dart",
+              "ToolTip": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\checkmark.dart",
+              "RelativeToolTip": "lib\\models\\checkmark.dart",
+              "ViewState": "AgIAAAYAAAAAAAAAAAAwwCEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-23T20:19:31.691Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "resposta_checkmark.dart",
+              "DocumentMoniker": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\resposta_checkmark.dart",
+              "RelativeDocumentMoniker": "lib\\models\\resposta_checkmark.dart",
+              "ToolTip": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\resposta_checkmark.dart",
+              "RelativeToolTip": "lib\\models\\resposta_checkmark.dart",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABwAAAA/AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-23T20:14:31.013Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "usuario.dart",
+              "DocumentMoniker": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\usuario.dart",
+              "RelativeDocumentMoniker": "lib\\models\\usuario.dart",
+              "ToolTip": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\usuario.dart",
+              "RelativeToolTip": "lib\\models\\usuario.dart",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACwAAAA0AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-23T20:21:19.65Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "avaliacao.dart",
+              "DocumentMoniker": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\avaliacao.dart",
+              "RelativeDocumentMoniker": "lib\\models\\avaliacao.dart",
+              "ToolTip": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\avaliacao.dart",
+              "RelativeToolTip": "lib\\models\\avaliacao.dart",
+              "ViewState": "AgIAABYAAAAAAAAAAAAwwEAAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-23T20:21:18.407Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "diagnostico.dart",
+              "DocumentMoniker": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\diagnostico.dart",
+              "RelativeDocumentMoniker": "lib\\models\\diagnostico.dart",
+              "ToolTip": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\diagnostico.dart",
+              "RelativeToolTip": "lib\\models\\diagnostico.dart",
+              "ViewState": "AgIAABcAAAAAAAAAAAAwwEEAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-23T20:21:16.552Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "log_sistema.dart",
+              "DocumentMoniker": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\log_sistema.dart",
+              "RelativeDocumentMoniker": "lib\\models\\log_sistema.dart",
+              "ToolTip": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\models\\log_sistema.dart",
+              "RelativeToolTip": "lib\\models\\log_sistema.dart",
+              "ViewState": "AgIAAA4AAAAAAAAAAAAwwDgAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-23T20:21:13.482Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "checklist.view.dart",
+              "DocumentMoniker": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\checklist\\checklist.view.dart",
+              "RelativeDocumentMoniker": "lib\\checklist\\checklist.view.dart",
+              "ToolTip": "C:\\Users\\Vinicius\\Documents\\Estudos\\SeeNet\\seenet\\lib\\checklist\\checklist.view.dart",
+              "RelativeToolTip": "lib\\checklist\\checklist.view.dart",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAAAAoAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-23T18:53:51.304Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

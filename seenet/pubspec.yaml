@@ -1,5 +1,5 @@
 name: seenet
-description: SeeNet Flutter App
+description: SeeNet Flutter App - Mobile Only
 
 publish_to: 'none'
 
@@ -14,11 +14,21 @@ dependencies:
   cupertino_icons: ^1.0.2
   flutter_svg: ^2.0.10
   get: ^4.7.2
-  google_sign_in: ^6.2.1
-  firebase_auth: ^4.17.8
-  firebase_core: ^2.30.0
-  mysql1: ^0.20.0 
   
+  # Banco de dados SQLite para mobile
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  
+  # HTTP para ChatGPT
+  http: ^1.1.0
+  
+  # Criptografia para senhas
+  crypto: ^3.0.3
+  
+  # Firebase (comentado - use se necessário)
+  # google_sign_in: ^6.2.1
+  # firebase_auth: ^4.17.8
+  # firebase_core: ^2.30.0
 
 dev_dependencies:
   flutter_test:

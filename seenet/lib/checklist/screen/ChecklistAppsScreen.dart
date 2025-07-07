@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:seenet/checklist/widgets/checklistapps.widget.dart';
 import 'package:seenet/checklist/widgets/checkmark_enviar.widget.dart';
+import '../../controllers/checkmark_controller.dart';
+import '../../controllers/usuario_controller.dart';
 
 class ChecklistAppsScreen extends StatefulWidget {
   const ChecklistAppsScreen({super.key});
@@ -11,22 +13,27 @@ class ChecklistAppsScreen extends StatefulWidget {
 }
 
 class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
-  // Lista para controlar o estado dos checkboxes
-  List<bool> checkStates = List.generate(10, (index) => false);
+  final CheckmarkController checkmarkController = Get.put(CheckmarkController());
+  final UsuarioController usuarioController = Get.find<UsuarioController>();
 
-  // Lista dos problemas de Aplicativos
-  final List<String> problemas = [
-    'Aplicativo não abre',
-    'Erro de conexão',
-    'Problema de login',
-    'Buffering constante',
-    'Qualidade fraca',
-    'Error code: xxxxx',
-    'Falha na autenticação',
-    'Velocidade abaixo do contratado',
-    'App trava constantemente',
-    'Configuração incorreta',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _inicializarDados();
+  }
+
+  void _inicializarDados() async {
+    // Carregar checkmarks da categoria Apps (ID = 3, ajuste se necessário)
+    await checkmarkController.carregarCheckmarks(3);
+
+    // Iniciar nova avaliação
+    if (usuarioController.usuarioLogado.value != null) {
+      await checkmarkController.iniciarAvaliacao(
+        usuarioController.usuarioLogado.value!.id!,
+        'Diagnóstico - Aplicativos'
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,30 +77,42 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
               ],
             ),
           ),
-          // Lista de checkboxes
+          // Lista de checkboxes dinâmica do banco
           Expanded(
             child: Column(
               children: [
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                    itemCount: problemas.length,
-                    itemBuilder: (context, index) {
-                      return ChecklistAppsWidget(
-                        title: problemas[index],
-                        isChecked: checkStates[index],
-                        onChanged: (value) {
-                          setState(() {
-                            checkStates[index] = value ?? false;
-                          });
-                        },
+                  child: Obx(() {
+                    if (checkmarkController.checkmarksAtivos.isEmpty) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF00FF88),
+                        ),
                       );
-                    },
-                  ),
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      itemCount: checkmarkController.checkmarksAtivos.length,
+                      itemBuilder: (context, index) {
+                        final checkmark = checkmarkController.checkmarksAtivos[index];
+
+                        return Obx(() => ChecklistAppsWidget(
+                          title: checkmark.titulo,
+                          isChecked: checkmarkController.respostas[checkmark.id] ?? false,
+                          onChanged: (value) {
+                            checkmarkController.toggleCheckmark(checkmark.id!, value ?? false);
+                          },
+                        ));
+                      },
+                    );
+                  }),
                 ),
-                const Padding(
+                Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  child: CheckmarkEnviarWidget(),
+                  child: CheckmarkEnviarWidget(
+                    onPressed: _enviarDiagnostico,
+                  ),
                 ),
               ],
             ),
@@ -101,5 +120,34 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
         ],
       ),
     );
+  }
+
+  void _enviarDiagnostico() async {
+    // Salvar respostas
+    bool salvou = await checkmarkController.salvarRespostas();
+
+    if (salvou) {
+      // Finalizar avaliação
+      await checkmarkController.finalizarAvaliacao();
+
+      Get.snackbar(
+        'Sucesso',
+        'Respostas salvas! Gerando diagnóstico...',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+
+      // Navegar para diagnóstico
+      Get.toNamed('/diagnostico');
+    } else {
+      Get.snackbar(
+        'Erro',
+        'Erro ao salvar respostas',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 }

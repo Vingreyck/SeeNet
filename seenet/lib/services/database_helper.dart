@@ -366,7 +366,219 @@ class DatabaseHelper {
       return false;
     }
   }
+// Adicione este método no seu DatabaseHelper para corrigir o admin
+// lib/services/database_helper.dart
 
+// ========== MÉTODO PARA CORRIGIR ADMIN ==========
+Future<void> corrigirUsuarioAdmin() async {
+  try {
+    final db = await database;
+    
+    // Atualizar o usuário admin para ter tipo correto
+    await db.update(
+      'usuarios',
+      {'tipo_usuario': 'administrador'},
+      where: 'email = ?',
+      whereArgs: ['admin@seenet.com'],
+    );
+    
+    print('✅ Usuário admin corrigido para tipo "administrador"');
+    
+    // Verificar se funcionou
+    List<Map<String, dynamic>> results = await db.query(
+      'usuarios',
+      where: 'email = ?',
+      whereArgs: ['admin@seenet.com'],
+    );
+    
+    if (results.isNotEmpty) {
+      var user = results.first;
+      print('📊 Admin verificado:');
+      print('   Email: ${user['email']}');
+      print('   Tipo: ${user['tipo_usuario']}');
+      print('   Nome: ${user['nome']}');
+    }
+    
+  } catch (e) {
+    print('❌ Erro ao corrigir admin: $e');
+  }
+}
+
+// ========== MÉTODO PARA VERIFICAR TODOS OS USUÁRIOS ==========
+Future<void> verificarTodosUsuarios() async {
+  try {
+    final db = await database;
+    List<Map<String, dynamic>> results = await db.query('usuarios');
+    
+    print('\n📊 === TODOS OS USUÁRIOS ===');
+    for (var user in results) {
+      print('🔍 ID: ${user['id']} | Email: ${user['email']} | Tipo: ${user['tipo_usuario']} | Nome: ${user['nome']}');
+    }
+    print('═══════════════════════════\n');
+    
+  } catch (e) {
+    print('❌ Erro ao verificar usuários: $e');
+  }
+}
+
+// ========== MÉTODOS PARA DEBUG ==========
+
+// Listar todos os usuários no console
+Future<void> debugListarUsuarios() async {
+  try {
+    final db = await database;
+    List<Map<String, dynamic>> results = await db.query(
+      'usuarios',
+      orderBy: 'data_criacao DESC',
+    );
+    
+    print('\n📊 === USUÁRIOS CADASTRADOS (${results.length}) ===');
+    print('┌──────┬─────────────────────┬─────────────────────────┬─────────────┬────────┬─────────────────────┐');
+    print('│  ID  │       NOME          │         EMAIL           │    TIPO     │ ATIVO  │    DATA CRIAÇÃO     │');
+    print('├──────┼─────────────────────┼─────────────────────────┼─────────────┼────────┼─────────────────────┤');
+    
+    for (var user in results) {
+      String id = user['id'].toString().padRight(4);
+      String nome = (user['nome'] ?? '').toString().padRight(19);
+      String email = (user['email'] ?? '').toString().padRight(23);
+      String tipo = (user['tipo_usuario'] ?? '').toString().padRight(11);
+      String ativo = (user['ativo'] == 1 ? 'SIM' : 'NÃO').padRight(6);
+      String data = _formatarDataConsole(user['data_criacao']);
+      
+      print('│ $id │ $nome │ $email │ $tipo │ $ativo │ $data │');
+    }
+    
+    print('└──────┴─────────────────────┴─────────────────────────┴─────────────┴────────┴─────────────────────┘');
+    
+    // Estatísticas
+    int totalTecnicos = results.where((u) => u['tipo_usuario'] == 'tecnico').length;
+    int totalAdmins = results.where((u) => u['tipo_usuario'] == 'administrador').length;
+    int totalAtivos = results.where((u) => u['ativo'] == 1).length;
+    
+    print('\n📈 ESTATÍSTICAS:');
+    print('   • Total de usuários: ${results.length}');
+    print('   • Técnicos: $totalTecnicos');
+    print('   • Administradores: $totalAdmins');
+    print('   • Ativos: $totalAtivos');
+    print('   • Inativos: ${results.length - totalAtivos}');
+    print('');
+    
+  } catch (e) {
+    print('❌ Erro ao listar usuários: $e');
+  }
+}
+
+// Buscar usuário específico por email
+Future<void> debugBuscarUsuario(String email) async {
+  try {
+    final db = await database;
+    List<Map<String, dynamic>> results = await db.query(
+      'usuarios',
+      where: 'email = ?',
+      whereArgs: [email.toLowerCase()],
+    );
+    
+    if (results.isEmpty) {
+      print('❌ Usuário não encontrado: $email');
+      return;
+    }
+    
+    var user = results.first;
+    print('\n👤 === DETALHES DO USUÁRIO ===');
+    print('📧 Email: ${user['email']}');
+    print('👨‍💼 Nome: ${user['nome']}');
+    print('🆔 ID: ${user['id']}');
+    print('👔 Tipo: ${user['tipo_usuario']}');
+    print('✅ Ativo: ${user['ativo'] == 1 ? 'Sim' : 'Não'}');
+    print('📅 Criado em: ${_formatarDataConsole(user['data_criacao'])}');
+    if (user['data_atualizacao'] != null) {
+      print('🔄 Atualizado em: ${_formatarDataConsole(user['data_atualizacao'])}');
+    }
+    print('🔐 Senha (hash): ${user['senha']}');
+    print('═══════════════════════════════\n');
+    
+  } catch (e) {
+    print('❌ Erro ao buscar usuário: $e');
+  }
+}
+
+// Listar últimos usuários cadastrados
+Future<void> debugUltimosUsuarios({int limite = 5}) async {
+  try {
+    final db = await database;
+    List<Map<String, dynamic>> results = await db.query(
+      'usuarios',
+      orderBy: 'data_criacao DESC',
+      limit: limite,
+    );
+    
+    print('\n🆕 === ÚLTIMOS $limite USUÁRIOS CADASTRADOS ===');
+    for (int i = 0; i < results.length; i++) {
+      var user = results[i];
+      print('${i + 1}. ${user['nome']} (${user['email']}) - ${_formatarDataConsole(user['data_criacao'])}');
+    }
+    print('═══════════════════════════════════════════\n');
+    
+  } catch (e) {
+    print('❌ Erro ao buscar últimos usuários: $e');
+  }
+}
+
+// Verificar se email já existe
+Future<bool> debugEmailExiste(String email) async {
+  try {
+    final db = await database;
+    List<Map<String, dynamic>> results = await db.query(
+      'usuarios',
+      where: 'email = ?',
+      whereArgs: [email.toLowerCase()],
+    );
+    
+    bool existe = results.isNotEmpty;
+    print('📧 Email "$email" ${existe ? 'JÁ EXISTE' : 'DISPONÍVEL'}');
+    return existe;
+    
+  } catch (e) {
+    print('❌ Erro ao verificar email: $e');
+    return false;
+  }
+}
+
+// Contar usuários por tipo
+Future<void> debugEstatisticas() async {
+  try {
+    final db = await database;
+    
+    var totalUsuarios = await db.rawQuery('SELECT COUNT(*) as count FROM usuarios');
+    var totalTecnicos = await db.rawQuery("SELECT COUNT(*) as count FROM usuarios WHERE tipo_usuario = 'tecnico'");
+    var totalAdmins = await db.rawQuery("SELECT COUNT(*) as count FROM usuarios WHERE tipo_usuario = 'administrador'");
+    var totalAtivos = await db.rawQuery('SELECT COUNT(*) as count FROM usuarios WHERE ativo = 1');
+    
+    print('\n📊 === ESTATÍSTICAS DETALHADAS ===');
+    print('👥 Total de usuários: ${totalUsuarios.first['count']}');
+    print('🔧 Técnicos: ${totalTecnicos.first['count']}');
+    print('👑 Administradores: ${totalAdmins.first['count']}');
+    print('✅ Ativos: ${totalAtivos.first['count']}');
+    print('❌ Inativos: ${(totalUsuarios.first['count'] as int) - (totalAtivos.first['count'] as int)}');
+    print('═══════════════════════════════════\n');
+    
+  } catch (e) {
+    print('❌ Erro ao gerar estatísticas: $e');
+  }
+}
+
+// Método auxiliar para formatar data no console
+String _formatarDataConsole(String? dataString) {
+  if (dataString == null) return 'N/A'.padRight(19);
+  
+  try {
+    DateTime data = DateTime.parse(dataString);
+    String formatted = '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year} ${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
+    return formatted.padRight(19);
+  } catch (e) {
+    return 'Data inválida'.padRight(19);
+  }
+}
   // ========== MÉTODOS PARA CATEGORIAS ==========
   Future<List<CategoriaCheckmark>> getCategorias() async {
     try {
@@ -554,7 +766,7 @@ class DatabaseHelper {
       
       var categorias = await db.rawQuery('SELECT COUNT(*) as count FROM categorias_checkmark');
       print('📁 Categorias no SQLite: ${categorias.first['count']}');
-      
+  
       var checkmarks = await db.rawQuery('SELECT COUNT(*) as count FROM checkmarks');
       print('✅ Checkmarks no SQLite: ${checkmarks.first['count']}');
       

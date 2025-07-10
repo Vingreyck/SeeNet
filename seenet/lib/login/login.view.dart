@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'widgets/logarbutton.widget.dart';
-import 'widgets/recuperarbutton.widget.dart';
 import 'widgets/logintextfield.widget.dart';
 import 'widgets/senhatextfield.dart';
 import 'widgets/registrarbutton.widget.dart';
@@ -48,9 +47,6 @@ class LoginView extends GetView<LoginController> {
                     height: 100,
                   ),
                   const SizedBox(width: 16),
-                  
-
-
                   const Text(
                     'SeeNet',
                     style: TextStyle(
@@ -78,13 +74,11 @@ class LoginView extends GetView<LoginController> {
           LoginTextField(),
           SizedBox(height: 30),
           SenhaTextField(),
-          SizedBox(height: 50),
-          RecuperarButton(),
-          SizedBox(height: 50),
+          SizedBox(height: 60), // ← ESPAÇAMENTO AUMENTADO (era 50)
           LogarButton(),
-          SizedBox(height: 20),
-                    Row(
-            children: const [
+          SizedBox(height: 30), // ← ESPAÇAMENTO AUMENTADO (era 20)
+          Row(
+            children: [
               Expanded(
                 child: Divider(
                   color: Colors.white,
@@ -108,12 +102,11 @@ class LoginView extends GetView<LoginController> {
               ),
             ],
           ),
-          SizedBox(height: 20),
-          //aqui vai ser o futuro icone google para autenticar
-                    Row(
+          SizedBox(height: 30), // ← ESPAÇAMENTO AUMENTADO (era 20)
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
+              Text(
                 'Ainda não tem uma conta?',
                 style: TextStyle(
                   color: Colors.white,

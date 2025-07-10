@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:seenet/checklist/widgets/checklistiptv.widget.dart';
 import 'package:seenet/checklist/widgets/checkmark_enviar.widget.dart';
+import '../../controllers/checkmark_controller.dart';
+import '../../controllers/usuario_controller.dart';
 
 class ChecklistIptvScreen extends StatefulWidget {
   const ChecklistIptvScreen({super.key});
@@ -11,22 +13,27 @@ class ChecklistIptvScreen extends StatefulWidget {
 }
 
 class _ChecklistIptvScreenState extends State<ChecklistIptvScreen> {
-  // Lista para controlar o estado dos checkboxes
-  List<bool> checkStates = List.generate(10, (index) => false);
+  final CheckmarkController checkmarkController = Get.put(CheckmarkController());
+  final UsuarioController usuarioController = Get.find<UsuarioController>();
 
-  // Lista dos problemas de IPTV
-  final List<String> problemas = [
-    'Canais travando/congelando',
-    'Buffering constante',
-    'Canal fora do ar',
-    'Qualidade fraca',
-    'Error code: xxxxx',
-    'IPTV não abre',
-    'Erro de autenticação',
-    'Velocidade abaixo do contratado',
-    'Problema de DNS',
-    'Configuração incorreta',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _inicializarDados();
+  }
+
+  void _inicializarDados() async {
+    // Carregar checkmarks da categoria IPTV (ID = 2, ajuste se necessário)
+    await checkmarkController.carregarCheckmarks(2);
+
+    // Iniciar nova avaliação
+    if (usuarioController.usuarioLogado.value != null) {
+      await checkmarkController.iniciarAvaliacao(
+        usuarioController.usuarioLogado.value!.id!,
+        'Diagnóstico - IPTV'
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,30 +77,77 @@ class _ChecklistIptvScreenState extends State<ChecklistIptvScreen> {
               ],
             ),
           ),
-          // Lista de checkboxes
+          // Lista de checkboxes dinâmica do banco
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              itemCount: problemas.length,
-              itemBuilder: (context, index) {
-                return ChecklistiptvWidget(
-                  title: problemas[index],
-                  isChecked: checkStates[index],
-                  onChanged: (value) {
-                    setState(() {
-                      checkStates[index] = value ?? false;
-                    });
-                  },
-                );
-              },
+            child: Column(
+              children: [
+                Expanded(
+                  child: Obx(() {
+                    if (checkmarkController.checkmarksAtivos.isEmpty) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF00FF88),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      itemCount: checkmarkController.checkmarksAtivos.length,
+                      itemBuilder: (context, index) {
+                        final checkmark = checkmarkController.checkmarksAtivos[index];
+
+                        return Obx(() => ChecklistiptvWidget(
+                          title: checkmark.titulo,
+                          isChecked: checkmarkController.respostas[checkmark.id] ?? false,
+                          onChanged: (value) {
+                            checkmarkController.toggleCheckmark(checkmark.id!, value ?? false);
+                          },
+                        ));
+                      },
+                    );
+                  }),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: CheckmarkEnviarWidget(
+                    onPressed: _enviarDiagnostico,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: CheckmarkEnviarWidget(),
           ),
         ],
       ),
     );
+  }
+
+  void _enviarDiagnostico() async {
+    // Salvar respostas
+    bool salvou = await checkmarkController.salvarRespostas();
+
+    if (salvou) {
+      // Finalizar avaliação
+      await checkmarkController.finalizarAvaliacao();
+
+      Get.snackbar(
+        'Sucesso',
+        'Respostas salvas! Gerando diagnóstico...',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+
+      // Navegar para diagnóstico
+      Get.toNamed('/diagnostico');
+    } else {
+      Get.snackbar(
+        'Erro',
+        'Erro ao salvar respostas',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 }

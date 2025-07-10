@@ -1,10 +1,12 @@
-// lib/main.dart - VERSÃO ATUALIZADA
+// lib/main.dart - VERSÃO ATUALIZADA COM ADMIN
 import 'package:flutter/material.dart';
 import 'package:seenet/checklist/screen/ChecklistAppsScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistIptvScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistLentidaoScreen.dart';
 import 'package:seenet/login/widgets/login.binding.dart';
 import 'package:seenet/registro/registro.view.dart';
+import 'package:seenet/admin/usuarios_admin.view.dart'; // ← NOVA IMPORTAÇÃO
+import 'package:seenet/admin/checkmarks_admin.view.dart'; // ← NOVA IMPORTAÇÃO
 import 'splash_screen/splash_screen.dart';
 import 'package:get/get.dart';
 import 'package:seenet/login/login.view.dart';
@@ -75,6 +77,15 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/diagnostico',
           page: () => const Diagnosticoview(),
+        ),
+        // ← NOVA ROTA PARA ADMIN
+        GetPage(
+          name: '/admin/usuarios',
+          page: () => const UsuariosAdminView(),
+        ),
+        GetPage(
+          name: '/admin/checkmarks',
+          page: () => const CheckmarksAdminView(),
         ),
       ],
     );

@@ -1,4 +1,4 @@
-// lib/diagnostico/diagnostico.view.dart
+// lib/diagnostico/diagnostico.view.dart - VERSÃO ATUALIZADA
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
@@ -40,68 +40,18 @@ class _DiagnosticoviewState extends State<Diagnosticoview> {
   }
 
   void _gerarDiagnostico() async {
-    // Simular diagnóstico se não há avaliação real
+    print('🔥 Iniciando geração de diagnóstico...');
+
+    // Verificar se há avaliação ativa
     if (checkmarkController.avaliacaoAtual.value == null) {
-      // Criar diagnóstico de exemplo para demonstração
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Simular resposta do ChatGPT
-      String diagnosticoExemplo = """🔍 DIAGNÓSTICO TÉCNICO
-
-Com base nos problemas identificados, foi detectado:
-
-📊 ANÁLISE:
-• Velocidade abaixo do contratado
-• Latência alta (ping > 100ms)
-• Perda de pacotes intermitente
-
-🎯 CAUSA PROVÁVEL:
-Sobrecarga na rede local ou interferência no sinal WiFi.
-
-🛠️ SOLUÇÕES RECOMENDADAS:
-
-1. REINICIALIZAÇÃO DO EQUIPAMENTO
-   - Desligue o roteador por 30 segundos
-   - Aguarde a inicialização completa
-
-2. VERIFICAÇÃO FÍSICA
-   - Confira cabos de rede (conectores soltos)
-   - Teste conexão cabeada diretamente
-
-3. OTIMIZAÇÃO WiFi
-   - Mude o canal WiFi (1, 6 ou 11)
-   - Aproxime dispositivos do roteador
-   - Remova interferências (micro-ondas, etc.)
-
-4. TESTE DE VELOCIDADE
-   - Realize teste em horário alternativo
-   - Compare com velocidade contratada
-
-⚠️ SE PERSISTIR:
-Entre em contato com a operadora informando os testes realizados.
-
-✅ PREVENÇÃO:
-- Atualize firmware do roteador mensalmente
-- Monitore dispositivos conectados
-- Evite sobrecarga simultânea""";
-
-      // Simular salvamento no controller
-      diagnosticoController.diagnosticos.add(
-        Diagnostico(
-          id: 1,
-          avaliacaoId: 1,
-          categoriaId: 1,
-          promptEnviado: "Diagnóstico de problemas de lentidão",
-          respostaChatgpt: diagnosticoExemplo,
-          resumoDiagnostico: "Problemas de lentidão detectados. Soluções: reiniciar roteador, verificar cabos, otimizar WiFi.",
-          statusApi: 'sucesso',
-        )
-      );
+      print('⚠️ Nenhuma avaliação ativa - criando diagnóstico de demonstração');
+      _criarDiagnosticoDemo();
       return;
     }
 
-    // Código real para quando tiver avaliação ativa
+    // Verificar se há checkmarks marcados
     List<int> checkmarksMarcadosIds = checkmarkController.checkmarksMarcados;
+    print('📝 Checkmarks marcados: $checkmarksMarcadosIds');
     
     if (checkmarksMarcadosIds.isEmpty) {
       Get.snackbar(
@@ -111,28 +61,105 @@ Entre em contato com a operadora informando os testes realizados.
         backgroundColor: Colors.orange,
         colorText: Colors.white,
       );
+      
+      // Criar diagnóstico de exemplo mesmo sem problemas selecionados
+      _criarDiagnosticoDemo();
       return;
     }
 
+    // Buscar objetos dos checkmarks marcados
     List<Checkmark> checkmarksMarcados = checkmarkController.checkmarksAtivos
         .where((checkmark) => checkmarksMarcadosIds.contains(checkmark.id))
         .toList();
 
+    print('🎯 Checkmarks para diagnóstico: ${checkmarksMarcados.map((c) => c.titulo).join(', ')}');
+
+    // Gerar diagnóstico real com ChatGPT
     bool sucesso = await diagnosticoController.gerarDiagnostico(
       checkmarkController.avaliacaoAtual.value!.id!,
-      1,
+      checkmarkController.categoriaAtual.value,
       checkmarksMarcados,
     );
 
     if (!sucesso) {
+      print('❌ Falha na geração de diagnóstico');
       Get.snackbar(
         'Erro',
-        'Erro ao gerar diagnóstico',
+        'Erro ao gerar diagnóstico. Criando diagnóstico de exemplo.',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
+      
+      // Como fallback, criar diagnóstico de exemplo
+      _criarDiagnosticoDemo();
+    } else {
+      print('✅ Diagnóstico gerado com sucesso');
     }
+  }
+
+  void _criarDiagnosticoDemo() {
+    print('🎭 Criando diagnóstico de demonstração');
+    
+    // Simular delay
+    Future.delayed(const Duration(seconds: 2), () {
+      // Simular resposta do ChatGPT
+      String diagnosticoExemplo = """🔍 **DIAGNÓSTICO TÉCNICO DEMONSTRAÇÃO**
+
+📊 **ANÁLISE REALIZADA:**
+Sistema em modo de demonstração. Este é um exemplo de como o diagnóstico apareceria com problemas reais selecionados.
+
+🎯 **CAUSA PROVÁVEL:**
+• Sobrecarga na rede local
+• Interferência no sinal WiFi
+• Possível degradação do sinal da operadora
+
+🛠️ **SOLUÇÕES RECOMENDADAS:**
+
+**1. REINICIALIZAÇÃO BÁSICA (5 min)**
+   ✓ Desligue o roteador por 30 segundos
+   ✓ Aguarde inicialização completa (2-3 minutos)
+   ✓ Teste novamente a conexão
+
+**2. VERIFICAÇÃO FÍSICA (10 min)**
+   ✓ Confira todos os cabos de rede
+   ✓ Procure por conectores soltos
+   ✓ Teste conexão cabeada diretamente
+
+**3. OTIMIZAÇÃO WiFi (15 min)**
+   ✓ Mude o canal WiFi (1, 6 ou 11)
+   ✓ Aproxime dispositivos do roteador
+   ✓ Remova interferências (micro-ondas, etc.)
+
+**4. TESTE DE VELOCIDADE**
+   ✓ Realize teste em horário alternativo
+   ✓ Compare com velocidade contratada
+
+⚠️ **SE PERSISTIR:**
+Entre em contato com a operadora informando os testes realizados.
+
+✅ **PREVENÇÃO:**
+• Atualize firmware mensalmente
+• Monitore dispositivos conectados
+• Evite sobrecarga simultânea
+
+---
+📋 Diagnóstico de demonstração - Configure sua chave do ChatGPT para diagnósticos reais""";
+
+      // Adicionar diagnóstico na lista
+      diagnosticoController.diagnosticos.add(
+        Diagnostico(
+          id: 1,
+          avaliacaoId: 1,
+          categoriaId: 1,
+          promptEnviado: "Diagnóstico de demonstração",
+          respostaChatgpt: diagnosticoExemplo,
+          resumoDiagnostico: "Diagnóstico de demonstração - Configure ChatGPT para funcionalidade completa",
+          statusApi: 'sucesso',
+          dataCriacao: DateTime.now(),
+        )
+      );
+    });
   }
 
   @override
@@ -147,6 +174,10 @@ Entre em contato com a operadora informando os testes realizados.
           onPressed: () {
             Get.offAllNamed('/checklist');
           },
+        ),
+        title: const Text(
+          'Diagnóstico IA',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
       backgroundColor: const Color(0xFF1A1A1A),
@@ -184,21 +215,58 @@ Entre em contato com a operadora informando os testes realizados.
               ),
             ),
             const SizedBox(height: 1),
-            // Título Diagnóstico
-            Container(
-              width: double.infinity,
-              color: const Color(0xFF4A4A4A),
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              child: const Text(
-                'Diagnóstico',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 16,
+            
+            // Status do diagnóstico
+            Obx(() {
+              if (diagnosticoController.statusMensagem.value.isNotEmpty) {
+                return Container(
+                  width: double.infinity,
+                  color: const Color(0xFF4A4A4A),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: Row(
+                    children: [
+                      if (diagnosticoController.isLoading.value)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFF00FF88),
+                          ),
+                        ),
+                      if (diagnosticoController.isLoading.value) const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          diagnosticoController.statusMensagem.value,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              
+              // Título padrão quando não há status
+              return Container(
+                width: double.infinity,
+                color: const Color(0xFF4A4A4A),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                child: const Text(
+                  'Diagnóstico Inteligente',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 16,
+                  ),
                 ),
-              ),
-            ),
-            // Área de diagnóstico - AQUI É ONDE APARECE O TEXTO DO CHATGPT
+              );
+            }),
+            
+            // Área de diagnóstico
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -207,19 +275,39 @@ Entre em contato com a operadora informando os testes realizados.
                 child: Obx(() {
                   // Loading enquanto gera diagnóstico
                   if (diagnosticoController.isLoading.value) {
-                    return const Center(
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircularProgressIndicator(
+                          const CircularProgressIndicator(
                             color: Color(0xFF00FF88),
+                            strokeWidth: 3,
                           ),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 24),
                           Text(
-                            'Gerando diagnóstico...',
-                            style: TextStyle(
+                            diagnosticoController.statusMensagem.value.isNotEmpty 
+                                ? diagnosticoController.statusMensagem.value
+                                : 'Gerando diagnóstico...',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1F1F1F),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              '🤖 Analisando problemas selecionados\n💡 Consultando inteligência artificial\n📋 Preparando soluções personalizadas',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ],
@@ -241,7 +329,9 @@ Entre em contato com a operadora informando os testes realizados.
                             color: const Color(0xFF1F1F1F),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: const Color(0xFF00FF88).withOpacity(0.3),
+                              color: diagnostico.isSucesso 
+                                  ? const Color(0xFF00FF88).withOpacity(0.3)
+                                  : Colors.red.withOpacity(0.3),
                               width: 1,
                             ),
                           ),
@@ -269,15 +359,42 @@ Entre em contato com a operadora informando os testes realizados.
                                       fontSize: 14,
                                     ),
                                   ),
+                                  const Spacer(),
+                                  // Indicador se é ChatGPT real ou simulado
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: diagnostico.promptEnviado.contains('demonstração') 
+                                          ? Colors.orange.withOpacity(0.2)
+                                          : Colors.blue.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: diagnostico.promptEnviado.contains('demonstração') 
+                                            ? Colors.orange
+                                            : Colors.blue,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      diagnostico.promptEnviado.contains('demonstração') ? 'DEMO' : 'CHATGPT',
+                                      style: TextStyle(
+                                        color: diagnostico.promptEnviado.contains('demonstração') 
+                                            ? Colors.orange
+                                            : Colors.blue,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 16),
                               
-                              // TEXTO DO DIAGNÓSTICO EM BRANCO - AQUI É O PRINCIPAL
+                              // TEXTO DO DIAGNÓSTICO EM BRANCO
                               Text(
                                 diagnostico.respostaChatgpt,
                                 style: const TextStyle(
-                                  color: Colors.white,  // 👈 TEXTO BRANCO AQUI
+                                  color: Colors.white,
                                   fontSize: 14,
                                   height: 1.5,
                                 ),
@@ -285,12 +402,73 @@ Entre em contato com a operadora informando os testes realizados.
                               
                               const SizedBox(height: 16),
                               
-                              // Timestamp
-                              Text(
-                                'Gerado em: ${_formatarData(diagnostico.dataCriacao)}',
-                                style: const TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 12,
+                              // Informações adicionais
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF141414),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Timestamp
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.access_time, size: 16, color: Colors.white54),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Gerado em: ${_formatarData(diagnostico.dataCriacao)}',
+                                          style: const TextStyle(
+                                            color: Colors.white54,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    
+                                    // Mostrar prompt se disponível
+                                    if (diagnostico.promptEnviado.isNotEmpty && 
+                                        !diagnostico.promptEnviado.contains('demonstração')) ...[
+                                      const SizedBox(height: 8),
+                                      const Divider(color: Colors.white24, height: 1),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.psychology, size: 16, color: Colors.white54),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            'Prompt enviado:',
+                                            style: TextStyle(
+                                              color: Colors.white54,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF0A0A0A),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: Colors.white12),
+                                        ),
+                                        child: Text(
+                                          diagnostico.promptEnviado.length > 200 
+                                              ? '${diagnostico.promptEnviado.substring(0, 200)}...'
+                                              : diagnostico.promptEnviado,
+                                          style: const TextStyle(
+                                            color: Colors.white60,
+                                            fontSize: 10,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ],
@@ -301,18 +479,50 @@ Entre em contato com a operadora informando os testes realizados.
                   }
 
                   // Mensagem quando não há diagnóstico
-                  return const Center(
-                    child: Text(
-                      'Nenhum diagnóstico disponível',
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 16,
-                      ),
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.psychology_outlined,
+                          size: 64,
+                          color: Colors.white54,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Nenhum diagnóstico disponível',
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Volte para o checklist e selecione problemas para gerar um diagnóstico',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton.icon(
+                          onPressed: () => Get.offAllNamed('/checklist'),
+                          icon: const Icon(Icons.arrow_back),
+                          label: const Text('Voltar ao Checklist'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00FF88),
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 }),
               ),
             ),
+            
             // Campo de input na parte inferior
             Container(
               padding: const EdgeInsets.all(16),
@@ -351,10 +561,17 @@ Entre em contato com a operadora informando os testes realizados.
                       color: Color(0xFF3A3A3A),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.mic,
-                      color: Colors.white70,
-                      size: 24,
+                    child: IconButton(
+                      icon: const Icon(Icons.mic, color: Colors.white70, size: 24),
+                      onPressed: () {
+                        Get.snackbar(
+                          'Funcionalidade',
+                          'Reconhecimento de voz será implementado em breve',
+                          snackPosition: SnackPosition.BOTTOM,
+                          backgroundColor: Colors.blue,
+                          colorText: Colors.white,
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -363,7 +580,7 @@ Entre em contato com a operadora informando os testes realizados.
                     width: 48,
                     height: 48,
                     decoration: const BoxDecoration(
-                      color: const Color(0xFF00FF88),
+                      color: Color(0xFF00FF88),
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
@@ -374,6 +591,7 @@ Entre em contato com a operadora informando os testes realizados.
                       ),
                       onPressed: () {
                         if (perguntaController.text.isNotEmpty) {
+                          // Aqui você pode implementar chat adicional no futuro
                           Get.snackbar(
                             'Funcionalidade',
                             'Chat adicional será implementado em breve',

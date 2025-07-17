@@ -76,7 +76,7 @@ class MyApp extends StatelessWidget {
         ),
         GetPage(
           name: '/diagnostico',
-          page: () => const Diagnosticoview(),
+          page: () => const DiagnosticoView(),
         ),
         // ← NOVA ROTA PARA ADMIN
         GetPage(

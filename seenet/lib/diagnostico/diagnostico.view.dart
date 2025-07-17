@@ -1,110 +1,200 @@
-// lib/diagnostico/diagnostico.view.dart - VERSÃO ATUALIZADA
+// lib/diagnostico/diagnostico_view.dart - VERSÃO PROFISSIONAL AVANÇADA
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'dart:ui' show ImageFilter;
 import '../controllers/diagnostico_controller.dart';
 import '../controllers/checkmark_controller.dart';
 import '../models/diagnostico.dart';
 import '../models/checkmark.dart';
 
-class Diagnosticoview extends StatefulWidget {
-  const Diagnosticoview({super.key});
+/// Diagnóstico View com técnicas avançadas de Flutter
+/// Implementa: Micro-interactions, Shimmer effects, Pull-to-refresh,
+/// Gesture handling, Performance optimizations, Custom animations
+class DiagnosticoView extends StatefulWidget {
+  const DiagnosticoView({super.key});
 
   @override
-  State<Diagnosticoview> createState() => _DiagnosticoviewState();
+  State<DiagnosticoView> createState() => _DiagnosticoViewState();
 }
 
-class _DiagnosticoviewState extends State<Diagnosticoview> {
-  late DiagnosticoController diagnosticoController;
-  late CheckmarkController checkmarkController;
-  final TextEditingController perguntaController = TextEditingController();
+class _DiagnosticoViewState extends State<DiagnosticoView>
+    with TickerProviderStateMixin {
+  // Controllers
+  late DiagnosticoController _diagnosticoController;
+  late CheckmarkController _checkmarkController;
+  late TextEditingController _perguntaController;
+
+  // Animation Controllers
+  late AnimationController _shimmerController;
+  late AnimationController _fabController;
+  late AnimationController _logoController;
+  late AnimationController _slideController;
+
+  // Animations
+  late Animation<double> _shimmerAnimation;
+  late Animation<double> _fabScaleAnimation;
+  late Animation<double> _logoRotateAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  // State variables
+  final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = 
+      GlobalKey<RefreshIndicatorState>();
+  bool _isInputFocused = false;
+  bool _showFloatingInput = false;
 
   @override
   void initState() {
     super.initState();
-    
-    // Inicializar controllers se não existirem
-    if (Get.isRegistered<DiagnosticoController>()) {
-      diagnosticoController = Get.find<DiagnosticoController>();
-    } else {
-      diagnosticoController = Get.put(DiagnosticoController());
-    }
-    
-    if (Get.isRegistered<CheckmarkController>()) {
-      checkmarkController = Get.find<CheckmarkController>();
-    } else {
-      checkmarkController = Get.put(CheckmarkController());
-    }
-    
-    _gerarDiagnostico();
+    _initializeControllers();
+    _setupAnimations();
+    _initializeDiagnostico();
   }
 
-  void _gerarDiagnostico() async {
-    print('🔥 Iniciando geração de diagnóstico...');
+  /// Inicializa os controllers usando padrão Singleton e Dependency Injection
+  void _initializeControllers() {
+    _perguntaController = TextEditingController();
 
-    // Verificar se há avaliação ativa
-    if (checkmarkController.avaliacaoAtual.value == null) {
-      print('⚠️ Nenhuma avaliação ativa - criando diagnóstico de demonstração');
-      _criarDiagnosticoDemo();
+    // Pattern: Dependency Injection com GetX
+    if (Get.isRegistered<DiagnosticoController>()) {
+      _diagnosticoController = Get.find<DiagnosticoController>();
+    } else {
+      _diagnosticoController = Get.put(DiagnosticoController());
+    }
+
+    if (Get.isRegistered<CheckmarkController>()) {
+      _checkmarkController = Get.find<CheckmarkController>();
+    } else {
+      _checkmarkController = Get.put(CheckmarkController());
+    }
+  }
+
+  /// Configura animações avançadas com physics customizadas
+  void _setupAnimations() {
+    // Shimmer animation para loading states
+    _shimmerController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+
+    _shimmerAnimation = Tween<double>(
+      begin: -1.0,
+      end: 2.0,
+    ).animate(CurvedAnimation(
+      parent: _shimmerController,
+      curve: Curves.easeInOutSine,
+    ));
+
+    // FAB scale animation para micro-interactions
+    _fabController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+
+    _fabScaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(
+      parent: _fabController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Logo rotation para feedback visual
+    _logoController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+
+    _logoRotateAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _logoController,
+      curve: Curves.elasticOut,
+    ));
+
+    // Slide animation para transições suaves
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    // Iniciar animações
+    _slideController.forward();
+  }
+
+  /// Inicializa o diagnóstico com feedback visual
+  void _initializeDiagnostico() {
+    _logoController.forward().then((_) {
+      _gerarDiagnostico();
+    });
+  }
+
+// Modificar o método _gerarDiagnostico() para limpar diagnósticos anteriores
+Future<void> _gerarDiagnostico() async {
+  _shimmerController.repeat();
+  
+  try {
+    await HapticFeedback.lightImpact(); // Haptic feedback
+
+    // ADICIONAR: Limpar diagnósticos anteriores SEMPRE
+    _diagnosticoController.diagnosticos.clear();
+
+    if (_checkmarkController.avaliacaoAtual.value == null) {
+      await _criarDiagnosticoDemo();
       return;
     }
 
-    // Verificar se há checkmarks marcados
-    List<int> checkmarksMarcadosIds = checkmarkController.checkmarksMarcados;
-    print('📝 Checkmarks marcados: $checkmarksMarcadosIds');
+    List<int> checkmarksMarcadosIds = _checkmarkController.checkmarksMarcados;
     
     if (checkmarksMarcadosIds.isEmpty) {
-      Get.snackbar(
+      _showSnackbar(
         'Aviso',
         'Nenhum problema foi selecionado',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
+        SnackbarType.warning,
       );
-      
-      // Criar diagnóstico de exemplo mesmo sem problemas selecionados
-      _criarDiagnosticoDemo();
+      await _criarDiagnosticoDemo();
       return;
     }
 
-    // Buscar objetos dos checkmarks marcados
-    List<Checkmark> checkmarksMarcados = checkmarkController.checkmarksAtivos
+    List<Checkmark> checkmarksMarcados = _checkmarkController.checkmarksAtivos
         .where((checkmark) => checkmarksMarcadosIds.contains(checkmark.id))
         .toList();
 
-    print('🎯 Checkmarks para diagnóstico: ${checkmarksMarcados.map((c) => c.titulo).join(', ')}');
-
-    // Gerar diagnóstico real com ChatGPT
-    bool sucesso = await diagnosticoController.gerarDiagnostico(
-      checkmarkController.avaliacaoAtual.value!.id!,
-      checkmarkController.categoriaAtual.value,
+    bool sucesso = await _diagnosticoController.gerarDiagnostico(
+      _checkmarkController.avaliacaoAtual.value!.id!,
+      _checkmarkController.categoriaAtual.value,
       checkmarksMarcados,
     );
 
     if (!sucesso) {
-      print('❌ Falha na geração de diagnóstico');
-      Get.snackbar(
+      _showSnackbar(
         'Erro',
         'Erro ao gerar diagnóstico. Criando diagnóstico de exemplo.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+        SnackbarType.error,
       );
-      
-      // Como fallback, criar diagnóstico de exemplo
-      _criarDiagnosticoDemo();
+      await _criarDiagnosticoDemo();
     } else {
-      print('✅ Diagnóstico gerado com sucesso');
+      await HapticFeedback.heavyImpact(); // Simular notification success
     }
+  } finally {
+    _shimmerController.stop();
   }
+}
+// Modificar o método _criarDiagnosticoDemo() para remover a limpeza duplicada
+Future<void> _criarDiagnosticoDemo() async {
+  await Future.delayed(const Duration(seconds: 2));
 
-  void _criarDiagnosticoDemo() {
-    print('🎭 Criando diagnóstico de demonstração');
-    
-    // Simular delay
-    Future.delayed(const Duration(seconds: 2), () {
-      // Simular resposta do ChatGPT
-      String diagnosticoExemplo = """🔍 **DIAGNÓSTICO TÉCNICO DEMONSTRAÇÃO**
+  const String diagnosticoExemplo = """🔍 **DIAGNÓSTICO TÉCNICO DEMONSTRAÇÃO**
 
 📊 **ANÁLISE REALIZADA:**
 Sistema em modo de demonstração. Este é um exemplo de como o diagnóstico apareceria com problemas reais selecionados.
@@ -146,465 +236,170 @@ Entre em contato com a operadora informando os testes realizados.
 ---
 📋 Diagnóstico de demonstração - Configure sua chave do ChatGPT para diagnósticos reais""";
 
-      // Adicionar diagnóstico na lista
-      diagnosticoController.diagnosticos.add(
-        Diagnostico(
-          id: 1,
-          avaliacaoId: 1,
-          categoriaId: 1,
-          promptEnviado: "Diagnóstico de demonstração",
-          respostaChatgpt: diagnosticoExemplo,
-          resumoDiagnostico: "Diagnóstico de demonstração - Configure ChatGPT para funcionalidade completa",
-          statusApi: 'sucesso',
-          dataCriacao: DateTime.now(),
-        )
-      );
-    });
+  // REMOVER: A limpeza da lista (já foi feita em _gerarDiagnostico)
+  // _diagnosticoController.diagnosticos.clear(); // <- REMOVER ESTA LINHA
+
+  _diagnosticoController.diagnosticos.add(
+    Diagnostico(
+      id: DateTime.now().millisecondsSinceEpoch,
+      avaliacaoId: 1,
+      categoriaId: 1,
+      promptEnviado: "Diagnóstico de demonstração",
+      respostaChatgpt: diagnosticoExemplo,
+      resumoDiagnostico: "Diagnóstico de demonstração - Configure ChatGPT para funcionalidade completa",
+      statusApi: 'sucesso',
+      dataCriacao: DateTime.now(),
+    )
+  );
+}
+// ADICIONAR: Método para limpar diagnósticos manualmente (se necessário)
+void _limparDiagnosticos() {
+  _diagnosticoController.diagnosticos.clear();
+  _showSnackbar(
+    'Limpeza',
+    'Diagnósticos anteriores foram removidos',
+    SnackbarType.info,
+  );
+}
+
+  /// Pull-to-refresh implementation
+  Future<void> _handleRefresh() async {
+    await HapticFeedback.mediumImpact();
+    await _gerarDiagnostico();
+  }
+
+  /// Sistema de Snackbar tipado
+  void _showSnackbar(String title, String message, SnackbarType type) {
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: type.color,
+      colorText: Colors.white,
+      borderRadius: 12,
+      margin: const EdgeInsets.all(16),
+      icon: Icon(type.icon, color: Colors.white),
+      duration: const Duration(seconds: 3),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        backgroundColor: const Color(0xFF6B7280),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Get.offAllNamed('/checklist');
-          },
-        ),
-        title: const Text(
-          'Diagnóstico IA',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-      backgroundColor: const Color(0xFF1A1A1A),
-      body: Container(
-        decoration: const BoxDecoration(
+      extendBodyBehindAppBar: true,
+      appBar: _buildAdvancedAppBar(),
+      backgroundColor: const Color(0xFF0A0A0A),
+      body: _buildBody(),
+      floatingActionButton: _buildAdvancedFAB(),
+    );
+  }
+
+  /// AppBar avançada com blur effect
+  PreferredSizeWidget _buildAdvancedAppBar() {
+    return AppBar(
+      centerTitle: true,
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      flexibleSpace: Container(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              Color(0xFF6B7280),
-              Color(0xFF4B5563),
-              Color(0xFF374151),
-              Color(0xFF1F2937),
-              Color(0xFF111827),
-              Color(0xFF0F0F0F),
+              const Color(0xFF6B7280).withOpacity(0.95),
+              const Color(0xFF4B5563).withOpacity(0.85),
             ],
-            stops: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
           ),
         ),
-        child: Column(
-          children: [
-            const SizedBox(height: 1),
-            // Logo SVG centralizada
-            Center(
-              child: Container(
-                width: 360,
-                height: 360,
-                padding: const EdgeInsets.all(1),
-                child: SvgPicture.asset(
-                  'assets/images/logo.svg',
-                  width: 160,
-                  height: 160,
-                  fit: BoxFit.contain,
+        // Removido o BackdropFilter (blur)
+        // child: BackdropFilter(
+        //   filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+        //   child: Container(
+        //     color: Colors.white.withOpacity(0.05),
+        //   ),
+        // ),
+      ),
+      leading: _buildBackButton(),
+      title: ShaderMask(
+        shaderCallback: (bounds) => const LinearGradient(
+          colors: [Colors.white, Color(0xFF00FF88)],
+        ).createShader(bounds),
+        child: const Text(
+          'Diagnóstico IA',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Botão de voltar com animação
+  Widget _buildBackButton() {
+    return GestureDetector(
+      onTapDown: (_) => _fabController.forward(),
+      onTapUp: (_) => _fabController.reverse(),
+      onTapCancel: () => _fabController.reverse(),
+      onTap: () async {
+        await HapticFeedback.selectionClick();
+        Get.offAllNamed('/checklist');
+      },
+      child: AnimatedBuilder(
+        animation: _fabScaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _fabScaleAnimation.value,
+            child: Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  width: 1,
                 ),
               ),
-            ),
-            const SizedBox(height: 1),
-            
-            // Status do diagnóstico
-            Obx(() {
-              if (diagnosticoController.statusMensagem.value.isNotEmpty) {
-                return Container(
-                  width: double.infinity,
-                  color: const Color(0xFF4A4A4A),
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                  child: Row(
-                    children: [
-                      if (diagnosticoController.isLoading.value)
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Color(0xFF00FF88),
-                          ),
-                        ),
-                      if (diagnosticoController.isLoading.value) const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          diagnosticoController.statusMensagem.value,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              
-              // Título padrão quando não há status
-              return Container(
-                width: double.infinity,
-                color: const Color(0xFF4A4A4A),
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                child: const Text(
-                  'Diagnóstico Inteligente',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 16,
-                  ),
-                ),
-              );
-            }),
-            
-            // Área de diagnóstico
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                color: const Color(0xFF2A2A2A),
-                padding: const EdgeInsets.all(16),
-                child: Obx(() {
-                  // Loading enquanto gera diagnóstico
-                  if (diagnosticoController.isLoading.value) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const CircularProgressIndicator(
-                            color: Color(0xFF00FF88),
-                            strokeWidth: 3,
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            diagnosticoController.statusMensagem.value.isNotEmpty 
-                                ? diagnosticoController.statusMensagem.value
-                                : 'Gerando diagnóstico...',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1F1F1F),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              '🤖 Analisando problemas selecionados\n💡 Consultando inteligência artificial\n📋 Preparando soluções personalizadas',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  // Mostra diagnósticos
-                  if (diagnosticoController.diagnosticos.isNotEmpty) {
-                    return ListView.builder(
-                      itemCount: diagnosticoController.diagnosticos.length,
-                      itemBuilder: (context, index) {
-                        final diagnostico = diagnosticoController.diagnosticos[index];
-                        
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1F1F1F),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: diagnostico.isSucesso 
-                                  ? const Color(0xFF00FF88).withOpacity(0.3)
-                                  : Colors.red.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Status do diagnóstico
-                              Row(
-                                children: [
-                                  Icon(
-                                    diagnostico.isSucesso ? Icons.check_circle : Icons.error,
-                                    color: diagnostico.isSucesso 
-                                        ? const Color(0xFF00FF88) 
-                                        : Colors.red,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    diagnostico.isSucesso ? 'Diagnóstico Concluído' : 'Erro no Diagnóstico',
-                                    style: TextStyle(
-                                      color: diagnostico.isSucesso 
-                                          ? const Color(0xFF00FF88) 
-                                          : Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  // Indicador se é ChatGPT real ou simulado
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: diagnostico.promptEnviado.contains('demonstração') 
-                                          ? Colors.orange.withOpacity(0.2)
-                                          : Colors.blue.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: diagnostico.promptEnviado.contains('demonstração') 
-                                            ? Colors.orange
-                                            : Colors.blue,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      diagnostico.promptEnviado.contains('demonstração') ? 'DEMO' : 'CHATGPT',
-                                      style: TextStyle(
-                                        color: diagnostico.promptEnviado.contains('demonstração') 
-                                            ? Colors.orange
-                                            : Colors.blue,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              // TEXTO DO DIAGNÓSTICO EM BRANCO
-                              Text(
-                                diagnostico.respostaChatgpt,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  height: 1.5,
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 16),
-                              
-                              // Informações adicionais
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF141414),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Timestamp
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.access_time, size: 16, color: Colors.white54),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Gerado em: ${_formatarData(diagnostico.dataCriacao)}',
-                                          style: const TextStyle(
-                                            color: Colors.white54,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    
-                                    // Mostrar prompt se disponível
-                                    if (diagnostico.promptEnviado.isNotEmpty && 
-                                        !diagnostico.promptEnviado.contains('demonstração')) ...[
-                                      const SizedBox(height: 8),
-                                      const Divider(color: Colors.white24, height: 1),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.psychology, size: 16, color: Colors.white54),
-                                          const SizedBox(width: 8),
-                                          const Text(
-                                            'Prompt enviado:',
-                                            style: TextStyle(
-                                              color: Colors.white54,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF0A0A0A),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: Colors.white12),
-                                        ),
-                                        child: Text(
-                                          diagnostico.promptEnviado.length > 200 
-                                              ? '${diagnostico.promptEnviado.substring(0, 200)}...'
-                                              : diagnostico.promptEnviado,
-                                          style: const TextStyle(
-                                            color: Colors.white60,
-                                            fontSize: 10,
-                                            fontFamily: 'monospace',
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  }
-
-                  // Mensagem quando não há diagnóstico
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.psychology_outlined,
-                          size: 64,
-                          color: Colors.white54,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Nenhum diagnóstico disponível',
-                          style: TextStyle(
-                            color: Colors.white54,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Volte para o checklist e selecione problemas para gerar um diagnóstico',
-                          style: TextStyle(
-                            color: Colors.white38,
-                            fontSize: 12,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 20),
-                        ElevatedButton.icon(
-                          onPressed: () => Get.offAllNamed('/checklist'),
-                          icon: const Icon(Icons.arrow_back),
-                          label: const Text('Voltar ao Checklist'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00FF88),
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
+              child: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 20,
               ),
             ),
-            
-            // Campo de input na parte inferior
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3A3A3A),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: TextField(
-                        controller: perguntaController,
-                        decoration: const InputDecoration(
-                          hintText: 'Pergunte algo sobre o diagnóstico',
-                          hintStyle: TextStyle(
-                            color: Colors.white54,
-                            fontSize: 16,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            vertical: 16,
-                            horizontal: 20,
-                          ),
-                        ),
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Ícone do microfone
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF3A3A3A),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.mic, color: Colors.white70, size: 24),
-                      onPressed: () {
-                        Get.snackbar(
-                          'Funcionalidade',
-                          'Reconhecimento de voz será implementado em breve',
-                          snackPosition: SnackPosition.BOTTOM,
-                          backgroundColor: Colors.blue,
-                          colorText: Colors.white,
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Ícone de envio
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF00FF88),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.send,
-                        color: Colors.black,
-                        size: 24,
-                      ),
-                      onPressed: () {
-                        if (perguntaController.text.isNotEmpty) {
-                          // Aqui você pode implementar chat adicional no futuro
-                          Get.snackbar(
-                            'Funcionalidade',
-                            'Chat adicional será implementado em breve',
-                            snackPosition: SnackPosition.BOTTOM,
-                            backgroundColor: Colors.blue,
-                            colorText: Colors.white,
-                          );
-                          perguntaController.clear();
-                        }
-                      },
-                    ),
-                  ),
-                ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Body principal com RefreshIndicator customizado
+  Widget _buildBody() {
+    return Container(
+      decoration: _buildGradientDecoration(),
+      child: RefreshIndicator(
+        key: _refreshIndicatorKey,
+        onRefresh: _handleRefresh,
+        backgroundColor: const Color(0xFF1A1A1A),
+        color: const Color(0xFF00FF88),
+        strokeWidth: 3,
+        displacement: 60,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.only(top: 120),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  _buildAnimatedLogo(),
+                  const SizedBox(height: 20),
+                  _buildStatusCard(),
+                  const SizedBox(height: 20),
+                  _buildDiagnosticContent(),
+                  const SizedBox(height: 100), // Space for FAB
+                ]),
               ),
             ),
           ],
@@ -613,6 +408,616 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
+  /// Decoração de gradiente avançada
+  BoxDecoration _buildGradientDecoration() {
+    return const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xFF1A1A1A),
+          Color(0xFF2D2D2D),
+          Color(0xFF1F1F1F),
+          Color(0xFF0A0A0A),
+        ],
+        stops: [0.0, 0.3, 0.7, 1.0],
+      ),
+    );
+  }
+
+  /// Logo animada com micro-interactions
+  Widget _buildAnimatedLogo() {
+    return AnimatedBuilder(
+      animation: _logoRotateAnimation,
+      builder: (context, child) {
+        return Transform.rotate(
+          angle: _logoRotateAnimation.value * 0.1,
+          child: GestureDetector(
+            onTap: () async {
+              await HapticFeedback.lightImpact();
+              _logoController.reset();
+              _logoController.forward();
+            },
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF00FF88).withValues(alpha: 0.3),
+                    Colors.transparent,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00FF88).withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: Center(
+                child: SvgPicture.asset(
+                  'assets/images/logo.svg',
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Card de status com animações
+  Widget _buildStatusCard() {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF00FF88).withValues(alpha: 0.3),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Obx(() {
+          if (_diagnosticoController.statusMensagem.value.isNotEmpty) {
+            return Row(
+              children: [
+                if (_diagnosticoController.isLoading.value)
+                  _buildShimmerIndicator(),
+                if (_diagnosticoController.isLoading.value) 
+                  const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    _diagnosticoController.statusMensagem.value,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+          
+          return const Text(
+            '🤖 Diagnóstico Inteligente Pronto',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  /// Shimmer indicator customizado
+  Widget _buildShimmerIndicator() {
+    return AnimatedBuilder(
+      animation: _shimmerAnimation,
+      builder: (context, child) {
+        return Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment(-1.0 - _shimmerAnimation.value, 0.0),
+              end: Alignment(1.0 - _shimmerAnimation.value, 0.0),
+              colors: [
+                Colors.transparent,
+                const Color(0xFF00FF88).withValues(alpha: 0.5),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Conteúdo do diagnóstico com loading states
+  Widget _buildDiagnosticContent() {
+    return Obx(() {
+      if (_diagnosticoController.isLoading.value) {
+        return _buildLoadingShimmer();
+      }
+
+      if (_diagnosticoController.diagnosticos.isNotEmpty) {
+        return _buildDiagnosticsList();
+      }
+
+      return _buildEmptyState();
+    });
+  }
+
+  /// Loading shimmer avançado
+  Widget _buildLoadingShimmer() {
+    return AnimatedBuilder(
+      animation: _shimmerAnimation,
+      builder: (context, child) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            children: List.generate(3, (index) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(20),
+                height: 200,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    begin: Alignment(-1.0 - _shimmerAnimation.value, 0.0),
+                    end: Alignment(1.0 - _shimmerAnimation.value, 0.0),
+                    colors: [
+                      const Color(0xFF2A2A2A),
+                      const Color(0xFF3A3A3A),
+                      const Color(0xFF2A2A2A),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              );
+            }),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Lista de diagnósticos com animações
+  Widget _buildDiagnosticsList() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: _diagnosticoController.diagnosticos.asMap().entries.map((entry) {
+          int index = entry.key;
+          Diagnostico diagnostico = entry.value;
+          
+          return AnimatedContainer(
+            duration: Duration(milliseconds: 300 + (index * 100)),
+            curve: Curves.easeOutBack,
+            margin: const EdgeInsets.only(bottom: 20),
+            child: _buildDiagnosticCard(diagnostico),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  /// Card individual de diagnóstico
+  Widget _buildDiagnosticCard(Diagnostico diagnostico) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: diagnostico.isSucesso 
+              ? const Color(0xFF00FF88).withValues(alpha: 0.5)
+              : Colors.red.withValues(alpha: 0.5),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: diagnostico.isSucesso 
+                ? const Color(0xFF00FF88).withValues(alpha: 0.1)
+                : Colors.red.withValues(alpha: 0.1),
+            blurRadius: 20,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCardHeader(diagnostico),
+          const SizedBox(height: 20),
+          _buildCardContent(diagnostico),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  /// Header do card com status
+  Widget _buildCardHeader(Diagnostico diagnostico) {
+    return Row(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 500),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: diagnostico.isSucesso 
+                ? const Color(0xFF00FF88).withValues(alpha: 0.2)
+                : Colors.red.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            diagnostico.isSucesso ? Icons.check_circle : Icons.error,
+            color: diagnostico.isSucesso ? const Color(0xFF00FF88) : Colors.red,
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            diagnostico.isSucesso ? 'Diagnóstico Concluído' : 'Erro no Diagnóstico',
+            style: TextStyle(
+              color: diagnostico.isSucesso ? const Color(0xFF00FF88) : Colors.red,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        _buildTypeChip(diagnostico),
+      ],
+    );
+  }
+
+  /// Chip indicador de tipo
+  Widget _buildTypeChip(Diagnostico diagnostico) {
+    bool isDemo = diagnostico.promptEnviado.contains('demonstração');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDemo ? Colors.orange.withValues(alpha: 0.2) : Colors.blue.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDemo ? Colors.orange : Colors.blue,
+          width: 1,
+        ),
+      ),
+      child: Text(
+        isDemo ? 'DEMO' : 'GEMINI',
+        style: TextStyle(
+          color: isDemo ? Colors.orange : Colors.blue,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  /// Conteúdo do card
+  Widget _buildCardContent(Diagnostico diagnostico) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SelectableText(
+        diagnostico.respostaChatgpt,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          height: 1.6,
+        ),
+      ),
+    );
+  }
+
+  /// Estado vazio com CTA
+  Widget _buildEmptyState() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white12,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.psychology_outlined,
+            size: 80,
+            color: Colors.white24,
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Nenhum diagnóstico disponível',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Volte para o checklist e selecione problemas para gerar um diagnóstico',
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 30),
+          _buildCTAButton(),
+        ],
+      ),
+    );
+  }
+
+  /// Botão CTA animado
+  Widget _buildCTAButton() {
+    return GestureDetector(
+      onTapDown: (_) => _fabController.forward(),
+      onTapUp: (_) => _fabController.reverse(),
+      onTapCancel: () => _fabController.reverse(),
+      onTap: () async {
+        await HapticFeedback.mediumImpact();
+        Get.offAllNamed('/checklist');
+      },
+      child: AnimatedBuilder(
+        animation: _fabScaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _fabScaleAnimation.value,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00FF88), Color(0xFF00CC6A)],
+                ),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00FF88).withValues(alpha: 0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.arrow_back, color: Colors.black),
+                  SizedBox(width: 8),
+                  Text(
+                    'Voltar ao Checklist',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// FAB avançado com micro-interactions
+  Widget _buildAdvancedFAB() {
+    return Positioned(
+      bottom: 30,
+      right: 20,
+      left: 20,
+      child: Container(
+        height: 70,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(35),
+          border: Border.all(
+            color: Colors.white12,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildInputField(),
+            ),
+            _buildMicButton(),
+            const SizedBox(width: 8),
+            _buildSendButton(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Campo de input avançado
+  Widget _buildInputField() {
+    return Container(
+      margin: const EdgeInsets.only(left: 20),
+      child: TextField(
+        controller: _perguntaController,
+        onChanged: (value) {
+          setState(() {
+            _showFloatingInput = value.isNotEmpty;
+          });
+        },
+        onTap: () async {
+          await HapticFeedback.selectionClick();
+          setState(() {
+            _isInputFocused = true;
+          });
+        },
+        onEditingComplete: () {
+          setState(() {
+            _isInputFocused = false;
+          });
+        },
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Pergunte sobre o diagnóstico...',
+          hintStyle: TextStyle(
+            color: Colors.white.withValues(alpha: 0.5),
+            fontSize: 16,
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 20),
+        ),
+      ),
+    );
+  }
+
+  /// Botão do microfone com animação
+  Widget _buildMicButton() {
+    return GestureDetector(
+      onTapDown: (_) => _fabController.forward(),
+      onTapUp: (_) => _fabController.reverse(),
+      onTapCancel: () => _fabController.reverse(),
+      onTap: () async {
+        await HapticFeedback.mediumImpact();
+        _showSnackbar(
+          'Funcionalidade',
+          'Reconhecimento de voz será implementado em breve',
+          SnackbarType.info,
+        );
+      },
+      child: AnimatedBuilder(
+        animation: _fabScaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _fabScaleAnimation.value,
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A2A2A),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white12,
+                  width: 1,
+                ),
+              ),
+              child: const Icon(
+                Icons.mic,
+                color: Colors.white70,
+                size: 24,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Botão de envio com gradiente
+  Widget _buildSendButton() {
+    return GestureDetector(
+      onTapDown: (_) => _fabController.forward(),
+      onTapUp: (_) => _fabController.reverse(),
+      onTapCancel: () => _fabController.reverse(),
+      onTap: () async {
+        if (_perguntaController.text.isNotEmpty) {
+          await HapticFeedback.mediumImpact();
+          
+          // Simular envio de mensagem
+          String pergunta = _perguntaController.text;
+          _perguntaController.clear();
+          
+          _showSnackbar(
+            'Mensagem Enviada',
+            'Pergunta: "$pergunta" - Chat será implementado em breve',
+            SnackbarType.success,
+          );
+          
+          setState(() {
+            _showFloatingInput = false;
+          });
+        }
+      },
+      child: AnimatedBuilder(
+        animation: _fabScaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _fabScaleAnimation.value,
+            child: Container(
+              width: 50,
+              height: 50,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: _perguntaController.text.isNotEmpty
+                      ? [const Color(0xFF00FF88), const Color(0xFF00CC6A)]
+                      : [const Color(0xFF2A2A2A), const Color(0xFF2A2A2A)],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: _perguntaController.text.isNotEmpty
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF00FF88).withValues(alpha: 0.4),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Icon(
+                Icons.send,
+                color: _perguntaController.text.isNotEmpty
+                    ? Colors.black
+                    : Colors.white54,
+                size: 24,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Formatar data brasileira
   String _formatarData(DateTime? data) {
     if (data == null) return 'Data não disponível';
     return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year} às ${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
@@ -620,7 +1025,192 @@ Entre em contato com a operadora informando os testes realizados.
 
   @override
   void dispose() {
-    perguntaController.dispose();
+    _perguntaController.dispose();
+    _shimmerController.dispose();
+    _fabController.dispose();
+    _logoController.dispose();
+    _slideController.dispose();
     super.dispose();
   }
 }
+
+/// Enum para tipos de Snackbar
+enum SnackbarType {
+  success(Color(0xFF4CAF50), Icons.check_circle),
+  error(Color(0xFFF44336), Icons.error),
+  warning(Color(0xFFFF9800), Icons.warning),
+  info(Color(0xFF2196F3), Icons.info);
+
+  const SnackbarType(this.color, this.icon);
+  final Color color;
+  final IconData icon;
+}
+
+/// Extension para facilitar uso de filtros
+extension ImageFilterImport on ImageFilter {
+  // Import necessário no topo do arquivo:
+  // import 'dart:ui' show ImageFilter;
+}
+
+/// Classe para shimmer customizado (opcional - para casos mais avançados)
+class CustomShimmer extends StatefulWidget {
+  final Widget child;
+  final Color baseColor;
+  final Color highlightColor;
+  final Duration duration;
+
+  const CustomShimmer({
+    super.key,
+    required this.child,
+    this.baseColor = const Color(0xFF2A2A2A),
+    this.highlightColor = const Color(0xFF3A3A3A),
+    this.duration = const Duration(milliseconds: 1500),
+  });
+
+  @override
+  State<CustomShimmer> createState() => _CustomShimmerState();
+}
+
+class _CustomShimmerState extends State<CustomShimmer>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: widget.duration,
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: -1.0,
+      end: 2.0,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutSine,
+    ));
+    _controller.repeat();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return ShaderMask(
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              begin: Alignment(-1.0 - _animation.value, 0.0),
+              end: Alignment(1.0 - _animation.value, 0.0),
+              colors: [
+                widget.baseColor,
+                widget.highlightColor,
+                widget.baseColor,
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ).createShader(bounds);
+          },
+          child: widget.child,
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+}
+
+/// Mixin para performance optimization
+mixin PerformanceOptimization<T extends StatefulWidget> on State<T> {
+  /// Cache para widgets pesados
+  final Map<String, Widget> _widgetCache = {};
+
+  /// Método para cachear widgets
+  Widget cacheWidget(String key, Widget Function() builder) {
+    return _widgetCache.putIfAbsent(key, builder);
+  }
+
+  /// Limpar cache quando necessário
+  void clearCache() {
+    _widgetCache.clear();
+  }
+
+  @override
+  void dispose() {
+    clearCache();
+    super.dispose();
+  }
+}
+
+/// Pattern: Observer para mudanças de estado
+abstract class DiagnosticoObserver {
+  void onDiagnosticoUpdated(List<Diagnostico> diagnosticos);
+  void onLoadingStateChanged(bool isLoading);
+  void onErrorOccurred(String error);
+}
+
+/// Pattern: Command para ações
+abstract class DiagnosticoCommand {
+  Future<void> execute();
+  Future<void> undo();
+}
+
+class GenerateDiagnosticoCommand implements DiagnosticoCommand {
+  final DiagnosticoController _controller;
+  final List<Checkmark> _checkmarks;
+  
+  GenerateDiagnosticoCommand(this._controller, this._checkmarks);
+
+  @override
+  Future<void> execute() async {
+    // Implementar geração de diagnóstico
+  }
+
+  @override
+  Future<void> undo() async {
+    // Implementar desfazer
+  }
+}
+
+/// Pattern: Factory para criação de widgets
+class DiagnosticoWidgetFactory {
+  static Widget createLoadingIndicator({
+    Color? color,
+    double? size,
+  }) {
+    return CircularProgressIndicator(
+      color: color ?? const Color(0xFF00FF88),
+      strokeWidth: 3,
+    );
+  }
+
+  static Widget createErrorWidget(String message) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error, color: Colors.red),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Adicionar import necessário no topo:
+// import 'dart:ui' show ImageFilter; (já adicionado acima)

@@ -1,7 +1,7 @@
 // lib/config/gemini_config.dart - BASEADO NO EXEMPLO OFICIAL
 class GeminiConfig {
   // SUBSTITUA PELA SUA CHAVE REAL DO GEMINI
-  static const String apiKey = 'AIzaSyBuTLGFDYNDgjNyx_ozSoojteihsDTEUMA';
+  static const String apiKey = 'AIzaSyBuTLGFDYNDgjNyx_ozSoojteihsDTEUMACU';
   
   // URL da API baseada no exemplo oficial do Google
   static const String apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';

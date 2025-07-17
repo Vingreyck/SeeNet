@@ -28,7 +28,7 @@ class DiagnosticoController extends GetxController {
         statusMensagem.value = 'Salvando diagnóstico...';
         
         // Adicionar cabeçalho indicando que foi gerado pelo Gemini
-        String respostaFinal = "**🤖 Diagnóstico gerado por Google Gemini AI**\n\n$resposta";
+        String respostaFinal = "*\n$resposta";
         
         // Criar diagnóstico
         Diagnostico diagnostico = Diagnostico(
@@ -110,21 +110,35 @@ class DiagnosticoController extends GetxController {
 
   // Criar diagnóstico simulado quando Gemini não está disponível
   void _criarDiagnosticoSimulado(int avaliacaoId, int categoriaId, String prompt) {
-    String diagnosticoSimulado = _gerarDiagnosticoSimuladoInteligente(prompt);
+    String _gerarDiagnosticoSimuladoInteligente(String prompt) {
+    DateTime agora = DateTime.now();
     
-    Diagnostico diagnostico = Diagnostico(
-      avaliacaoId: avaliacaoId,
-      categoriaId: categoriaId,
-      promptEnviado: prompt,
-      respostaChatgpt: diagnosticoSimulado,
-      resumoDiagnostico: _extrairResumo(diagnosticoSimulado),
-      statusApi: 'simulado',
-      dataCriacao: DateTime.now(),
-    );
+    // Analisar o prompt para personalizar a resposta
+    List<String> problemas = _extrairProblemasDoPrompt(prompt);
+    String categoria = _identificarCategoriaDoPrompt(prompt);
     
-    diagnosticos.add(diagnostico);
-    statusMensagem.value = 'Diagnóstico simulado criado!';
-    print('📋 Diagnóstico simulado criado como fallback');
+    return """🚨 **DIAGNÓSTICO RÁPIDO - ${categoria.toUpperCase()}**
+
+  📋 **PROBLEMAS IDENTIFICADOS:** ${problemas.join(', ')}
+
+  ${_gerarSolucoesPorCategoria(categoria)}
+
+  📞 **PRÓXIMOS PASSOS:**
+  • Execute na ordem apresentada
+  • Anote o que funcionou ou não
+  • Se nada resolver, ligue para suporte com estas informações
+
+  ---
+  ⏰ Diagnóstico gerado em ${_formatarDataHora(agora)}
+
+  💡 **QUER DIAGNÓSTICOS PERSONALIZADOS?**
+  Configure Google Gemini em: https://makersuite.google.com/app/apikey
+  • Gratuito e fácil de configurar
+  • Diagnósticos específicos para cada problema
+  • Respostas ainda mais precisas
+
+  🤖 SeeNet v1.0 - Soluções Diretas e Práticas""";
+  }
   }
 
   // Gerar diagnóstico simulado inteligente baseado no prompt
@@ -240,102 +254,77 @@ Configure Google Gemini gratuitamente em: https://makersuite.google.com/app/apik
     }
   }
 
-  String _gerarSolucoesPorCategoria(String categoria) {
-    switch (categoria) {
-      case 'lentidão':
-        return """**1. TESTE INICIAL (5 minutos)**
-   ✓ Execute teste de velocidade em speedtest.net
-   ✓ Compare resultado com velocidade contratada
-   ✓ Anote horário e resultado do teste
+ String _gerarSolucoesPorCategoria(String categoria) {
+  switch (categoria) {
+    case 'lentidão':
+      return """🔧 **SOLUÇÃO RÁPIDA (2 min):**
+1. ⚡ Desligue o roteador da tomada por 30 segundos
+2. 🔌 Ligue novamente e aguarde 2 minutos
+3. 📱 Teste a velocidade no celular perto do roteador
 
-**2. REINICIALIZAÇÃO BÁSICA (5 minutos)**
-   ✓ Desligue o roteador da tomada por 30 segundos
-   ✓ Desligue o modem por 30 segundos (se separado)
-   ✓ Ligue primeiro o modem, aguarde 2 minutos
-   ✓ Ligue o roteador e aguarde inicialização completa
+🔧 **SE NÃO RESOLVER (5 min):**
+1. 📶 Troque o canal WiFi para 1, 6 ou 11 nas configurações
+2. 🔗 Teste cabo direto do modem ao computador
+3. 📊 Faça teste de velocidade em speedtest.net
 
-**3. OTIMIZAÇÃO WiFi (15 minutos)**
-   ✓ Acesse configurações do roteador (192.168.1.1 ou 192.168.0.1)
-   ✓ Altere canal WiFi 2.4GHz para 1, 6 ou 11
-   ✓ Use rede 5GHz se disponível no seu dispositivo
-   ✓ Aproxime dispositivo do roteador para teste
-   ✓ Remova interferências (micro-ondas, babá eletrônica)
+⚠️ **AINDA COM PROBLEMA:**
+"Ligue para operadora informando: velocidade testada, horário do teste e se melhora com cabo"
 
-**4. VERIFICAÇÃO FÍSICA (10 minutos)**
-   ✓ Confira todos os cabos de rede (RJ45, coaxial)
-   ✓ Procure por conectores soltos ou danificados
-   ✓ Teste conexão cabeada diretamente no modem
-   ✓ Substitua cabo de rede se necessário""";
+✅ **DICA RÁPIDA:**
+Reinicie o roteador toda semana para manter performance""";
         
-      case 'iptv':
-        return """**1. VERIFICAÇÃO DE LARGURA DE BANDA (5 minutos)**
-   ✓ Teste velocidade durante reprodução da IPTV
-   ✓ Pause downloads e streaming em outros dispositivos
-   ✓ Verifique quantos dispositivos estão usando a rede
-   ✓ Reserve pelo menos 25Mbps para IPTV em HD
+    case 'iptv':
+      return """🔧 **SOLUÇÃO RÁPIDA (2 min):**
+1. 📺 Desligue a TV box da tomada por 1 minuto
+2. 🔌 Ligue novamente e aguarde inicializar
+3. 📺 Teste um canal diferente
 
-**2. REINICIALIZAÇÃO DOS EQUIPAMENTOS (10 minutos)**
-   ✓ Desligue o decodificador da tomada por 1 minuto
-   ✓ Reinicie a Smart TV ou dispositivo de reprodução
-   ✓ Reinicie o roteador conforme instruções anteriores
-   ✓ Aguarde sincronização completa de todos os equipamentos
+🔧 **SE NÃO RESOLVER (5 min):**
+1. 🌐 Use cabo ethernet na TV box (não WiFi)
+2. 📱 Feche apps desnecessários em outros dispositivos
+3. ⏰ Teste em horário diferente (manhã/noite)
 
-**3. CONFIGURAÇÕES DE REDE (15 minutos)**
-   ✓ Configure DNS nos dispositivos (8.8.8.8 e 8.8.4.4)
-   ✓ Use conexão cabeada no decodificador se possível
-   ✓ Configure QoS no roteador priorizando tráfego de vídeo
-   ✓ Verifique configurações de multicast no roteador
+⚠️ **AINDA COM PROBLEMA:**
+"Ligue para operadora informando: quais canais travam, horário do problema e se acontece todo dia"
 
-**4. TESTES DE QUALIDADE (10 minutos)**
-   ✓ Teste diferentes canais em diferentes horários
-   ✓ Verifique nível de sinal na configuração da TV
-   ✓ Documente horários com melhor/pior qualidade""";
+✅ **DICA RÁPIDA:**
+Reserve 25Mbps da internet só para a IPTV""";
         
-      case 'aplicativos':
-        return """**1. LIMPEZA E RESET BÁSICO (5 minutos)**
-   ✓ Force fechamento dos aplicativos problemáticos
-   ✓ Limpe cache dos apps nas configurações do dispositivo
-   ✓ Reinicie o dispositivo (smartphone, tablet, Smart TV)
-   ✓ Reabra os aplicativos e teste novamente
+    case 'aplicativos':
+      return """🔧 **SOLUÇÃO RÁPIDA (2 min):**
+1. 📱 Force fechar o app completamente
+2. 🗑️ Limpe o cache do app nas configurações
+3. 📲 Abra o app novamente
 
-**2. VERIFICAÇÃO DE CONECTIVIDADE (10 minutos)**
-   ✓ Teste acesso à internet em outros apps ou navegador
-   ✓ Configure DNS manual (8.8.8.8 e 8.8.4.4)
-   ✓ Teste usando dados móveis para comparação
-   ✓ Verifique se outros dispositivos têm o mesmo problema
+🔧 **SE NÃO RESOLVER (5 min):**
+1. 🔄 Reinicie o dispositivo completamente
+2. 📶 Teste usando dados móveis (4G)
+3. 🆕 Atualize o app na loja
 
-**3. ATUALIZAÇÃO E REINSTALAÇÃO (15 minutos)**
-   ✓ Verifique atualizações disponíveis na loja de apps
-   ✓ Atualize sistema operacional se disponível
-   ✓ Desinstale e reinstale aplicativos problemáticos
-   ✓ Verifique espaço de armazenamento disponível
+⚠️ **AINDA COM PROBLEMA:**
+"Ligue para operadora informando: nome do app, código de erro (se aparecer) e se funciona com 4G"
 
-**4. CONFIGURAÇÕES AVANÇADAS (10 minutos)**
-   ✓ Desative VPN ou proxy temporariamente
-   ✓ Verifique configurações de data e hora
-   ✓ Configure permissões necessárias para os apps
-   ✓ Teste em rede WiFi diferente se possível""";
+✅ **DICA RÁPIDA:**
+Atualize os apps toda semana para evitar problemas""";
         
-      default:
-        return """**1. DIAGNÓSTICO INICIAL (5 minutos)**
-   ✓ Teste conectividade básica (ping, navegação)
-   ✓ Reinicie todos os equipamentos de rede
-   ✓ Verifique status dos LEDs nos equipamentos
-   ✓ Teste em dispositivos diferentes
+    default:
+      return """🔧 **SOLUÇÃO RÁPIDA (2 min):**
+1. ⚡ Reinicie todos os equipamentos
+2. 📱 Teste em dispositivo diferente
+3. ⏰ Aguarde 5 minutos e teste novamente
 
-**2. CONFIGURAÇÕES DE REDE (15 minutos)**
-   ✓ Configure DNS apropriado (8.8.8.8, 1.1.1.1)
-   ✓ Verifique configurações de IP (automático vs manual)
-   ✓ Teste conexão cabeada vs wireless
-   ✓ Reinicie configurações de rede se necessário
+🔧 **SE NÃO RESOLVER (5 min):**
+1. 🔗 Verifique todos os cabos
+2. 📶 Teste conexão em local diferente
+3. 📞 Anote horário exato do problema
 
-**3. TESTES AVANÇADOS (20 minutos)**
-   ✓ Execute teste de ping para gateway local
-   ✓ Faça traceroute para servidores externos
-   ✓ Monitore estabilidade da conexão por 10 minutos
-   ✓ Documente todos os resultados obtidos""";
-    }
+⚠️ **AINDA COM PROBLEMA:**
+"Ligue para operadora com horário exato e descrição do problema"
+
+✅ **DICA RÁPIDA:**
+Mantenha equipamentos sempre atualizados""";
   }
+}
 
   String _gerarInstrucoesSuporte(String categoria) {
     switch (categoria) {

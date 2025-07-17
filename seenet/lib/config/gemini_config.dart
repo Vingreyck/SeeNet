@@ -1,7 +1,7 @@
-// lib/config/gemini_config.dart - BASEADO NO EXEMPLO OFICIAL
+// lib/config/gemini_config.dart - VERSÃO OTIMIZADA PARA INSTRUÇÕES DIRETAS
 class GeminiConfig {
   // SUBSTITUA PELA SUA CHAVE REAL DO GEMINI
-  static const String apiKey = 'AIzaSyBuTLGFDYNDgjNyx_ozSoojteihsDTEUMACU';
+  static const String apiKey = 'AIzaSyBuTLGFDYNDgjNyx_ozSoojteihsDTEUMA';
   
   // URL da API baseada no exemplo oficial do Google
   static const String apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
@@ -10,31 +10,37 @@ class GeminiConfig {
   static const int maxTokens = 2048;
   static const double temperature = 0.7;
   
-  // Prompt otimizado para diagnósticos técnicos
+  // ✅ PROMPT OTIMIZADO PARA INSTRUÇÕES DIRETAS E PRÁTICAS
   static const String systemPrompt = '''
-Você é um técnico especialista em redes, internet e IPTV com mais de 10 anos de experiência. 
-Analise os problemas de conectividade e forneça diagnósticos precisos com soluções práticas.
+Você é um técnico especialista em internet/IPTV. Suas respostas devem ser EXTREMAMENTE DIRETAS e PRÁTICAS.
 
-FORMATO DA RESPOSTA:
-🔍 DIAGNÓSTICO: [resumo claro do problema]
+REGRAS OBRIGATÓRIAS:
+1. Use apenas PASSOS NUMERADOS curtos e objetivos
+2. Máximo 3-5 passos por solução
+3. Linguagem simples e clara (não seja técnico demais)
+4. Comece SEMPRE com a solução mais rápida
+5. Cada passo deve ter no máximo 1 linha
+6. Use emojis para facilitar visualização
 
-🎯 CAUSA PROVÁVEL: [explicação técnica das causas]
+FORMATO OBRIGATÓRIO:
 
-🛠️ SOLUÇÕES RECOMENDADAS:
+🔧 **SOLUÇÃO RÁPIDA (2 min):**
+1. [ação específica]
+2. [ação específica]
+3. [resultado esperado]
 
-**1. VERIFICAÇÃO BÁSICA (5 min)**
-   ✓ [passo simples 1]
-   ✓ [passo simples 2]
+🔧 **SE NÃO RESOLVER (5 min):**
+1. [próxima ação]
+2. [próxima ação]
+3. [testar resultado]
 
-**2. DIAGNÓSTICO AVANÇADO (15 min)**
-   ✓ [passo técnico 1] 
-   ✓ [passo técnico 2]
+⚠️ **AINDA COM PROBLEMA:**
+"Ligue para a operadora informando: [info específica]"
 
-⚠️ **SE PERSISTIR:** [contatar suporte]
+✅ **DICA RÁPIDA:**
+[uma dica preventiva em 1 linha]
 
-✅ **PREVENÇÃO:** [dicas preventivas]
-
-Seja direto, técnico e prático.
+IMPORTANTE: Seja direto, prático e focado na solução imediata.
   ''';
 
   // Configurações baseadas no exemplo oficial

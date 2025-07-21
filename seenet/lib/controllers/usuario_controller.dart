@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../models/usuario.dart';
 import '../services/database_helper.dart';
+import '../services/security_service.dart';
 
 class UsuarioController extends GetxController {
   Rx<Usuario?> usuarioLogado = Rx<Usuario?>(null);
@@ -17,44 +18,107 @@ class UsuarioController extends GetxController {
 
   // Login usando SQLite
   Future<bool> login(String email, String senha) async {
-    try {
-      isLoading.value = true;
-      
-      Usuario? usuario = await DatabaseHelper.instance.loginUsuario(
-        email.toLowerCase().trim(), 
-        senha
-      );
-      
-      if (usuario != null) {
-        usuarioLogado.value = usuario;
-        print('✅ Login realizado: ${usuario.email}');
-        
-        Get.snackbar(
-          'Sucesso',
-          'Bem-vindo, ${usuario.nome}!',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-        return true;
-      } else {
-        print('❌ Credenciais inválidas para: $email');
-        return false;
-      }
-    } catch (e) {
-      print('❌ Erro no login: $e');
+  try {
+    isLoading.value = true;
+    
+    // Validações de segurança
+    if (email.trim().isEmpty) {
       Get.snackbar(
         'Erro',
-        'Erro interno no sistema',
+        'Email não pode ser vazio',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
       return false;
-    } finally {
-      isLoading.value = false;
     }
+    
+    if (!SecurityService.isValidEmail(email)) {
+      Get.snackbar(
+        'Erro',
+        'Formato de email inválido',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+    
+    if (senha.isEmpty) {
+      Get.snackbar(
+        'Erro',
+        'Senha não pode ser vazia',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+    
+    // Validar força da senha
+    String? senhaError = SecurityService.validatePassword(senha);
+    if (senhaError != null) {
+      Get.snackbar(
+        'Erro',
+        senhaError,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+    
+    // Tentar fazer login
+    Usuario? usuario = await DatabaseHelper.instance.loginUsuario(
+      email.trim(),
+      senha
+    );
+
+    if (usuario != null) {
+      usuarioLogado.value = usuario;
+      
+      print('✅ Login realizado: ${SecurityService.maskSensitiveData(email)}');
+      
+      Get.snackbar(
+        'Sucesso',
+        'Bem-vindo, ${usuario.nome}!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+      return true;
+    } else {
+      print('❌ Login falhou para: ${SecurityService.maskSensitiveData(email)}');
+      
+      Get.snackbar(
+        'Erro',
+        'Email ou senha incorretos',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+  } catch (e) {
+    print('❌ Erro no login: $e');
+    
+    String mensagem = 'Erro ao conectar com servidor';
+    if (e.toString().contains('Muitas tentativas')) {
+      mensagem = e.toString();
+    }
+    
+    Get.snackbar(
+      'Erro',
+      mensagem,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
+    return false;
+  } finally {
+    isLoading.value = false;
   }
+}
 
   // Registrar usuário - CORRIGIDO
   Future<bool> registrar(String nome, String email, String senha) async {

@@ -1,16 +1,14 @@
-// lib/config/gemini_config.dart - VERSÃO OTIMIZADA PARA INSTRUÇÕES DIRETAS
+import 'environment.dart';
+
 class GeminiConfig {
-  // SUBSTITUA PELA SUA CHAVE REAL DO GEMINI
-  static const String apiKey = 'AIzaSyBuTLGFDYNDgjNyx_ozSoojteihsDTEUMA';
+  // Agora usando Environment
+  static String get apiKey => Environment.geminiApiKey;
   
-  // URL da API baseada no exemplo oficial do Google
   static const String apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
   
-  // Configurações do modelo
   static const int maxTokens = 2048;
   static const double temperature = 0.7;
   
-  // ✅ PROMPT OTIMIZADO PARA INSTRUÇÕES DIRETAS E PRÁTICAS
   static const String systemPrompt = '''
 Você é um técnico especialista em internet/IPTV. Suas respostas devem ser EXTREMAMENTE DIRETAS e PRÁTICAS.
 
@@ -43,25 +41,26 @@ FORMATO OBRIGATÓRIO:
 IMPORTANTE: Seja direto, prático e focado na solução imediata.
   ''';
 
-  // Configurações baseadas no exemplo oficial
   static const String modelName = 'gemini-2.0-flash';
   static const String apiVersion = 'v1beta';
-  
-  // URLs úteis
   static const String apiKeyUrl = 'https://makersuite.google.com/app/apikey';
   
   // Verificar se está configurado
   static bool get isConfigured {
-    return apiKey != 'SUA_CHAVE_GEMINI_AQUI' && 
-           apiKey.isNotEmpty &&
-           apiKey.length > 20;
+    return apiKey.isNotEmpty && 
+           apiKey.length > 20 &&
+           apiKey.startsWith('AIza');
   }
   
-  // Debug
+  // Debug - só mostra se necessário
   static void printStatus() {
+    if (!Environment.enableDebugLogs) return;
+    
     print('🔑 Gemini configurado: ${isConfigured ? "SIM" : "NÃO"}');
     if (isConfigured) {
       print('🗝️ Chave: ${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}');
+    } else {
+      print('⚠️ Configure a chave em: $apiKeyUrl');
     }
     print('🤖 Modelo: $modelName');
     print('📡 URL: $apiUrl');

@@ -9,10 +9,14 @@ import 'package:seenet/admin/usuarios_admin.view.dart'; // ← NOVA IMPORTAÇÃO
 import 'package:seenet/admin/checkmarks_admin.view.dart'; // ← NOVA IMPORTAÇÃO
 import 'splash_screen/splash_screen.dart';
 import 'package:get/get.dart';
+import 'package:seenet/config/gemini_config.dart'; // Importar configuração do Gemini
 import 'package:seenet/login/login.view.dart';
 import 'package:seenet/checklist/checklist.view.dart';
 import 'package:seenet/diagnostico/diagnostico.view.dart';
 import 'package:seenet/registro/widgets/registro.bindings.dart';
+
+// Importe a configuração de ambiente
+import 'package:seenet/config/environment.dart';
 
 // Importar controllers
 import 'controllers/usuario_controller.dart';
@@ -21,6 +25,15 @@ import 'controllers/diagnostico_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Configurar ambiente
+  Environment.printConfiguration();
+  GeminiConfig.printStatus();
+  
+  // Verificar configuração crítica
+  if (Environment.isProduction && !Environment.isConfigured) {
+    throw Exception('❌ Configuração incompleta para produção');
+  }
   
   // Inicializar controllers globais
   Get.put(UsuarioController(), permanent: true);

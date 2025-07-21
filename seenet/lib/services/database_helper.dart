@@ -7,6 +7,8 @@ import '../models/checkmark.dart';
 import '../models/avaliacao.dart';
 import '../models/resposta_checkmark.dart';
 import '../models/diagnostico.dart';
+import '../config/environment.dart';
+import 'security_service.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
@@ -326,26 +328,81 @@ class DatabaseHelper {
   
   // ========== MÉTODOS PARA USUÁRIOS ==========
   Future<Usuario?> loginUsuario(String email, String senha) async {
-    try {
-      final db = await database;
-      String senhaHash = _hashPassword(senha);
-      
-      List<Map<String, dynamic>> results = await db.query(
-        'usuarios',
-        where: 'email = ? AND (senha = ? OR senha = ?) AND ativo = 1',
-        whereArgs: [email, senha, senhaHash],
-      );
-      
-      if (results.isNotEmpty) {
-        print('✅ Login: $email');
-        return Usuario.fromMap(results.first);
-      }
-      return null;
-    } catch (e) {
-      print('❌ Erro login: $e');
+  try {
+    // Sanitizar email
+    email = SecurityService.sanitizeInput(email.toLowerCase().trim());
+    
+    // Verificar rate limiting
+    if (!SecurityService.checkRateLimit(email, maxAttempts: Environment.maxLoginAttempts)) {
+      print('⚠️ Rate limit excedido para: ${SecurityService.maskSensitiveData(email)}');
+      throw Exception('Muitas tentativas de login. Tente novamente em 15 minutos.');
+    }
+    
+    final db = await database;
+    
+    // Buscar usuário por email
+    List<Map<String, dynamic>> results = await db.query(
+      'usuarios',
+      where: 'email = ? AND ativo = 1',
+      whereArgs: [email],
+    );
+    
+    if (results.isEmpty) {
+      print('❌ Usuário não encontrado: ${SecurityService.maskSensitiveData(email)}');
       return null;
     }
+    
+    final userData = results.first;
+    final storedPassword = userData['senha'] as String;
+    
+    // Verificar senha - suporta tanto hash antigo quanto novo
+    bool passwordValid = false;
+    
+    if (storedPassword.contains(':')) {
+      // Novo formato com salt
+      passwordValid = SecurityService.verifyPassword(senha, storedPassword);
+    } else {
+      // Formato antigo (compatibilidade)
+      String oldHash = _hashPassword(senha);
+      passwordValid = (storedPassword == oldHash || storedPassword == senha);
+      
+      // Se login com formato antigo for bem-sucedido, atualizar para novo formato
+      if (passwordValid) {
+        String newHash = SecurityService.hashPassword(senha);
+        await db.update(
+          'usuarios',
+          {'senha': newHash},
+          where: 'id = ?',
+          whereArgs: [userData['id']],
+        );
+        print('🔄 Senha migrada para formato seguro para usuário: ${userData['id']}');
+      }
+    }
+    
+    if (passwordValid) {
+      // Login bem-sucedido
+      SecurityService.clearRateLimit(email);
+      
+      // Atualizar último login
+      await db.update(
+        'usuarios',
+        {'data_atualizacao': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [userData['id']],
+      );
+      
+      print('✅ Login bem-sucedido: ${SecurityService.maskSensitiveData(email)}');
+      return Usuario.fromMap(userData);
+    } else {
+      print('❌ Senha incorreta para: ${SecurityService.maskSensitiveData(email)}');
+      return null;
+    }
+    
+  } catch (e) {
+    print('❌ Erro no login: $e');
+    rethrow;
   }
+}
   
   Future<bool> criarUsuario(Usuario usuario) async {
     try {

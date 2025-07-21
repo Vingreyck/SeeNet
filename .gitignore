@@ -1,0 +1,29 @@
+# Flutter
+/build/
+/.dart_tool/
+/.packages
+.metadata
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sensitive files - NUNCA COMMITIR
+.env
+.env.local
+.env.production
+lib/config/env_config.dart
+**/api_keys.dart
+**/secrets.dart
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

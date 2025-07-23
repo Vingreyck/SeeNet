@@ -4,6 +4,8 @@ import '../models/checkmark.dart';
 import '../models/avaliacao.dart';
 import '../models/resposta_checkmark.dart';
 import '../services/database_helper.dart';
+import '../services/audit_service.dart';
+import './usuario_controller.dart';
 
 class CheckmarkController extends GetxController {
   RxList<CategoriaCheckmark> categorias = <CategoriaCheckmark>[].obs;
@@ -93,6 +95,14 @@ class CheckmarkController extends GetxController {
           await DatabaseHelper.instance.salvarResposta(resposta);
         }
       }
+
+      // Adicionar log de auditoria
+      await AuditService.instance.log(
+        action: AuditAction.evaluationCompleted,
+        usuarioId: Get.find<UsuarioController>().idUsuario,
+        tabelaAfetada: 'avaliacoes',
+        registroId: avaliacaoAtual.value!.id,
+      );
       
       print('✅ ${respostas.length} respostas salvas');
       return true;

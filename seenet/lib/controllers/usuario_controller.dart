@@ -1,9 +1,12 @@
 // lib/controllers/usuario_controller.dart - VERSÃO MELHORADA
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../models/usuario.dart';
 import '../services/database_helper.dart';
 import '../services/security_service.dart';
+import '../services/audit_service.dart';
+import '../config/environment.dart'; // Adicione este import (ajuste o caminho conforme necessário)
 
 class UsuarioController extends GetxController {
   Rx<Usuario?> usuarioLogado = Rx<Usuario?>(null);
@@ -198,11 +201,15 @@ class UsuarioController extends GetxController {
   }
 
   // Logout
-  void logout() {
+  Future<void> logout() async {
+    if (usuarioLogado.value?.id != null) {
+      await DatabaseHelper.instance.logoutUsuario(usuarioLogado.value!.id!);
+    }
     usuarioLogado.value = null;
     print('👋 Logout realizado');
     Get.offAllNamed('/login');
   }
+  
 
   // Atualizar dados do usuário
   Future<bool> atualizarPerfil({
@@ -289,6 +296,20 @@ class UsuarioController extends GetxController {
     } else {
       print('👤 Nenhum usuário logado');
     }
+  }
+  Timer? _sessionTimer;
+
+  void iniciarTimerSessao() {
+    _sessionTimer?.cancel();
+    _sessionTimer = Timer(Duration(minutes: Environment.sessionTimeoutMinutes), () {
+      // Log de sessão expirada
+      AuditService.instance.log(
+        action: AuditAction.logout,
+        usuarioId: idUsuario,
+        detalhes: 'Sessão expirada por inatividade',
+      );
+      logout();
+    });
   }
 
   // ✅ NOVO - Forçar correção e relogin do admin

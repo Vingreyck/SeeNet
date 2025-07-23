@@ -1,8 +1,15 @@
 // lib/services/security_service.dart - VERSÃO CORRIGIDA
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'package:encrypt/encrypt.dart';
 import 'dart:math';
 import '../config/environment.dart'; // ← IMPORT NECESSÁRIO
+
+enum PasswordStrength {
+  weak,
+  medium,
+  strong,
+}
 
 class SecurityService {
   static const String _chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
@@ -119,4 +126,51 @@ class SecurityService {
     
     return '${data.substring(0, visibleChars)}${'*' * (data.length - visibleChars * 2)}${data.substring(data.length - visibleChars)}';
   }
+  static String encrypt(String plainText, String key) {
+    try {
+      // Pad the key to exactly 32 bytes (256 bits)
+      final paddedKey = key.padRight(32).substring(0, 32);
+      
+      final encrypter = Encrypter(AES(Key.fromUtf8(paddedKey)));
+      final iv = IV.fromLength(16); // Generate IV for AES
+      
+      final encrypted = encrypter.encrypt(plainText, iv: iv);
+      return '${encrypted.base64}:${iv.base64}'; // Store IV with encrypted data
+    } catch (e) {
+      throw Exception('Encryption failed: $e');
+    }
+  }
+
+  static String decrypt(String encryptedText, String key) {
+    try {
+      final parts = encryptedText.split(':');
+      if (parts.length != 2) throw Exception('Invalid encrypted text format');
+
+      // Pad the key to exactly 32 bytes (256 bits)
+      final paddedKey = key.padRight(32).substring(0, 32);
+      
+      final encrypter = Encrypter(AES(Key.fromUtf8(paddedKey)));
+      final iv = IV.fromBase64(parts[1]);
+      final encrypted = Encrypted.fromBase64(parts[0]);
+      
+      return encrypter.decrypt(encrypted, iv: iv);
+    } catch (e) {
+      throw Exception('Decryption failed: $e');
+    }
+  }
+
+  static PasswordStrength checkPasswordStrength(String password) {
+  int strength = 0;
+  
+  if (password.length >= 8) strength++;
+  if (password.length >= 12) strength++;
+  if (RegExp(r'[A-Z]').hasMatch(password)) strength++;
+  if (RegExp(r'[a-z]').hasMatch(password)) strength++;
+  if (RegExp(r'[0-9]').hasMatch(password)) strength++;
+  if (RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) strength++;
+  
+  if (strength <= 2) return PasswordStrength.weak;
+  if (strength <= 4) return PasswordStrength.medium;
+  return PasswordStrength.strong;
+}
 }

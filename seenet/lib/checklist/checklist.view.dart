@@ -290,6 +290,19 @@ class Checklistview extends StatelessWidget {
               ],
               
               const SizedBox(height: 12),
+
+              _buildMenuOption(
+                icon: Icons.security,
+                title: 'Logs de Auditoria',
+                subtitle: 'Ver logs de segurança e atividades',
+                onTap: () {
+                  Navigator.pop(context);
+                  Get.toNamed('/admin/logs');
+                },
+                color: Colors.purple,
+              ),
+
+              const SizedBox(height: 12),
               
               _buildMenuOption(
                 icon: Icons.logout,

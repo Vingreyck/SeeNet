@@ -12,6 +12,7 @@ import 'package:get/get.dart';
 import 'package:seenet/config/gemini_config.dart'; // Importar configuração do Gemini
 import 'package:seenet/login/login.view.dart';
 import 'package:seenet/checklist/checklist.view.dart';
+import 'package:seenet/admin/logs_admin.view.dart'; // ← NOVA IMPORTAÇÃO
 import 'package:seenet/diagnostico/diagnostico.view.dart';
 import 'package:seenet/registro/widgets/registro.bindings.dart';
 
@@ -100,6 +101,10 @@ class MyApp extends StatelessWidget {
           name: '/admin/checkmarks',
           page: () => const CheckmarksAdminView(),
         ),
+        GetPage(
+          name: '/admin/logs',
+          page: () => const LogsAdminView(),
+        )
       ],
     );
   }

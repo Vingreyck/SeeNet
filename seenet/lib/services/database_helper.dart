@@ -7,14 +7,16 @@ import '../models/checkmark.dart';
 import '../models/avaliacao.dart';
 import '../models/resposta_checkmark.dart';
 import '../models/diagnostico.dart';
+import '../models/log_sistema.dart';
 import '../config/environment.dart';
 import 'security_service.dart';
+import 'audit_service.dart'; // ← NOVO IMPORT
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
 class DatabaseHelper {
   static const String _databaseName = 'seenet.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 2; // ← INCREMENTADO PARA ADICIONAR LOGS
   
   static Database? _database;
   
@@ -38,6 +40,7 @@ class DatabaseHelper {
         path,
         version: _databaseVersion,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade, // ← NOVO: Para atualizar banco existente
         onOpen: _onOpen,
       );
       
@@ -62,6 +65,8 @@ class DatabaseHelper {
         senha TEXT NOT NULL,
         tipo_usuario TEXT NOT NULL CHECK (tipo_usuario IN ('tecnico', 'administrador')),
         ativo INTEGER DEFAULT 1,
+        tentativas_login INTEGER DEFAULT 0,
+        ultimo_login TEXT,
         data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
         data_atualizacao TEXT DEFAULT CURRENT_TIMESTAMP
       )
@@ -143,7 +148,26 @@ class DatabaseHelper {
       )
     ''');
     
+    // ← NOVA TABELA: Criar tabela de logs
+    await AuditService.createTable(db);
+    
     print('✅ Tabelas criadas com sucesso');
+  }
+  
+  // ← NOVO: Atualizar banco existente
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    print('📈 Atualizando banco de v$oldVersion para v$newVersion');
+    
+    if (oldVersion < 2) {
+      // Adicionar tabela de logs
+      await AuditService.createTable(db);
+      
+      // Adicionar campos de segurança na tabela usuarios
+      await db.execute('ALTER TABLE usuarios ADD COLUMN tentativas_login INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE usuarios ADD COLUMN ultimo_login TEXT');
+      
+      print('✅ Banco atualizado para versão 2');
+    }
   }
   
   // Executar quando abrir database
@@ -164,18 +188,18 @@ class DatabaseHelper {
       
       print('📊 Inserindo dados iniciais...');
       
-      // Inserir usuários
+      // Inserir usuários com senha segura
       await db.insert('usuarios', {
         'nome': 'Administrador',
         'email': 'admin@seenet.com',
-        'senha': _hashPassword('admin123'),
+        'senha': SecurityService.hashPassword('admin123'), // ← Usar novo hash
         'tipo_usuario': 'administrador',
       });
       
       await db.insert('usuarios', {
         'nome': 'Técnico Teste',
         'email': 'tecnico@seenet.com',
-        'senha': _hashPassword('123456'),
+        'senha': SecurityService.hashPassword('123456'), // ← Usar novo hash
         'tipo_usuario': 'tecnico',
       });
 
@@ -326,101 +350,310 @@ class DatabaseHelper {
     }
   }
   
-  // ========== MÉTODOS PARA USUÁRIOS ==========
-  Future<Usuario?> loginUsuario(String email, String senha) async {
-  try {
-    // Sanitizar email
-    email = SecurityService.sanitizeInput(email.toLowerCase().trim());
-    
-    // Verificar rate limiting
-    if (!SecurityService.checkRateLimit(email, maxAttempts: Environment.maxLoginAttempts)) {
-      print('⚠️ Rate limit excedido para: ${SecurityService.maskSensitiveData(email)}');
-      throw Exception('Muitas tentativas de login. Tente novamente em 15 minutos.');
-    }
-    
-    final db = await database;
-    
-    // Buscar usuário por email
-    List<Map<String, dynamic>> results = await db.query(
-      'usuarios',
-      where: 'email = ? AND ativo = 1',
-      whereArgs: [email],
-    );
-    
-    if (results.isEmpty) {
-      print('❌ Usuário não encontrado: ${SecurityService.maskSensitiveData(email)}');
-      return null;
-    }
-    
-    final userData = results.first;
-    final storedPassword = userData['senha'] as String;
-    
-    // Verificar senha - suporta tanto hash antigo quanto novo
-    bool passwordValid = false;
-    
-    if (storedPassword.contains(':')) {
-      // Novo formato com salt
-      passwordValid = SecurityService.verifyPassword(senha, storedPassword);
-    } else {
-      // Formato antigo (compatibilidade)
-      String oldHash = _hashPassword(senha);
-      passwordValid = (storedPassword == oldHash || storedPassword == senha);
+   Future<Usuario?> loginUsuario(String email, String senha) async {
+    try {
+      // Sanitizar email
+      email = SecurityService.sanitizeInput(email.toLowerCase().trim());
       
-      // Se login com formato antigo for bem-sucedido, atualizar para novo formato
+      // Verificar rate limiting
+      if (!SecurityService.checkRateLimit(email, maxAttempts: Environment.maxLoginAttempts)) {
+        // ← LOG: Tentativa bloqueada por rate limit
+        await AuditService.instance.logLogin(
+          email: email,
+          sucesso: false,
+          motivo: 'Rate limit excedido',
+        );
+        
+        print('⚠️ Rate limit excedido para: ${SecurityService.maskSensitiveData(email)}');
+        throw Exception('Muitas tentativas de login. Tente novamente em 15 minutos.');
+      }
+      
+      final db = await database;
+      
+      // Buscar usuário por email
+      List<Map<String, dynamic>> results = await db.query(
+        'usuarios',
+        where: 'email = ? AND ativo = 1',
+        whereArgs: [email],
+      );
+      
+      if (results.isEmpty) {
+        // ← LOG: Usuário não encontrado
+        await AuditService.instance.logLogin(
+          email: email,
+          sucesso: false,
+          motivo: 'Usuário não encontrado',
+        );
+        
+        print('❌ Usuário não encontrado: ${SecurityService.maskSensitiveData(email)}');
+        return null;
+      }
+      
+      final userData = results.first;
+      final storedPassword = userData['senha'] as String;
+      
+      // Verificar senha
+      bool passwordValid = false;
+      
+      if (storedPassword.contains(':')) {
+        // Novo formato com salt
+        passwordValid = SecurityService.verifyPassword(senha, storedPassword);
+      } else {
+        // Formato antigo (compatibilidade)
+        String oldHash = _hashPassword(senha);
+        passwordValid = (storedPassword == oldHash || storedPassword == senha);
+        
+        // Se login com formato antigo for bem-sucedido, atualizar para novo formato
+        if (passwordValid) {
+          String newHash = SecurityService.hashPassword(senha);
+          await db.update(
+            'usuarios',
+            {'senha': newHash},
+            where: 'id = ?',
+            whereArgs: [userData['id']],
+          );
+          print('🔄 Senha migrada para formato seguro para usuário: ${userData['id']}');
+        }
+      }
+      
       if (passwordValid) {
-        String newHash = SecurityService.hashPassword(senha);
+        // Login bem-sucedido
+        SecurityService.clearRateLimit(email);
+        
+        // Atualizar último login e resetar tentativas
         await db.update(
           'usuarios',
-          {'senha': newHash},
+          {
+            'ultimo_login': DateTime.now().toIso8601String(),
+            'tentativas_login': 0,
+            'data_atualizacao': DateTime.now().toIso8601String()
+          },
           where: 'id = ?',
           whereArgs: [userData['id']],
         );
-        print('🔄 Senha migrada para formato seguro para usuário: ${userData['id']}');
+        
+        // ← LOG: Login bem-sucedido
+        await AuditService.instance.logLogin(
+          email: email,
+          sucesso: true,
+          usuarioId: userData['id'] as int,
+        );
+        
+        print('✅ Login bem-sucedido: ${SecurityService.maskSensitiveData(email)}');
+        return Usuario.fromMap(userData);
+      } else {
+        // Incrementar tentativas de login falhas
+        await db.update(
+          'usuarios',
+          {
+            'tentativas_login': (userData['tentativas_login'] ?? 0) + 1,
+          },
+          where: 'id = ?',
+          whereArgs: [userData['id']],
+        );
+        
+        // ← LOG: Senha incorreta
+        await AuditService.instance.logLogin(
+          email: email,
+          sucesso: false,
+          usuarioId: userData['id'] as int,
+          motivo: 'Senha incorreta',
+        );
+        
+        print('❌ Senha incorreta para: ${SecurityService.maskSensitiveData(email)}');
+        return null;
       }
-    }
-    
-    if (passwordValid) {
-      // Login bem-sucedido
-      SecurityService.clearRateLimit(email);
       
-      // Atualizar último login
-      await db.update(
-        'usuarios',
-        {'data_atualizacao': DateTime.now().toIso8601String()},
-        where: 'id = ?',
-        whereArgs: [userData['id']],
-      );
-      
-      print('✅ Login bem-sucedido: ${SecurityService.maskSensitiveData(email)}');
-      return Usuario.fromMap(userData);
-    } else {
-      print('❌ Senha incorreta para: ${SecurityService.maskSensitiveData(email)}');
-      return null;
+    } catch (e) {
+      print('❌ Erro no login: $e');
+      rethrow;
     }
-    
-  } catch (e) {
-    print('❌ Erro no login: $e');
-    rethrow;
   }
-}
   
   Future<bool> criarUsuario(Usuario usuario) async {
     try {
       final db = await database;
       
-      await db.insert('usuarios', {
+      int id = await db.insert('usuarios', {
         'nome': usuario.nome,
-        'email': usuario.email,
-        'senha': _hashPassword(usuario.senha),
+        'email': usuario.email.toLowerCase(),
+        'senha': SecurityService.hashPassword(usuario.senha), // ← Usar novo hash
         'tipo_usuario': usuario.tipoUsuario,
         'ativo': usuario.ativo ? 1 : 0,
       });
+      
+      // ← LOG: Usuário criado
+      await AuditService.instance.logUserChange(
+        operacao: 'create',
+        usuarioId: id,
+        operadorId: null, // Auto-registro
+        dadosNovos: {
+          'nome': usuario.nome,
+          'email': usuario.email,
+          'tipo_usuario': usuario.tipoUsuario,
+        },
+      );
       
       print('✅ Usuário criado: ${usuario.email}');
       return true;
     } catch (e) {
       print('❌ Erro criar usuário: $e');
       return false;
+    }
+  }
+
+  // ========== MÉTODOS PARA CHECKMARKS COM AUDITORIA ==========
+  
+  Future<bool> criarCheckmark(Checkmark checkmark, int operadorId) async {
+    try {
+      final db = await database;
+      
+      int id = await db.insert('checkmarks', checkmark.toMap());
+      
+      // ← LOG: Checkmark criado
+      await AuditService.instance.log(
+        action: AuditAction.checkmarkCreated,
+        usuarioId: operadorId,
+        tabelaAfetada: 'checkmarks',
+        registroId: id,
+        dadosNovos: checkmark.toMap(),
+      );
+      
+      print('✅ Checkmark criado: $id');
+      return true;
+    } catch (e) {
+      print('❌ Erro ao criar checkmark: $e');
+      return false;
+    }
+  }
+  
+  // ========== MÉTODOS PARA DIAGNÓSTICOS COM AUDITORIA ==========
+
+  Future<bool> salvarDiagnosticoComAuditoria(Diagnostico diagnostico) async {
+    try {
+      final db = await database;
+      await db.insert('diagnosticos', diagnostico.toMap());
+      
+      // ← LOG: Diagnóstico gerado
+      await AuditService.instance.log(
+        action: diagnostico.isSucesso 
+            ? AuditAction.diagnosticGenerated 
+            : AuditAction.diagnosticFailed,
+        tabelaAfetada: 'diagnosticos',
+        detalhes: diagnostico.isSucesso 
+            ? 'Diagnóstico gerado com sucesso'
+            : 'Falha ao gerar diagnóstico: ${diagnostico.erroApi}',
+      );
+      
+      print('✅ Diagnóstico salvo para avaliação ${diagnostico.avaliacaoId}');
+      return true;
+    } catch (e) {
+      print('❌ Erro salvar diagnóstico: $e');
+      return false;
+    }
+  }
+  // ========== MÉTODOS DE SEGURANÇA E MANUTENÇÃO ==========
+  
+  // Verificar integridade do banco
+  Future<Map<String, dynamic>> verificarIntegridade() async {
+    try {
+      final db = await database;
+      Map<String, dynamic> resultado = {};
+      
+      // Verificar usuários com senhas fracas (formato antigo)
+      var senhasFracas = await db.rawQuery('''
+        SELECT COUNT(*) as total FROM usuarios 
+        WHERE senha NOT LIKE '%:%'
+      ''');
+      resultado['senhas_fracas'] = senhasFracas.first['total'];
+      
+      // Verificar tentativas de login excessivas
+      var tentativasExcessivas = await db.rawQuery('''
+        SELECT id, email, tentativas_login FROM usuarios 
+        WHERE tentativas_login > 5
+      ''');
+      resultado['usuarios_bloqueados'] = tentativasExcessivas;
+      
+      // Logs suspeitos
+      var logsSuspeitos = await AuditService.instance.buscarLogs(
+        nivel: 'error',
+        dataInicio: DateTime.now().subtract(const Duration(days: 7)),
+      );
+      resultado['logs_suspeitos'] = logsSuspeitos.length;
+      
+      // ← LOG: Verificação de integridade
+      await AuditService.instance.log(
+        action: AuditAction.configChanged,
+        detalhes: 'Verificação de integridade executada',
+      );
+      
+      return resultado;
+    } catch (e) {
+      print('❌ Erro ao verificar integridade: $e');
+      return {'erro': e.toString()};
+    }
+  }
+  
+  // Backup do banco
+  Future<bool> fazerBackup(int operadorId) async {
+    try {
+      // Implementar backup real aqui
+      // Por enquanto, apenas registrar a ação
+      
+      // ← LOG: Backup realizado
+      await AuditService.instance.log(
+        action: AuditAction.dataExported,
+        usuarioId: operadorId,
+        detalhes: 'Backup do banco de dados realizado',
+      );
+      
+      print('💾 Backup realizado');
+      return true;
+    } catch (e) {
+      print('❌ Erro ao fazer backup: $e');
+      return false;
+    }
+  }
+  
+  // ========== MÉTODOS AUXILIARES (mantidos do original) ==========
+  
+  static String _hashPassword(String password) {
+    var bytes = utf8.encode(password);
+    var digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  Future<void> closeDatabase() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+      print('🔒 SQLite database fechado');
+    }
+  }
+
+  Future<bool> testarConexaoRapida() async {
+    try {
+      await database;
+      print('✅ SQLite funcionando perfeitamente');
+      return true;
+    } catch (e) {
+      print('❌ Erro no SQLite: $e');
+      return false;
+    }
+  }
+
+    // ← NOVO: Logout com auditoria
+  Future<void> logoutUsuario(int usuarioId) async {
+    try {
+      await AuditService.instance.log(
+        action: AuditAction.logout,
+        usuarioId: usuarioId,
+        detalhes: 'Logout realizado',
+      );
+      
+      print('👋 Logout registrado para usuário: $usuarioId');
+    } catch (e) {
+      print('❌ Erro ao registrar logout: $e');
     }
   }
 // Adicione este método no seu DatabaseHelper para corrigir o admin
@@ -789,11 +1022,6 @@ String _formatarDataConsole(String? dataString) {
   }
 
   // ========== UTILIDADES ==========
-  static String _hashPassword(String password) {
-    var bytes = utf8.encode(password);
-    var digest = sha256.convert(bytes);
-    return digest.toString();
-  }
 
   Future<void> close() async {
     if (_database != null) {

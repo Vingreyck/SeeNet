@@ -27,3 +27,4 @@ Thumbs.db
 
 # Logs
 *.log
+/seenet/lib/config/env.config_example.dart

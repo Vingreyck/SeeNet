@@ -1,17 +1,19 @@
-// lib/config/database_config.dart - CONFIGURAÇÃO REAL
+// lib/config/database_config.dart - CORRIGIDO
+import 'env.config_example.dart'; // ← IMPORT CORRETO (não o .example)
+
 class DatabaseConfig {
   // Configuração para desenvolvimento local
   static const bool isProduction = false;
   
-  // Configurações locais (ajuste conforme seu setup)
-  static const String localHost = '127.0.0.1';  // ou 'localhost'
-  static const String localUsername = 'root';    // seu usuário MySQL
-  static const String localPassword = '12345678'; // sua senha MySQL (ajuste aqui)
+  // Configurações locais (vem do arquivo de configuração)
+  static const String localHost = '127.0.0.1';
+  static const String localUsername = 'root';
+  static String get localPassword => EnvConfig.localDbPassword; 
   
-  // Configurações do servidor (para quando subir)
-  static const String serverHost = 'IP_DO_SERVIDOR_AQUI';
-  static const String serverUsername = 'flutter_user';
-  static const String serverPassword = '1524Br101';
+  // Configurações do servidor (vem do arquivo de configuração)
+  static String get serverHost => EnvConfig.serverHost;
+  static String get serverUsername => EnvConfig.serverUsername;
+  static String get serverPassword => EnvConfig.serverDbPassword;
   
   // Configurações ativas
   static String get host => isProduction ? serverHost : localHost;

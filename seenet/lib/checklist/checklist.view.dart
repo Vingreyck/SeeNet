@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:seenet/checklist/widgets/checklist_categoria_card.widget.dart';
 import 'package:get/get.dart';
-import '../controllers/usuario_controller.dart'; // ← NOVA IMPORTAÇÃO
+import '../controllers/usuario_controller.dart';
 
 class Checklistview extends StatelessWidget {
   const Checklistview({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // ← OBTER CONTROLLER DO USUÁRIO
     final UsuarioController usuarioController = Get.find<UsuarioController>();
 
     return Scaffold(
@@ -65,7 +64,6 @@ class Checklistview extends StatelessWidget {
                         ),
                       ],
                     ),
-                    // ← BOTÃO DE PERFIL/ADMIN MODIFICADO
                     GestureDetector(
                       onTap: () {
                         _mostrarMenuUsuario(context, usuarioController);
@@ -75,7 +73,6 @@ class Checklistview extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.white.withOpacity(0.2),
-                          // Borda especial para admin
                           border: usuarioController.isAdmin 
                               ? Border.all(color: Colors.orange, width: 2)
                               : null,
@@ -136,7 +133,6 @@ class Checklistview extends StatelessWidget {
               ),
             ),
           ),
-          //Container
           Positioned(
             top: 270, 
             left: 0,
@@ -145,7 +141,6 @@ class Checklistview extends StatelessWidget {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Card 1 - Lentidão
                   ChecklistCategoriaCardWidget(
                     title: 'Lentidão',
                     description: 'Problema de velocidade, latência alta, conexão instável',
@@ -154,7 +149,6 @@ class Checklistview extends StatelessWidget {
                       Get.toNamed('/checklist/lentidao');
                     },
                   ),
-                  // Card 2 - IPTV
                   ChecklistCategoriaCardWidget(
                     title: 'IPTV',
                     description: 'Travamento, buffering, canais fora do ar, qualidade baixa',
@@ -163,7 +157,6 @@ class Checklistview extends StatelessWidget {
                       Get.toNamed('/checklist/iptv');
                     },
                   ),
-                  // Card 3 - Apps
                   ChecklistCategoriaCardWidget(
                     title: 'Aplicativos',
                     description: 'Apps não funcionam, erro de conexão, problemas de login',
@@ -182,7 +175,6 @@ class Checklistview extends StatelessWidget {
     );
   }
 
-  // ← NOVO MÉTODO PARA MOSTRAR MENU DO USUÁRIO
   void _mostrarMenuUsuario(BuildContext context, UsuarioController usuarioController) {
     showModalBottomSheet(
       context: context,
@@ -263,7 +255,7 @@ class Checklistview extends StatelessWidget {
               
               const SizedBox(height: 20),
               
-              // Opções do menu
+              // Opções do menu - APENAS PARA ADMIN
               if (usuarioController.isAdmin) ...[
                 _buildMenuOption(
                   icon: Icons.people,
@@ -287,23 +279,21 @@ class Checklistview extends StatelessWidget {
                   color: Colors.blue,
                 ),
                 const SizedBox(height: 12),
+                // ← LOGS APENAS PARA ADMIN
+                _buildMenuOption(
+                  icon: Icons.security,
+                  title: 'Logs de Auditoria',
+                  subtitle: 'Ver logs de segurança e atividades',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Get.toNamed('/admin/logs');
+                  },
+                  color: Colors.purple,
+                ),
+                const SizedBox(height: 12),
               ],
               
-              const SizedBox(height: 12),
-
-              _buildMenuOption(
-                icon: Icons.security,
-                title: 'Logs de Auditoria',
-                subtitle: 'Ver logs de segurança e atividades',
-                onTap: () {
-                  Navigator.pop(context);
-                  Get.toNamed('/admin/logs');
-                },
-                color: Colors.purple,
-              ),
-
-              const SizedBox(height: 12),
-              
+              // Opção de sair (para todos os usuários)
               _buildMenuOption(
                 icon: Icons.logout,
                 title: 'Sair',

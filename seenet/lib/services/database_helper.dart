@@ -7,166 +7,199 @@ import '../models/checkmark.dart';
 import '../models/avaliacao.dart';
 import '../models/resposta_checkmark.dart';
 import '../models/diagnostico.dart';
-import '../models/log_sistema.dart';
 import '../config/environment.dart';
+import '../models/transcricao_tecnica.dart';
 import 'security_service.dart';
 import 'audit_service.dart'; // ← NOVO IMPORT
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
-class DatabaseHelper {
-  static const String _databaseName = 'seenet.db';
-  static const int _databaseVersion = 2; // ← INCREMENTADO PARA ADICIONAR LOGS
-  
-  static Database? _database;
-  
-  // Singleton pattern
-  DatabaseHelper._privateConstructor();
-  static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
-  
-  // Getter para o database
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
-  }
-  
-  // Inicializar database
-  Future<Database> _initDatabase() async {
-    try {
-      String path = join(await getDatabasesPath(), _databaseName);
-      
-      Database db = await openDatabase(
-        path,
-        version: _databaseVersion,
-        onCreate: _onCreate,
-        onUpgrade: _onUpgrade, // ← NOVO: Para atualizar banco existente
-        onOpen: _onOpen,
-      );
-      
-      print('✅ SQLite conectado: $path');
-      return db;
-    } catch (e) {
-      print('❌ Erro ao inicializar SQLite: $e');
-      rethrow;
+  class DatabaseHelper {
+    static const String _databaseName = 'seenet.db';
+    static const int _databaseVersion = 3; // ← INCREMENTADO PARA ADICIONAR TRANSCRICOES
+    
+    static Database? _database;
+    
+    // Singleton pattern
+    DatabaseHelper._privateConstructor();
+    static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
+    
+    // Getter para o database
+    Future<Database> get database async {
+      if (_database != null) return _database!;
+      _database = await _initDatabase();
+      return _database!;
     }
-  }
-  
-  // Criar tabelas
-  Future<void> _onCreate(Database db, int version) async {
-    print('🔨 Criando tabelas SQLite...');
     
-    // Tabela usuarios
-    await db.execute('''
-      CREATE TABLE usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        senha TEXT NOT NULL,
-        tipo_usuario TEXT NOT NULL CHECK (tipo_usuario IN ('tecnico', 'administrador')),
-        ativo INTEGER DEFAULT 1,
-        tentativas_login INTEGER DEFAULT 0,
-        ultimo_login TEXT,
-        data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
-        data_atualizacao TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
+    // Inicializar database
+    Future<Database> _initDatabase() async {
+      try {
+        String path = join(await getDatabasesPath(), _databaseName);
+        
+        Database db = await openDatabase(
+          path,
+          version: _databaseVersion,
+          onCreate: _onCreate,
+          onUpgrade: _onUpgrade, // ← NOVO: Para atualizar banco existente
+          onOpen: _onOpen,
+        );
+        
+        print('✅ SQLite conectado: $path');
+        return db;
+      } catch (e) {
+        print('❌ Erro ao inicializar SQLite: $e');
+        rethrow;
+      }
+    }
 
-    // Tabela categorias_checkmark
-    await db.execute('''
-      CREATE TABLE categorias_checkmark (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL,
-        descricao TEXT,
-        ativo INTEGER DEFAULT 1,
-        ordem INTEGER DEFAULT 0,
-        data_criacao TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
-
-    // Tabela checkmarks
-    await db.execute('''
-      CREATE TABLE checkmarks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        categoria_id INTEGER NOT NULL,
-        titulo TEXT NOT NULL,
-        descricao TEXT,
-        prompt_chatgpt TEXT NOT NULL,
-        ativo INTEGER DEFAULT 1,
-        ordem INTEGER DEFAULT 0,
-        data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (categoria_id) REFERENCES categorias_checkmark(id)
-      )
-    ''');
-
-    // Tabela avaliacoes
-    await db.execute('''
-      CREATE TABLE avaliacoes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tecnico_id INTEGER NOT NULL,
-        titulo TEXT,
-        descricao TEXT,
-        status TEXT DEFAULT 'em_andamento' CHECK (status IN ('em_andamento', 'concluida', 'cancelada')),
-        data_inicio TEXT DEFAULT CURRENT_TIMESTAMP,
-        data_conclusao TEXT,
-        data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
-        data_atualizacao TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (tecnico_id) REFERENCES usuarios(id)
-      )
-    ''');
-
-    // Tabela respostas_checkmark
-    await db.execute('''
-      CREATE TABLE respostas_checkmark (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        avaliacao_id INTEGER NOT NULL,
-        checkmark_id INTEGER NOT NULL,
-        marcado INTEGER DEFAULT 0,
-        observacoes TEXT,
-        data_resposta TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (avaliacao_id) REFERENCES avaliacoes(id) ON DELETE CASCADE,
-        FOREIGN KEY (checkmark_id) REFERENCES checkmarks(id),
-        UNIQUE(avaliacao_id, checkmark_id)
-      )
-    ''');
-
-    // Tabela diagnosticos
-    await db.execute('''
-      CREATE TABLE diagnosticos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        avaliacao_id INTEGER NOT NULL,
-        categoria_id INTEGER NOT NULL,
-        prompt_enviado TEXT NOT NULL,
-        resposta_chatgpt TEXT NOT NULL,
-        resumo_diagnostico TEXT,
-        status_api TEXT DEFAULT 'pendente' CHECK (status_api IN ('pendente', 'sucesso', 'erro')),
-        erro_api TEXT,
-        tokens_utilizados INTEGER,
-        data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (avaliacao_id) REFERENCES avaliacoes(id) ON DELETE CASCADE,
-        FOREIGN KEY (categoria_id) REFERENCES categorias_checkmark(id)
-      )
-    ''');
+    // ← NOVA TABELA: Criar tabela de transcrições técnicas
+    static Future<void> _createTranscricaoTable(Database db) async {
+      await db.execute('''
+        CREATE TABLE transcricoes_tecnicas (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tecnico_id INTEGER NOT NULL,
+          titulo TEXT NOT NULL,
+          descricao TEXT,
+          transcricao_original TEXT NOT NULL,
+          pontos_da_acao TEXT NOT NULL,
+          status TEXT DEFAULT 'concluida' CHECK (status IN ('gravando', 'processando', 'concluida', 'erro')),
+          duracao_segundos INTEGER,
+          categoria_problema TEXT,
+          cliente_info TEXT,
+          data_inicio TEXT,
+          data_conclusao TEXT,
+          data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (tecnico_id) REFERENCES usuarios(id)
+        )
+      ''');
+      
+      // Criar índices para performance
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_transcricoes_tecnico ON transcricoes_tecnicas(tecnico_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_transcricoes_data ON transcricoes_tecnicas(data_criacao)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_transcricoes_status ON transcricoes_tecnicas(status)');
+      
+      print('✅ Tabela transcricoes_tecnicas criada');
+    }
     
-    // ← NOVA TABELA: Criar tabela de logs
-    await AuditService.createTable(db);
-    
-    print('✅ Tabelas criadas com sucesso');
-  }
-  
+    // Criar tabelas
+    Future<void> _onCreate(Database db, int version) async {
+      print('🔨 Criando tabelas SQLite...');
+      
+      // Tabela usuarios
+      await db.execute('''
+        CREATE TABLE usuarios (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nome TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          senha TEXT NOT NULL,
+          tipo_usuario TEXT NOT NULL CHECK (tipo_usuario IN ('tecnico', 'administrador')),
+          ativo INTEGER DEFAULT 1,
+          tentativas_login INTEGER DEFAULT 0,
+          ultimo_login TEXT,
+          data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
+          data_atualizacao TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      ''');
+
+      // Tabela categorias_checkmark
+      await db.execute('''
+        CREATE TABLE categorias_checkmark (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nome TEXT NOT NULL,
+          descricao TEXT,
+          ativo INTEGER DEFAULT 1,
+          ordem INTEGER DEFAULT 0,
+          data_criacao TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      ''');
+
+      // Tabela checkmarks
+      await db.execute('''
+        CREATE TABLE checkmarks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          categoria_id INTEGER NOT NULL,
+          titulo TEXT NOT NULL,
+          descricao TEXT,
+          prompt_chatgpt TEXT NOT NULL,
+          ativo INTEGER DEFAULT 1,
+          ordem INTEGER DEFAULT 0,
+          data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (categoria_id) REFERENCES categorias_checkmark(id)
+        )
+      ''');
+
+      // Tabela avaliacoes
+      await db.execute('''
+        CREATE TABLE avaliacoes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tecnico_id INTEGER NOT NULL,
+          titulo TEXT,
+          descricao TEXT,
+          status TEXT DEFAULT 'em_andamento' CHECK (status IN ('em_andamento', 'concluida', 'cancelada')),
+          data_inicio TEXT DEFAULT CURRENT_TIMESTAMP,
+          data_conclusao TEXT,
+          data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
+          data_atualizacao TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (tecnico_id) REFERENCES usuarios(id)
+        )
+      ''');
+
+      // Tabela respostas_checkmark
+      await db.execute('''
+        CREATE TABLE respostas_checkmark (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          avaliacao_id INTEGER NOT NULL,
+          checkmark_id INTEGER NOT NULL,
+          marcado INTEGER DEFAULT 0,
+          observacoes TEXT,
+          data_resposta TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (avaliacao_id) REFERENCES avaliacoes(id) ON DELETE CASCADE,
+          FOREIGN KEY (checkmark_id) REFERENCES checkmarks(id),
+          UNIQUE(avaliacao_id, checkmark_id)
+        )
+      ''');
+
+      // Tabela diagnosticos
+      await db.execute('''
+        CREATE TABLE diagnosticos (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          avaliacao_id INTEGER NOT NULL,
+          categoria_id INTEGER NOT NULL,
+          prompt_enviado TEXT NOT NULL,
+          resposta_chatgpt TEXT NOT NULL,
+          resumo_diagnostico TEXT,
+          status_api TEXT DEFAULT 'pendente' CHECK (status_api IN ('pendente', 'sucesso', 'erro')),
+          erro_api TEXT,
+          tokens_utilizados INTEGER,
+          data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (avaliacao_id) REFERENCES avaliacoes(id) ON DELETE CASCADE,
+          FOREIGN KEY (categoria_id) REFERENCES categorias_checkmark(id)
+        )
+      ''');
+      
+      // ← NOVA TABELA: Criar tabela de logs
+      await AuditService.createTable(db);
+      await _createTranscricaoTable(db);
+      
+      print('✅ Tabelas criadas com sucesso');
+    }
+
   // ← NOVO: Atualizar banco existente
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     print('📈 Atualizando banco de v$oldVersion para v$newVersion');
     
     if (oldVersion < 2) {
-      // Adicionar tabela de logs
+      // Código existente para versão 2
       await AuditService.createTable(db);
-      
-      // Adicionar campos de segurança na tabela usuarios
       await db.execute('ALTER TABLE usuarios ADD COLUMN tentativas_login INTEGER DEFAULT 0');
       await db.execute('ALTER TABLE usuarios ADD COLUMN ultimo_login TEXT');
-      
       print('✅ Banco atualizado para versão 2');
+    }
+    
+    if (oldVersion < 3) {
+      // Nova atualização para versão 3 - adicionar transcrições
+      await _createTranscricaoTable(db);
+      print('✅ Banco atualizado para versão 3');
     }
   }
   
@@ -1018,6 +1051,258 @@ String _formatarDataConsole(String? dataString) {
     } catch (e) {
       print('❌ Erro buscar diagnósticos: $e');
       return [];
+    }
+  }
+  // =========== MÉTODOS PARA TRANSCRIÇÕES ==========
+  /// Salvar transcrição
+  Future<bool> salvarTranscricao(TranscricaoTecnica transcricao) async {
+    try {
+      final db = await database;
+      
+      await db.insert('transcricoes_tecnicas', transcricao.toMap());
+      
+      // Log de auditoria
+      await AuditService.instance.log(
+        action: AuditAction.documentCreated,
+        usuarioId: transcricao.tecnicoId,
+        tabelaAfetada: 'transcricoes_tecnicas',
+        detalhes: 'Documentação criada: ${transcricao.titulo}',
+      );
+      
+      print('✅ Transcrição salva: ${transcricao.titulo}');
+      return true;
+    } catch (e) {
+      print('❌ Erro ao salvar transcrição: $e');
+      return false;
+    }
+  }
+
+  /// Buscar transcrições por técnico
+  Future<List<TranscricaoTecnica>> getTranscricoesPorTecnico(int tecnicoId) async {
+    try {
+      final db = await database;
+      
+      List<Map<String, dynamic>> results = await db.query(
+        'transcricoes_tecnicas',
+        where: 'tecnico_id = ?',
+        whereArgs: [tecnicoId],
+        orderBy: 'data_criacao DESC',
+      );
+      
+      List<TranscricaoTecnica> transcricoes = results
+          .map((map) => TranscricaoTecnica.fromMap(map))
+          .toList();
+      
+      print('✅ ${transcricoes.length} transcrições carregadas para técnico $tecnicoId');
+      return transcricoes;
+    } catch (e) {
+      print('❌ Erro ao buscar transcrições: $e');
+      return [];
+    }
+  }
+
+  /// Buscar transcrição por ID
+  Future<TranscricaoTecnica?> getTranscricaoPorId(int id) async {
+    try {
+      final db = await database;
+      
+      List<Map<String, dynamic>> results = await db.query(
+        'transcricoes_tecnicas',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      
+      if (results.isNotEmpty) {
+        return TranscricaoTecnica.fromMap(results.first);
+      }
+      
+      return null;
+    } catch (e) {
+      print('❌ Erro ao buscar transcrição: $e');
+      return null;
+    }
+  }
+
+  /// Atualizar transcrição
+  Future<bool> atualizarTranscricao(TranscricaoTecnica transcricao) async {
+    try {
+      final db = await database;
+      
+      await db.update(
+        'transcricoes_tecnicas',
+        transcricao.toMap(),
+        where: 'id = ?',
+        whereArgs: [transcricao.id],
+      );
+      
+      // Log de auditoria
+      await AuditService.instance.log(
+        action: AuditAction.documentUpdated,
+        usuarioId: transcricao.tecnicoId,
+        tabelaAfetada: 'transcricoes_tecnicas',
+        registroId: transcricao.id,
+        detalhes: 'Documentação atualizada: ${transcricao.titulo}',
+      );
+      
+      print('✅ Transcrição atualizada: ${transcricao.id}');
+      return true;
+    } catch (e) {
+      print('❌ Erro ao atualizar transcrição: $e');
+      return false;
+    }
+  }
+
+  /// Remover transcrição
+  Future<bool> removerTranscricao(int id, int operadorId) async {
+    try {
+      final db = await database;
+      
+      // Buscar dados antes de remover para log
+      TranscricaoTecnica? transcricao = await getTranscricaoPorId(id);
+      
+      await db.delete(
+        'transcricoes_tecnicas',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      
+      // Log de auditoria
+      await AuditService.instance.log(
+        action: AuditAction.documentDeleted,
+        usuarioId: operadorId,
+        tabelaAfetada: 'transcricoes_tecnicas',
+        registroId: id,
+        detalhes: 'Documentação removida: ${transcricao?.titulo ?? "ID $id"}',
+      );
+      
+      print('✅ Transcrição removida: $id');
+      return true;
+    } catch (e) {
+      print('❌ Erro ao remover transcrição: $e');
+      return false;
+    }
+  }
+
+  /// Buscar transcrições com filtros
+  Future<List<TranscricaoTecnica>> buscarTranscricoes({
+    int? tecnicoId,
+    String? status,
+    String? categoria,
+    DateTime? dataInicio,
+    DateTime? dataFim,
+    String? termoBusca,
+    int limite = 100,
+    int offset = 0,
+  }) async {
+    try {
+      final db = await database;
+      
+      String query = 'SELECT * FROM transcricoes_tecnicas WHERE 1=1';
+      List<dynamic> args = [];
+      
+      if (tecnicoId != null) {
+        query += ' AND tecnico_id = ?';
+        args.add(tecnicoId);
+      }
+      
+      if (status != null) {
+        query += ' AND status = ?';
+        args.add(status);
+      }
+      
+      if (categoria != null) {
+        query += ' AND categoria_problema = ?';
+        args.add(categoria);
+      }
+      
+      if (dataInicio != null) {
+        query += ' AND data_criacao >= ?';
+        args.add(dataInicio.toIso8601String());
+      }
+      
+      if (dataFim != null) {
+        query += ' AND data_criacao <= ?';
+        args.add(dataFim.toIso8601String());
+      }
+      
+      if (termoBusca != null && termoBusca.isNotEmpty) {
+        query += ' AND (titulo LIKE ? OR transcricao_original LIKE ? OR pontos_da_acao LIKE ?)';
+        String termo = '%$termoBusca%';
+        args.addAll([termo, termo, termo]);
+      }
+      
+      query += ' ORDER BY data_criacao DESC LIMIT ? OFFSET ?';
+      args.addAll([limite, offset]);
+      
+      List<Map<String, dynamic>> results = await db.rawQuery(query, args);
+      
+      return results.map((map) => TranscricaoTecnica.fromMap(map)).toList();
+    } catch (e) {
+      print('❌ Erro ao buscar transcrições: $e');
+      return [];
+    }
+  }
+
+  /// Obter estatísticas de transcrições
+  Future<Map<String, dynamic>> getEstatisticasTranscricoes(int tecnicoId) async {
+    try {
+      final db = await database;
+      
+      // Total de transcrições
+      var totalResult = await db.rawQuery(
+        'SELECT COUNT(*) as total FROM transcricoes_tecnicas WHERE tecnico_id = ?',
+        [tecnicoId],
+      );
+      
+      // Transcrições este mês
+      DateTime agora = DateTime.now();
+      DateTime inicioMes = DateTime(agora.year, agora.month, 1);
+      
+      var esteMesResult = await db.rawQuery(
+        'SELECT COUNT(*) as total FROM transcricoes_tecnicas WHERE tecnico_id = ? AND data_criacao >= ?',
+        [tecnicoId, inicioMes.toIso8601String()],
+      );
+      
+      // Tempo total de gravação
+      var tempoResult = await db.rawQuery(
+        'SELECT SUM(duracao_segundos) as total_segundos FROM transcricoes_tecnicas WHERE tecnico_id = ? AND duracao_segundos IS NOT NULL',
+        [tecnicoId],
+      );
+      
+      // Categorias mais usadas
+      var categoriasResult = await db.rawQuery(
+        'SELECT categoria_problema, COUNT(*) as total FROM transcricoes_tecnicas WHERE tecnico_id = ? AND categoria_problema IS NOT NULL GROUP BY categoria_problema ORDER BY total DESC LIMIT 5',
+        [tecnicoId],
+      );
+      
+      int total = totalResult.first['total'] as int;
+      int esteMes = esteMesResult.first['total'] as int;
+      int totalSegundos = (tempoResult.first['total_segundos'] as int?) ?? 0;
+      
+      return {
+        'total': total,
+        'esteMes': esteMes,
+        'tempoTotalSegundos': totalSegundos,
+        'tempoTotal': _formatarDuracao(totalSegundos),
+        'mediaMinutos': total > 0 ? totalSegundos / 60.0 / total : 0.0,
+        'categorias': categoriasResult,
+      };
+    } catch (e) {
+      print('❌ Erro ao obter estatísticas: $e');
+      return {};
+    }
+  }
+
+  /// Método auxiliar para formatar duração
+  String _formatarDuracao(int totalSegundos) {
+    int horas = totalSegundos ~/ 3600;
+    int minutos = (totalSegundos % 3600) ~/ 60;
+    int segundos = totalSegundos % 60;
+    
+    if (horas > 0) {
+      return '${horas}h ${minutos.toString().padLeft(2, '0')}m';
+    } else {
+      return '${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
     }
   }
 

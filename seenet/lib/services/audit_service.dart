@@ -40,6 +40,14 @@ enum AuditAction {
   diagnosticGenerated('DIAGNOSTIC_GENERATED', 'info'),
   diagnosticFailed('DIAGNOSTIC_FAILED', 'error'),
   
+  // Documentação
+  documentCreated('DOCUMENT_CREATED', 'info'),
+  documentUpdated('DOCUMENT_UPDATED', 'info'),
+  documentDeleted('DOCUMENT_DELETED', 'warning'),
+  transcriptionStarted('TRANSCRIPTION_STARTED', 'info'),
+  transcriptionCompleted('TRANSCRIPTION_COMPLETED', 'info'),
+  transcriptionFailed('TRANSCRIPTION_FAILED', 'error'),
+  
   // Sistema
   dataExported('DATA_EXPORTED', 'info'),
   dataImported('DATA_IMPORTED', 'warning'),

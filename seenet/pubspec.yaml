@@ -16,6 +16,10 @@ dependencies:
   get: ^4.7.2
   intl: ^0.18.1
   encrypt: ^5.0.1
+  speech_to_text: ^6.6.0        # Reconhecimento de voz
+  permission_handler: ^11.1.0   # Gerenciar permissões
+  share_plus: ^7.2.1          # Compartilhamento
+
   
   # Banco de dados SQLite para mobile
   sqflite: ^2.3.0

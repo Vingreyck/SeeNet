@@ -292,7 +292,18 @@ class Checklistview extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
               ],
-              
+              // Opção de transcrição técnica (para todos os usuários)
+              _buildMenuOption(
+                icon: Icons.description,
+                title: 'Documentar Ações',
+                subtitle: 'Grave suas ações técnicas por voz',
+                onTap: () {
+                  Navigator.pop(context);
+                  Get.toNamed('/transcricao');
+                },
+                color: Colors.purple,
+              ),
+              const SizedBox(height: 12),
               // Opção de sair (para todos os usuários)
               _buildMenuOption(
                 icon: Icons.logout,

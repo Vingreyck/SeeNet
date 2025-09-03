@@ -1,4 +1,4 @@
-// lib/controllers/usuario_controller.dart - VERSÃO MELHORADA
+
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
@@ -6,7 +6,7 @@ import '../models/usuario.dart';
 import '../services/database_helper.dart';
 import '../services/security_service.dart';
 import '../services/audit_service.dart';
-import '../config/environment.dart'; // Adicione este import (ajuste o caminho conforme necessário)
+import '../config/environment.dart';
 
 class UsuarioController extends GetxController {
   Rx<Usuario?> usuarioLogado = Rx<Usuario?>(null);
@@ -15,8 +15,7 @@ class UsuarioController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Verificar se existe usuário salvo (você pode implementar SharedPreferences se quiser)
-    print('🎯 UsuarioController inicializado');
+    print(' UsuarioController inicializado');
   }
 
   // Login usando SQLite
@@ -80,7 +79,7 @@ class UsuarioController extends GetxController {
     if (usuario != null) {
       usuarioLogado.value = usuario;
       
-      print('✅ Login realizado: ${SecurityService.maskSensitiveData(email)}');
+      print(' Login realizado: ${SecurityService.maskSensitiveData(email)}');
       
       Get.snackbar(
         'Sucesso',
@@ -91,7 +90,7 @@ class UsuarioController extends GetxController {
       );
       return true;
     } else {
-      print('❌ Login falhou para: ${SecurityService.maskSensitiveData(email)}');
+      print(' Login falhou para: ${SecurityService.maskSensitiveData(email)}');
       
       Get.snackbar(
         'Erro',
@@ -103,7 +102,7 @@ class UsuarioController extends GetxController {
       return false;
     }
   } catch (e) {
-    print('❌ Erro no login: $e');
+    print(' Erro no login: $e');
     
     String mensagem = 'Erro ao conectar com servidor';
     if (e.toString().contains('Muitas tentativas')) {
@@ -136,7 +135,7 @@ class UsuarioController extends GetxController {
       if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
         throw Exception('Email inválido');
       }
-      
+
       if (senha.length < 6) {
         throw Exception('Senha muito curta');
       }
@@ -155,24 +154,24 @@ class UsuarioController extends GetxController {
       bool sucesso = await DatabaseHelper.instance.criarUsuario(novoUsuario);
       
       if (sucesso) {
-        print('✅ Usuário registrado: ${novoUsuario.email}');
+        print(' Usuário registrado: ${novoUsuario.email}');
         
         // Fazer login automaticamente após registro
         bool loginSucesso = await login(email, senha);
         
         if (loginSucesso) {
-          print('✅ Login automático após registro realizado');
+          print(' Login automático após registro realizado');
           return true;
         } else {
-          print('⚠️ Usuário criado mas login automático falhou');
+          print(' Usuário criado mas login automático falhou');
           return true; // Ainda é sucesso, o usuário pode fazer login manual
         }
       } else {
-        print('❌ Falha ao criar usuário no banco');
+        print(' Falha ao criar usuário no banco');
         return false;
       }
     } catch (e) {
-      print('❌ Erro no registro: $e');
+      print(' Erro no registro: $e');
       
       // Mensagens de erro específicas
       String mensagem = 'Erro ao registrar usuário';
@@ -206,7 +205,7 @@ class UsuarioController extends GetxController {
       await DatabaseHelper.instance.logoutUsuario(usuarioLogado.value!.id!);
     }
     usuarioLogado.value = null;
-    print('👋 Logout realizado');
+    print(' Logout realizado');
     Get.offAllNamed('/login');
   }
   
@@ -247,7 +246,7 @@ class UsuarioController extends GetxController {
       
       return true;
     } catch (e) {
-      print('❌ Erro ao atualizar perfil: $e');
+      print(' Erro ao atualizar perfil: $e');
       return false;
     }
   }
@@ -255,7 +254,7 @@ class UsuarioController extends GetxController {
   // Getters úteis
   bool get isLoggedIn => usuarioLogado.value != null;
   
-  // ✅ CORRIGIDO - Verificação de admin mais robusta
+  // Verificação de admin
   bool get isAdmin {
     if (usuarioLogado.value == null) return false;
     
@@ -263,7 +262,7 @@ class UsuarioController extends GetxController {
     bool ehAdmin = tipo == 'administrador' || tipo == 'admin';
     
     // Debug para verificar
-    print('🔍 Verificando admin:');
+    print(' Verificando admin:');
     print('   Email: ${usuarioLogado.value!.email}');
     print('   Tipo original: "${usuarioLogado.value!.tipoUsuario}"');
     print('   Tipo processado: "$tipo"');
@@ -285,7 +284,7 @@ class UsuarioController extends GetxController {
   void debugUsuario() {
     if (usuarioLogado.value != null) {
       final user = usuarioLogado.value!;
-      print('👤 Usuário logado:');
+      print(' Usuário logado:');
       print('   ID: ${user.id}');
       print('   Nome: ${user.nome}');
       print('   Email: ${user.email}');
@@ -294,7 +293,7 @@ class UsuarioController extends GetxController {
       print('   Admin (getter isAdmin): $isAdmin');
       print('   Admin (método direto): ${user.tipoUsuario.toLowerCase() == 'administrador'}');
     } else {
-      print('👤 Nenhum usuário logado');
+      print(' Nenhum usuário logado');
     }
   }
   Timer? _sessionTimer;
@@ -312,7 +311,7 @@ class UsuarioController extends GetxController {
     });
   }
 
-  // ✅ NOVO - Forçar correção e relogin do admin
+  // Forçar correção e relogin do admin
   Future<void> corrigirERelogarAdmin() async {
     try {
       // Corrigir no banco
@@ -322,7 +321,7 @@ class UsuarioController extends GetxController {
       if (usuarioLogado.value != null && 
           usuarioLogado.value!.email.toLowerCase() == 'admin@seenet.com') {
         
-        print('🔄 Fazendo relogin do admin...');
+        print(' Fazendo relogin do admin...');
         
         // Fazer logout
         usuarioLogado.value = null;
@@ -331,13 +330,13 @@ class UsuarioController extends GetxController {
         bool loginSucesso = await login('admin@seenet.com', 'admin123');
         
         if (loginSucesso) {
-          print('✅ Admin relogado com sucesso!');
+          print(' Admin relogado com sucesso!');
           debugUsuario();
         }
       }
       
     } catch (e) {
-      print('❌ Erro ao corrigir admin: $e');
+      print(' Erro ao corrigir admin: $e');
     }
   }
 
@@ -346,7 +345,7 @@ class UsuarioController extends GetxController {
     try {
       bool conexaoOk = await DatabaseHelper.instance.testarConexao();
       if (conexaoOk) {
-        print('✅ Conexão com SQLite OK');
+        print(' Conexão com SQLite OK');
         
         // Corrigir admin se necessário
         await DatabaseHelper.instance.corrigirUsuarioAdmin();
@@ -356,7 +355,7 @@ class UsuarioController extends GetxController {
       }
       return conexaoOk;
     } catch (e) {
-      print('❌ Erro ao testar banco: $e');
+      print(' Erro ao testar banco: $e');
       return false;
     }
   }

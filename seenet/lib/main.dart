@@ -1,4 +1,4 @@
-// lib/main.dart - VERSÃO ATUALIZADA COM ADMIN
+
 import 'package:flutter/material.dart';
 import 'package:seenet/checklist/screen/ChecklistAppsScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistIptvScreen.dart';
@@ -34,12 +34,12 @@ void main() async {
   Environment.printConfiguration();
   GeminiConfig.printStatus();
   
-  // Verificar configuração crítica
+  // Verificar configuração
   if (Environment.isProduction && !Environment.isConfigured) {
-    throw Exception('❌ Configuração incompleta para produção');
+    throw Exception(' Configuração incompleta para produção');
   }
   
-  // Inicializar controllers globais
+  // Inicializar controllers
   Get.put(UsuarioController(), permanent: true);
   Get.put(CheckmarkController(), permanent: true);
   Get.put(DiagnosticoController(), permanent: true);

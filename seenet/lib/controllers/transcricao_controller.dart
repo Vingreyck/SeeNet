@@ -1,4 +1,4 @@
-// lib/controllers/transcricao_controller.dart
+
 import 'package:get/get.dart';
 import '../models/transcricao_tecnica.dart';
 import '../services/transcricao_service.dart';
@@ -78,15 +78,15 @@ class TranscricaoController extends GetxController {
         isGravando.value = true;
         _inicioGravacao = DateTime.now();
         statusMensagem.value = 'Gravando... Fale claramente';
-        print('✅ Gravação iniciada');
+        print(' Gravação iniciada');
         return true;
       } else {
         statusMensagem.value = 'Falha ao iniciar gravação';
-        print('❌ Falha ao iniciar gravação');
+        print(' Falha ao iniciar gravação');
         return false;
       }
     } catch (e) {
-      print('❌ Erro ao iniciar gravação: $e');
+      print(' Erro ao iniciar gravação: $e');
       statusMensagem.value = 'Erro: $e';
       return false;
     }
@@ -105,9 +105,9 @@ class TranscricaoController extends GetxController {
         statusMensagem.value = 'Nenhum texto foi capturado';
       }
       
-      print('🛑 Gravação finalizada');
+      print(' Gravação finalizada');
     } catch (e) {
-      print('❌ Erro ao parar gravação: $e');
+      print(' Erro ao parar gravação: $e');
       statusMensagem.value = 'Erro ao finalizar gravação';
     }
   }
@@ -118,9 +118,9 @@ class TranscricaoController extends GetxController {
       await _transcricaoService.cancelListening();
       limpar();
       statusMensagem.value = 'Gravação cancelada';
-      print('❌ Gravação cancelada');
+      print(' Gravação cancelada');
     } catch (e) {
-      print('❌ Erro ao cancelar gravação: $e');
+      print(' Erro ao cancelar gravação: $e');
     }
   }
 
@@ -135,15 +135,15 @@ class TranscricaoController extends GetxController {
       if (textoProcessadoIA != null && textoProcessadoIA.isNotEmpty) {
         textoProcessado.value = textoProcessadoIA;
         statusMensagem.value = 'Ações organizadas com sucesso!';
-        print('✅ Texto processado pela IA');
+        print(' Texto processado pela IA');
       } else {
         // Criar texto básico se IA falhar
         textoProcessado.value = _criarTextoBasico(textoOriginal);
         statusMensagem.value = 'Processamento básico concluído';
-        print('⚠️ IA não disponível, usando processamento básico');
+        print('️ IA não disponível, usando processamento básico');
       }
     } catch (e) {
-      print('❌ Erro no processamento: $e');
+      print(' Erro no processamento: $e');
       textoProcessado.value = _criarTextoBasico(textoOriginal);
       statusMensagem.value = 'Erro no processamento, texto básico criado';
     } finally {
@@ -170,7 +170,7 @@ class TranscricaoController extends GetxController {
 • Duração: ${_calcularDuracao()}
 
 ---
-💡 **Dica:** Configure Google Gemini para processamento automático mais detalhado das ações técnicas.""";
+ **Dica:** Configure Google Gemini para processamento automático mais detalhado das ações técnicas.""";
   }
 
   /// Salvar transcrição
@@ -202,14 +202,14 @@ class TranscricaoController extends GetxController {
       
       if (salvou) {
         await carregarHistorico(); // Recarregar histórico
-        print('✅ Transcrição salva');
+        print(' Transcrição salva');
         return true;
       } else {
-        print('❌ Erro ao salvar transcrição');
+        print(' Erro ao salvar transcrição');
         return false;
       }
     } catch (e) {
-      print('❌ Erro ao salvar: $e');
+      print(' Erro ao salvar: $e');
       Get.snackbar('Erro', 'Erro ao salvar documentação');
       return false;
     }
@@ -224,9 +224,9 @@ class TranscricaoController extends GetxController {
           .buscarTranscricoesTecnico(_usuarioController.idUsuario!);
       
       historico.value = lista;
-      print('✅ ${lista.length} transcrições carregadas');
+      print(' ${lista.length} transcrições carregadas');
     } catch (e) {
-      print('❌ Erro ao carregar histórico: $e');
+      print(' Erro ao carregar histórico: $e');
     }
   }
 
@@ -268,7 +268,7 @@ class TranscricaoController extends GetxController {
     try {
       return await _transcricaoService.isSupported();
     } catch (e) {
-      print('❌ Erro ao verificar disponibilidade: $e');
+      print(' Erro ao verificar disponibilidade: $e');
       return false;
     }
   }
@@ -328,7 +328,7 @@ class TranscricaoController extends GetxController {
       
       return true;
     } catch (e) {
-      print('❌ Erro ao remover: $e');
+      print(' Erro ao remover: $e');
       return false;
     }
   }
@@ -349,13 +349,13 @@ class TranscricaoController extends GetxController {
 
   /// Debug - informações do serviço
   void debugInfo() {
-    print('\n🎤 === TRANSCRIÇÃO DEBUG ===');
-    print('📱 Suporte speech-to-text: ${_transcricaoService.isSupported()}');
-    print('🎤 Está gravando: ${isGravando.value}');
-    print('🤖 Está processando: ${isProcessando.value}');
-    print('📝 Texto transcrito: "${textoTranscrito.value}"');
-    print('📋 Histórico: ${historico.length} itens');
-    print('👤 Usuário: ${_usuarioController.idUsuario}');
+    print('\n === TRANSCRIÇÃO DEBUG ===');
+    print(' Suporte speech-to-text: ${_transcricaoService.isSupported()}');
+    print(' Está gravando: ${isGravando.value}');
+    print(' Está processando: ${isProcessando.value}');
+    print(' Texto transcrito: "${textoTranscrito.value}"');
+    print(' Histórico: ${historico.length} itens');
+    print(' Usuário: ${_usuarioController.idUsuario}');
     print('================================\n');
   }
 }

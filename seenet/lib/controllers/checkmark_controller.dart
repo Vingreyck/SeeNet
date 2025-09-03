@@ -24,9 +24,9 @@ class CheckmarkController extends GetxController {
   Future<void> carregarCategorias() async {
     try {
       categorias.value = await DatabaseHelper.instance.getCategorias();
-      print('✅ ${categorias.length} categorias carregadas');
+      print(' ${categorias.length} categorias carregadas');
     } catch (e) {
-      print('❌ Erro ao carregar categorias: $e');
+      print(' Erro ao carregar categorias: $e');
     }
   }
 
@@ -36,9 +36,9 @@ class CheckmarkController extends GetxController {
       categoriaAtual.value = categoriaId;
       checkmarksAtivos.value = await DatabaseHelper.instance.getCheckmarksPorCategoria(categoriaId);
       respostas.clear();
-      print('✅ ${checkmarksAtivos.length} checkmarks carregados');
+      print(' ${checkmarksAtivos.length} checkmarks carregados');
     } catch (e) {
-      print('❌ Erro ao carregar checkmarks: $e');
+      print(' Erro ao carregar checkmarks: $e');
     }
   }
 
@@ -60,12 +60,12 @@ class CheckmarkController extends GetxController {
           titulo: titulo,
           status: 'em_andamento',
         );
-        print('✅ Avaliação iniciada: $avaliacaoId');
+        print(' Avaliação iniciada: $avaliacaoId');
         return true;
       }
       return false;
     } catch (e) {
-      print('❌ Erro ao iniciar avaliação: $e');
+      print(' Erro ao iniciar avaliação: $e');
       return false;
     }
   }
@@ -73,14 +73,14 @@ class CheckmarkController extends GetxController {
   // Marcar/desmarcar checkmark
   void toggleCheckmark(int checkmarkId, bool marcado) {
     respostas[checkmarkId] = marcado;
-    print('📝 Checkmark $checkmarkId: $marcado');
+    print(' Checkmark $checkmarkId: $marcado');
   }
 
   // Salvar respostas no SQLite
   Future<bool> salvarRespostas() async {
     try {
       if (avaliacaoAtual.value == null) {
-        print('❌ Nenhuma avaliação ativa');
+        print(' Nenhuma avaliação ativa');
         return false;
       }
 
@@ -104,10 +104,10 @@ class CheckmarkController extends GetxController {
         registroId: avaliacaoAtual.value!.id,
       );
       
-      print('✅ ${respostas.length} respostas salvas');
+      print(' ${respostas.length} respostas salvas');
       return true;
     } catch (e) {
-      print('❌ Erro ao salvar respostas: $e');
+      print(' Erro ao salvar respostas: $e');
       return false;
     }
   }
@@ -120,12 +120,12 @@ class CheckmarkController extends GetxController {
       bool sucesso = await DatabaseHelper.instance.finalizarAvaliacao(avaliacaoAtual.value!.id!);
       
       if (sucesso) {
-        print('✅ Avaliação finalizada');
+        print(' Avaliação finalizada');
       }
       
       return sucesso;
     } catch (e) {
-      print('❌ Erro ao finalizar avaliação: $e');
+      print(' Erro ao finalizar avaliação: $e');
       return false;
     }
   }

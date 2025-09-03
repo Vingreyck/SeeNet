@@ -6,8 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.seenet"
-    compileSdk = 34
-    ndkVersion = "23.1.7779620"
+    compileSdk = 35
+    ndkVersion = "26.3.11579264"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

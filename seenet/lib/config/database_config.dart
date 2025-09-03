@@ -1,5 +1,4 @@
-// lib/config/database_config.dart - CORRIGIDO
-import 'env.config_example.dart'; // ← IMPORT CORRETO (não o .example)
+import 'env.config_example.dart'; 
 
 class DatabaseConfig {
   // Configuração para desenvolvimento local

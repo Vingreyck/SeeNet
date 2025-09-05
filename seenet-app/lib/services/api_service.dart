@@ -252,4 +252,4 @@ class ApiService extends GetxService {
     
     print('================================\n');
   }
-}
+} 

@@ -3,35 +3,57 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
+const path = require('path');
 require('dotenv').config();
 
-const tenantRoutes = require('./routes/tenant')
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ========== MIDDLEWARES GLOBAIS ==========
-app.use(helmet()); 
-app.use(compression()); 
-app.use(morgan('combined')); 
+console.log('🚀 Iniciando servidor SeeNet API...');
 
-// CORS configurado para Flutter
+// ========== MIDDLEWARES GLOBAIS ==========
+app.use(helmet());
+app.use(compression());
+app.use(morgan('combined'));
+
 app.use(cors({
   origin: process.env.CORS_ORIGINS?.split(',') || [
     'http://localhost:3000',
     'http://localhost:8080',
     'http://127.0.0.1:3000',
     'http://10.0.2.2:3000',
-    'http://172.20.10.2:3000',
-    'http://172.20.10.1:3000'
+    'http://10.50.160.140:3000', // ← SEU IP ATUAL
+    'http://172.20.10.2:3000'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Code']
 }));
 
-// Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ========== IMPORTAR E USAR ROTAS ==========
+console.log('📁 Carregando rotas...');
+
+// Rotas de Tenant
+try {
+  const tenantRoutes = require('./routes/tenant');
+  app.use('/api/tenant', tenantRoutes);
+  console.log('✅ Rotas tenant carregadas em /api/tenant');
+} catch (error) {
+  console.error('❌ Erro ao carregar rotas tenant:', error.message);
+}
+
+// Rotas de Autenticação ← ADICIONAR ESTAS LINHAS
+try {
+  const authRoutes = require('./routes/auth');
+  app.use('/api/auth', authRoutes);
+  console.log('✅ Rotas auth carregadas em /api/auth');
+} catch (error) {
+  console.error('❌ Erro ao carregar rotas auth:', error.message);
+  console.error('📁 Verifique se existe: src/routes/auth.js');
+}
 
 // ========== ROTAS BÁSICAS ==========
 
@@ -57,70 +79,101 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-
-app.get('/api/debug/tenants', async (req, res) => {
-  try {
-    const { db } = require('./config/database');
-    const tenants = await db('tenants').select('*');
-    
-    res.json({
-      message: 'Debug - Todos os tenants',
-      tenants: tenants,
-      total: tenants.length
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
 // Rota de teste
 app.get('/api/test', (req, res) => {
   res.json({
     message: 'API funcionando!',
     timestamp: new Date().toISOString(),
-    method: req.method,
-    path: req.path,
-    query: req.query,
+    ip: req.ip,
     headers: {
-      'content-type': req.get('content-type'),
-      'user-agent': req.get('user-agent'),
-      'authorization': req.get('authorization') ? 'Present' : 'Not present',
-      'x-tenant-code': req.get('x-tenant-code') || 'Not present'
+      'user-agent': req.get('User-Agent'),
+      'origin': req.get('Origin')
     }
   });
 });
 
-// Rota de teste POST
-app.post('/api/test', (req, res) => {
-  res.json({
-    message: 'POST funcionando!',
-    timestamp: new Date().toISOString(),
-    body: req.body,
-    headers: {
-      'content-type': req.get('content-type'),
-      'authorization': req.get('authorization') ? 'Present' : 'Not present',
-      'x-tenant-code': req.get('x-tenant-code') || 'Not present'
-    }
-  });
-});
-
-// Rota de debug temporária
+// ========== ROTA DE DEBUG PARA BANCO ==========
 app.get('/api/debug/database', async (req, res) => {
   try {
     const { db } = require('./config/database');
     
+    // Verificar se tabela existe
+    const hasTable = await db.schema.hasTable('tenants');
+    
+    if (!hasTable) {
+      return res.json({
+        error: 'Tabela tenants não existe',
+        solution: 'Execute: npx knex migrate:latest'
+      });
+    }
+    
+    // Buscar todos
     const tenants = await db('tenants').select('*');
     
     res.json({
-      message: 'Debug do banco',
-      total: tenants.length,
+      message: 'Debug do banco SQLite',
+      table_exists: hasTable,
+      total_tenants: tenants.length,
       tenants: tenants
     });
     
   } catch (error) {
+    console.error('❌ Erro no debug:', error);
     res.status(500).json({
       error: error.message
+    });
+  }
+});
+
+// ========== TESTE DIRETO DE LOGIN ==========
+app.post('/api/test/login', async (req, res) => {
+  try {
+    const { db } = require('./config/database');
+    const bcrypt = require('bcryptjs');
+    
+    console.log('🧪 Teste direto de login...');
+    console.log('📄 Body recebido:', req.body);
+    
+    const { email, senha, codigoEmpresa } = req.body;
+    
+    // Buscar usuário
+    const user = await db('usuarios')
+      .join('tenants', 'usuarios.tenant_id', 'tenants.id')
+      .where('usuarios.email', email?.toLowerCase())
+      .where('tenants.codigo', codigoEmpresa?.toUpperCase())
+      .where('usuarios.ativo', 1)
+      .where('tenants.ativo', 1)
+      .select('usuarios.*', 'tenants.nome as tenant_name', 'tenants.codigo as tenant_code')
+      .first();
+    
+    if (!user) {
+      return res.json({
+        teste: 'FALHOU',
+        motivo: 'Usuário não encontrado',
+        email_procurado: email?.toLowerCase(),
+        codigo_procurado: codigoEmpresa?.toUpperCase()
+      });
+    }
+    
+    // Verificar senha
+    const senhaValida = await bcrypt.compare(senha, user.senha);
+    
+    res.json({
+      teste: senhaValida ? 'SUCESSO' : 'FALHOU',
+      motivo: senhaValida ? 'Login válido' : 'Senha incorreta',
+      usuario_encontrado: {
+        nome: user.nome,
+        email: user.email,
+        tipo: user.tipo_usuario,
+        tenant: user.tenant_name
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro no teste de login:', error);
+    res.status(500).json({ 
+      teste: 'ERRO',
+      erro: error.message 
     });
   }
 });
@@ -131,11 +184,17 @@ app.use('*', (req, res) => {
     'GET /health',
     'GET /api/health', 
     'GET /api/test',
+    'POST /api/test/login',
     'GET /api/tenant/verify/:codigo',
     'GET /api/tenant/list',
-    'GET /api/debug/tenants',
-    'POST /api/test'
+    'POST /api/auth/login',
+    'POST /api/auth/register',
+    'GET /api/auth/verify',
+    'POST /api/auth/logout',
+    'GET /api/debug/database'
   ];
+  
+  console.log(`404 - Endpoint não encontrado: ${req.method} ${req.originalUrl}`);
   
   res.status(404).json({ 
     error: 'Endpoint não encontrado',
@@ -145,53 +204,26 @@ app.use('*', (req, res) => {
   });
 });
 
-// Error handler básico
+// Error handler
 app.use((error, req, res, next) => {
   console.error('❌ Erro na aplicação:', error);
   
   res.status(500).json({
     error: 'Erro interno do servidor',
-    message: process.env.NODE_ENV === 'development' ? error.message : 'Algo deu errado',
-    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Algo deu errado'
   });
 });
 
 // ========== INICIALIZAÇÃO ==========
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('\n🚀 ===================================');
-  console.log('🚀 SeeNet API INICIADO COM SUCESSO!');
-  console.log('🚀 ===================================');
-  console.log(`📡 Porta: ${PORT}`);
-  console.log(`🏠 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📝 Health check: http://172.20.10.2:${PORT}/health`);
-  console.log(`🧪 Teste GET: http://172.20.10.2:${PORT}/api/test`);
-  console.log(`🏢 Verificar empresa: http://172.20.10.2:${PORT}/api/tenant/verify/DEMO2024`);
-  console.log(`📊 Debug tenants: http://172.20.10.2:${PORT}/api/debug/tenants`);
-  console.log(`🔑 Gemini API: ${process.env.GEMINI_API_KEY ? '✅ CONFIGURADO' : '❌ NÃO CONFIGURADO'}`);
-  console.log(`🌐 CORS: ${process.env.CORS_ORIGINS || 'localhost padrão'}`);
-  console.log('🚀 ===================================\n');
-  
-  // Teste inicial
-  console.log('🧪 Executando teste inicial...');
-  
-  // Verificar .env
-  if (process.env.GEMINI_API_KEY) {
-    console.log('✅ Arquivo .env carregado corretamente');
-    console.log(`✅ Gemini API Key: ${process.env.GEMINI_API_KEY.substring(0, 10)}...`);
-  } else {
-    console.log('⚠️ GEMINI_API_KEY não encontrada no .env');
-  }
-  
-  console.log('\n🎯 Pronto para receber requisições do Flutter!\n');
-});
-
-// Tratamento graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM recebido. Fechando servidor...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT recebido. Fechando servidor...');
-  process.exit(0);
+  console.log(`🚀 SeeNet API rodando em todas as interfaces na porta ${PORT}`);
+  console.log(`📝 Health check: http://10.50.160.140:${PORT}/health`);
+  console.log(`🧪 Teste: http://10.50.160.140:${PORT}/api/test`);
+  console.log(`🏢 Verificar empresa: http://10.50.160.140:${PORT}/api/tenant/verify/DEMO2024`);
+  console.log(`📊 Listar empresas: http://10.50.160.140:${PORT}/api/tenant/list`);
+  console.log(`🔐 Login: http://10.50.160.140:${PORT}/api/auth/login`);
+  console.log(`📝 Registro: http://10.50.160.140:${PORT}/api/auth/register`);
+  console.log(`🗄️ Debug banco: http://10.50.160.140:${PORT}/api/debug/database`);
+  console.log(`🔑 Gemini: ${process.env.GEMINI_API_KEY ? 'Configurado' : 'NÃO CONFIGURADO'}`);
+  console.log(`🌐 IP atual: 10.50.160.140`);
 });

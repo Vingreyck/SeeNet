@@ -2,7 +2,7 @@ import 'environment.dart'; // ← Import do seu arquivo existente
 
 class ApiConfig {
   // URLs baseadas no ambiente
-  static const String _devBaseUrl = 'http://172.20.10.2:3000/api';
+  static const String _devBaseUrl = 'http://10.50.160.140:3000/api';
   static const String _prodBaseUrl = 'https://api.seenet.com/api';
   
   // URL ativa baseada no Environment

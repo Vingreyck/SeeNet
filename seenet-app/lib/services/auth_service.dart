@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:flutter/material.dart';
 import 'api_service.dart';
 import '../controllers/usuario_controller.dart';
 import '../models/usuario.dart';
@@ -81,12 +82,12 @@ class AuthService extends GetxService {
     }
   }
   
-  // Registro
+  // Registro com token da empresa
   Future<bool> register(String nome, String email, String senha, String codigoEmpresa) async {
     try {
       _usuarioController.isLoading.value = true;
       
-      final response = await _api.post('register', {
+      final response = await _api.post('/auth/register', {
         'nome': nome,
         'email': email,
         'senha': senha,
@@ -94,31 +95,58 @@ class AuthService extends GetxService {
       }, requireAuth: false);
       
       if (response['success']) {
-        print('✅ Registro bem-sucedido');
+        print('✅ Registro bem-sucedido para empresa: $codigoEmpresa');
+        
+        // Obter nome da empresa da resposta
+        String empresaNome = response['data']?['tenantName'] ?? codigoEmpresa;
+        
         Get.snackbar(
           'Sucesso', 
-          'Usuário criado com sucesso! Faça login para continuar.',
-          backgroundColor: Get.theme.colorScheme.primary,
-          colorText: Get.theme.colorScheme.onPrimary,
+          'Conta criada com sucesso!\nEmpresa: $empresaNome\n\nFaça login para continuar.',
+          backgroundColor: const Color(0xFF00FF99),
+          colorText: Colors.black,
+          duration: const Duration(seconds: 5),
+          margin: const EdgeInsets.all(20),
+          borderRadius: 12,
+          icon: const Icon(Icons.check_circle, color: Colors.black),
         );
         return true;
       } else {
         print('❌ Registro falhou: ${response['error']}');
+        
+        // Mensagens de erro mais específicas
+        String errorMsg = response['error'] ?? 'Falha no registro';
+        if (errorMsg.contains('já está cadastrado')) {
+          errorMsg = 'Este email já está cadastrado nesta empresa';
+        } else if (errorMsg.contains('Limite de usuários')) {
+          errorMsg = 'Limite de usuários atingido para esta empresa';
+        } else if (errorMsg.contains('inválido') || errorMsg.contains('não encontrado')) {
+          errorMsg = 'Token da empresa inválido ou expirado';
+        }
+        
         Get.snackbar(
-          'Erro', 
-          response['error'] ?? 'Falha no registro',
-          backgroundColor: Get.theme.colorScheme.error,
-          colorText: Get.theme.colorScheme.onError,
+          'Erro no Registro', 
+          errorMsg,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+          margin: const EdgeInsets.all(20),
+          borderRadius: 12,
+          icon: const Icon(Icons.error, color: Colors.white),
         );
         return false;
       }
     } catch (e) {
       print('❌ Erro no registro: $e');
       Get.snackbar(
-        'Erro', 
-        'Erro de conexão com o servidor',
-        backgroundColor: Get.theme.colorScheme.error,
-        colorText: Get.theme.colorScheme.onError,
+        'Erro de Conexão', 
+        'Não foi possível conectar ao servidor.\nVerifique sua conexão e tente novamente.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+        margin: const EdgeInsets.all(20),
+        borderRadius: 12,
+        icon: const Icon(Icons.wifi_off, color: Colors.white),
       );
       return false;
     } finally {
@@ -168,6 +196,7 @@ class AuthService extends GetxService {
       return false;
     }
   }
+  
   
   // Verificar se está logado
   bool get isLoggedIn => _usuarioController.isLoggedIn;

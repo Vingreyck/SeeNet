@@ -204,6 +204,66 @@ app.use('*', (req, res) => {
   });
 });
 
+// ========== DEBUG - LISTAR USUÁRIOS ==========
+app.get('/api/debug/usuarios', async (req, res) => {
+  try {
+    const { db } = require('./config/database');
+    
+    const usuarios = await db('usuarios')
+      .join('tenants', 'usuarios.tenant_id', 'tenants.id')
+      .select(
+        'usuarios.id',
+        'usuarios.nome',
+        'usuarios.email',
+        'usuarios.tipo_usuario',
+        'usuarios.ativo',
+        'usuarios.data_criacao',
+        'tenants.nome as empresa',
+        'tenants.codigo as codigo_empresa'
+      )
+      .orderBy('usuarios.data_criacao', 'desc');
+    
+    res.json({
+      message: 'Usuários na API Node.js',
+      total: usuarios.length,
+      usuarios: usuarios
+    });
+  } catch (error) {
+    console.error('❌ Erro ao listar usuários:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== DEBUG - ATUALIZAR TIPO DE USUÁRIO ==========
+app.post('/api/debug/update-user-type', async (req, res) => {
+  try {
+    const { email, tipo } = req.body;
+    const { db } = require('./config/database');
+    
+    await db('usuarios')
+      .where('email', email.toLowerCase())
+      .update({ 
+        tipo_usuario: tipo,
+        data_atualizacao: new Date().toISOString()
+      });
+    
+    const user = await db('usuarios')
+      .where('email', email.toLowerCase())
+      .first();
+    
+    res.json({ 
+      message: 'Usuário atualizado na API',
+      user: {
+        email: user.email,
+        nome: user.nome,
+        tipo_usuario: user.tipo_usuario
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Error handler
 app.use((error, req, res, next) => {
   console.error('❌ Erro na aplicação:', error);

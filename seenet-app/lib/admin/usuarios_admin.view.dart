@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/usuario.dart';
 import '../services/database_helper.dart';
-import 'package:crypto/crypto.dart'; // ← IMPORT NECESSÁRIO
-import 'dart:convert'; // ← IMPORT NECESSÁRIO
+import 'package:crypto/crypto.dart';
+import '../services/api_service.dart';
+import 'dart:convert';
 
 class UsuariosAdminView extends StatefulWidget {
   const UsuariosAdminView({super.key});
@@ -29,7 +30,53 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         isLoading = true;
       });
 
-      // Buscar todos os usuários no SQLite
+      // Buscar usuários da API
+      final apiService = Get.find<ApiService>();
+      final response = await apiService.get('/auth/debug/usuarios', requireAuth: false);
+      
+      if (response['success'] && response['data'] != null) {
+        List<dynamic> usuariosData = response['data']['usuarios'];
+        
+        usuarios = usuariosData.map((userData) => Usuario(
+          id: userData['id'],
+          nome: userData['nome'],
+          email: userData['email'],
+          senha: '', // Não vem da API
+          tipoUsuario: userData['tipo_usuario'],
+          ativo: userData['ativo'] == 1,
+          dataCriacao: DateTime.tryParse(userData['data_criacao'] ?? '') ?? DateTime.now(),
+        )).toList();
+        
+        print('📊 ${usuarios.length} usuários carregados da API');
+      } else {
+        print('❌ Erro na resposta da API: ${response['error']}');
+        Get.snackbar(
+          'Erro',
+          'Erro ao conectar com servidor: ${response['error']}',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        
+        // Fallback para SQLite local se API falhar
+        await _carregarUsuariosLocal();
+      }
+    } catch (e) {
+      print('❌ Erro ao carregar usuários da API: $e');
+      
+      // Fallback para SQLite local
+      await _carregarUsuariosLocal();
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // Método fallback para SQLite local
+  Future<void> _carregarUsuariosLocal() async {
+    try {
+      print('⚠️ Usando SQLite local como fallback');
+      
       final db = await DatabaseHelper.instance.database;
       List<Map<String, dynamic>> results = await db.query(
         'usuarios',
@@ -37,20 +84,15 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       );
 
       usuarios = results.map((map) => Usuario.fromMap(map)).toList();
-      
-      print('📊 ${usuarios.length} usuários carregados');
+      print('📊 ${usuarios.length} usuários carregados do SQLite local');
     } catch (e) {
-      print('❌ Erro ao carregar usuários: $e');
+      print('❌ Erro no fallback SQLite: $e');
       Get.snackbar(
         'Erro',
         'Erro ao carregar usuários',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
@@ -319,9 +361,9 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF2A2A2A),
-        title: Text(
+        title: const Text(
           'Detalhes do Usuário',
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -386,13 +428,13 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year} às ${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
   }
 
-  // ========== MÉTODOS DE GERENCIAMENTO DE USUÁRIOS ==========
+  // ========== MÉTODOS DE GERENCIAMENTO DE USUÁRIOS (MIGRADOS PARA API) ==========
 
   // Editar usuário
   void _editarUsuario(Usuario usuario) {
     final TextEditingController nomeController = TextEditingController(text: usuario.nome);
     final TextEditingController emailController = TextEditingController(text: usuario.email);
-    final TextEditingController senhaController = TextEditingController(); // ← NOVA SENHA (vazio por padrão)
+    final TextEditingController senhaController = TextEditingController();
     String tipoSelecionado = usuario.tipoUsuario;
     bool ativoSelecionado = usuario.ativo;
 
@@ -443,7 +485,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
                 ),
                 const SizedBox(height: 16),
                 
-                // ← CAMPO NOVA SENHA
+                // Campo Nova Senha
                 TextField(
                   controller: senhaController,
                   style: const TextStyle(color: Colors.white),
@@ -527,7 +569,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
                   usuario.id!,
                   nomeController.text.trim(),
                   emailController.text.trim(),
-                  senhaController.text.trim(), // ← INCLUIR NOVA SENHA
+                  senhaController.text.trim(),
                   tipoSelecionado,
                   ativoSelecionado,
                 );
@@ -545,12 +587,66 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     );
   }
 
-  // Salvar edição do usuário
+  // Salvar edição do usuário (MIGRADO PARA API)
   Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String novaSenha, String tipo, bool ativo) async {
     try {
+      final apiService = Get.find<ApiService>();
+      
+      // Preparar dados para envio
+      Map<String, dynamic> dadosAtualizacao = {
+        'nome': nome,
+        'email': email.toLowerCase(),
+        'tipo_usuario': tipo,
+        'ativo': ativo,
+      };
+
+      // Se nova senha foi fornecida, incluir
+      if (novaSenha.isNotEmpty) {
+        dadosAtualizacao['senha'] = novaSenha;
+      }
+      
+      // Enviar para API
+      final response = await apiService.put('/auth/usuarios/$id', dadosAtualizacao);
+      
+      if (response['success']) {
+        String mensagemSucesso = 'Usuário atualizado com sucesso!';
+        if (novaSenha.isNotEmpty) {
+          mensagemSucesso += '\n🔐 Senha alterada';
+        }
+
+        Get.snackbar(
+          'Sucesso',
+          mensagemSucesso,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+
+        await carregarUsuarios();
+      } else {
+        String mensagem = response['error'] ?? 'Erro ao atualizar usuário';
+        
+        Get.snackbar(
+          'Erro',
+          mensagem,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      print('❌ Erro ao editar usuário via API: $e');
+      
+      // Fallback para SQLite se API falhar
+      await _salvarEdicaoUsuarioLocal(id, nome, email, novaSenha, tipo, ativo);
+    }
+  }
+
+  // Fallback para SQLite local
+  Future<void> _salvarEdicaoUsuarioLocal(int id, String nome, String email, String novaSenha, String tipo, bool ativo) async {
+    try {
+      print('⚠️ Usando SQLite local para edição - fallback');
+      
       final db = await DatabaseHelper.instance.database;
       
-      // Preparar dados para atualização
       Map<String, dynamic> dadosAtualizacao = {
         'nome': nome,
         'email': email.toLowerCase(),
@@ -559,9 +655,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         'data_atualizacao': DateTime.now().toIso8601String(),
       };
 
-      // ← SE NOVA SENHA FOI FORNECIDA, INCLUIR NA ATUALIZAÇÃO
       if (novaSenha.isNotEmpty) {
-        // Importar função de hash (você pode mover isso para um método separado)
         dadosAtualizacao['senha'] = _hashPassword(novaSenha);
         print('✅ Senha será atualizada para usuário ID: $id');
       }
@@ -573,7 +667,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         whereArgs: [id],
       );
 
-      String mensagemSucesso = 'Usuário atualizado com sucesso!';
+      String mensagemSucesso = 'Usuário atualizado com sucesso! (Offline)';
       if (novaSenha.isNotEmpty) {
         mensagemSucesso += '\n🔐 Senha alterada';
       }
@@ -587,7 +681,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
 
       await carregarUsuarios();
     } catch (e) {
-      print('❌ Erro ao editar usuário: $e');
+      print('❌ Erro no fallback SQLite para edição: $e');
       
       String mensagem = 'Erro ao atualizar usuário';
       if (e.toString().contains('UNIQUE constraint failed')) {
@@ -603,15 +697,14 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     }
   }
 
-  // ← MÉTODO PARA HASH DE SENHA (mesmo do DatabaseHelper)
+  // Método para hash de senha
   String _hashPassword(String password) {
-    // Importar o crypto
     var bytes = utf8.encode(password);
     var digest = sha256.convert(bytes);
     return digest.toString();
   }
 
-  // ← NOVO MÉTODO PARA RESETAR SENHA RAPIDAMENTE
+  // Resetar senha do usuário
   void _resetarSenhaUsuario(Usuario usuario) {
     final TextEditingController novaSenhaController = TextEditingController();
     final TextEditingController confirmarSenhaController = TextEditingController();
@@ -726,9 +819,39 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     );
   }
 
-  // Confirmar reset de senha
+  // Confirmar reset de senha (MIGRADO PARA API)
   Future<void> _confirmarResetarSenha(int userId, String novaSenha) async {
     try {
+      final apiService = Get.find<ApiService>();
+      
+      final response = await apiService.put('/auth/usuarios/$userId/resetar-senha', {
+        'nova_senha': novaSenha,
+      });
+      
+      if (response['success']) {
+        Get.snackbar(
+          'Sucesso',
+          '🔐 Senha resetada com sucesso!\nO usuário deve fazer login com a nova senha.',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+      } else {
+        throw Exception(response['error']);
+      }
+    } catch (e) {
+      print('❌ Erro ao resetar senha via API: $e');
+      
+      // Fallback para SQLite
+      await _confirmarResetarSenhaLocal(userId, novaSenha);
+    }
+  }
+
+  // Fallback para reset de senha no SQLite
+  Future<void> _confirmarResetarSenhaLocal(int userId, String novaSenha) async {
+    try {
+      print('⚠️ Usando SQLite local para reset de senha - fallback');
+      
       final db = await DatabaseHelper.instance.database;
       
       await db.update(
@@ -743,14 +866,13 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
 
       Get.snackbar(
         'Sucesso',
-        '🔐 Senha resetada com sucesso!\nO usuário deve fazer login com a nova senha.',
+        '🔐 Senha resetada com sucesso! (Offline)\nO usuário deve fazer login com a nova senha.',
         backgroundColor: Colors.green,
         colorText: Colors.white,
         duration: const Duration(seconds: 4),
       );
-
     } catch (e) {
-      print('❌ Erro ao resetar senha: $e');
+      print('❌ Erro no fallback SQLite para reset de senha: $e');
       Get.snackbar(
         'Erro',
         'Erro ao resetar senha',
@@ -759,6 +881,8 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       );
     }
   }
+
+  // Alternar status do usuário
   Future<void> _alternarStatusUsuario(Usuario usuario) async {
     bool novoStatus = !usuario.ativo;
     
@@ -800,9 +924,40 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     );
   }
 
-  // Atualizar status do usuário
+  // Atualizar status do usuário (MIGRADO PARA API)
   Future<void> _atualizarStatusUsuario(int id, bool ativo) async {
     try {
+      final apiService = Get.find<ApiService>();
+      
+      final response = await apiService.put('/auth/usuarios/$id/status', {
+        'ativo': ativo,
+      });
+      
+      if (response['success']) {
+        Get.snackbar(
+          'Sucesso',
+          'Status do usuário ${ativo ? 'ativado' : 'desativado'} com sucesso!',
+          backgroundColor: ativo ? Colors.green : Colors.orange,
+          colorText: Colors.white,
+        );
+
+        await carregarUsuarios();
+      } else {
+        throw Exception(response['error']);
+      }
+    } catch (e) {
+      print('❌ Erro ao atualizar status via API: $e');
+      
+      // Fallback para SQLite
+      await _atualizarStatusUsuarioLocal(id, ativo);
+    }
+  }
+
+  // Fallback para atualizar status no SQLite
+  Future<void> _atualizarStatusUsuarioLocal(int id, bool ativo) async {
+    try {
+      print('⚠️ Usando SQLite local para atualizar status - fallback');
+      
       final db = await DatabaseHelper.instance.database;
       
       await db.update(
@@ -817,14 +972,14 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
 
       Get.snackbar(
         'Sucesso',
-        'Status do usuário ${ativo ? 'ativado' : 'desativado'} com sucesso!',
+        'Status do usuário ${ativo ? 'ativado' : 'desativado'} com sucesso! (Offline)',
         backgroundColor: ativo ? Colors.green : Colors.orange,
         colorText: Colors.white,
       );
 
       await carregarUsuarios();
     } catch (e) {
-      print('❌ Erro ao atualizar status: $e');
+      print('❌ Erro no fallback SQLite para atualizar status: $e');
       Get.snackbar(
         'Erro',
         'Erro ao atualizar status do usuário',
@@ -848,9 +1003,9 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Tem certeza que deseja remover o usuário?',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 16),
             Container(
@@ -909,12 +1064,40 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     );
   }
 
-  // Confirmar remoção do usuário
+  // Confirmar remoção do usuário (MIGRADO PARA API)
   Future<void> _confirmarRemocaoUsuario(int id) async {
     try {
+      final apiService = Get.find<ApiService>();
+      
+      final response = await apiService.delete('/auth/usuarios/$id');
+      
+      if (response['success']) {
+        Get.snackbar(
+          'Sucesso',
+          'Usuário removido com sucesso!',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+
+        await carregarUsuarios();
+      } else {
+        throw Exception(response['error']);
+      }
+    } catch (e) {
+      print('❌ Erro ao remover usuário via API: $e');
+      
+      // Fallback para SQLite
+      await _confirmarRemocaoUsuarioLocal(id);
+    }
+  }
+
+  // Fallback para remoção no SQLite
+  Future<void> _confirmarRemocaoUsuarioLocal(int id) async {
+    try {
+      print('⚠️ Usando SQLite local para remoção - fallback');
+      
       final db = await DatabaseHelper.instance.database;
       
-      // Remover usuário
       await db.delete(
         'usuarios',
         where: 'id = ?',
@@ -923,14 +1106,14 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
 
       Get.snackbar(
         'Sucesso',
-        'Usuário removido com sucesso!',
+        'Usuário removido com sucesso! (Offline)',
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );
 
       await carregarUsuarios();
     } catch (e) {
-      print('❌ Erro ao remover usuário: $e');
+      print('❌ Erro no fallback SQLite para remoção: $e');
       Get.snackbar(
         'Erro',
         'Erro ao remover usuário',

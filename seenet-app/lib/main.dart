@@ -82,7 +82,7 @@ class MyApp extends StatelessWidget {
         ),
         GetPage(
           name: '/registro',
-          page: () => const RegistrarView(),
+          page: () => RegistrarView(),
           binding: RegistroBindings(),
         ),
         GetPage(

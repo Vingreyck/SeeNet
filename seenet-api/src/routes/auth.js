@@ -12,7 +12,7 @@ const router = express.Router();
 
 // Rate limiting para login (mais restritivo)
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
+  windowMs: 0 * 60 * 1000, // 15 minutos MUDAR PARA 15 AQUI 
   max: 5, // máximo 5 tentativas de login por IP
   message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
   standardHeaders: true,
@@ -323,6 +323,279 @@ router.post('/logout', async (req, res) => {
   } catch (error) {
     // Mesmo com erro, permitir logout
     res.json({ message: 'Logout realizado' });
+  }
+});
+// ========== ENDPOINTS DE DEBUG ==========
+
+// ========== ENDPOINTS DE GERENCIAMENTO DE USUÁRIOS ==========
+
+// Editar usuário
+router.put('/usuarios/:id', [
+  body('nome').optional().trim().isLength({ min: 2, max: 100 }),
+  body('email').optional().isEmail().normalizeEmail(),
+  body('senha').optional().isLength({ min: 6, max: 128 }),
+  body('tipo_usuario').optional().isIn(['tecnico', 'administrador']),
+  body('ativo').optional().isBoolean(),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        error: 'Dados inválidos', 
+        details: errors.array() 
+      });
+    }
+
+    const { id } = req.params;
+    const { nome, email, senha, tipo_usuario, ativo } = req.body;
+
+    // Verificar se usuário existe
+    const user = await db('usuarios').where('id', id).first();
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    // Preparar dados para atualização
+    const updateData = {
+      data_atualizacao: new Date().toISOString()
+    };
+
+    if (nome) updateData.nome = nome;
+    if (email) updateData.email = email.toLowerCase();
+    if (tipo_usuario) updateData.tipo_usuario = tipo_usuario;
+    if (typeof ativo === 'boolean') updateData.ativo = ativo;
+    
+    // Se senha fornecida, fazer hash
+    if (senha) {
+      updateData.senha = await bcrypt.hash(senha, 12);
+    }
+
+    await db('usuarios').where('id', id).update(updateData);
+
+    await auditService.log({
+      action: 'USER_UPDATED',
+      usuario_id: id,
+      details: `Usuário atualizado: ${Object.keys(updateData).join(', ')}`,
+      ip_address: req.ip
+    });
+
+    res.json({ success: true, message: 'Usuário atualizado com sucesso' });
+  } catch (error) {
+    logger.error('Erro ao editar usuário:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Resetar senha
+router.put('/usuarios/:id/resetar-senha', [
+  body('nova_senha').isLength({ min: 6, max: 128 }).withMessage('Nova senha deve ter entre 6 e 128 caracteres'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        error: 'Dados inválidos', 
+        details: errors.array() 
+      });
+    }
+
+    const { id } = req.params;
+    const { nova_senha } = req.body;
+
+    const user = await db('usuarios').where('id', id).first();
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    const senhaHash = await bcrypt.hash(nova_senha, 12);
+    
+    await db('usuarios').where('id', id).update({
+      senha: senhaHash,
+      data_atualizacao: new Date().toISOString()
+    });
+
+    await auditService.log({
+      action: 'PASSWORD_RESET',
+      usuario_id: id,
+      details: `Senha resetada para usuário: ${user.email}`,
+      ip_address: req.ip
+    });
+
+    res.json({ success: true, message: 'Senha resetada com sucesso' });
+  } catch (error) {
+    logger.error('Erro ao resetar senha:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Atualizar status (ativar/desativar)
+router.put('/usuarios/:id/status', [
+  body('ativo').isBoolean().withMessage('Status deve ser true ou false'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        error: 'Dados inválidos', 
+        details: errors.array() 
+      });
+    }
+
+    const { id } = req.params;
+    const { ativo } = req.body;
+
+    const user = await db('usuarios').where('id', id).first();
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    await db('usuarios').where('id', id).update({
+      ativo,
+      data_atualizacao: new Date().toISOString()
+    });
+
+    await auditService.log({
+      action: 'USER_STATUS_CHANGED',
+      usuario_id: id,
+      details: `Status alterado para: ${ativo ? 'ativo' : 'inativo'}`,
+      ip_address: req.ip
+    });
+
+    res.json({ success: true, message: `Usuário ${ativo ? 'ativado' : 'desativado'} com sucesso` });
+  } catch (error) {
+    logger.error('Erro ao atualizar status:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Remover usuário
+router.delete('/usuarios/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await db('usuarios').where('id', id).first();
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    await db('usuarios').where('id', id).del();
+
+    await auditService.log({
+      action: 'USER_DELETED',
+      details: `Usuário removido: ${user.email} (ID: ${id})`,
+      ip_address: req.ip
+    });
+
+    res.json({ success: true, message: 'Usuário removido com sucesso' });
+  } catch (error) {
+    logger.error('Erro ao remover usuário:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Debug - Listar usuários
+router.get('/debug/usuarios', async (req, res) => {
+  try {
+    const usuarios = await db('usuarios')
+      .join('tenants', 'usuarios.tenant_id', 'tenants.id')
+      .select(
+        'usuarios.id',
+        'usuarios.nome',
+        'usuarios.email',
+        'usuarios.tipo_usuario',
+        'usuarios.ativo',
+        'usuarios.data_criacao',
+        'usuarios.ultimo_login',
+        'tenants.nome as empresa',
+        'tenants.codigo as codigo_empresa'
+      )
+      .orderBy('usuarios.data_criacao', 'desc');
+    
+    res.json({
+      message: 'Usuários na API Node.js',
+      total: usuarios.length,
+      usuarios: usuarios
+    });
+  } catch (error) {
+    logger.error('❌ Erro ao listar usuários:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Debug - Atualizar tipo de usuário
+router.post('/debug/update-user-type', async (req, res) => {
+  try {
+    const { email, tipo } = req.body;
+    
+    if (!email || !tipo) {
+      return res.status(400).json({ error: 'Email e tipo são obrigatórios' });
+    }
+
+    if (!['tecnico', 'administrador'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo deve ser "tecnico" ou "administrador"' });
+    }
+
+    // Atualizar usuário
+    const updated = await db('usuarios')
+      .where('email', email.toLowerCase())
+      .update({ 
+        tipo_usuario: tipo,
+        data_atualizacao: new Date().toISOString()
+      });
+
+    if (updated === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+    
+    // Buscar usuário atualizado
+    const user = await db('usuarios')
+      .join('tenants', 'usuarios.tenant_id', 'tenants.id')
+      .where('usuarios.email', email.toLowerCase())
+      .select(
+        'usuarios.id',
+        'usuarios.nome',
+        'usuarios.email',
+        'usuarios.tipo_usuario',
+        'tenants.nome as empresa'
+      )
+      .first();
+
+    // Log de auditoria
+    await auditService.log({
+      action: 'USER_UPDATED',
+      usuario_id: user.id,
+      tenant_id: user.tenant_id,
+      details: `Tipo de usuário alterado para: ${tipo}`,
+      ip_address: req.ip
+    });
+    
+    logger.info(`✅ Tipo atualizado: ${email} -> ${tipo}`);
+    
+    res.json({ 
+      message: 'Tipo de usuário atualizado',
+      user: {
+        email: user.email,
+        nome: user.nome,
+        tipo_usuario: user.tipo_usuario,
+        empresa: user.empresa
+      }
+    });
+  } catch (error) {
+    logger.error('❌ Erro ao atualizar tipo:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Debug - Limpar rate limit
+router.post('/debug/clear-rate-limit', async (req, res) => {
+  try {
+    // O rate limit do express-rate-limit é automaticamente limpo ao reiniciar
+    res.json({ 
+      message: 'Para limpar rate limit, reinicie o servidor',
+      tip: 'Ctrl+C e npm start novamente'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

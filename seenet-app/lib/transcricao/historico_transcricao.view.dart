@@ -74,8 +74,8 @@ class _HistoricoTranscricaoViewState extends State<HistoricoTranscricaoView> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.back(),
         backgroundColor: const Color(0xFF00FF88),
-        child: const Icon(Icons.add, color: Colors.black),
         tooltip: 'Nova Documentação',
+        child: const Icon(Icons.add, color: Colors.black),
       ),
     );
   }

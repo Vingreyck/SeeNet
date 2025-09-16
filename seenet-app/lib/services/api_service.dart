@@ -51,34 +51,42 @@ class ApiService extends GetxService {
   }
   
   // GET
-  Future<Map<String, dynamic>> get(
-    String endpoint, {
-    Map<String, String>? queryParams,
-    bool requireAuth = true,
-  }) async {
-    try {
-      String url = ApiConfig.getUrl(ApiConfig.endpoints[endpoint] ?? endpoint);
-      
-      if (queryParams != null && queryParams.isNotEmpty) {
-        url += '?' + queryParams.entries
-            .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
-            .join('&');
-      }
-      
-      print('🌐 GET: $url');
-      
-      final response = await _client
-          .get(
-            Uri.parse(url),
-            headers: _getHeaders(requireAuth: requireAuth),
-          )
-          .timeout(ApiConfig.requestTimeout);
-      
-      return _handleResponse(response);
-    } catch (e) {
-      return _handleError(e);
+Future<Map<String, dynamic>> get(
+  String endpoint, {
+  Map<String, String>? queryParams,
+  bool requireAuth = true,
+}) async {
+  try {
+    String url;
+    
+    // Se o endpoint começar com '/', usar diretamente
+    if (endpoint.startsWith('/')) {
+      url = '${ApiConfig.baseUrl.replaceAll('/api', '')}$endpoint';
+    } else {
+      // Senão, procurar na lista de endpoints
+      url = ApiConfig.getUrl(ApiConfig.endpoints[endpoint] ?? endpoint);
     }
+    
+    if (queryParams != null && queryParams.isNotEmpty) {
+      url += '?${queryParams.entries
+          .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+          .join('&')}';
+    }
+    
+    print('🌐 GET: $url');
+    
+    final response = await _client
+        .get(
+          Uri.parse(url),
+          headers: _getHeaders(requireAuth: requireAuth),
+        )
+        .timeout(ApiConfig.requestTimeout);
+    
+    return _handleResponse(response);
+  } catch (e) {
+    return _handleError(e);
   }
+}
   
   // POST
   Future<Map<String, dynamic>> post(
@@ -228,13 +236,29 @@ class ApiService extends GetxService {
   
   // Verificar conectividade
   Future<bool> checkConnectivity() async {
-    try {
-      final response = await get('/health', requireAuth: false);
-      return response['success'] == true;
-    } catch (e) {
-      return false;
-    }
+  try {
+    // Usar URL direta para health check
+    final baseUrl = ApiConfig.baseUrl.replaceAll('/api', '');
+    final url = '$baseUrl/health';
+    
+    print('🌐 Health Check: $url');
+    
+    final response = await _client
+        .get(
+          Uri.parse(url),
+          headers: ApiConfig.defaultHeaders,
+        )
+        .timeout(const Duration(seconds: 10));
+    
+    print('📡 Health Status: ${response.statusCode}');
+    print('📄 Health Response: ${response.body}');
+    
+    return response.statusCode == 200;
+  } catch (e) {
+    print('❌ Health Check Error: $e');
+    return false;
   }
+}
   
   // Debug - testar todas as URLs
   Future<void> debugEndpoints() async {
@@ -252,4 +276,4 @@ class ApiService extends GetxService {
     
     print('================================\n');
   }
-} 
+}

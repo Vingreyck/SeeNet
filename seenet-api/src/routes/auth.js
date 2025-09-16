@@ -12,7 +12,7 @@ const router = express.Router();
 
 // Rate limiting para login (mais restritivo)
 const loginLimiter = rateLimit({
-  windowMs: 0 * 60 * 1000, // 15 minutos MUDAR PARA 15 AQUI 
+  windowMs: 15 * 60 * 1000, // 15 minutos MUDAR PARA 15 AQUI 
   max: 5, // máximo 5 tentativas de login por IP
   message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
   standardHeaders: true,
@@ -41,7 +41,7 @@ router.post('/register', [
     // Verificar se o tenant existe e está ativo
     const tenant = await db('tenants')
       .where('codigo', codigoEmpresa.toUpperCase())
-      .where('ativo', true)
+      .where('ativo', 1) // ← MUDAR: true para 1
       .first();
 
     if (!tenant) {
@@ -65,7 +65,7 @@ router.post('/register', [
     // Verificar limite de usuários do plano
     const userCount = await db('usuarios')
       .where('tenant_id', tenant.id)
-      .where('ativo', true)
+      .where('ativo', 1) // ← MUDAR: true para 1
       .count('id as total')
       .first();
 
@@ -93,7 +93,7 @@ router.post('/register', [
       senha: senhaHash,
       tenant_id: tenant.id,
       tipo_usuario: 'tecnico', // Novos usuários sempre como técnico
-      ativo: true,
+      ativo: 1,
       data_criacao: new Date().toISOString(),
     });
 
@@ -142,8 +142,8 @@ router.post('/login', loginLimiter, [
       .join('tenants', 'usuarios.tenant_id', 'tenants.id')
       .where('usuarios.email', email.toLowerCase())
       .where('tenants.codigo', codigoEmpresa.toUpperCase())
-      .where('usuarios.ativo', true)
-      .where('tenants.ativo', true)
+      .where('usuarios.ativo', 1)
+      .where('tenants.ativo', 1)
       .select(
         'usuarios.*',
         'tenants.id as tenant_id',
@@ -253,8 +253,8 @@ router.get('/verify', async (req, res) => {
     const user = await db('usuarios')
       .join('tenants', 'usuarios.tenant_id', 'tenants.id')
       .where('usuarios.id', decoded.userId)
-      .where('usuarios.ativo', true)
-      .where('tenants.ativo', true)
+      .where('usuarios.ativo', 1)
+      .where('tenants.ativo', 1)
       .select(
         'usuarios.id',
         'usuarios.nome',
@@ -325,173 +325,8 @@ router.post('/logout', async (req, res) => {
     res.json({ message: 'Logout realizado' });
   }
 });
+
 // ========== ENDPOINTS DE DEBUG ==========
-
-// ========== ENDPOINTS DE GERENCIAMENTO DE USUÁRIOS ==========
-
-// Editar usuário
-router.put('/usuarios/:id', [
-  body('nome').optional().trim().isLength({ min: 2, max: 100 }),
-  body('email').optional().isEmail().normalizeEmail(),
-  body('senha').optional().isLength({ min: 6, max: 128 }),
-  body('tipo_usuario').optional().isIn(['tecnico', 'administrador']),
-  body('ativo').optional().isBoolean(),
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        error: 'Dados inválidos', 
-        details: errors.array() 
-      });
-    }
-
-    const { id } = req.params;
-    const { nome, email, senha, tipo_usuario, ativo } = req.body;
-
-    // Verificar se usuário existe
-    const user = await db('usuarios').where('id', id).first();
-    if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
-    }
-
-    // Preparar dados para atualização
-    const updateData = {
-      data_atualizacao: new Date().toISOString()
-    };
-
-    if (nome) updateData.nome = nome;
-    if (email) updateData.email = email.toLowerCase();
-    if (tipo_usuario) updateData.tipo_usuario = tipo_usuario;
-    if (typeof ativo === 'boolean') updateData.ativo = ativo;
-    
-    // Se senha fornecida, fazer hash
-    if (senha) {
-      updateData.senha = await bcrypt.hash(senha, 12);
-    }
-
-    await db('usuarios').where('id', id).update(updateData);
-
-    await auditService.log({
-      action: 'USER_UPDATED',
-      usuario_id: id,
-      details: `Usuário atualizado: ${Object.keys(updateData).join(', ')}`,
-      ip_address: req.ip
-    });
-
-    res.json({ success: true, message: 'Usuário atualizado com sucesso' });
-  } catch (error) {
-    logger.error('Erro ao editar usuário:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Resetar senha
-router.put('/usuarios/:id/resetar-senha', [
-  body('nova_senha').isLength({ min: 6, max: 128 }).withMessage('Nova senha deve ter entre 6 e 128 caracteres'),
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        error: 'Dados inválidos', 
-        details: errors.array() 
-      });
-    }
-
-    const { id } = req.params;
-    const { nova_senha } = req.body;
-
-    const user = await db('usuarios').where('id', id).first();
-    if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
-    }
-
-    const senhaHash = await bcrypt.hash(nova_senha, 12);
-    
-    await db('usuarios').where('id', id).update({
-      senha: senhaHash,
-      data_atualizacao: new Date().toISOString()
-    });
-
-    await auditService.log({
-      action: 'PASSWORD_RESET',
-      usuario_id: id,
-      details: `Senha resetada para usuário: ${user.email}`,
-      ip_address: req.ip
-    });
-
-    res.json({ success: true, message: 'Senha resetada com sucesso' });
-  } catch (error) {
-    logger.error('Erro ao resetar senha:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Atualizar status (ativar/desativar)
-router.put('/usuarios/:id/status', [
-  body('ativo').isBoolean().withMessage('Status deve ser true ou false'),
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        error: 'Dados inválidos', 
-        details: errors.array() 
-      });
-    }
-
-    const { id } = req.params;
-    const { ativo } = req.body;
-
-    const user = await db('usuarios').where('id', id).first();
-    if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
-    }
-
-    await db('usuarios').where('id', id).update({
-      ativo,
-      data_atualizacao: new Date().toISOString()
-    });
-
-    await auditService.log({
-      action: 'USER_STATUS_CHANGED',
-      usuario_id: id,
-      details: `Status alterado para: ${ativo ? 'ativo' : 'inativo'}`,
-      ip_address: req.ip
-    });
-
-    res.json({ success: true, message: `Usuário ${ativo ? 'ativado' : 'desativado'} com sucesso` });
-  } catch (error) {
-    logger.error('Erro ao atualizar status:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Remover usuário
-router.delete('/usuarios/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const user = await db('usuarios').where('id', id).first();
-    if (!user) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
-    }
-
-    await db('usuarios').where('id', id).del();
-
-    await auditService.log({
-      action: 'USER_DELETED',
-      details: `Usuário removido: ${user.email} (ID: ${id})`,
-      ip_address: req.ip
-    });
-
-    res.json({ success: true, message: 'Usuário removido com sucesso' });
-  } catch (error) {
-    logger.error('Erro ao remover usuário:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
 
 // Debug - Listar usuários
 router.get('/debug/usuarios', async (req, res) => {

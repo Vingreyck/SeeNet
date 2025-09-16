@@ -456,7 +456,9 @@ class PerformanceService extends GetxService {
     _metrics.clear();
     
     // Limpar timers
-    _debounceTimers.values.forEach((timer) => timer?.cancel());
+    for (var timer in _debounceTimers.values) {
+      timer?.cancel();
+    }
     _debounceTimers.clear();
     
     if (kDebugMode) {
@@ -481,7 +483,9 @@ class PerformanceService extends GetxService {
   @override
   void onClose() {
     _batchTimer?.cancel();
-    _debounceTimers.values.forEach((timer) => timer?.cancel());
+    for (var timer in _debounceTimers.values) {
+      timer?.cancel();
+    }
     forceGC();
     super.onClose();
   }

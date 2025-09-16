@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'widgets/logarbutton.widget.dart';
 import 'widgets/logintextfield.widget.dart';
 import 'widgets/senhatextfield.dart';
 import 'widgets/registrarbutton.widget.dart';
 import 'widgets/codigoempresa_textfield.dart';
 import 'loginview.controller.dart';
-import '../services/api_service.dart';
-import '../services/auth_service.dart'; // ← NOVO IMPORT
 
 class LoginView extends GetView<LoginController> {
   const LoginView({super.key});
@@ -123,293 +123,405 @@ class LoginView extends GetView<LoginController> {
             ],
           ),
           
-          // ========== TESTES DE API (TEMPORÁRIOS) ==========
+          // ========== TESTES DE API ==========
           const SizedBox(height: 40),
-          _buildTestSection(), // ← SEÇÃO DE TESTES ATUALIZADA
+          _buildTestSection(),
+          
+          // ========== NOVO: TESTE DETALHADO FLUTTER ==========
+          const SizedBox(height: 20),
+          _buildAdvancedTestSection(),
         ],
       ),
     );
   }
 
-  // ========== SEÇÃO DE TESTES ==========
-Widget _buildTestSection() {
-  return Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: const Color(0xFF374151).withOpacity(0.8),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(
-        color: const Color(0xFF00FF99).withOpacity(0.3),
-        width: 1,
+  // ========== SEÇÃO DE TESTES BÁSICOS ==========
+  Widget _buildTestSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF374151).withOpacity(0.8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF00FF99).withOpacity(0.3),
+          width: 1,
+        ),
       ),
-    ),
-    child: Column(
-      children: [
-        const Text(
-          '🧪 Testes de API',
-          style: TextStyle(
-            color: Color(0xFF00FF99),
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+      child: Column(
+        children: [
+          const Text(
+            '🧪 Testes Rápidos',
+            style: TextStyle(
+              color: Color(0xFF00FF99),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        
-        // Botão 1: Teste de conectividade
-        _buildTestButton(
-          'Testar Backend',
-          Icons.wifi_protected_setup,
-          controller.testarBackend,
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Botão 2: Login Demo Admin (preenche campos + faz login)
-        _buildTestButton(
-          'Login Demo (Admin)',
-          Icons.admin_panel_settings,
-          controller.testarLoginAdmin,
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Botão 3: Login Demo Técnico (preenche campos + faz login)
-        _buildTestButton(
-          'Login Demo (Técnico)',
-          Icons.engineering,
-          controller.testarLoginTecnico,
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Botão 4: Verificar empresas
-        _buildTestButton(
-          'Verificar Empresas',
-          Icons.business,
-          controller.testarEmpresas,
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Botão 5: Limpar campos
-        _buildTestButton(
-          'Limpar Campos',
-          Icons.clear_all,
-          controller.limparCampos,
-        ),
-      ],
-    ),
-  );
-}
+          const SizedBox(height: 16),
+          
+          // Botão 1: Teste de conectividade
+          _buildTestButton(
+            'Testar Backend',
+            Icons.wifi_protected_setup,
+            controller.testarBackend,
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Botão 2: Login Demo Admin (preenche campos + faz login)
+          _buildTestButton(
+            'Login Demo (Admin)',
+            Icons.admin_panel_settings,
+            controller.testarLoginAdmin,
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Botão 3: Login Demo Técnico (preenche campos + faz login)
+          _buildTestButton(
+            'Login Demo (Técnico)',
+            Icons.engineering,
+            controller.testarLoginTecnico,
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Botão 4: Verificar empresas
+          _buildTestButton(
+            'Verificar Empresas',
+            Icons.business,
+            controller.testarEmpresas,
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Botão 5: Limpar campos
+          _buildTestButton(
+            'Limpar Campos',
+            Icons.clear_all,
+            controller.limparCampos,
+          ),
+        ],
+      ),
+    );
+  }
 
-Widget _buildTestButton(String title, IconData icon, VoidCallback onPressed) {
-  return SizedBox(
-    width: double.infinity,
-    child: Obx(() {
-      return ElevatedButton.icon(
-        onPressed: controller.isLoading.value ? null : onPressed,
-        icon: controller.isLoading.value 
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : Icon(icon, size: 18),
-        label: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+  // ========== NOVA SEÇÃO: TESTE DETALHADO ==========
+  Widget _buildAdvancedTestSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F2937).withOpacity(0.9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.blue.withOpacity(0.4),
+          width: 1,
         ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: controller.isLoading.value 
-              ? const Color(0xFF4B5563).withOpacity(0.5)
-              : const Color(0xFF4B5563),
-          foregroundColor: Colors.white,
-          elevation: controller.isLoading.value ? 0 : 2,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: BorderSide(
-              color: const Color(0xFF00FF99).withOpacity(0.5),
-              width: 1,
+      ),
+      child: Column(
+        children: [
+          const Text(
+            '🔬 Teste Detalhado Flutter',
+            style: TextStyle(
+              color: Colors.blue,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'IP: 10.0.2.167:3000',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Botão para teste completo
+          _buildAdvancedTestButton(),
+          
+          const SizedBox(height: 16),
+          
+          // Área de resultados
+          _buildTestResults(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdvancedTestButton() {
+    return Obx(() {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: controller.isLoading.value ? null : _executarTesteCompleto,
+          icon: controller.isLoading.value 
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Icon(Icons.play_arrow, size: 18),
+          label: Text(
+            controller.isLoading.value ? 'EXECUTANDO...' : 'EXECUTAR TESTE COMPLETO',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: controller.isLoading.value 
+                ? Colors.blue.withOpacity(0.5)
+                : Colors.blue,
+            foregroundColor: Colors.white,
+            elevation: controller.isLoading.value ? 0 : 3,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
         ),
       );
-    }),
-  );
+    });
+  }
+
+  Widget _buildTestResults() {
+    return Obx(() {
+      if (controller.testResults.isEmpty) {
+        return Container(
+          height: 120,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xFF111827),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          ),
+          child: const Center(
+            child: Text(
+              'Clique no botão acima para executar os testes',
+              style: TextStyle(
+                color: Colors.white60,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
+      }
+      
+      return Container(
+        height: 200,
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111827),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '📋 Resultados:',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(
+                  controller.testResults.value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+  Future<void> _testeHTTPDireto() async {
+  try {
+    print('🧪 Teste direto HTTP...');
+    
+    final response = await http.get(
+      Uri.parse('http://10.0.2.167:3000/health'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    
+    print('Status: ${response.statusCode}');
+    print('Body: ${response.body}');
+    
+    if (response.statusCode == 200) {
+      Get.snackbar('Sucesso', 'HTTP Direto funcionando!');
+    } else {
+      Get.snackbar('Erro', 'Status: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('Erro HTTP direto: $e');
+    Get.snackbar('Erro', 'Erro: $e');
+  }
 }
 
-  // ========== TESTE DE CONECTIVIDADE ==========
-  void _testBackend() async {
-    try {
-      _showLoading();
-      
-      final apiService = Get.find<ApiService>();
-      bool conectado = await apiService.checkConnectivity();
-      
-      Get.back(); // Fechar loading
-
-      _showSnackbar(
-        conectado ? 'Backend Online' : 'Backend Offline',
-        conectado 
-            ? '✅ Servidor conectado via hotspot!'
-            : '❌ Não foi possível conectar ao servidor',
-        conectado,
-      );
-
-    } catch (e) {
-      _closeLoadingIfOpen();
-      _showSnackbar('Erro no Teste', '❌ Erro: $e', false);
-    }
-  }
-
-  // ========== TESTE DE LOGIN ADMIN ==========
-  void _testLoginAdmin() async {
-    try {
-      _showLoading();
-
-      final authService = Get.find<AuthService>();
-      bool success = await authService.login(
-        'admin@seenet.com', 
-        'admin123', 
-        'DEMO2024'
-      );
-
-      Get.back(); // Fechar loading
-
-      _showSnackbar(
-        success ? '✅ Login Admin OK' : '❌ Login Admin Falhou',
-        success 
-            ? 'Logado como admin@seenet.com!\nEmpresa:SeeNet'
-            : 'Erro ao fazer login com credenciais do admin',
-        success,
-      );
-
-      if (success) {
-        print('🎉 Login admin bem-sucedido!');
-        // Aqui você pode navegar para a tela principal se quiser
-        // Get.offAllNamed('/home');
-      }
-
-    } catch (e) {
-      _closeLoadingIfOpen();
-      _showSnackbar('Erro no Login Admin', '❌ Erro: $e', false);
-    }
-  }
-
-  // ========== TESTE DE LOGIN TÉCNICO ==========
-  void _testLoginTecnico() async {
-    try {
-      _showLoading();
-
-      final authService = Get.find<AuthService>();
-      bool success = await authService.login(
-        'tecnico@seenet.com', 
-        '123456', 
-        'DEMO2024'
-      );
-
-      Get.back(); // Fechar loading
-
-      _showSnackbar(
-        success ? '✅ Login Técnico OK' : '❌ Login Técnico Falhou',
-        success 
-            ? 'Logado como tecnico@demo.seenet.com!\nEmpresa: SeeNet Demo'
-            : 'Erro ao fazer login com credenciais do técnico',
-        success,
-      );
-
-      if (success) {
-        print('🎉 Login técnico bem-sucedido!');
-      }
-
-    } catch (e) {
-      _closeLoadingIfOpen();
-      _showSnackbar('Erro no Login Técnico', '❌ Erro: $e', false);
-    }
-  }
-
-  // ========== TESTE DE VERIFICAÇÃO DE EMPRESAS ==========
-  void _testCompanies() async {
-    try {
-      _showLoading();
-
-      final authService = Get.find<AuthService>();
-      
-      var demo = await authService.verificarCodigoEmpresa('DEMO2024');
-      var tech = await authService.verificarCodigoEmpresa('TECH2024');
-      var invalid = await authService.verificarCodigoEmpresa('INVALID');
-
-      Get.back(); // Fechar loading
-
-      String message = '';
-      if (demo != null) {
-        message += '✅ DEMO2024: ${demo['nome']}\n';
-      }
-      if (tech != null) {
-        message += '✅ TECH2024: ${tech['nome']}\n';
-      }
-      message += '❌ INVALID: Não encontrada';
-
-      _showSnackbar(
-        '🏢 Verificação de Empresas',
-        message,
-        demo != null || tech != null,
-      );
-
-      // Debug
-      print('📊 DEMO2024: $demo');
-      print('📊 TECH2024: $tech');
-      print('📊 INVALID: $invalid');
-
-    } catch (e) {
-      _closeLoadingIfOpen();
-      _showSnackbar('Erro na Verificação', '❌ Erro: $e', false);
-    }
-  }
-
-  // ========== MÉTODOS AUXILIARES ==========
-  void _showLoading() {
-    Get.dialog(
-      const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00FF99)),
-        ),
-      ),
-      barrierDismissible: false,
+  Widget _buildTestButton(String title, IconData icon, VoidCallback onPressed) {
+    return SizedBox(
+      width: double.infinity,
+      child: Obx(() {
+        return ElevatedButton.icon(
+          onPressed: controller.isLoading.value ? null : onPressed,
+          icon: controller.isLoading.value 
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Icon(icon, size: 18),
+          label: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: controller.isLoading.value 
+                ? const Color(0xFF4B5563).withOpacity(0.5)
+                : const Color(0xFF4B5563),
+            foregroundColor: Colors.white,
+            elevation: controller.isLoading.value ? 0 : 2,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(
+                color: const Color(0xFF00FF99).withOpacity(0.5),
+                width: 1,
+              ),
+            ),
+          ),
+        );
+      }),
     );
   }
 
-  void _closeLoadingIfOpen() {
-    if (Get.isDialogOpen ?? false) {
-      Get.back();
+  // ========== MÉTODO DO TESTE COMPLETO ==========
+  Future<void> _executarTesteCompleto() async {
+    controller.isLoading.value = true;
+    controller.testResults.value = '🚀 Iniciando teste completo...\n\n';
+    
+    const String baseUrl = 'http://10.0.2.167:3000';
+    
+    try {
+      // Teste 1: Health Check
+      await _testeHealth(baseUrl);
+      
+      // Teste 2: Verificar Empresa
+      await _testeEmpresa(baseUrl);
+      
+      // Teste 3: Login
+      await _testeLogin(baseUrl);
+      
+      controller.testResults.value += '\n🎯 TODOS OS TESTES CONCLUÍDOS!';
+      
+    } catch (e) {
+      controller.testResults.value += '\n❌ ERRO GERAL: $e';
+    } finally {
+      controller.isLoading.value = false;
     }
   }
 
-  void _showSnackbar(String title, String message, bool isSuccess) {
-    Get.snackbar(
-      title,
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: isSuccess 
-          ? const Color(0xFF00FF99) 
-          : Colors.red,
-      colorText: isSuccess 
-          ? Colors.black 
-          : Colors.white,
-      duration: const Duration(seconds: 4),
-      margin: const EdgeInsets.all(20),
-      borderRadius: 12,
-      icon: Icon(
-        isSuccess ? Icons.check_circle : Icons.error,
-        color: isSuccess ? Colors.black : Colors.white,
-      ),
-    );
+  Future<void> _testeHealth(String baseUrl) async {
+    try {
+      controller.testResults.value += '1️⃣ Testando Health Check...\n';
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/health'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        controller.testResults.value += '✅ Health Check: OK (${response.statusCode})\n\n';
+      } else {
+        controller.testResults.value += '❌ Health Check: FALHA (${response.statusCode})\n';
+        controller.testResults.value += 'Response: ${response.body}\n\n';
+      }
+      
+    } catch (e) {
+      controller.testResults.value += '❌ Health Check: ERRO\n';
+      controller.testResults.value += 'Detalhes: $e\n\n';
+    }
+  }
+
+  Future<void> _testeEmpresa(String baseUrl) async {
+    try {
+      controller.testResults.value += '2️⃣ Testando verificação de empresa...\n';
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/tenant/verify/DEMO2024'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        controller.testResults.value += '✅ Empresa encontrada: ${data['empresa']['nome']}\n';
+        controller.testResults.value += 'Plano: ${data['empresa']['plano']}\n\n';
+      } else {
+        controller.testResults.value += '❌ Empresa: FALHA (${response.statusCode})\n';
+        controller.testResults.value += 'Response: ${response.body}\n\n';
+      }
+      
+    } catch (e) {
+      controller.testResults.value += '❌ Empresa: ERRO\n';
+      controller.testResults.value += 'Detalhes: $e\n\n';
+    }
+  }
+
+  Future<void> _testeLogin(String baseUrl) async {
+    try {
+      controller.testResults.value += '3️⃣ Testando login...\n';
+      
+      final loginData = {
+        'email': 'admin@seenet.com',
+        'senha': 'admin123',
+        'codigoEmpresa': 'DEMO2024',
+      };
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(loginData),
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        controller.testResults.value += '✅ LOGIN SUCESSO!\n';
+        controller.testResults.value += 'Usuário: ${data['user']['nome']}\n';
+        controller.testResults.value += 'Tipo: ${data['user']['tipo_usuario']}\n';
+        controller.testResults.value += 'Empresa: ${data['user']['tenant']['nome']}\n';
+        controller.testResults.value += 'Token recebido: ${data['token'].substring(0, 30)}...\n\n';
+      } else {
+        controller.testResults.value += '❌ Login: FALHA (${response.statusCode})\n';
+        controller.testResults.value += 'Response: ${response.body}\n\n';
+      }
+      
+    } catch (e) {
+      controller.testResults.value += '❌ Login: ERRO\n';
+      controller.testResults.value += 'Detalhes: $e\n\n';
+    }
   }
 }

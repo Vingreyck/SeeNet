@@ -1,8 +1,8 @@
-import 'environment.dart'; // ← Import do seu arquivo existente
+import 'environment.dart';
 
 class ApiConfig {
-  // URLs baseadas no ambiente
-  static const String _devBaseUrl = 'http://10.50.160.140:3000/api';
+  // URLs baseadas no ambiente - CORRIGIDO para emulador Android
+  static const String _devBaseUrl = 'http://10.0.1.112:3000/api'; // ← MUDANÇA AQUI
   static const String _prodBaseUrl = 'https://api.seenet.com/api';
   
   // URL ativa baseada no Environment
@@ -12,12 +12,15 @@ class ApiConfig {
   
   // Endpoints da API
   static const Map<String, String> endpoints = {
+    // Health
+    'health': '/health',
+
     // Autenticação
     'login': '/auth/login',
     'register': '/auth/register',
     'verify': '/auth/verify',
     'logout': '/auth/logout',
-    
+
     // Tenant
     'verifyTenant': '/tenant/verify',
     
@@ -55,7 +58,7 @@ class ApiConfig {
     };
   }
   
-  // Headers com autenticação - CORRIGIDO
+  // Headers com autenticação
   static Map<String, String> getAuthHeaders(String token, String tenantCode) {
     return {
       'Content-Type': 'application/json',
@@ -81,6 +84,7 @@ class ApiConfig {
     print('🏗️ Ambiente: ${Environment.isDevelopment ? "DEV" : "PROD"}');
     print('⏰ Timeout: ${requestTimeout.inSeconds}s');
     print('📊 Total endpoints: ${endpoints.length}');
+    print('🤖 Emulador Android: 10.0.2.2');
     print('================================\n');
   }
 }

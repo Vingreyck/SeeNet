@@ -110,7 +110,7 @@ class DiagnosticoController extends GetxController {
 
   // Criar diagnóstico simulado quando Gemini não está disponível
   void _criarDiagnosticoSimulado(int avaliacaoId, int categoriaId, String prompt) {
-    String _gerarDiagnosticoSimuladoInteligente(String prompt) {
+    String gerarDiagnosticoSimuladoInteligente(String prompt) {
     DateTime agora = DateTime.now();
     
     // Analisar o prompt para personalizar a resposta
@@ -480,7 +480,7 @@ Para diagnósticos completos, configure uma IA como Google Gemini.""";
       categoriaId: categoriaId,
       promptEnviado: "Erro no sistema",
       respostaChatgpt: diagnosticoErro,
-      resumoDiagnostico: "Erro no sistema: ${erro.length > 50 ? erro.substring(0, 50) + '...' : erro}",
+      resumoDiagnostico: "Erro no sistema: ${erro.length > 50 ? '${erro.substring(0, 50)}...' : erro}",
       statusApi: 'erro',
       erroApi: erro,
       dataCriacao: DateTime.now(),

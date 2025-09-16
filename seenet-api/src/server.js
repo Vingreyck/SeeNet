@@ -23,7 +23,8 @@ app.use(cors({
     'http://127.0.0.1:3000',
     'http://10.0.2.2:3000',
     'http://10.50.160.140:3000', // ← SEU IP ATUAL
-    'http://172.20.10.2:3000'
+    'http://172.20.10.2:3000',
+    'http://10.0.1.112:3000'  // ← SEU IP ATUAL,
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],

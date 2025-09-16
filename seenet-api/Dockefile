@@ -1,0 +1,30 @@
+FROM node:18-alpine
+
+# Instalar dependências do sistema
+RUN apk add --no-cache python3 make g++ sqlite
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Copiar package.json
+COPY package*.json ./
+
+# Instalar dependências
+RUN npm ci --only=production
+
+# Copiar código fonte
+COPY . .
+
+# Criar diretórios necessários
+RUN mkdir -p logs database
+
+# Definir usuário não-root
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+USER nodejs
+
+# Expor portas
+EXPOSE 3000 9090
+
+# Comando de inicialização
+CMD ["npm", "start"]

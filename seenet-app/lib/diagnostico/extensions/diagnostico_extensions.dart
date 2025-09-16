@@ -685,10 +685,10 @@ class DiagnosticoAnimations {
   static const Curve bounceOut = Curves.bounceOut;
   
   /// Curve customizada para micro-interactions
-  static final Curve microInteraction = Curves.easeInOutCubic;
+  static const Curve microInteraction = Curves.easeInOutCubic;
   
   /// Curve customizada para entrada de elementos
-  static final Curve elementEntry = Curves.easeOutBack;
+  static const Curve elementEntry = Curves.easeOutBack;
 }
 
 /// Classe para dimensões e espaçamentos

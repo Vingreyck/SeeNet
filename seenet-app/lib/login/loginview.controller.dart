@@ -15,6 +15,7 @@ class LoginController extends GetxController {
   RxString email = ''.obs;
   RxString senha = ''.obs;
   RxString codigoEmpresa = ''.obs;
+  RxString testResults = ''.obs;
   RxBool empresaValida = false.obs;
   RxBool verificandoEmpresa = false.obs;
   Rx<Map<String, dynamic>?> empresaInfo = Rx<Map<String, dynamic>?>(null);
@@ -164,6 +165,7 @@ class LoginController extends GetxController {
     }
   }
 
+
   // ← NOVO: Método para preencher campos de teste
   void preencherTeste({
     required String email,
@@ -247,10 +249,10 @@ class LoginController extends GetxController {
   Future<void> testarBackend() async {
     try {
       isLoading.value = true;
-      
+
       final apiService = Get.find<ApiService>();
       bool conectado = await apiService.checkConnectivity();
-      
+
       if (conectado) {
         _showSuccess('Backend conectado via hotspot!');
         await apiService.debugEndpoints();
@@ -267,7 +269,7 @@ class LoginController extends GetxController {
   Future<void> testarLoginAdmin() async {
     // Preencher campos automaticamente
     preencherTeste(
-      email: 'admin@demo.seenet.com',
+      email: 'admin@seenet.com',
       senha: 'admin123',
       codigo: 'DEMO2024',
     );
@@ -282,7 +284,7 @@ class LoginController extends GetxController {
   Future<void> testarLoginTecnico() async {
     // Preencher campos automaticamente
     preencherTeste(
-      email: 'tecnico@demo.seenet.com',
+      email: 'tecnico@seenet.com',
       senha: '123456',
       codigo: 'DEMO2024',
     );

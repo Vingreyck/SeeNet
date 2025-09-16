@@ -90,25 +90,6 @@ class RegistroController extends GetxController {
     try {
       verificandoToken.value = true;
       
-      // Simular verificação se AuthService não estiver disponível
-      if (authService == null) {
-        await Future.delayed(const Duration(seconds: 1));
-        
-        if (token == 'DEMO2024' || token == 'TECH2024') {
-          empresaInfo.value = {
-            'nome': token == 'DEMO2024' ? 'SeeNet Demo' : 'TechCorp Ltda',
-            'plano': 'profissional'
-          };
-          tokenValido.value = true;
-          print('✅ Token válido (simulado): ${empresaInfo.value!['nome']}');
-        } else {
-          empresaInfo.value = null;
-          tokenValido.value = false;
-          print('❌ Token inválido (simulado): $token');
-        }
-        return;
-      }
-      
       final empresa = await authService.verificarCodigoEmpresa(token);
       
       if (empresa != null) {
@@ -138,26 +119,21 @@ class RegistroController extends GetxController {
       isLoading.value = true;
       
       // Tentar registro via API se disponível
-      if (authService != null) {
-        bool sucesso = await authService.register(
-          nomeInput.text.trim(),
-          emailInput.text.trim(),
-          senhaInput.text,
-          tokenEmpresaController.text.trim().toUpperCase(),
-        );
-        
-        if (sucesso) {
-        _showSuccess('Conta criada com sucesso!\n\nAgora você pode fazer login com suas credenciais.');
-          // Aguardar um pouco para mostrar a mensagem, depois redirecionar
-        Future.delayed(const Duration(seconds: 2), () {
-          Get.offAllNamed('/login');
-        });
-      }
-      } else {
-        // Fallback para registro local
-        await _registroLocal();
-      }
+      bool sucesso = await authService.register(
+        nomeInput.text.trim(),
+        emailInput.text.trim(),
+        senhaInput.text,
+        tokenEmpresaController.text.trim().toUpperCase(),
+      );
       
+      if (sucesso) {
+      _showSuccess('Conta criada com sucesso!\n\nAgora você pode fazer login com suas credenciais.');
+        // Aguardar um pouco para mostrar a mensagem, depois redirecionar
+      Future.delayed(const Duration(seconds: 2), () {
+        Get.offAllNamed('/login');
+      });
+    }
+          
     } catch (e) {
       _showError('Erro ao conectar com servidor');
       print('❌ Erro no registro: $e');

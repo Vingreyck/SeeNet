@@ -988,18 +988,16 @@ class _LogsAdminViewState extends State<LogsAdminView>
       },
     );
     
-    if (picked != null) {
-      setState(() {
-        if (isInicio) {
-          filtroDataInicio = picked;
-        } else {
-          filtroDataFim = picked;
-        }
-        paginaAtual = 0;
-      });
-      carregarDados();
+    setState(() {
+      if (isInicio) {
+        filtroDataInicio = picked;
+      } else {
+        filtroDataFim = picked;
+      }
+      paginaAtual = 0;
+    });
+    carregarDados();
     }
-  }
   
   void _mostrarDetalhesAlerta(LogSistema alerta) {
     showDialog(

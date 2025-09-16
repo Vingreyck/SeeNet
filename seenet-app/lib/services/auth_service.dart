@@ -154,9 +154,10 @@ class AuthService extends GetxService {
     }
   }
   
-  // Verificar código da empresa
+    // Verificar código da empresa
   Future<Map<String, dynamic>?> verificarCodigoEmpresa(String codigo) async {
     try {
+      // Usar endpoint direto
       final response = await _api.get('/tenant/verify/$codigo', requireAuth: false);
       
       if (response['success']) {

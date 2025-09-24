@@ -1,9 +1,9 @@
-
+// lib/controllers/usuario_controller.dart - VERSÃO CORRIGIDA
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../models/usuario.dart';
-import '../services/database_helper.dart';
+import '../services/database_adapter.dart'; // ✅ MUDANÇA: Usar DatabaseAdapter
 import '../services/security_service.dart';
 import '../services/audit_service.dart';
 import '../config/environment.dart';
@@ -15,112 +15,112 @@ class UsuarioController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    print(' UsuarioController inicializado');
+    print('📱 UsuarioController inicializado');
   }
 
-  // Login usando SQLite
+  // Login usando DatabaseAdapter (SQLite ou PostgreSQL)
   Future<bool> login(String email, String senha) async {
-  try {
-    isLoading.value = true;
-    
-    // Validações de segurança
-    if (email.trim().isEmpty) {
-      Get.snackbar(
-        'Erro',
-        'Email não pode ser vazio',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+    try {
+      isLoading.value = true;
+      
+      // Validações de segurança
+      if (email.trim().isEmpty) {
+        Get.snackbar(
+          'Erro',
+          'Email não pode ser vazio',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+      
+      if (!SecurityService.isValidEmail(email)) {
+        Get.snackbar(
+          'Erro',
+          'Formato de email inválido',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+      
+      if (senha.isEmpty) {
+        Get.snackbar(
+          'Erro',
+          'Senha não pode ser vazia',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+      
+      // Validar força da senha
+      String? senhaError = SecurityService.validatePassword(senha);
+      if (senhaError != null) {
+        Get.snackbar(
+          'Erro',
+          senhaError,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+      
+      // ✅ MUDANÇA: Usar DatabaseAdapter
+      Usuario? usuario = await DatabaseAdapter.instance.loginUsuario(
+        email.trim(),
+        senha
       );
-      return false;
-    }
-    
-    if (!SecurityService.isValidEmail(email)) {
-      Get.snackbar(
-        'Erro',
-        'Formato de email inválido',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      return false;
-    }
-    
-    if (senha.isEmpty) {
-      Get.snackbar(
-        'Erro',
-        'Senha não pode ser vazia',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      return false;
-    }
-    
-    // Validar força da senha
-    String? senhaError = SecurityService.validatePassword(senha);
-    if (senhaError != null) {
-      Get.snackbar(
-        'Erro',
-        senhaError,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      return false;
-    }
-    
-    // Tentar fazer login
-    Usuario? usuario = await DatabaseHelper.instance.loginUsuario(
-      email.trim(),
-      senha
-    );
 
-    if (usuario != null) {
-      usuarioLogado.value = usuario;
+      if (usuario != null) {
+        usuarioLogado.value = usuario;
+        
+        print('✅ Login realizado: ${SecurityService.maskSensitiveData(email)}');
+        
+        Get.snackbar(
+          'Sucesso',
+          'Bem-vindo, ${usuario.nome}!',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+        return true;
+      } else {
+        print('❌ Login falhou para: ${SecurityService.maskSensitiveData(email)}');
+        
+        Get.snackbar(
+          'Erro',
+          'Email ou senha incorretos',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erro no login: $e');
       
-      print(' Login realizado: ${SecurityService.maskSensitiveData(email)}');
-      
-      Get.snackbar(
-        'Sucesso',
-        'Bem-vindo, ${usuario.nome}!',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-      return true;
-    } else {
-      print(' Login falhou para: ${SecurityService.maskSensitiveData(email)}');
+      String mensagem = 'Erro ao conectar com servidor';
+      if (e.toString().contains('Muitas tentativas')) {
+        mensagem = e.toString();
+      }
       
       Get.snackbar(
         'Erro',
-        'Email ou senha incorretos',
+        mensagem,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
       return false;
+    } finally {
+      isLoading.value = false;
     }
-  } catch (e) {
-    print(' Erro no login: $e');
-    
-    String mensagem = 'Erro ao conectar com servidor';
-    if (e.toString().contains('Muitas tentativas')) {
-      mensagem = e.toString();
-    }
-    
-    Get.snackbar(
-      'Erro',
-      mensagem,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
-    return false;
-  } finally {
-    isLoading.value = false;
   }
-}
 
   // Registrar usuário - CORRIGIDO
   Future<bool> registrar(String nome, String email, String senha) async {
@@ -150,28 +150,28 @@ class UsuarioController extends GetxController {
         dataCriacao: DateTime.now(),
       );
       
-      // Salvar no banco
-      bool sucesso = await DatabaseHelper.instance.criarUsuario(novoUsuario);
+      // ✅ MUDANÇA: Usar DatabaseAdapter
+      bool sucesso = await DatabaseAdapter.instance.criarUsuario(novoUsuario);
       
       if (sucesso) {
-        print(' Usuário registrado: ${novoUsuario.email}');
+        print('✅ Usuário registrado: ${novoUsuario.email}');
         
         // Fazer login automaticamente após registro
         bool loginSucesso = await login(email, senha);
         
         if (loginSucesso) {
-          print(' Login automático após registro realizado');
+          print('✅ Login automático após registro realizado');
           return true;
         } else {
-          print(' Usuário criado mas login automático falhou');
+          print('⚠️ Usuário criado mas login automático falhou');
           return true; // Ainda é sucesso, o usuário pode fazer login manual
         }
       } else {
-        print(' Falha ao criar usuário no banco');
+        print('❌ Falha ao criar usuário no banco');
         return false;
       }
     } catch (e) {
-      print(' Erro no registro: $e');
+      print('❌ Erro no registro: $e');
       
       // Mensagens de erro específicas
       String mensagem = 'Erro ao registrar usuário';
@@ -202,10 +202,11 @@ class UsuarioController extends GetxController {
   // Logout
   Future<void> logout() async {
     if (usuarioLogado.value?.id != null) {
-      await DatabaseHelper.instance.logoutUsuario(usuarioLogado.value!.id!);
+      // ✅ MUDANÇA: Usar DatabaseAdapter
+      await DatabaseAdapter.instance.logoutUsuario(usuarioLogado.value!.id!);
     }
     usuarioLogado.value = null;
-    print(' Logout realizado');
+    print('👋 Logout realizado');
     Get.offAllNamed('/login');
   }
   
@@ -246,7 +247,7 @@ class UsuarioController extends GetxController {
       
       return true;
     } catch (e) {
-      print(' Erro ao atualizar perfil: $e');
+      print('❌ Erro ao atualizar perfil: $e');
       return false;
     }
   }
@@ -262,7 +263,7 @@ class UsuarioController extends GetxController {
     bool ehAdmin = tipo == 'administrador' || tipo == 'admin';
     
     // Debug para verificar
-    print(' Verificando admin:');
+    print('🔍 Verificando admin:');
     print('   Email: ${usuarioLogado.value!.email}');
     print('   Tipo original: "${usuarioLogado.value!.tipoUsuario}"');
     print('   Tipo processado: "$tipo"');
@@ -284,7 +285,7 @@ class UsuarioController extends GetxController {
   void debugUsuario() {
     if (usuarioLogado.value != null) {
       final user = usuarioLogado.value!;
-      print(' Usuário logado:');
+      print('👤 === USUÁRIO LOGADO ===');
       print('   ID: ${user.id}');
       print('   Nome: ${user.nome}');
       print('   Email: ${user.email}');
@@ -292,10 +293,13 @@ class UsuarioController extends GetxController {
       print('   Ativo: ${user.ativo}');
       print('   Admin (getter isAdmin): $isAdmin');
       print('   Admin (método direto): ${user.tipoUsuario.toLowerCase() == 'administrador'}');
+      print('   Banco: ${DatabaseAdapter.isUsingSQLite ? "SQLite" : "PostgreSQL"}');
+      print('=========================');
     } else {
-      print(' Nenhum usuário logado');
+      print('❌ Nenhum usuário logado');
     }
   }
+  
   Timer? _sessionTimer;
 
   void iniciarTimerSessao() {
@@ -311,52 +315,65 @@ class UsuarioController extends GetxController {
     });
   }
 
-  // Forçar correção e relogin do admin
+  // ✅ CORRIGIDO: Métodos para correção do admin (só funciona com SQLite)
   Future<void> corrigirERelogarAdmin() async {
     try {
-      // Corrigir no banco
-      await DatabaseHelper.instance.corrigirUsuarioAdmin();
-      
-      // Se o usuário atual é admin, fazer relogin
-      if (usuarioLogado.value != null && 
-          usuarioLogado.value!.email.toLowerCase() == 'admin@seenet.com') {
+      if (DatabaseAdapter.isUsingSQLite) {
+        // Só funciona com SQLite
+        await DatabaseAdapter.instance.corrigirUsuarioAdmin();
         
-        print(' Fazendo relogin do admin...');
-        
-        // Fazer logout
-        usuarioLogado.value = null;
-        
-        // Fazer login novamente para pegar dados atualizados
-        bool loginSucesso = await login('admin@seenet.com', 'admin123');
-        
-        if (loginSucesso) {
-          print(' Admin relogado com sucesso!');
-          debugUsuario();
+        // Se o usuário atual é admin, fazer relogin
+        if (usuarioLogado.value != null && 
+            usuarioLogado.value!.email.toLowerCase() == 'admin@seenet.com') {
+          
+          print('🔄 Fazendo relogin do admin...');
+          
+          // Fazer logout
+          usuarioLogado.value = null;
+          
+          // Fazer login novamente para pegar dados atualizados
+          bool loginSucesso = await login('admin@seenet.com', 'admin123');
+          
+          if (loginSucesso) {
+            print('✅ Admin relogado com sucesso!');
+            debugUsuario();
+          }
         }
+      } else {
+        print('⚠️ corrigirERelogarAdmin só funciona com SQLite');
       }
-      
     } catch (e) {
-      print(' Erro ao corrigir admin: $e');
+      print('❌ Erro ao corrigir admin: $e');
     }
   }
 
   // Testar conexão com banco E corrigir admin
   Future<bool> testarBanco() async {
     try {
-      bool conexaoOk = await DatabaseHelper.instance.testarConexao();
+      // ✅ MUDANÇA: Usar DatabaseAdapter
+      bool conexaoOk = await DatabaseAdapter.instance.testarConexao();
       if (conexaoOk) {
-        print(' Conexão com SQLite OK');
+        print('✅ Conexão com banco OK');
         
-        // Corrigir admin se necessário
-        await DatabaseHelper.instance.corrigirUsuarioAdmin();
-        
-        await DatabaseHelper.instance.verificarEstrutura();
-        await DatabaseHelper.instance.verificarTodosUsuarios();
+        // Só executar métodos de correção se for SQLite
+        if (DatabaseAdapter.isUsingSQLite) {
+          await DatabaseAdapter.instance.corrigirUsuarioAdmin();
+          await DatabaseAdapter.instance.verificarEstrutura();
+          await DatabaseAdapter.instance.verificarTodosUsuarios();
+        } else {
+          print('ℹ️ Usando PostgreSQL - métodos de debug não disponíveis');
+          await DatabaseAdapter.instance.verificarEstrutura();
+        }
       }
       return conexaoOk;
     } catch (e) {
-      print(' Erro ao testar banco: $e');
+      print('❌ Erro ao testar banco: $e');
       return false;
     }
+  }
+  
+  // ✅ NOVO: Debug do adapter
+  void debugAdapter() {
+    DatabaseAdapter.instance.printInfo();
   }
 }

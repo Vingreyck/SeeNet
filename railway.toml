@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"
+
+[env]
+DATABASE_URL = { $ref = "DATABASE_URL" }
+ENVIRONMENT = "production"

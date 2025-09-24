@@ -3,7 +3,7 @@ import '../models/categoria_checkmark.dart';
 import '../models/checkmark.dart';
 import '../models/avaliacao.dart';
 import '../models/resposta_checkmark.dart';
-import '../services/database_helper.dart';
+import '../services/database_adapter.dart';
 import '../services/audit_service.dart';
 import './usuario_controller.dart';
 
@@ -23,7 +23,7 @@ class CheckmarkController extends GetxController {
   // Carregar categorias do SQLite
   Future<void> carregarCategorias() async {
     try {
-      categorias.value = await DatabaseHelper.instance.getCategorias();
+      categorias.value = await DatabaseAdapter.instance.getCategorias();
       print(' ${categorias.length} categorias carregadas');
     } catch (e) {
       print(' Erro ao carregar categorias: $e');
@@ -34,7 +34,7 @@ class CheckmarkController extends GetxController {
   Future<void> carregarCheckmarks(int categoriaId) async {
     try {
       categoriaAtual.value = categoriaId;
-      checkmarksAtivos.value = await DatabaseHelper.instance.getCheckmarksPorCategoria(categoriaId);
+      checkmarksAtivos.value = await DatabaseAdapter.instance.getCheckmarksPorCategoria(categoriaId);
       respostas.clear();
       print(' ${checkmarksAtivos.length} checkmarks carregados');
     } catch (e) {
@@ -51,7 +51,7 @@ class CheckmarkController extends GetxController {
         status: 'em_andamento',
       );
       
-      int? avaliacaoId = await DatabaseHelper.instance.criarAvaliacao(novaAvaliacao);
+      int? avaliacaoId = await DatabaseAdapter.instance.criarAvaliacao(novaAvaliacao);
       
       if (avaliacaoId != null) {
         avaliacaoAtual.value = Avaliacao(
@@ -92,7 +92,7 @@ class CheckmarkController extends GetxController {
             marcado: entry.value,
           );
           
-          await DatabaseHelper.instance.salvarResposta(resposta);
+          await DatabaseAdapter.instance.salvarResposta(resposta);
         }
       }
 
@@ -117,7 +117,7 @@ class CheckmarkController extends GetxController {
     try {
       if (avaliacaoAtual.value == null) return false;
       
-      bool sucesso = await DatabaseHelper.instance.finalizarAvaliacao(avaliacaoAtual.value!.id!);
+      bool sucesso = await DatabaseAdapter.instance.finalizarAvaliacao(avaliacaoAtual.value!.id!);
       
       if (sucesso) {
         print(' Avaliação finalizada');

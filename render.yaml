@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: seenet-api
+    env: dart
+    buildCommand: dart pub get && dart compile exe bin/server.dart -o server
+    startCommand: ./server
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: seenet-db
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+
+databases:
+  - name: seenet-db
+    databaseName: seenet
+    user: seenet_user

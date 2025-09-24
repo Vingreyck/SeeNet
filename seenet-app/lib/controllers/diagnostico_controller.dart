@@ -2,7 +2,7 @@
 import 'package:get/get.dart';
 import '../models/diagnostico.dart';
 import '../models/checkmark.dart';
-import '../services/database_helper.dart';
+import '../services/database_adapter.dart';
 import '../services/gemini_service.dart';
 
 class DiagnosticoController extends GetxController {
@@ -42,7 +42,7 @@ class DiagnosticoController extends GetxController {
         );
         
         // Salvar no SQLite
-        bool salvou = await DatabaseHelper.instance.salvarDiagnostico(diagnostico);
+        bool salvou = await DatabaseAdapter.instance.salvarDiagnostico(diagnostico);
         
         if (salvou) {
           await carregarDiagnosticos(avaliacaoId);
@@ -401,7 +401,7 @@ Mantenha equipamentos sempre atualizados""";
   // Carregar diagnósticos de uma avaliação
   Future<void> carregarDiagnosticos(int avaliacaoId) async {
     try {
-      diagnosticos.value = await DatabaseHelper.instance.getDiagnosticosPorAvaliacao(avaliacaoId);
+      diagnosticos.value = await DatabaseAdapter.instance.getDiagnosticosPorAvaliacao(avaliacaoId);
       print(' ${diagnosticos.length} diagnósticos carregados do banco');
     } catch (e) {
       print(' Erro ao carregar diagnósticos: $e');

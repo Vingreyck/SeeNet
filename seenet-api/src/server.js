@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const { initDatabase } = require('./config/database');
 const morgan = require('morgan');
 const compression = require('compression');
 const path = require('path');
@@ -13,8 +14,13 @@ console.log('🚀 Iniciando servidor SeeNet API...');
 
 // ========== MIDDLEWARES GLOBAIS ==========
 app.use(helmet());
-app.use(compression());
+app.use(compression()); 
 app.use(morgan('combined'));
+
+initDatabase().catch(error => {
+  console.error('❌ Falha ao conectar banco:', error);
+  process.exit(1);
+});
 
 app.use(cors({
   origin: process.env.CORS_ORIGINS?.split(',') || [
@@ -23,7 +29,7 @@ app.use(cors({
     'http://127.0.0.1:3000',
     'http://10.0.2.2:3000',
     'http://10.50.160.140:3000', // ← SEU IP ATUAL
-    'http://172.20.10.2:3000'
+    'http://10.0.1.112:3000'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],

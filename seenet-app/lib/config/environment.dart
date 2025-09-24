@@ -7,8 +7,20 @@ class Environment {
   static String get geminiApiKey => 
     const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
   
-  // Database
-  static String get databasePassword => 
+  // ✅ NOVO: Configurações de PostgreSQL
+  static String get dbHost => 
+    const String.fromEnvironment('DB_HOST', defaultValue: 'localhost');
+    
+  static int get dbPort => 
+    const int.fromEnvironment('DB_PORT', defaultValue: 5432);
+    
+  static String get dbName => 
+    const String.fromEnvironment('DB_NAME', defaultValue: 'seenet');
+    
+  static String get dbUsername => 
+    const String.fromEnvironment('DB_USERNAME', defaultValue: 'postgres');
+    
+  static String get dbPassword => 
     const String.fromEnvironment('DB_PASSWORD', defaultValue: '');
   
   // URLs por ambiente
@@ -25,7 +37,7 @@ class Environment {
   
   // Configurações de segurança
   static int get sessionTimeoutMinutes => 
-    const int.fromEnvironment('SESSION_TIMEOUT', defaultValue: 480); // 8 horas
+    const int.fromEnvironment('SESSION_TIMEOUT', defaultValue: 480);
   
   static int get maxLoginAttempts => 
     const int.fromEnvironment('MAX_LOGIN_ATTEMPTS', defaultValue: 5);
@@ -34,7 +46,9 @@ class Environment {
   static bool get isConfigured {
     if (isProduction) {
       return geminiApiKey.isNotEmpty && 
-             apiBaseUrl.isNotEmpty;
+             apiBaseUrl.isNotEmpty &&
+             dbHost.isNotEmpty &&
+             dbPassword.isNotEmpty;
     }
     return true; // Em dev, aceita valores padrão
   }
@@ -47,6 +61,11 @@ class Environment {
     print('🏗️ Modo: ${isProduction ? "PRODUÇÃO" : "DESENVOLVIMENTO"}');
     print('🔑 Gemini configurado: ${geminiApiKey.isNotEmpty ? "SIM" : "NÃO"}');
     print('📡 API URL: $apiBaseUrl');
+    print('🐘 DB Host: $dbHost');
+    print('🔌 DB Port: $dbPort');
+    print('💾 DB Name: $dbName');
+    print('👤 DB User: $dbUsername');
+    print('🔐 DB Password: ${dbPassword.isNotEmpty ? "***configured***" : "***empty***"}');
     print('⏰ Timeout sessão: ${sessionTimeoutMinutes}min');
     print('🛡️ Max tentativas login: $maxLoginAttempts');
     print('🔧 Debug logs: $enableDebugLogs');

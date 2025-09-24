@@ -2,12 +2,19 @@ const knex = require('knex');
 const path = require('path');
 const logger = require('./logger');
 
+// 🐘 PostgreSQL sempre (dev + produção)
 const dbConfig = {
-  client: 'sqlite3',
-  connection: {
-    filename: path.join(__dirname, '../../database/seenet.sqlite')
+  client: 'pg',
+   connection: {
+    host: 'db.tcqhyzbkkigukrqniefx.supabase.co',
+    port: 5432,
+    user: 'postgres',
+    password: '1524Br101',
+    database: 'postgres',
+    ssl: {
+      rejectUnauthorized: false
+    }
   },
-  useNullAsDefault: true,
   migrations: {
     directory: path.join(__dirname, '../migrations')
   },
@@ -15,10 +22,8 @@ const dbConfig = {
     directory: path.join(__dirname, '../seeds')
   },
   pool: {
-    afterCreate: (conn, done) => {
-      // Habilitar foreign keys no SQLite
-      conn.run('PRAGMA foreign_keys = ON', done);
-    }
+    min: 2,
+    max: 10
   }
 };
 
@@ -26,12 +31,11 @@ const db = knex(dbConfig);
 
 async function initDatabase() {
   try {
-    // Criar diretório do banco se não existir
-    const fs = require('fs');
-    const dbDir = path.dirname(dbConfig.connection.filename);
-    if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-    }
+    logger.info('🔌 Conectando ao PostgreSQL...');
+
+    // Testar conexão
+    await db.raw('SELECT 1');
+    logger.info('✅ Conexão com PostgreSQL estabelecida');
 
     // Executar migrações
     await db.migrate.latest();
@@ -50,4 +54,18 @@ async function initDatabase() {
   }
 }
 
-module.exports = { db, initDatabase };
+// Função para verificar qual banco está sendo usado
+function getDatabaseInfo() {
+  return {
+    type: 'PostgreSQL',
+    environment: process.env.NODE_ENV || 'development',
+    connection: process.env.DATABASE_URL ? 'Connected' : 'Not configured',
+    ready: true
+  };
+}
+
+module.exports = { 
+  db, 
+  initDatabase,
+  getDatabaseInfo
+};

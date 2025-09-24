@@ -16,12 +16,14 @@ dependencies:
   get: ^4.7.2
   intl: ^0.18.1
   encrypt: ^5.0.1
-  speech_to_text: ^7.0.0        # Reconhecimento de voz
-  permission_handler: ^11.1.0   # Gerenciar permissões
-  share_plus: ^7.2.1          # Compartilhamento
-
+  speech_to_text: ^7.0.0
+  permission_handler: ^11.1.0
+  share_plus: ^7.2.1
   
-  # Banco de dados SQLite para mobile
+  # ✅ ADICIONADO: PostgreSQL
+ postgres: ^2.4.6
+   
+  # Banco de dados SQLite para mobile (mantido para compatibilidade)
   sqflite: ^2.3.0
   path: ^1.8.3
   
@@ -30,11 +32,6 @@ dependencies:
   
   # Criptografia para senhas
   crypto: ^3.0.3
-  
-  # Firebase (comentado - use se necessário)
-  # google_sign_in: ^6.2.1
-  # firebase_auth: ^4.17.8
-  # firebase_core: ^2.30.0
 
 dev_dependencies:
   flutter_test:

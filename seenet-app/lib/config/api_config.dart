@@ -1,16 +1,16 @@
 import 'environment.dart';
 
 class ApiConfig {
-  // URLs baseadas no ambiente - CORRIGIDO para emulador Android
-  static const String _devBaseUrl = 'http://10.0.1.112:3000/api'; // ← MUDANÇA AQUI
+  // URLs ambiente
+  static const String _devBaseUrl = 'http://10.0.1.112:3000/api'; // muda o ip aqui
   static const String _prodBaseUrl = 'https://api.seenet.com/api';
   
-  // URL ativa baseada no Environment
+  // URL aenv
   static String get baseUrl {
     return Environment.isDevelopment ? _devBaseUrl : _prodBaseUrl;
   }
   
-  // Endpoints da API
+  // Endpoints 
   static const Map<String, String> endpoints = {
     // Health
     'health': '/health',

@@ -1,9 +1,18 @@
 const bcrypt = require('bcryptjs');
 
 exports.seed = async function(knex) {
-  // Hash das senhas
-  const adminPassword = await bcrypt.hash('admin123', 12);
-  const tecnicoPassword = await bcrypt.hash('123456', 12);
+  // Verificar se já existem dados
+  const existingUsers = await knex('usuarios').select('id').limit(1);
+  if (existingUsers.length > 0) {
+    console.log('📊 Seeds já executados, pulando...');
+    return;
+  }
+
+  // Hash das senhas CORRETAS para PostgreSQL
+  const adminPassword = await bcrypt.hash('admin123', 10);
+  const tecnicoPassword = await bcrypt.hash('123456', 10);
+
+  console.log('👤 Criando usuários...');
 
   // Inserir usuários
   await knex('usuarios').insert([
@@ -51,5 +60,5 @@ exports.seed = async function(knex) {
     }
   ]);
 
-  console.log('✅ Usuários criados');
+  console.log('✅ Usuários criados para PostgreSQL');
 };

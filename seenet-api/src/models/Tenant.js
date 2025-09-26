@@ -1,20 +1,50 @@
-const { db } = require('../config/database');
+// MUDANÇA: Não importar db diretamente
+// const { db } = require('../config/database'); ← REMOVER ESTA LINHA
 
 class Tenant {
+  // Função auxiliar para acessar o db quando necessário
+  static getDb() {
+    const { db } = require('../config/database');
+    return db;
+  }
+
   static async findByCode(codigo) {
-    return await db('tenants')
-      .where('codigo', codigo.toUpperCase())
-      .where('ativo', true)
-      .first();
+    console.log('🔍 Buscando tenant com código:', codigo?.toUpperCase());
+    
+    try {
+      const db = this.getDb(); // Acessar db apenas quando necessário
+      
+      const result = await db('tenants')
+        .select('id', 'nome', 'codigo', 'plano', 'descricao', 'ativo')
+        .where('codigo', codigo.toUpperCase())
+        .where('ativo', true)
+        .first();
+        
+      console.log('🔍 Resultado da busca:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Erro ao buscar tenant:', error.message);
+      throw error;
+    }
   }
 
   static async findById(id) {
-    return await db('tenants')
-      .where('id', id)
-      .first();
+    try {
+      const db = this.getDb();
+      
+      return await db('tenants')
+        .select('*')
+        .where('id', id)
+        .first();
+    } catch (error) {
+      console.error('❌ Erro ao buscar tenant por ID:', error.message);
+      throw error;
+    }
   }
 
   static async getUsers(tenantId, filters = {}) {
+    const db = this.getDb();
+    
     let query = db('usuarios')
       .where('tenant_id', tenantId);
 
@@ -30,52 +60,40 @@ class Tenant {
   }
 
   static async getUserCount(tenantId) {
+    const db = this.getDb();
+    
     const result = await db('usuarios')
       .where('tenant_id', tenantId)
       .where('ativo', true)
       .count('id as total')
       .first();
     
-    return result.total;
+    return parseInt(result.total);
   }
 
-  static async getUsageStats(tenantId, dias = 30) {
-    const dataInicio = new Date(Date.now() - (dias * 24 * 60 * 60 * 1000)).toISOString();
-
-    const stats = await db.raw(`
-      SELECT 
-        COUNT(DISTINCT a.id) as avaliacoes_total,
-        COUNT(DISTINCT d.id) as diagnosticos_total,
-        COUNT(DISTINCT t.id) as transcricoes_total,
-        AVG(d.tokens_utilizados) as tokens_medio,
-        SUM(d.tokens_utilizados) as tokens_total
-      FROM tenants tn
-      LEFT JOIN avaliacoes a ON tn.id = a.tenant_id AND a.data_criacao >= ?
-      LEFT JOIN diagnosticos d ON tn.id = d.tenant_id AND d.data_criacao >= ?
-      LEFT JOIN transcricoes_tecnicas t ON tn.id = t.tenant_id AND t.data_criacao >= ?
-      WHERE tn.id = ?
-    `, [dataInicio, dataInicio, dataInicio, tenantId]);
-
-    return stats[0];
+  static async getAllTenants() {
+    try {
+      const db = this.getDb();
+      
+      const tenants = await db('tenants').select('*');
+      console.log('📊 Todos os tenants:', tenants);
+      return tenants;
+    } catch (error) {
+      console.error('❌ Erro ao buscar todos os tenants:', error.message);
+      throw error;
+    }
   }
 
-  static async checkLimits(tenantId, tipo) {
-    const tenant = await this.findById(tenantId);
-    if (!tenant) return false;
-
-    const limites = JSON.parse(tenant.limites || '{}');
-    
-    switch (tipo) {
-      case 'usuarios':
-        const userCount = await this.getUserCount(tenantId);
-        return userCount < (limites.usuarios_max || 5);
+  static async testConnection() {
+    try {
+      const db = this.getDb();
       
-      case 'api_calls':
-        // Implementar verificação de calls por dia
-        return true; // Por enquanto sempre permite
-      
-      default:
-        return true;
+      const result = await db.raw('SELECT NOW() as current_time');
+      console.log('✅ Conexão PostgreSQL OK:', result.rows[0]);
+      return true;
+    } catch (error) {
+      console.error('❌ Erro de conexão PostgreSQL:', error.message);
+      return false;
     }
   }
 }

@@ -3,25 +3,33 @@ class Environment {
   static const bool isDevelopment = bool.fromEnvironment('DEVELOPMENT', defaultValue: true);
   static const bool isProduction = bool.fromEnvironment('PRODUCTION', defaultValue: false);
   
-  // API Keys
-  static String get geminiApiKey => 
-    const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
-  
-  // ✅ NOVO: Configurações de PostgreSQL
+  // ✅ SUPABASE PostgreSQL - Configurações corrigidas
+  static bool get usePostgreSQL => 
+    const String.fromEnvironment('USE_POSTGRESQL', defaultValue: 'false') == 'true';
+    
   static String get dbHost => 
-    const String.fromEnvironment('DB_HOST', defaultValue: 'localhost');
+    const String.fromEnvironment('DB_HOST', defaultValue: 'db.tcqhyzbkkigukrqniefx.supabase.co');
     
   static int get dbPort => 
     const int.fromEnvironment('DB_PORT', defaultValue: 5432);
     
   static String get dbName => 
-    const String.fromEnvironment('DB_NAME', defaultValue: 'seenet');
+    const String.fromEnvironment('DB_NAME', defaultValue: 'postgres');
     
   static String get dbUsername => 
     const String.fromEnvironment('DB_USERNAME', defaultValue: 'postgres');
     
   static String get dbPassword => 
     const String.fromEnvironment('DB_PASSWORD', defaultValue: '');
+  
+  // ✅ URL COMPLETA para facilitar
+  static String get databaseUrl => 
+    const String.fromEnvironment('DATABASE_URL', 
+      defaultValue: 'postgresql://postgres:@db.tcqhyzbkkigukrqniefx.supabase.co:5432/postgres');
+  
+  // API Keys
+  static String get geminiApiKey => 
+    const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
   
   // URLs por ambiente
   static String get apiBaseUrl {
@@ -44,13 +52,10 @@ class Environment {
   
   // Validar configuração
   static bool get isConfigured {
-    if (isProduction) {
-      return geminiApiKey.isNotEmpty && 
-             apiBaseUrl.isNotEmpty &&
-             dbHost.isNotEmpty &&
-             dbPassword.isNotEmpty;
+    if (usePostgreSQL) {
+      return dbHost.isNotEmpty && dbPassword.isNotEmpty;
     }
-    return true; // Em dev, aceita valores padrão
+    return true;
   }
   
   // Debug info (só em desenvolvimento)
@@ -59,6 +64,7 @@ class Environment {
     
     print('🔧 === CONFIGURAÇÃO DE AMBIENTE ===');
     print('🏗️ Modo: ${isProduction ? "PRODUÇÃO" : "DESENVOLVIMENTO"}');
+    print('🐘 PostgreSQL: ${usePostgreSQL ? "ATIVO" : "INATIVO"}');
     print('🔑 Gemini configurado: ${geminiApiKey.isNotEmpty ? "SIM" : "NÃO"}');
     print('📡 API URL: $apiBaseUrl');
     print('🐘 DB Host: $dbHost');

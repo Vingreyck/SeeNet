@@ -21,8 +21,8 @@ dependencies:
   share_plus: ^7.2.1
   
   # ✅ ADICIONADO: PostgreSQL
- postgres: ^2.4.6
-   
+  postgres: ^2.4.6
+
   # Banco de dados SQLite para mobile (mantido para compatibilidade)
   sqflite: ^2.3.0
   path: ^1.8.3

@@ -1,10 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { initDatabase } = require('./config/database');
 const morgan = require('morgan');
 const compression = require('compression');
-const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -17,18 +15,13 @@ app.use(helmet());
 app.use(compression()); 
 app.use(morgan('combined'));
 
-initDatabase().catch(error => {
-  console.error('❌ Falha ao conectar banco:', error);
-  process.exit(1);
-});
-
 app.use(cors({
-  origin: process.env.CORS_ORIGINS?.split(',') || [
+  origin: [
     'http://localhost:3000',
     'http://localhost:8080',
     'http://127.0.0.1:3000',
     'http://10.0.2.2:3000',
-    'http://10.50.160.140:3000', // ← SEU IP ATUAL
+    'http://10.0.0.6:3000',
     'http://10.0.1.112:3000'
   ],
   credentials: true,
@@ -39,31 +32,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ========== IMPORTAR E USAR ROTAS ==========
-console.log('📁 Carregando rotas...');
-
-// Rotas de Tenant
-try {
-  const tenantRoutes = require('./routes/tenant');
-  app.use('/api/tenant', tenantRoutes);
-  console.log('✅ Rotas tenant carregadas em /api/tenant');
-} catch (error) {
-  console.error('❌ Erro ao carregar rotas tenant:', error.message);
-}
-
-// Rotas de Autenticação ← ADICIONAR ESTAS LINHAS
-try {
-  const authRoutes = require('./routes/auth');
-  app.use('/api/auth', authRoutes);
-  console.log('✅ Rotas auth carregadas em /api/auth');
-} catch (error) {
-  console.error('❌ Erro ao carregar rotas auth:', error.message);
-  console.error('📁 Verifique se existe: src/routes/auth.js');
-}
-
-// ========== ROTAS BÁSICAS ==========
-
-// Health check
+// ========== ROTAS BÁSICAS (antes da inicialização do banco) ==========
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -74,222 +43,148 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development',
-    database: 'SQLite conectado',
-    gemini: process.env.GEMINI_API_KEY ? 'Configurado' : 'Não configurado'
-  });
-});
-
-// Rota de teste
 app.get('/api/test', (req, res) => {
   res.json({
     message: 'API funcionando!',
     timestamp: new Date().toISOString(),
-    ip: req.ip,
-    headers: {
-      'user-agent': req.get('User-Agent'),
-      'origin': req.get('Origin')
-    }
+    ip: req.ip
   });
 });
 
-// ========== ROTA DE DEBUG PARA BANCO ==========
-app.get('/api/debug/database', async (req, res) => {
+// ========== INICIALIZAR BANCO E ROTAS ==========
+async function startServer() {
   try {
-    const { db } = require('./config/database');
+    console.log('🔌 Inicializando banco de dados...');
     
-    // Verificar se tabela existe
-    const hasTable = await db.schema.hasTable('tenants');
+    // 1. Primeiro inicializar o banco
+    const { initDatabase } = require('./config/database');
+    await initDatabase();
     
-    if (!hasTable) {
-      return res.json({
-        error: 'Tabela tenants não existe',
-        solution: 'Execute: npx knex migrate:latest'
-      });
+    console.log('📁 Carregando rotas...');
+    
+    // 2. Agora carregar as rotas que usam banco
+    try {
+      const tenantRoutes = require('./routes/tenant');
+      app.use('/api/tenant', tenantRoutes);
+      console.log('✅ Rotas tenant carregadas');
+    } catch (error) {
+      console.error('❌ Erro ao carregar rotas tenant:', error.message);
     }
     
-    // Buscar todos
-    const tenants = await db('tenants').select('*');
+    try {
+      const authRoutes = require('./routes/auth');
+      app.use('/api/auth', authRoutes);
+      console.log('✅ Rotas auth carregadas');
+    } catch (error) {
+      console.error('⚠️ Rotas auth não encontradas (normal se não existir)');
+    }
     
-    res.json({
-      message: 'Debug do banco SQLite',
-      table_exists: hasTable,
-      total_tenants: tenants.length,
-      tenants: tenants
-    });
+    // ========== ROTAS QUE USAM BANCO ==========
     
-  } catch (error) {
-    console.error('❌ Erro no debug:', error);
-    res.status(500).json({
-      error: error.message
+    app.get('/api/health', (req, res) => {
+      res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        database: 'PostgreSQL conectado',
+        gemini: process.env.GEMINI_API_KEY ? 'Configurado' : 'Não configurado'
+      });
     });
-  }
-});
 
-// ========== TESTE DIRETO DE LOGIN ==========
-app.post('/api/test/login', async (req, res) => {
-  try {
-    const { db } = require('./config/database');
-    const bcrypt = require('bcryptjs');
-    
-    console.log('🧪 Teste direto de login...');
-    console.log('📄 Body recebido:', req.body);
-    
-    const { email, senha, codigoEmpresa } = req.body;
-    
-    // Buscar usuário
-    const user = await db('usuarios')
-      .join('tenants', 'usuarios.tenant_id', 'tenants.id')
-      .where('usuarios.email', email?.toLowerCase())
-      .where('tenants.codigo', codigoEmpresa?.toUpperCase())
-      .where('usuarios.ativo', 1)
-      .where('tenants.ativo', 1)
-      .select('usuarios.*', 'tenants.nome as tenant_name', 'tenants.codigo as tenant_code')
-      .first();
-    
-    if (!user) {
-      return res.json({
-        teste: 'FALHOU',
-        motivo: 'Usuário não encontrado',
-        email_procurado: email?.toLowerCase(),
-        codigo_procurado: codigoEmpresa?.toUpperCase()
-      });
-    }
-    
-    // Verificar senha
-    const senhaValida = await bcrypt.compare(senha, user.senha);
-    
-    res.json({
-      teste: senhaValida ? 'SUCESSO' : 'FALHOU',
-      motivo: senhaValida ? 'Login válido' : 'Senha incorreta',
-      usuario_encontrado: {
-        nome: user.nome,
-        email: user.email,
-        tipo: user.tipo_usuario,
-        tenant: user.tenant_name
+    app.get('/api/debug/database', async (req, res) => {
+      try {
+        const { db } = require('./config/database');
+        const tenants = await db('tenants').select('*').limit(5);
+        
+        res.json({
+          message: 'Debug do banco PostgreSQL',
+          total_tenants: tenants.length,
+          tenants: tenants,
+          connection: 'PostgreSQL OK'
+        });
+        
+      } catch (error) {
+        console.error('❌ Erro no debug:', error);
+        res.status(500).json({
+          error: error.message
+        });
       }
     });
-    
-  } catch (error) {
-    console.error('❌ Erro no teste de login:', error);
-    res.status(500).json({ 
-      teste: 'ERRO',
-      erro: error.message 
-    });
-  }
-});
 
-// 404 handler
-app.use('*', (req, res) => {
-  const availableEndpoints = [
-    'GET /health',
-    'GET /api/health', 
-    'GET /api/test',
-    'POST /api/test/login',
-    'GET /api/tenant/verify/:codigo',
-    'GET /api/tenant/list',
-    'POST /api/auth/login',
-    'POST /api/auth/register',
-    'GET /api/auth/verify',
-    'POST /api/auth/logout',
-    'GET /api/debug/database'
-  ];
-  
-  console.log(`404 - Endpoint não encontrado: ${req.method} ${req.originalUrl}`);
-  
-  res.status(404).json({ 
-    error: 'Endpoint não encontrado',
-    path: req.originalUrl,
-    method: req.method,
-    availableEndpoints
-  });
-});
-
-// ========== DEBUG - LISTAR USUÁRIOS ==========
-app.get('/api/debug/usuarios', async (req, res) => {
-  try {
-    const { db } = require('./config/database');
-    
-    const usuarios = await db('usuarios')
-      .join('tenants', 'usuarios.tenant_id', 'tenants.id')
-      .select(
-        'usuarios.id',
-        'usuarios.nome',
-        'usuarios.email',
-        'usuarios.tipo_usuario',
-        'usuarios.ativo',
-        'usuarios.data_criacao',
-        'tenants.nome as empresa',
-        'tenants.codigo as codigo_empresa'
-      )
-      .orderBy('usuarios.data_criacao', 'desc');
-    
-    res.json({
-      message: 'Usuários na API Node.js',
-      total: usuarios.length,
-      usuarios: usuarios
-    });
-  } catch (error) {
-    console.error('❌ Erro ao listar usuários:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ========== DEBUG - ATUALIZAR TIPO DE USUÁRIO ==========
-app.post('/api/debug/update-user-type', async (req, res) => {
-  try {
-    const { email, tipo } = req.body;
-    const { db } = require('./config/database');
-    
-    await db('usuarios')
-      .where('email', email.toLowerCase())
-      .update({ 
-        tipo_usuario: tipo,
-        data_atualizacao: new Date().toISOString()
-      });
-    
-    const user = await db('usuarios')
-      .where('email', email.toLowerCase())
-      .first();
-    
-    res.json({ 
-      message: 'Usuário atualizado na API',
-      user: {
-        email: user.email,
-        nome: user.nome,
-        tipo_usuario: user.tipo_usuario
+    app.get('/api/debug/connection', async (req, res) => {
+      try {
+        const Tenant = require('./models/Tenant');
+        const isConnected = await Tenant.testConnection();
+        res.json({
+          success: isConnected,
+          message: isConnected ? 'Conexão OK' : 'Conexão falhou'
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: error.message
+        });
       }
     });
+
+    app.get('/api/debug/tenants', async (req, res) => {
+      try {
+        const Tenant = require('./models/Tenant');
+        const tenants = await Tenant.getAllTenants();
+        res.json({
+          success: true,
+          count: tenants.length,
+          tenants: tenants
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: error.message
+        });
+      }
+    });
+
+    // 404 handler
+    app.use('*', (req, res) => {
+      res.status(404).json({ 
+        error: 'Endpoint não encontrado',
+        path: req.originalUrl,
+        method: req.method,
+        availableEndpoints: [
+          'GET /health',
+          'GET /api/health', 
+          'GET /api/test',
+          'GET /api/tenant/verify/:codigo',
+          'GET /api/tenant/list',
+          'GET /api/debug/database',
+          'GET /api/debug/tenants'
+        ]
+      });
+    });
+
+    // Error handler
+    app.use((error, req, res, next) => {
+      console.error('❌ Erro na aplicação:', error);
+      res.status(500).json({
+        error: 'Erro interno do servidor',
+        message: process.env.NODE_ENV === 'development' ? error.message : 'Algo deu errado'
+      });
+    });
+
+    // ========== INICIALIZAÇÃO ==========
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 SeeNet API rodando na porta ${PORT}`);
+      console.log(`📝 Health: http://10.50.160.140:${PORT}/health`);
+      console.log(`🏢 Tenant: http://10.50.160.140:${PORT}/api/tenant/verify/DEMO2024`);
+      console.log(`🗄️ Debug: http://10.50.160.140:${PORT}/api/debug/database`);
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Falha ao iniciar servidor:', error);
+    process.exit(1);
   }
-});
+}
 
-// Error handler
-app.use((error, req, res, next) => {
-  console.error('❌ Erro na aplicação:', error);
-  
-  res.status(500).json({
-    error: 'Erro interno do servidor',
-    message: process.env.NODE_ENV === 'development' ? error.message : 'Algo deu errado'
-  });
-});
-
-// ========== INICIALIZAÇÃO ==========
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 SeeNet API rodando em todas as interfaces na porta ${PORT}`);
-  console.log(`📝 Health check: http://10.50.160.140:${PORT}/health`);
-  console.log(`🧪 Teste: http://10.50.160.140:${PORT}/api/test`);
-  console.log(`🏢 Verificar empresa: http://10.50.160.140:${PORT}/api/tenant/verify/DEMO2024`);
-  console.log(`📊 Listar empresas: http://10.50.160.140:${PORT}/api/tenant/list`);
-  console.log(`🔐 Login: http://10.50.160.140:${PORT}/api/auth/login`);
-  console.log(`📝 Registro: http://10.50.160.140:${PORT}/api/auth/register`);
-  console.log(`🗄️ Debug banco: http://10.50.160.140:${PORT}/api/debug/database`);
-  console.log(`🔑 Gemini: ${process.env.GEMINI_API_KEY ? 'Configurado' : 'NÃO CONFIGURADO'}`);
-  console.log(`🌐 IP atual: 10.50.160.140`);
-});
+// Iniciar servidor
+startServer();

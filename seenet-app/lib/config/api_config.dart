@@ -2,7 +2,7 @@ import 'environment.dart';
 
 class ApiConfig {
   // URLs ambiente
-  static const String _devBaseUrl = 'http://10.0.1.112:3000/api'; // muda o ip aqui
+  static const String _devBaseUrl = 'http://10.0.0.6:3000/api'; // muda o ip aqui
   static const String _prodBaseUrl = 'https://api.seenet.com/api';
   
   // URL aenv

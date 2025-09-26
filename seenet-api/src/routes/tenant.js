@@ -1,9 +1,16 @@
 const express = require('express');
-const { db } = require('../config/database');
+// MUDANÇA: Não importar db diretamente
+// const { db } = require('../config/database'); ← REMOVER
 
 const router = express.Router();
 
 console.log('🔍 Carregando rotas de tenant...');
+
+// Função auxiliar para acessar db
+function getDb() {
+  const { db } = require('../config/database');
+  return db;
+}
 
 // ========== VERIFICAR CÓDIGO DA EMPRESA ==========
 router.get('/verify/:codigo', async (req, res) => {
@@ -13,11 +20,12 @@ router.get('/verify/:codigo', async (req, res) => {
     
     console.log(`🔍 Verificando código da empresa: "${codigo}" -> "${codigoUpper}"`);
 
-    // CORRIGIDO: Usar ativo = 1 (SQLite usa integer para boolean)
+    const db = getDb(); // Acessar db apenas quando necessário
+
     const tenant = await db('tenants')
       .where('codigo', codigoUpper)
-      .where('ativo', 1) // ← MUDOU: true para 1
-      .select('id', 'nome', 'codigo', 'plano', 'descricao') // ← ADICIONADO: id
+      .where('ativo', true)
+      .select('id', 'nome', 'codigo', 'plano', 'descricao')
       .first();
 
     if (!tenant) {
@@ -36,17 +44,17 @@ router.get('/verify/:codigo', async (req, res) => {
 
     console.log(`✅ Empresa encontrada: ${tenant.nome}`);
 
-    // Contar usuários ativos (opcional - pode remover por enquanto)
+    // Contar usuários ativos
     let usuariosAtivos = 0;
     try {
       const userCount = await db('usuarios')
         .where('tenant_id', tenant.id)
-        .where('ativo', 1) // ← MUDOU: true para 1
+        .where('ativo', true)
         .count('id as total')
         .first();
-      usuariosAtivos = userCount?.total || 0;
+      usuariosAtivos = parseInt(userCount?.total) || 0;
     } catch (userError) {
-      console.log('⚠️ Tabela usuarios ainda não existe:', userError.message);
+      console.log('⚠️ Erro ao contar usuários:', userError.message);
       usuariosAtivos = 0;
     }
 
@@ -61,7 +69,7 @@ router.get('/verify/:codigo', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Erro ao verificar tenant:', error); // ← MUDOU: logger para console
+    console.error('❌ Erro ao verificar tenant:', error);
     res.status(500).json({ 
       error: 'Erro interno do servidor',
       details: error.message 
@@ -74,8 +82,10 @@ router.get('/list', async (req, res) => {
   try {
     console.log('📊 Listando todas as empresas...');
 
+    const db = getDb();
+
     const tenants = await db('tenants')
-      .where('ativo', 1) // ← MUDOU: true para 1
+      .where('ativo', true)
       .select('nome', 'codigo', 'plano', 'descricao');
 
     console.log(`📊 Encontradas ${tenants.length} empresas ativas`);
@@ -90,6 +100,24 @@ router.get('/list', async (req, res) => {
     res.status(500).json({ 
       error: 'Erro interno do servidor',
       details: error.message
+    });
+  }
+});
+
+// ========== DEBUG ==========
+router.get('/debug', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.raw('SELECT * FROM tenants LIMIT 5');
+    res.json({
+      success: true,
+      tenants: result.rows,
+      query_test: 'PostgreSQL OK'
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message
     });
   }
 });

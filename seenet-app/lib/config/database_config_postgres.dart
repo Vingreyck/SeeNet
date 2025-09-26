@@ -1,27 +1,28 @@
-// lib/config/database_config_postgres.dart - VERSÃO 2.4.6
+// lib/config/database_config_postgres.dart - VERSÃO 2.4.6 - SUPABASE
 import 'environment.dart';
 
 class PostgreSQLConfig {
-  // Configurações do banco
+  // ✅ CONFIGURAÇÕES AJUSTADAS PARA SUPABASE
   static String get host => Environment.isDevelopment 
-      ? Environment.dbHost ?? 'localhost'
-      : Environment.dbHost ?? 'postgresql-host';
+      ? Environment.dbHost
+      : Environment.dbHost;
       
-  static int get port => Environment.dbPort ?? 5432;
+  static int get port => Environment.dbPort;
   
-  static String get database => Environment.dbName ?? 'seenet';
+  // ✅ SUPABASE USA 'postgres' como nome do banco
+  static String get database => Environment.dbName;
   
-  static String get username => Environment.dbUsername ?? 'postgres';
+  static String get username => Environment.dbUsername;
   
-  static String get password => Environment.dbPassword ?? '';
+  static String get password => Environment.dbPassword;
   
   // Pool de conexões
   static const int maxConnections = 20;
   static const Duration connectionTimeout = Duration(seconds: 30);
   static const Duration queryTimeout = Duration(seconds: 60);
   
-  // Configuração SSL para produção
-  static bool get useSSL => Environment.isProduction;
+  // ✅ SUPABASE SEMPRE USA SSL
+  static bool get useSSL => true; // Supabase sempre requer SSL
   
   // Connection string para facilitar
   static String get connectionString {
@@ -33,15 +34,16 @@ class PostgreSQLConfig {
   static void printConfig() {
     if (!Environment.enableDebugLogs) return;
     
-    print('=== POSTGRESQL CONFIG ===');
+    print('=== POSTGRESQL CONFIG (SUPABASE) ===');
     print('Host: $host');
     print('Port: $port');
     print('Database: $database');
     print('Username: $username');
-    print('Password: ${password.isNotEmpty ? "***configured***" : "***empty***"}');
-    print('SSL: $useSSL');
+    print('Password: ${password.isNotEmpty ? "***configured***" : "***EMPTY - CONFIGURE!***"}');
+    print('SSL: $useSSL (Supabase requires SSL)');
+    print('Use PostgreSQL: ${Environment.usePostgreSQL}');
     print('Environment: ${Environment.isDevelopment ? "DEV" : "PROD"}');
-    print('Connection String: postgresql://$username:***@$host:$port/$database');
-    print('==============================');
+    print('Connection String: postgresql://$username:***@$host:$port/$database?sslmode=require');
+    print('=====================================');
   }
 }

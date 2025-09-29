@@ -29,7 +29,9 @@ const dbConfig = {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '1524Br101',
     database: process.env.DB_NAME || 'postgres',
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: false },
+    // FORÇAR IPv4
+    family: 4
   },
   pool: { min: 0, max: 7 },
   acquireConnectionTimeout: 60000,
@@ -55,7 +57,6 @@ async function initDatabase() {
       logger.info('✅ Migrações executadas');
     } catch (migrationError) {
       logger.warn('⚠️ Erro nas migrações (pode ser normal):', migrationError.message);
-      // Não falhar por causa de migrações
     }
     
     // Executar seeds
@@ -65,7 +66,6 @@ async function initDatabase() {
       logger.info('✅ Seeds executados');
     } catch (seedError) {
       logger.warn('⚠️ Erro nos seeds (pode ser normal):', seedError.message);
-      // Não falhar por causa de seeds
     }
     
     return db;

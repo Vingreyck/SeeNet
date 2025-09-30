@@ -16,14 +16,16 @@ app.use(compression());
 app.use(morgan('combined'));
 
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:8080',
-    'http://127.0.0.1:3000',
-    'http://10.0.2.2:3000',
-    'http://10.0.0.6:3000',
-    'http://10.0.1.112:3000'
-  ],
+  origin: process.env.NODE_ENV === 'production' 
+    ? '*'
+    : [
+        'http://localhost:3000',
+        'http://localhost:8080',
+        'http://127.0.0.1:3000',
+        'http://10.0.2.2:3000',
+        'http://10.0.0.6:3000',
+        'http://10.0.1.112:3000'
+      ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Code']
@@ -32,7 +34,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ========== ROTAS BÁSICAS (antes da inicialização do banco) ==========
+// ========== ROTAS BÁSICAS ==========
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -56,13 +58,11 @@ async function startServer() {
   try {
     console.log('🔌 Inicializando banco de dados...');
     
-    // 1. Primeiro inicializar o banco
     const { initDatabase } = require('./config/database');
     await initDatabase();
     
     console.log('📁 Carregando rotas...');
     
-    // 2. Agora carregar as rotas que usam banco
     try {
       const tenantRoutes = require('./routes/tenant');
       app.use('/api/tenant', tenantRoutes);
@@ -76,10 +76,8 @@ async function startServer() {
       app.use('/api/auth', authRoutes);
       console.log('✅ Rotas auth carregadas');
     } catch (error) {
-      console.error('⚠️ Rotas auth não encontradas (normal se não existir)');
+      console.error('⚠️ Rotas auth não encontradas');
     }
-    
-    // ========== ROTAS QUE USAM BANCO ==========
     
     app.get('/api/health', (req, res) => {
       res.json({ 
@@ -103,7 +101,6 @@ async function startServer() {
           tenants: tenants,
           connection: 'PostgreSQL OK'
         });
-        
       } catch (error) {
         console.error('❌ Erro no debug:', error);
         res.status(500).json({
@@ -145,7 +142,6 @@ async function startServer() {
       }
     });
 
-    // 404 handler
     app.use('*', (req, res) => {
       res.status(404).json({ 
         error: 'Endpoint não encontrado',
@@ -163,7 +159,6 @@ async function startServer() {
       });
     });
 
-    // Error handler
     app.use((error, req, res, next) => {
       console.error('❌ Erro na aplicação:', error);
       res.status(500).json({
@@ -172,13 +167,12 @@ async function startServer() {
       });
     });
 
-    // ========== INICIALIZAÇÃO ==========
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 SeeNet API rodando na porta ${PORT}`);
-      console.log(`📝 Health: http://10.50.160.140:${PORT}/health`);
-      console.log(`🏢 Tenant: http://10.50.160.140:${PORT}/api/tenant/verify/DEMO2024`);
-      console.log(`🗄️ Debug: http://10.50.160.140:${PORT}/api/debug/database`);
-    });
+    // Só inicia o servidor se não estiver no Vercel
+    if (process.env.VERCEL !== '1') {
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 SeeNet API rodando na porta ${PORT}`);
+      });
+    }
 
   } catch (error) {
     console.error('❌ Falha ao iniciar servidor:', error);
@@ -188,3 +182,6 @@ async function startServer() {
 
 // Iniciar servidor
 startServer();
+
+// Export para Vercel (serverless)
+module.exports = app;

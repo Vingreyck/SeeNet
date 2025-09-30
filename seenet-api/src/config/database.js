@@ -1,5 +1,6 @@
 const knex = require('knex');
 const winston = require('winston');
+const path = require('path');
 require('dotenv').config();
 
 // Logger
@@ -20,7 +21,7 @@ const logger = winston.createLogger({
   ]
 });
 
-// CONFIGURAÇÃO POSTGRESQL SIMPLES
+// CONFIGURAÇÃO POSTGRESQL COM CAMINHOS DE MIGRAÇÃO
 const dbConfig = {
   client: 'pg',
   connection: {
@@ -30,6 +31,12 @@ const dbConfig = {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     ssl: { rejectUnauthorized: false }
+  },
+  migrations: {
+    directory: path.join(__dirname, '../migrations') // Ajuste o caminho relativo
+  },
+  seeds: {
+    directory: path.join(__dirname, '../seeds')
   },
   pool: { min: 0, max: 7 },
   acquireConnectionTimeout: 60000,
@@ -45,16 +52,20 @@ async function initDatabase() {
     
     // Testar conexão
     await db.raw('SELECT NOW()');
-    
     logger.info('✅ Conexão com PostgreSQL estabelecida');
     
     // Executar migrações
     try {
       logger.info('🔄 Executando migrações...');
-      await db.migrate.latest();
-      logger.info('✅ Migrações executadas');
+      const [batchNo, migrationsList] = await db.migrate.latest();
+      if (migrationsList.length === 0) {
+        logger.info('ℹ️ Nenhuma migração pendente');
+      } else {
+        logger.info(`✅ Migrações executadas - Batch ${batchNo}:`, migrationsList);
+      }
     } catch (migrationError) {
-      logger.warn('⚠️ Erro nas migrações (pode ser normal):', migrationError.message);
+      logger.error('❌ Erro nas migrações:', migrationError.message);
+      throw migrationError;
     }
     
     // Executar seeds
@@ -63,7 +74,7 @@ async function initDatabase() {
       await db.seed.run();
       logger.info('✅ Seeds executados');
     } catch (seedError) {
-      logger.warn('⚠️ Erro nos seeds (pode ser normal):', seedError.message);
+      logger.warn('⚠️ Erro nos seeds:', seedError.message);
     }
     
     return db;
@@ -98,7 +109,7 @@ module.exports = {
   closeDatabase,
   get db() {
     if (!db) {
-      throw new Error('Database not initialized. Call initializeDatabase() first.');
+      throw new Error('Database not initialized. Call initDatabase() first.');
     }
     return db;
   }

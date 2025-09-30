@@ -1,6 +1,10 @@
 const knex = require('knex');
 const winston = require('winston');
+const dns = require('dns');
 require('dotenv').config();
+
+// 🔧 FORÇAR IPv4 GLOBALMENTE
+dns.setDefaultResultOrder('ipv4first');
 
 // Logger
 const logger = winston.createLogger({
@@ -20,7 +24,7 @@ const logger = winston.createLogger({
   ]
 });
 
-// APENAS CONFIGURAÇÃO POSTGRESQL
+// CONFIGURAÇÃO POSTGRESQL COM FORÇAMENTO IPv4
 const dbConfig = {
   client: 'pg',
   connection: {
@@ -29,12 +33,34 @@ const dbConfig = {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '1524Br101',
     database: process.env.DB_NAME || 'postgres',
-    ssl: { rejectUnauthorized: false },
-    // FORÇAR IPv4
-    family: 4
+    ssl: { rejectUnauthorized: false }
   },
-  pool: { min: 0, max: 7 },
+  pool: { 
+    min: 0, 
+    max: 7,
+    // Configuração customizada de criação de conexão
+    afterCreate: (conn, done) => {
+      // Força keep-alive para conexões mais estáveis
+      conn.connection.setKeepAlive(true);
+      done(null, conn);
+    }
+  },
   acquireConnectionTimeout: 60000,
+  // Driver customizado para forçar IPv4
+  connection: {
+    host: process.env.DB_HOST || 'db.tcqhyzbkkigukrqniefx.supabase.co',
+    port: parseInt(process.env.DB_PORT) || 5432,
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || '1524Br101',
+    database: process.env.DB_NAME || 'postgres',
+    ssl: { rejectUnauthorized: false },
+    // Opções do driver pg para forçar IPv4
+    options: {
+      lookup: (hostname, options, callback) => {
+        dns.lookup(hostname, { family: 4 }, callback);
+      }
+    }
+  }
 };
 
 let db = null;
@@ -48,7 +74,7 @@ async function initDatabase() {
     // Testar conexão
     await db.raw('SELECT NOW()');
     
-    logger.info('✅ Conexão com PostgreSQL estabelecida');
+    logger.info('✅ Conexão com PostgreSQL estabelecida via IPv4');
     
     // Executar migrações
     try {
@@ -70,7 +96,9 @@ async function initDatabase() {
     
     return db;
   } catch (error) {
-    logger.error('❌ Falha ao conectar com PostgreSQL:', error.message);
+    logger.error('❌ Falha ao conectar com PostgreSQL:');
+    logger.error('Mensagem:', error.message);
+    logger.error('Código:', error.code);
     throw error;
   }
 }

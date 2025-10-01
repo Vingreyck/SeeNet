@@ -371,7 +371,7 @@ class RegistrarView extends GetView<RegistroController> {
           ),
         ),
         TextFormField(
-          controller: controller.tokenEmpresaController,
+          controller: controller.codigoEmpresaController,
           textCapitalization: TextCapitalization.characters,
           style: const TextStyle(
             color: Colors.white,
@@ -424,7 +424,7 @@ class RegistrarView extends GetView<RegistroController> {
   // Status do token
   Widget _buildTokenStatus() {
     return Obx(() {
-      if (controller.verificandoToken.value) {
+      if (controller.verificandoCodigo.value) {
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -448,7 +448,7 @@ class RegistrarView extends GetView<RegistroController> {
         );
       }
 
-      if (controller.tokenValido.value && controller.empresaInfo.value != null) {
+      if (controller.codigoValido.value && controller.empresaInfo.value != null) {
         final empresa = controller.empresaInfo.value!;
         return Container(
           padding: const EdgeInsets.all(12),
@@ -473,7 +473,7 @@ class RegistrarView extends GetView<RegistroController> {
         );
       }
 
-      if (controller.tokenEmpresa.isNotEmpty && !controller.tokenValido.value) {
+      if (controller.codigoEmpresa.isNotEmpty && !controller.codigoValido.value) {
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -503,8 +503,8 @@ Widget _buildRegisterButton() {
     bool podeRegistrar= controller.nomeInput.text.trim().isNotEmpty &&
                       controller.emailInput.text.trim().isNotEmpty &&
                       controller.senhaInput.text.length >= 6 &&
-                      controller.tokenEmpresaController.text.trim().isNotEmpty &&
-                      controller.tokenValido.value &&
+                      controller.codigoEmpresaController.text.trim().isNotEmpty &&
+                      controller.codigoValido.value &&
                       !controller.isLoading.value;
 
     return SizedBox(
@@ -562,8 +562,8 @@ String _getButtonText(bool canRegister) {
   if (controller.nomeInput.text.trim().isEmpty) return 'Digite seu nome';
   if (controller.emailInput.text.trim().isEmpty) return 'Digite seu email';
   if (controller.senhaInput.text.length < 6) return 'Senha muito curta';
-  if (controller.tokenEmpresaController.text.trim().isEmpty) return 'Digite o token';
-  if (!controller.tokenValido.value) return 'Token inválido';
+  if (controller.codigoEmpresaController.text.trim().isEmpty) return 'Digite o token';
+  if (!controller.codigoValido.value) return 'Token inválido';
   return 'CRIAR CONTA';
 }
 

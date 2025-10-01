@@ -44,22 +44,22 @@ class TokenEmpresaTextField extends GetView<RegistroController> {
           
           // Campo de texto
           TextFormField(
-            controller: controller.tokenEmpresaController,
+            controller: controller.codigoEmpresaController,
             textInputAction: TextInputAction.done,
             textCapitalization: TextCapitalization.characters,
             onChanged: (value) {
-              controller.tokenEmpresa.value = value.toUpperCase();
-              controller.tokenEmpresaController.text = value.toUpperCase();
-              controller.tokenEmpresaController.selection = TextSelection.fromPosition(
-                TextPosition(offset: controller.tokenEmpresaController.text.length),
+              controller.codigoEmpresa.value = value.toUpperCase();
+              controller.codigoEmpresaController.text = value.toUpperCase();
+              controller.codigoEmpresaController.selection = TextSelection.fromPosition(
+                TextPosition(offset: controller.codigoEmpresaController.text.length),
               );
               
               // Verificar token automaticamente se tiver 4+ caracteres
               if (value.length >= 4) {
-                controller.verificarToken(value.toUpperCase());
+                controller.verificarCodigo(value.toUpperCase());
               } else {
                 controller.empresaInfo.value = null;
-                controller.tokenValido.value = false;
+                controller.codigoValido.value = false;
               }
             },
             style: const TextStyle(
@@ -77,7 +77,7 @@ class TokenEmpresaTextField extends GetView<RegistroController> {
               ),
               prefixIcon: Icon(
                 Icons.vpn_key,
-                color: controller.tokenValido.value 
+                color: controller.codigoValido.value 
                     ? const Color(0xFF00FF99)
                     : Colors.white.withOpacity(0.7),
                 size: 24,
@@ -92,7 +92,7 @@ class TokenEmpresaTextField extends GetView<RegistroController> {
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: controller.tokenValido.value
+                  color: controller.codigoValido.value
                       ? const Color(0xFF00FF99)
                       : Colors.white.withOpacity(0.3),
                   width: 1.5,
@@ -120,14 +120,14 @@ class TokenEmpresaTextField extends GetView<RegistroController> {
           ),
           
           // Dica de ajuda
-          if (controller.tokenEmpresa.isEmpty) _buildHelpText(),
+          if (controller.codigoEmpresa.isEmpty) _buildHelpText(),
         ],
       );
     });
   }
 
   Widget _buildSuffixIcon() {
-    if (controller.verificandoToken.value) {
+    if (controller.verificandoCodigo.value) {
       return const Padding(
         padding: EdgeInsets.all(12),
         child: SizedBox(
@@ -141,7 +141,7 @@ class TokenEmpresaTextField extends GetView<RegistroController> {
       );
     }
 
-    if (controller.tokenValido.value && controller.empresaInfo.value != null) {
+    if (controller.codigoValido.value && controller.empresaInfo.value != null) {
       return const Icon(
         Icons.verified,
         color: Color(0xFF00FF99),
@@ -149,9 +149,9 @@ class TokenEmpresaTextField extends GetView<RegistroController> {
       );
     }
 
-    if (controller.tokenEmpresa.value.isNotEmpty && 
+    if (controller.codigoEmpresa.value.isNotEmpty && 
         controller.empresaInfo.value == null &&
-        !controller.verificandoToken.value) {
+        !controller.verificandoCodigo.value) {
       return Icon(
         Icons.error,
         color: Colors.red.shade400,

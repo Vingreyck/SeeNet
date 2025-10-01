@@ -20,7 +20,7 @@ class AuthService extends GetxService {
     try {
       _usuarioController.isLoading.value = true;
       
-      final response = await _api.post('login', {
+      final response = await _api.post('/auth/login', {
         'email': email,
         'senha': senha,
         'codigoEmpresa': codigoEmpresa.toUpperCase(),
@@ -173,7 +173,7 @@ class AuthService extends GetxService {
   Future<void> logout() async {
     try {
       // Tentar fazer logout no servidor
-      await _api.post('logout', {});
+      await _api.post('/auth/logout', {});
     } catch (e) {
       print('⚠️ Erro no logout do servidor: $e');
     } finally {
@@ -189,7 +189,7 @@ class AuthService extends GetxService {
   // Verificar token
   Future<bool> verifyToken() async {
     try {
-      final response = await _api.get('verify');
+      final response = await _api.get('/auth/verify');
       return response['success'];
     } catch (e) {
       print('❌ Token inválido: $e');

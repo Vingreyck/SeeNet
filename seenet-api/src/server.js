@@ -8,6 +8,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.set('trust proxy', true);
 console.log('🚀 Iniciando servidor SeeNet API...');
 
 // ========== MIDDLEWARES GLOBAIS ==========

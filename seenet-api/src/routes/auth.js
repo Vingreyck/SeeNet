@@ -130,17 +130,20 @@ router.post('/register', [
 router.post('/login', loginLimiter, [
   body('email').isEmail().normalizeEmail().withMessage('Email inválido'),
   body('senha').notEmpty().withMessage('Senha é obrigatória'),
-   body().custom((value, { req }) => {
-    if (!req.body.codigoEmpresa && !req.body.tenantCode) {
+  body().custom((value, { req }) => {
+    const codigo = req.body.codigoEmpresa || req.body.tenantCode;
+    if (!codigo || codigo.trim().length < 3 || codigo.trim().length > 20) {
       throw new Error('Código da empresa é obrigatório');
     }
     return true;
   })
 ], async (req, res) => {
   try {
-    // Verificar erros de validação
+    console.log('🔍 POST /api/auth/login - Body recebido:', req.body); // ✅ ADICIONAR
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Erros de validação:', errors.array()); // ✅ ADICIONAR
       return res.status(400).json({ 
         error: 'Dados inválidos', 
         details: errors.array() 
@@ -149,6 +152,9 @@ router.post('/login', loginLimiter, [
 
     const { email, senha } = req.body;
     const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode;
+
+    console.log('✅ Validação OK - Buscando usuário:', email, codigoEmpresa); // ✅ ADICIONAR
+
 
     // Buscar usuário com tenant
     const user = await db('usuarios')

@@ -138,8 +138,10 @@ router.post('/login', loginLimiter, [
     return true;
   })
 ], async (req, res) => {
-  try {
-    console.log('🔍 POST /api/auth/login - Body recebido:', req.body); // ✅ ADICIONAR
+  try {    
+    console.log('🔍 POST /api/auth/login iniciado');
+    console.log('📦 Body:', JSON.stringify(req.body));
+    console.log('📝 Headers:', JSON.stringify(req.headers));
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -252,7 +254,8 @@ router.post('/login', loginLimiter, [
     });
 
   } catch (error) {
-    logger.error('Erro no login:', error);
+    console.error('❌ ERRO CRÍTICO NO LOGIN:', error);
+    console.error('Stack trace:', error.stack);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

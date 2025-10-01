@@ -1,6 +1,6 @@
 class Environment {
   // Configurações de ambiente
-  static const bool isDevelopment = bool.fromEnvironment('DEVELOPMENT', defaultValue: true);
+  static const bool isDevelopment = bool.fromEnvironment('DEVELOPMENT', defaultValue: false);
   static const bool isProduction = bool.fromEnvironment('PRODUCTION', defaultValue: false);
   
   // ✅ SUPABASE PostgreSQL - Configurações corrigidas

@@ -2,10 +2,10 @@ import 'environment.dart';
 
 class ApiConfig {
   // URLs ambiente
-  static const String _devBaseUrl = 'http://10.0.0.6:3000/api'; // muda o ip aqui
-  static const String _prodBaseUrl = 'https://api.seenet.com/api';
+  static const String _devBaseUrl = 'http://10.0.0.6:3000/api'; // desenvolvimento local
+  static const String _prodBaseUrl = 'https://seenet-production.up.railway.app/api'; // ✅ ATUALIZADO
   
-  // URL aenv
+  // URL atual baseado no ambiente
   static String get baseUrl {
     return Environment.isDevelopment ? _devBaseUrl : _prodBaseUrl;
   }
@@ -84,7 +84,10 @@ class ApiConfig {
     print('🏗️ Ambiente: ${Environment.isDevelopment ? "DEV" : "PROD"}');
     print('⏰ Timeout: ${requestTimeout.inSeconds}s');
     print('📊 Total endpoints: ${endpoints.length}');
-    print('🤖 Emulador Android: 10.0.2.2');
+    if (Environment.isDevelopment) {
+      print('🤖 Emulador Android: 10.0.2.2');
+      print('📱 Dispositivo físico: Ajuste o IP em _devBaseUrl');
+    }
     print('================================\n');
   }
 }

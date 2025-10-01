@@ -24,10 +24,16 @@ router.post('/register', [
   body('nome').trim().isLength({ min: 2, max: 100 }).withMessage('Nome deve ter entre 2 e 100 caracteres'),
   body('email').isEmail().normalizeEmail().withMessage('Email inválido'),
   body('senha').isLength({ min: 6, max: 128 }).withMessage('Senha deve ter entre 6 e 128 caracteres'),
-  body('codigoEmpresa').trim().isLength({ min: 3, max: 20 }).withMessage('Código da empresa inválido'),
+  // ✅ MODIFICADO: Aceitar ambos os nomes de campo
+  body().custom((value, { req }) => {
+    const codigo = req.body.codigoEmpresa || req.body.tenantCode;
+    if (!codigo || codigo.trim().length < 3 || codigo.trim().length > 20) {
+      throw new Error('Código da empresa inválido');
+    }
+    return true;
+  })
 ], async (req, res) => {
   try {
-    // Verificar erros de validação
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ 
@@ -36,7 +42,8 @@ router.post('/register', [
       });
     }
 
-    const { nome, email, senha, codigoEmpresa } = req.body;
+    const { nome, email, senha } = req.body;
+    const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode; // ✅ ACEITAR AMBOS
 
     // Verificar se o tenant existe e está ativo
     const tenant = await db('tenants')
@@ -123,7 +130,12 @@ router.post('/register', [
 router.post('/login', loginLimiter, [
   body('email').isEmail().normalizeEmail().withMessage('Email inválido'),
   body('senha').notEmpty().withMessage('Senha é obrigatória'),
-  body('codigoEmpresa').trim().isLength({ min: 3, max: 20 }).withMessage('Código da empresa inválido'),
+   body().custom((value, { req }) => {
+    if (!req.body.codigoEmpresa && !req.body.tenantCode) {
+      throw new Error('Código da empresa é obrigatório');
+    }
+    return true;
+  })
 ], async (req, res) => {
   try {
     // Verificar erros de validação
@@ -135,7 +147,8 @@ router.post('/login', loginLimiter, [
       });
     }
 
-    const { email, senha, codigoEmpresa } = req.body;
+    const { email, senha } = req.body;
+    const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode;
 
     // Buscar usuário com tenant
     const user = await db('usuarios')

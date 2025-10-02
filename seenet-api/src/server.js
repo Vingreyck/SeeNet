@@ -71,6 +71,14 @@ async function startServer() {
     } catch (error) {
       console.error('❌ Erro ao carregar rotas checkmarks:', error.message);
     }
+    
+    try {
+      const avaliacoesRoutes = require('./routes/avaliacoes');
+      app.use('/api/avaliacoes', avaliacoesRoutes);
+      console.log('✅ Rotas avaliacoes carregadas');
+    } catch (error) {
+      console.error('❌ Erro ao carregar rotas avaliacoes:', error.message);
+    }
 
     try {
       const tenantRoutes = require('./routes/tenant');

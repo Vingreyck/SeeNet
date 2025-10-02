@@ -70,9 +70,9 @@ class RegistrarView extends GetView<RegistroController> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 30),
-                
+
                 // Formulário principal
                 Container(
                   padding: const EdgeInsets.all(24),
@@ -94,9 +94,9 @@ class RegistrarView extends GetView<RegistroController> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      
+
                       const SizedBox(height: 30),
-                      
+
                       // Campo Nome
                       _buildTextField(
                         controller: controller.nomeInput,
@@ -105,9 +105,9 @@ class RegistrarView extends GetView<RegistroController> {
                         icon: Icons.person,
                         textCapitalization: TextCapitalization.words,
                       ),
-                      
+
                       const SizedBox(height: 20),
-                      
+
                       // Campo Email
                       _buildTextField(
                         controller: controller.emailInput,
@@ -116,32 +116,32 @@ class RegistrarView extends GetView<RegistroController> {
                         icon: Icons.email,
                         keyboardType: TextInputType.emailAddress,
                       ),
-                      
+
                       const SizedBox(height: 20),
-                      
+
                       // Campo Senha
                       _buildPasswordField(),
-                      
+
                       const SizedBox(height: 20),
-                      
+
                       // Campo Token da Empresa
                       _buildTokenField(),
-                      
+
                       const SizedBox(height: 20),
-                      
+
                       // Status do Token
                       _buildTokenStatus(),
-                      
+
                       const SizedBox(height: 30),
-                      
+
                       // Botão Registrar
                       _buildRegisterButton(),
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 30),
-                
+
                 // Link para login
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -371,7 +371,7 @@ class RegistrarView extends GetView<RegistroController> {
           ),
         ),
         TextFormField(
-          controller: controller.codigoEmpresaController,
+          controller: controller.tokenEmpresaController,
           textCapitalization: TextCapitalization.characters,
           style: const TextStyle(
             color: Colors.white,
@@ -424,7 +424,7 @@ class RegistrarView extends GetView<RegistroController> {
   // Status do token
   Widget _buildTokenStatus() {
     return Obx(() {
-      if (controller.verificandoCodigo.value) {
+      if (controller.verificandoToken.value) {
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -448,7 +448,7 @@ class RegistrarView extends GetView<RegistroController> {
         );
       }
 
-      if (controller.codigoValido.value && controller.empresaInfo.value != null) {
+      if (controller.tokenValido.value && controller.empresaInfo.value != null) {
         final empresa = controller.empresaInfo.value!;
         return Container(
           padding: const EdgeInsets.all(12),
@@ -473,7 +473,7 @@ class RegistrarView extends GetView<RegistroController> {
         );
       }
 
-      if (controller.codigoEmpresa.isNotEmpty && !controller.codigoValido.value) {
+      if (controller.tokenEmpresa.isNotEmpty && !controller.tokenValido.value) {
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -498,74 +498,74 @@ class RegistrarView extends GetView<RegistroController> {
   }
 
   // Botão de registro
-Widget _buildRegisterButton() {
-  return Obx(() {
-    bool podeRegistrar= controller.nomeInput.text.trim().isNotEmpty &&
-                      controller.emailInput.text.trim().isNotEmpty &&
-                      controller.senhaInput.text.length >= 6 &&
-                      controller.codigoEmpresaController.text.trim().isNotEmpty &&
-                      controller.codigoValido.value &&
-                      !controller.isLoading.value;
+  Widget _buildRegisterButton() {
+    return Obx(() {
+      bool podeRegistrar= controller.nomeInput.text.trim().isNotEmpty &&
+          controller.emailInput.text.trim().isNotEmpty &&
+          controller.senhaInput.text.length >= 6 &&
+          controller.tokenEmpresaController.text.trim().isNotEmpty &&
+          controller.tokenValido.value &&
+          !controller.isLoading.value;
 
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: podeRegistrar ? controller.tryToRegister : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: controller.podeRegistrar 
-              ? const Color(0xFF00FF99) 
-              : const Color(0xFF4B5563), // ← MAIS VISÍVEL
+      return SizedBox(
+        width: double.infinity,
+        height: 56,
+        child: ElevatedButton(
+          onPressed: podeRegistrar ? controller.tryToRegister : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: controller.podeRegistrar
+                ? const Color(0xFF00FF99)
+                : const Color(0xFF4B5563), // ← MAIS VISÍVEL
 
-          foregroundColor: controller.podeRegistrar 
-              ? Colors.black 
-              : Colors.white70, // ← MAIS VISÍVEL
-          elevation: podeRegistrar ? 4 : 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            foregroundColor: controller.podeRegistrar
+                ? Colors.black
+                : Colors.white70, // ← MAIS VISÍVEL
+            elevation: podeRegistrar ? 4 : 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: controller.isLoading.value
+              ? const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+            ),
+          )
+              : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                podeRegistrar ? Icons.person_add : Icons.lock,
+                size: 20,
+                color: podeRegistrar ? Colors.black : Colors.white70,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _getButtonText(podeRegistrar),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: podeRegistrar ? Colors.black : Colors.white70,
+                ),
+              ),
+            ],
           ),
         ),
-        child: controller.isLoading.value
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    podeRegistrar ? Icons.person_add : Icons.lock,
-                    size: 20,
-                    color: podeRegistrar ? Colors.black : Colors.white70,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _getButtonText(podeRegistrar),
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: podeRegistrar ? Colors.black : Colors.white70,
-                    ),
-                  ),
-                ],
-              ),
-      ),
-    );
-  });
-}
+      );
+    });
+  }
 
-String _getButtonText(bool canRegister) {
-  if (controller.nomeInput.text.trim().isEmpty) return 'Digite seu nome';
-  if (controller.emailInput.text.trim().isEmpty) return 'Digite seu email';
-  if (controller.senhaInput.text.length < 6) return 'Senha muito curta';
-  if (controller.codigoEmpresaController.text.trim().isEmpty) return 'Digite o token';
-  if (!controller.codigoValido.value) return 'Token inválido';
-  return 'CRIAR CONTA';
-}
+  String _getButtonText(bool canRegister) {
+    if (controller.nomeInput.text.trim().isEmpty) return 'Digite seu nome';
+    if (controller.emailInput.text.trim().isEmpty) return 'Digite seu email';
+    if (controller.senhaInput.text.length < 6) return 'Senha muito curta';
+    if (controller.tokenEmpresaController.text.trim().isEmpty) return 'Digite o token';
+    if (!controller.tokenValido.value) return 'Token inválido';
+    return 'CRIAR CONTA';
+  }
 
   // Observable para controlar visibilidade da senha
   late final RxBool _obscurePassword;
@@ -592,9 +592,9 @@ String _getButtonText(bool canRegister) {
             size: 40,
           ),
         ),
-        
+
         const SizedBox(height: 20),
-        
+
         // Título de sucesso
         const Text(
           '🎉 Conta Criada!',
@@ -604,9 +604,9 @@ String _getButtonText(bool canRegister) {
             fontWeight: FontWeight.bold,
           ),
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Informações da empresa
         Obx(() {
           final empresa = controller.empresaInfo.value;
@@ -658,9 +658,9 @@ String _getButtonText(bool canRegister) {
           }
           return const SizedBox.shrink();
         }),
-        
+
         const SizedBox(height: 24),
-        
+
         // Botão ENTRAR (usando LoginButton existente)
         SizedBox(
           width: double.infinity,
@@ -691,9 +691,9 @@ String _getButtonText(bool canRegister) {
             ),
           ),
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Botão secundário para criar outra conta
         TextButton(
           onPressed: controller.criarNovaConta,

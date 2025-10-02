@@ -1,22 +1,24 @@
-
+// lib/controllers/transcricao_controller.dart - VERSÃO API (CORRIGIDA)
 import 'package:get/get.dart';
 import '../models/transcricao_tecnica.dart';
 import '../services/transcricao_service.dart';
+import '../services/api_service.dart';
 import '../controllers/usuario_controller.dart';
 
 class TranscricaoController extends GetxController {
   final TranscricaoService _transcricaoService = TranscricaoService.instance;
+  final ApiService _api = ApiService.instance;
   final UsuarioController _usuarioController = Get.find<UsuarioController>();
 
   // Estados observáveis
   RxBool isGravando = false.obs;
   RxBool isProcessando = false.obs;
+  RxBool isLoading = false.obs;
   RxString textoTranscrito = ''.obs;
   RxString textoProcessado = ''.obs;
   RxString statusMensagem = ''.obs;
   RxList<TranscricaoTecnica> historico = <TranscricaoTecnica>[].obs;
 
-  // Dados da transcrição atual
   DateTime? _inicioGravacao;
   String _textoCompleto = '';
 
@@ -33,7 +35,6 @@ class TranscricaoController extends GetxController {
     super.onClose();
   }
 
-  /// Configurar callbacks do serviço
   void _configurarCallbacks() {
     _transcricaoService.onTranscriptionUpdate = (texto) {
       textoTranscrito.value = texto;
@@ -43,7 +44,7 @@ class TranscricaoController extends GetxController {
     _transcricaoService.onTranscriptionComplete = (texto) async {
       textoTranscrito.value = texto;
       _textoCompleto = texto;
-      
+
       if (texto.isNotEmpty) {
         await _processarComIA(texto);
       }
@@ -51,99 +52,81 @@ class TranscricaoController extends GetxController {
 
     _transcricaoService.onError = (erro) {
       statusMensagem.value = 'Erro: $erro';
-      Get.snackbar(
-        'Erro na Gravação',
-        erro,
-        backgroundColor: Get.theme.colorScheme.error,
-        colorText: Get.theme.colorScheme.onError,
-      );
-      
-      // Resetar estados em caso de erro
+      Get.snackbar('Erro na Gravação', erro);
       isGravando.value = false;
       isProcessando.value = false;
     };
   }
 
-  /// Iniciar gravação
   Future<bool> iniciarGravacao() async {
     try {
-      // Limpar dados anteriores
       limpar();
-      
       statusMensagem.value = 'Iniciando gravação...';
-      
+
       bool sucesso = await _transcricaoService.startListening();
-      
+
       if (sucesso) {
         isGravando.value = true;
         _inicioGravacao = DateTime.now();
         statusMensagem.value = 'Gravando... Fale claramente';
-        print(' Gravação iniciada');
+        print('🎤 Gravação iniciada');
         return true;
       } else {
         statusMensagem.value = 'Falha ao iniciar gravação';
-        print(' Falha ao iniciar gravação');
         return false;
       }
     } catch (e) {
-      print(' Erro ao iniciar gravação: $e');
+      print('❌ Erro ao iniciar gravação: $e');
       statusMensagem.value = 'Erro: $e';
       return false;
     }
   }
 
-  /// Parar gravação
   Future<void> pararGravacao() async {
     try {
       await _transcricaoService.stopListening();
       isGravando.value = false;
-      
+
       if (_textoCompleto.isNotEmpty) {
         statusMensagem.value = 'Processando com IA...';
         await _processarComIA(_textoCompleto);
       } else {
-        statusMensagem.value = 'Nenhum texto foi capturado';
+        statusMensagem.value = 'Nenhum texto capturado';
       }
-      
-      print(' Gravação finalizada');
     } catch (e) {
-      print(' Erro ao parar gravação: $e');
+      print('❌ Erro ao parar gravação: $e');
       statusMensagem.value = 'Erro ao finalizar gravação';
     }
   }
 
-  /// Cancelar gravação
   Future<void> cancelarGravacao() async {
     try {
       await _transcricaoService.cancelListening();
       limpar();
       statusMensagem.value = 'Gravação cancelada';
-      print(' Gravação cancelada');
     } catch (e) {
-      print(' Erro ao cancelar gravação: $e');
+      print('❌ Erro ao cancelar: $e');
     }
   }
 
-  /// Processar texto com IA
   Future<void> _processarComIA(String textoOriginal) async {
     try {
       isProcessando.value = true;
       statusMensagem.value = 'Organizando ações com IA...';
 
       String? textoProcessadoIA = await _transcricaoService.processarComGemini(textoOriginal);
-      
+
       if (textoProcessadoIA != null && textoProcessadoIA.isNotEmpty) {
         textoProcessado.value = textoProcessadoIA;
         statusMensagem.value = 'Ações organizadas com sucesso!';
-        print(' Texto processado pela IA');
+        print('✅ Texto processado pela IA');
       } else {
-        // Criar texto básico se IA falhar
         textoProcessado.value = _criarTextoBasico(textoOriginal);
         statusMensagem.value = 'Processamento básico concluído';
-        print('️ IA não disponível, usando processamento básico');
+        print('⚠️ IA não disponível, usando processamento básico');
       }
     } catch (e) {
-      print(' Erro no processamento: $e');
+      print('❌ Erro no processamento: $e');
       textoProcessado.value = _criarTextoBasico(textoOriginal);
       statusMensagem.value = 'Erro no processamento, texto básico criado';
     } finally {
@@ -151,10 +134,9 @@ class TranscricaoController extends GetxController {
     }
   }
 
-  /// Criar texto básico se IA falhar
   String _criarTextoBasico(String textoOriginal) {
     DateTime agora = DateTime.now();
-    
+
     return """**CATEGORIA:** Atendimento Técnico
 
 **AÇÕES REALIZADAS:**
@@ -170,10 +152,10 @@ class TranscricaoController extends GetxController {
 • Duração: ${_calcularDuracao()}
 
 ---
- **Dica:** Configure Google Gemini para processamento automático mais detalhado das ações técnicas.""";
+💡 **Dica:** A IA está processando via API Node.js para melhor detalhamento.""";
   }
 
-  /// Salvar transcrição
+  // ========== SALVAR TRANSCRIÇÃO VIA API ==========
   Future<bool> salvarTranscricao(String titulo) async {
     try {
       if (_usuarioController.idUsuario == null) {
@@ -186,51 +168,68 @@ class TranscricaoController extends GetxController {
         return false;
       }
 
-      TranscricaoTecnica transcricao = TranscricaoTecnica(
-        tecnicoId: _usuarioController.idUsuario!,
-        titulo: titulo,
-        transcricaoOriginal: textoTranscrito.value,
-        pontosDaAcao: textoProcessado.value,
-        status: 'concluida',
-        duracaoSegundos: _calcularDuracaoSegundos(),
-        dataInicio: _inicioGravacao,
-        dataConclusao: DateTime.now(),
-        dataCriacao: DateTime.now(),
-      );
+      isLoading.value = true;
 
-      bool salvou = await _transcricaoService.salvarTranscricao(transcricao);
-      
-      if (salvou) {
-        await carregarHistorico(); // Recarregar histórico
-        print(' Transcrição salva');
+      final response = await _api.post('/transcriptions', {
+        'titulo': titulo,
+        'transcricao_original': textoTranscrito.value,
+        'pontos_da_acao': textoProcessado.value,
+        'duracao_segundos': _calcularDuracaoSegundos(),
+        'descricao': 'Documentação técnica',
+      });
+
+      if (response['success']) {
+        await carregarHistorico();
+        print('✅ Transcrição salva na API');
+
+        Get.snackbar(
+          'Sucesso',
+          'Documentação salva com sucesso!',
+          duration: const Duration(seconds: 2),
+        );
+
         return true;
       } else {
-        print(' Erro ao salvar transcrição');
+        print('❌ Erro ao salvar: ${response['error']}');
+        Get.snackbar('Erro', 'Falha ao salvar documentação');
         return false;
       }
     } catch (e) {
-      print(' Erro ao salvar: $e');
-      Get.snackbar('Erro', 'Erro ao salvar documentação');
+      print('❌ Erro ao salvar: $e');
+      Get.snackbar('Erro', 'Erro de conexão ao salvar');
       return false;
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  /// Carregar histórico do técnico
+  // ========== CARREGAR HISTÓRICO DA API ==========
   Future<void> carregarHistorico() async {
     try {
       if (_usuarioController.idUsuario == null) return;
-      
-      List<TranscricaoTecnica> lista = await _transcricaoService
-          .buscarTranscricoesTecnico(_usuarioController.idUsuario!);
-      
-      historico.value = lista;
-      print(' ${lista.length} transcrições carregadas');
+
+      isLoading.value = true;
+
+      final response = await _api.get('/transcriptions/minhas');
+
+      if (response['success']) {
+        final List<dynamic> data = response['data']['transcricoes'];
+
+        historico.value = data
+            .map((json) => TranscricaoTecnica.fromMap(json))
+            .toList();
+
+        print('✅ ${historico.length} transcrições carregadas da API');
+      } else {
+        print('❌ Erro ao carregar histórico: ${response['error']}');
+      }
     } catch (e) {
-      print(' Erro ao carregar histórico: $e');
+      print('❌ Erro ao carregar histórico: $e');
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  /// Limpar dados atuais
   void limpar() {
     isGravando.value = false;
     isProcessando.value = false;
@@ -241,39 +240,34 @@ class TranscricaoController extends GetxController {
     _inicioGravacao = null;
   }
 
-  /// Calcular duração da gravação
   String _calcularDuracao() {
     if (_inicioGravacao == null) return 'N/A';
-    
+
     Duration duracao = DateTime.now().difference(_inicioGravacao!);
     int minutos = duracao.inMinutes;
     int segundos = duracao.inSeconds % 60;
-    
+
     return '${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
   }
 
-  /// Calcular duração em segundos
   int? _calcularDuracaoSegundos() {
     if (_inicioGravacao == null) return null;
     return DateTime.now().difference(_inicioGravacao!).inSeconds;
   }
 
-  /// Formatar data e hora
   String _formatarDataHora(DateTime data) {
     return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year} às ${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
   }
 
-  /// Verificar se serviço está disponível
   Future<bool> verificarDisponibilidade() async {
     try {
       return await _transcricaoService.isSupported();
     } catch (e) {
-      print(' Erro ao verificar disponibilidade: $e');
+      print('❌ Erro ao verificar disponibilidade: $e');
       return false;
     }
   }
 
-  /// Obter estatísticas do histórico
   Map<String, dynamic> get estatisticasHistorico {
     if (historico.isEmpty) {
       return {
@@ -286,24 +280,24 @@ class TranscricaoController extends GetxController {
 
     DateTime agora = DateTime.now();
     DateTime inicioMes = DateTime(agora.year, agora.month, 1);
-    
-    int esteMes = historico.where((t) => 
-        t.dataCriacao != null && t.dataCriacao!.isAfter(inicioMes)
+
+    int esteMes = historico.where((t) =>
+    t.dataCriacao != null && t.dataCriacao!.isAfter(inicioMes)
     ).length;
-    
+
     int tempoTotalSegundos = historico
         .where((t) => t.duracaoSegundos != null)
         .map((t) => t.duracaoSegundos!)
         .fold(0, (a, b) => a + b);
-    
-    double mediaMinutos = historico.isNotEmpty 
-        ? tempoTotalSegundos / 60.0 / historico.length 
+
+    double mediaMinutos = historico.isNotEmpty
+        ? tempoTotalSegundos / 60.0 / historico.length
         : 0.0;
-    
+
     int minutos = tempoTotalSegundos ~/ 60;
     int segundos = tempoTotalSegundos % 60;
     String tempoTotal = '${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
-    
+
     return {
       'total': historico.length,
       'esteMes': esteMes,
@@ -312,50 +306,41 @@ class TranscricaoController extends GetxController {
     };
   }
 
-  /// Remover transcrição do histórico
   Future<bool> removerTranscricao(int transcricaoId) async {
     try {
-      // Implementar remoção no banco
-      // Por enquanto, apenas remove da lista local
-      historico.removeWhere((t) => t.id == transcricaoId);
-      
-      Get.snackbar(
-        'Removido',
-        'Documentação removida do histórico',
-        backgroundColor: Get.theme.colorScheme.secondary,
-        colorText: Get.theme.colorScheme.onSecondary,
-      );
-      
-      return true;
+      final response = await _api.delete('/transcriptions/$transcricaoId');
+
+      if (response['success']) {
+        historico.removeWhere((t) => t.id == transcricaoId);
+        Get.snackbar('Removido', 'Documentação removida');
+        return true;
+      }
+      return false;
     } catch (e) {
-      print(' Erro ao remover: $e');
+      print('❌ Erro ao remover: $e');
       return false;
     }
   }
 
-  /// Buscar no histórico
   List<TranscricaoTecnica> buscarNoHistorico(String termo) {
     if (termo.isEmpty) return historico;
-    
+
     String termoBusca = termo.toLowerCase();
-    
+
     return historico.where((transcricao) {
       return transcricao.titulo.toLowerCase().contains(termoBusca) ||
-             transcricao.transcricaoOriginal.toLowerCase().contains(termoBusca) ||
-             transcricao.pontosDaAcao.toLowerCase().contains(termoBusca) ||
-             (transcricao.categoriaProblema?.toLowerCase().contains(termoBusca) ?? false);
+          transcricao.transcricaoOriginal.toLowerCase().contains(termoBusca) ||
+          transcricao.pontosDaAcao.toLowerCase().contains(termoBusca);
     }).toList();
   }
 
-  /// Debug - informações do serviço
   void debugInfo() {
-    print('\n === TRANSCRIÇÃO DEBUG ===');
-    print(' Suporte speech-to-text: ${_transcricaoService.isSupported()}');
-    print(' Está gravando: ${isGravando.value}');
-    print(' Está processando: ${isProcessando.value}');
-    print(' Texto transcrito: "${textoTranscrito.value}"');
-    print(' Histórico: ${historico.length} itens');
-    print(' Usuário: ${_usuarioController.idUsuario}');
-    print('================================\n');
+    print('\n🔍 === TRANSCRIÇÃO DEBUG ===');
+    print('🎤 Gravando: ${isGravando.value}');
+    print('🤖 Processando: ${isProcessando.value}');
+    print('📝 Texto: "${textoTranscrito.value}"');
+    print('📊 Histórico: ${historico.length} itens');
+    print('👤 Usuário: ${_usuarioController.idUsuario}');
+    print('=============================\n');
   }
 }

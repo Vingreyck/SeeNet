@@ -15,12 +15,12 @@ class LogarButton extends GetView<RegistroController> {
         child: ElevatedButton(
           onPressed: controller.podeRegistrar ? controller.tryToRegister : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: controller.podeRegistrar 
-                ? const Color(0xFF00FF99) 
+            backgroundColor: controller.podeRegistrar
+                ? const Color(0xFF00FF99)
                 : Colors.grey.withOpacity(0.5),
             disabledBackgroundColor: Colors.grey.withOpacity(0.3),
-            foregroundColor: controller.podeRegistrar 
-                ? Colors.black 
+            foregroundColor: controller.podeRegistrar
+                ? Colors.black
                 : Colors.grey,
             elevation: controller.podeRegistrar ? 4 : 0,
             shape: RoundedRectangleBorder(
@@ -30,32 +30,32 @@ class LogarButton extends GetView<RegistroController> {
           ),
           child: controller.isLoading.value
               ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-                  ),
-                )
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+            ),
+          )
               : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      _getButtonIcon(),
-                      size: 20,
-                      color: controller.podeRegistrar ? Colors.black : Colors.grey,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _getButtonText(),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: controller.podeRegistrar ? Colors.black : Colors.grey,
-                      ),
-                    ),
-                  ],
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                _getButtonIcon(),
+                size: 20,
+                color: controller.podeRegistrar ? Colors.black : Colors.grey,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _getButtonText(),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: controller.podeRegistrar ? Colors.black : Colors.grey,
                 ),
+              ),
+            ],
+          ),
         ),
       );
     });
@@ -65,31 +65,31 @@ class LogarButton extends GetView<RegistroController> {
     if (controller.nomeInput.text.trim().isEmpty) {
       return 'Digite seu nome';
     }
-    
+
     if (controller.emailInput.text.trim().isEmpty) {
       return 'Digite seu email';
     }
-    
+
     if (controller.senhaInput.text.isEmpty) {
       return 'Digite sua senha';
     }
-    
+
     if (controller.senhaInput.text.length < 6) {
       return 'Senha muito curta';
     }
-    
+
     if (controller.tokenEmpresa.isEmpty) {
       return 'Digite o token da empresa';
     }
-    
+
     if (controller.verificandoToken.value) {
       return 'Verificando token...';
     }
-    
+
     if (!controller.tokenValido.value) {
       return 'Token inválido';
     }
-    
+
     return 'CRIAR CONTA';
   }
 
@@ -100,19 +100,19 @@ class LogarButton extends GetView<RegistroController> {
         controller.senhaInput.text.length < 6) {
       return Icons.edit;
     }
-    
+
     if (controller.tokenEmpresa.isEmpty) {
       return Icons.vpn_key;
     }
-    
+
     if (controller.verificandoToken.value) {
       return Icons.hourglass_empty;
     }
-    
+
     if (!controller.tokenValido.value) {
       return Icons.error;
     }
-    
+
     return Icons.person_add;
   }
 }

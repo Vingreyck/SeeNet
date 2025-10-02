@@ -122,7 +122,7 @@ class LoginView extends GetView<LoginController> {
               RegistrarButton(),
             ],
           ),
-          
+
           // ========== TESTES DE API (TEMPORÁRIOS) ==========
           const SizedBox(height: 40),
           _buildTestSection(), // ← SEÇÃO DE TESTES ATUALIZADA
@@ -132,132 +132,132 @@ class LoginView extends GetView<LoginController> {
   }
 
   // ========== SEÇÃO DE TESTES ==========
-Widget _buildTestSection() {
-  return Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: const Color(0xFF374151).withOpacity(0.8),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(
-        color: const Color(0xFF00FF99).withOpacity(0.3),
-        width: 1,
+  Widget _buildTestSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF374151).withOpacity(0.8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF00FF99).withOpacity(0.3),
+          width: 1,
+        ),
       ),
-    ),
-    child: Column(
-      children: [
-        const Text(
-          '🧪 Testes de API',
-          style: TextStyle(
-            color: Color(0xFF00FF99),
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        
-        // Botão 1: Teste de conectividade
-        _buildTestButton(
-          'Testar Backend',
-          Icons.wifi_protected_setup,
-          controller.testarBackend,
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Botão 2: Login Demo Admin (preenche campos + faz login)
-        _buildTestButton(
-          'Login Demo (Admin)',
-          Icons.admin_panel_settings,
-          controller.testarLoginAdmin,
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Botão 3: Login Demo Técnico (preenche campos + faz login)
-        _buildTestButton(
-          'Login Demo (Técnico)',
-          Icons.engineering,
-          controller.testarLoginTecnico,
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Botão 4: Verificar empresas
-        _buildTestButton(
-          'Verificar Empresas',
-          Icons.business,
-          controller.testarEmpresas,
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Botão 5: Limpar campos
-        _buildTestButton(
-          'Limpar Campos',
-          Icons.clear_all,
-          controller.limparCampos,
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildTestButton(String title, IconData icon, VoidCallback onPressed) {
-  return SizedBox(
-    width: double.infinity,
-    child: Obx(() {
-      return ElevatedButton.icon(
-        onPressed: controller.isLoading.value ? null : onPressed,
-        icon: controller.isLoading.value 
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : Icon(icon, size: 18),
-        label: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: controller.isLoading.value 
-              ? const Color(0xFF4B5563).withOpacity(0.5)
-              : const Color(0xFF4B5563),
-          foregroundColor: Colors.white,
-          elevation: controller.isLoading.value ? 0 : 2,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: BorderSide(
-              color: const Color(0xFF00FF99).withOpacity(0.5),
-              width: 1,
+      child: Column(
+        children: [
+          const Text(
+            '🧪 Testes de API',
+            style: TextStyle(
+              color: Color(0xFF00FF99),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ),
-      );
-    }),
-  );
-}
+          const SizedBox(height: 16),
+
+          // Botão 1: Teste de conectividade
+          _buildTestButton(
+            'Testar Backend',
+            Icons.wifi_protected_setup,
+            controller.testarBackend,
+          ),
+
+          const SizedBox(height: 12),
+
+          // Botão 2: Login Demo Admin (preenche campos + faz login)
+          _buildTestButton(
+            'Login Demo (Admin)',
+            Icons.admin_panel_settings,
+            controller.testarLoginAdmin,
+          ),
+
+          const SizedBox(height: 12),
+
+          // Botão 3: Login Demo Técnico (preenche campos + faz login)
+          _buildTestButton(
+            'Login Demo (Técnico)',
+            Icons.engineering,
+            controller.testarLoginTecnico,
+          ),
+
+          const SizedBox(height: 12),
+
+          // Botão 4: Verificar empresas
+          _buildTestButton(
+            'Verificar Empresas',
+            Icons.business,
+            controller.testarEmpresas,
+          ),
+
+          const SizedBox(height: 12),
+
+          // Botão 5: Limpar campos
+          _buildTestButton(
+            'Limpar Campos',
+            Icons.clear_all,
+            controller.limparCampos,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTestButton(String title, IconData icon, VoidCallback onPressed) {
+    return SizedBox(
+      width: double.infinity,
+      child: Obx(() {
+        return ElevatedButton.icon(
+          onPressed: controller.isLoading.value ? null : onPressed,
+          icon: controller.isLoading.value
+              ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          )
+              : Icon(icon, size: 18),
+          label: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: controller.isLoading.value
+                ? const Color(0xFF4B5563).withOpacity(0.5)
+                : const Color(0xFF4B5563),
+            foregroundColor: Colors.white,
+            elevation: controller.isLoading.value ? 0 : 2,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(
+                color: const Color(0xFF00FF99).withOpacity(0.5),
+                width: 1,
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
 
   // ========== TESTE DE CONECTIVIDADE ==========
   void _testBackend() async {
     try {
       _showLoading();
-      
+
       final apiService = Get.find<ApiService>();
       bool conectado = await apiService.checkConnectivity();
-      
+
       Get.back(); // Fechar loading
 
       _showSnackbar(
         conectado ? 'Backend Online' : 'Backend Offline',
-        conectado 
+        conectado
             ? '✅ Servidor conectado via hotspot!'
             : '❌ Não foi possível conectar ao servidor',
         conectado,
@@ -276,16 +276,16 @@ Widget _buildTestButton(String title, IconData icon, VoidCallback onPressed) {
 
       final authService = Get.find<AuthService>();
       bool success = await authService.login(
-        'admin@seenet.com', 
-        'admin123', 
-        'DEMO2024'
+          'admin@seenet.com',
+          'admin123',
+          'DEMO2024'
       );
 
       Get.back(); // Fechar loading
 
       _showSnackbar(
         success ? '✅ Login Admin OK' : '❌ Login Admin Falhou',
-        success 
+        success
             ? 'Logado como admin@seenet.com!\nEmpresa:SeeNet'
             : 'Erro ao fazer login com credenciais do admin',
         success,
@@ -310,16 +310,16 @@ Widget _buildTestButton(String title, IconData icon, VoidCallback onPressed) {
 
       final authService = Get.find<AuthService>();
       bool success = await authService.login(
-        'tecnico@seenet.com', 
-        '123456', 
-        'DEMO2024'
+          'tecnico@seenet.com',
+          '123456',
+          'DEMO2024'
       );
 
       Get.back(); // Fechar loading
 
       _showSnackbar(
         success ? '✅ Login Técnico OK' : '❌ Login Técnico Falhou',
-        success 
+        success
             ? 'Logado como tecnico@demo.seenet.com!\nEmpresa: SeeNet Demo'
             : 'Erro ao fazer login com credenciais do técnico',
         success,
@@ -341,7 +341,7 @@ Widget _buildTestButton(String title, IconData icon, VoidCallback onPressed) {
       _showLoading();
 
       final authService = Get.find<AuthService>();
-      
+
       var demo = await authService.verificarCodigoEmpresa('DEMO2024');
       var tech = await authService.verificarCodigoEmpresa('TECH2024');
       var invalid = await authService.verificarCodigoEmpresa('INVALID');
@@ -397,11 +397,11 @@ Widget _buildTestButton(String title, IconData icon, VoidCallback onPressed) {
       title,
       message,
       snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: isSuccess 
-          ? const Color(0xFF00FF99) 
+      backgroundColor: isSuccess
+          ? const Color(0xFF00FF99)
           : Colors.red,
-      colorText: isSuccess 
-          ? Colors.black 
+      colorText: isSuccess
+          ? Colors.black
           : Colors.white,
       duration: const Duration(seconds: 4),
       margin: const EdgeInsets.all(20),

@@ -2,11 +2,13 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
 const { db } = require('../config/database');
+const authMiddleware = require('../middleware/auth');
 const { adminMiddleware } = require('../middleware/auth');
 const auditService = require('../services/auditService');
 const logger = require('../config/logger');
 
 const router = express.Router();
+router.use(authMiddleware);
 
 // ========== LISTAR CATEGORIAS ==========
 router.get('/categorias', async (req, res) => {

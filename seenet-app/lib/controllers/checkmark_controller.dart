@@ -6,7 +6,7 @@ import '../services/api_service.dart';
 
 class CheckmarkController extends GetxController {
   final ApiService _api = ApiService.instance;
-  
+
   RxList<CategoriaCheckmark> categorias = <CategoriaCheckmark>[].obs;
   RxList<Checkmark> checkmarksAtivos = <Checkmark>[].obs;
   RxMap<int, bool> respostas = <int, bool>{}.obs;
@@ -24,15 +24,15 @@ class CheckmarkController extends GetxController {
   Future<void> carregarCategorias() async {
     try {
       isLoading.value = true;
-      
+
       final response = await _api.get('categorias');
-      
+
       if (response['success']) {
         final List<dynamic> data = response['data']['categorias'];
         categorias.value = data
             .map((json) => CategoriaCheckmark.fromMap(json))
             .toList();
-        
+
         print('✅ ${categorias.length} categorias carregadas da API');
       } else {
         print('❌ Erro ao carregar categorias: ${response['error']}');
@@ -51,15 +51,15 @@ class CheckmarkController extends GetxController {
     try {
       isLoading.value = true;
       categoriaAtual.value = categoriaId;
-      
+
       final response = await _api.get('checkmarksPorCategoria/$categoriaId');
-      
+
       if (response['success']) {
         final List<dynamic> data = response['data']['checkmarks'];
         checkmarksAtivos.value = data
             .map((json) => Checkmark.fromMap(json))
             .toList();
-        
+
         respostas.clear();
         print('✅ ${checkmarksAtivos.length} checkmarks carregados da API');
       } else {
@@ -78,22 +78,22 @@ class CheckmarkController extends GetxController {
   Future<bool> iniciarAvaliacao(int tecnicoId, String titulo) async {
     try {
       isLoading.value = true;
-      
+
       final response = await _api.post('/avaliacoes', {
         'titulo': titulo,
         'descricao': 'Avaliação técnica',
       });
-      
+
       if (response['success']) {
         final int avaliacaoId = response['data']['id'];
-        
+
         avaliacaoAtual.value = Avaliacao(
           id: avaliacaoId,
           tecnicoId: tecnicoId,
           titulo: titulo,
           status: 'em_andamento',
         );
-        
+
         print('✅ Avaliação iniciada na API: $avaliacaoId');
         return true;
       } else {
@@ -197,7 +197,7 @@ class CheckmarkController extends GetxController {
   }
 
   // ========== GETTERS ÚTEIS ==========
-  
+
   List<int> get checkmarksMarcados {
     return respostas.entries
         .where((entry) => entry.value == true)
@@ -215,7 +215,7 @@ class CheckmarkController extends GetxController {
   String get nomeCategoriaAtual {
     if (categoriaAtual.value == 0) return '';
     CategoriaCheckmark? categoria = categorias.firstWhereOrNull(
-      (cat) => cat.id == categoriaAtual.value
+            (cat) => cat.id == categoriaAtual.value
     );
     return categoria?.nome ?? '';
   }

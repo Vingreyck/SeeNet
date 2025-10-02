@@ -63,6 +63,14 @@ async function startServer() {
     await initDatabase();
     
     console.log('📁 Carregando rotas...');
+
+    try {
+      const checkmarksRoutes = require('./routes/checkmarks');
+      app.use('/api/checkmarks', checkmarksRoutes);
+      console.log('✅ Rotas checkmarks carregadas');
+    } catch (error) {
+      console.error('❌ Erro ao carregar rotas checkmarks:', error.message);
+    }
     
     try {
       const tenantRoutes = require('./routes/tenant');

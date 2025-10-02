@@ -39,8 +39,8 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
   late Animation<Offset> _slideAnimation;
 
   // State variables
-  final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = 
-      GlobalKey<RefreshIndicatorState>();
+  final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
+  GlobalKey<RefreshIndicatorState>();
   bool _isInputFocused = false;
   bool _showFloatingInput = false;
 
@@ -140,61 +140,55 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
   }
 
 // Modificar o método _gerarDiagnostico() para limpar diagnósticos anteriores
-Future<void> _gerarDiagnostico() async {
-  _shimmerController.repeat();
-  
-  try {
-    await HapticFeedback.lightImpact(); // Haptic feedback
-
-    // ADICIONAR: Limpar diagnósticos anteriores SEMPRE
+  Future<void> _gerarDiagnostico() async {
+    _shimmerController.repeat();
     _diagnosticoController.diagnosticos.clear();
 
-    if (_checkmarkController.avaliacaoAtual.value == null) {
-      await _criarDiagnosticoDemo();
-      return;
-    }
+    try {
+      await HapticFeedback.lightImpact();
 
-    List<int> checkmarksMarcadosIds = _checkmarkController.checkmarksMarcados;
-    
-    if (checkmarksMarcadosIds.isEmpty) {
-      _showSnackbar(
-        'Aviso',
-        'Nenhum problema foi selecionado',
-        SnackbarType.warning,
+      if (_checkmarkController.avaliacaoAtual.value == null) {
+        await _criarDiagnosticoDemo();
+        return;
+      }
+
+      List<int> checkmarksMarcadosIds = _checkmarkController.checkmarksMarcados;
+
+      if (checkmarksMarcadosIds.isEmpty) {
+        _showSnackbar(
+          'Aviso',
+          'Nenhum problema foi selecionado',
+          SnackbarType.warning,
+        );
+        await _criarDiagnosticoDemo();
+        return;
+      }
+
+      bool sucesso = await _diagnosticoController.gerarDiagnostico(
+        _checkmarkController.avaliacaoAtual.value!.id!,
+        _checkmarkController.categoriaAtual.value,
+        checkmarksMarcadosIds, // ← Direto da propriedade do controller
       );
-      await _criarDiagnosticoDemo();
-      return;
+
+      if (!sucesso) {
+        _showSnackbar(
+          'Erro',
+          'Erro ao gerar diagnóstico. Criando diagnóstico de exemplo.',
+          SnackbarType.error,
+        );
+        await _criarDiagnosticoDemo();
+      } else {
+        await HapticFeedback.heavyImpact();
+      }
+    } finally {
+      _shimmerController.stop();
     }
-
-    List<Checkmark> checkmarksMarcados = _checkmarkController.checkmarksAtivos
-        .where((checkmark) => checkmarksMarcadosIds.contains(checkmark.id))
-        .toList();
-
-    bool sucesso = await _diagnosticoController.gerarDiagnostico(
-      _checkmarkController.avaliacaoAtual.value!.id!,
-      _checkmarkController.categoriaAtual.value,
-      checkmarksMarcados,
-    );
-
-    if (!sucesso) {
-      _showSnackbar(
-        'Erro',
-        'Erro ao gerar diagnóstico. Criando diagnóstico de exemplo.',
-        SnackbarType.error,
-      );
-      await _criarDiagnosticoDemo();
-    } else {
-      await HapticFeedback.heavyImpact(); // Simular notification success
-    }
-  } finally {
-    _shimmerController.stop();
   }
-}
 // Modificar o método _criarDiagnosticoDemo() para remover a limpeza duplicada
-Future<void> _criarDiagnosticoDemo() async {
-  await Future.delayed(const Duration(seconds: 2));
+  Future<void> _criarDiagnosticoDemo() async {
+    await Future.delayed(const Duration(seconds: 2));
 
-  const String diagnosticoExemplo = """🔍 **DIAGNÓSTICO TÉCNICO DEMONSTRAÇÃO**
+    const String diagnosticoExemplo = """🔍 **DIAGNÓSTICO TÉCNICO DEMONSTRAÇÃO**
 
 📊 **ANÁLISE REALIZADA:**
 Sistema em modo de demonstração. Este é um exemplo de como o diagnóstico apareceria com problemas reais selecionados.
@@ -236,31 +230,31 @@ Entre em contato com a operadora informando os testes realizados.
 ---
 📋 Diagnóstico de demonstração - Configure sua chave do ChatGPT para diagnósticos reais""";
 
-  // REMOVER: A limpeza da lista (já foi feita em _gerarDiagnostico)
-  // _diagnosticoController.diagnosticos.clear(); // <- REMOVER ESTA LINHA
+    // REMOVER: A limpeza da lista (já foi feita em _gerarDiagnostico)
+    // _diagnosticoController.diagnosticos.clear(); // <- REMOVER ESTA LINHA
 
-  _diagnosticoController.diagnosticos.add(
-    Diagnostico(
-      id: DateTime.now().millisecondsSinceEpoch,
-      avaliacaoId: 1,
-      categoriaId: 1,
-      promptEnviado: "Diagnóstico de demonstração",
-      respostaChatgpt: diagnosticoExemplo,
-      resumoDiagnostico: "Diagnóstico de demonstração - Configure ChatGPT para funcionalidade completa",
-      statusApi: 'sucesso',
-      dataCriacao: DateTime.now(),
-    )
-  );
-}
+    _diagnosticoController.diagnosticos.add(
+        Diagnostico(
+          id: DateTime.now().millisecondsSinceEpoch,
+          avaliacaoId: 1,
+          categoriaId: 1,
+          promptEnviado: "Diagnóstico de demonstração",
+          respostaChatgpt: diagnosticoExemplo,
+          resumoDiagnostico: "Diagnóstico de demonstração - Configure ChatGPT para funcionalidade completa",
+          statusApi: 'sucesso',
+          dataCriacao: DateTime.now(),
+        )
+    );
+  }
 // ADICIONAR: Método para limpar diagnósticos manualmente (se necessário)
-void _limparDiagnosticos() {
-  _diagnosticoController.diagnosticos.clear();
-  _showSnackbar(
-    'Limpeza',
-    'Diagnósticos anteriores foram removidos',
-    SnackbarType.info,
-  );
-}
+  void _limparDiagnosticos() {
+    _diagnosticoController.diagnosticos.clear();
+    _showSnackbar(
+      'Limpeza',
+      'Diagnósticos anteriores foram removidos',
+      SnackbarType.info,
+    );
+  }
 
   /// Pull-to-refresh implementation
   Future<void> _handleRefresh() async {
@@ -500,7 +494,7 @@ void _limparDiagnosticos() {
               children: [
                 if (_diagnosticoController.isLoading.value)
                   _buildShimmerIndicator(),
-                if (_diagnosticoController.isLoading.value) 
+                if (_diagnosticoController.isLoading.value)
                   const SizedBox(width: 16),
                 Expanded(
                   child: Text(
@@ -515,7 +509,7 @@ void _limparDiagnosticos() {
               ],
             );
           }
-          
+
           return const Text(
             '🤖 Diagnóstico Inteligente Pronto',
             style: TextStyle(
@@ -612,7 +606,7 @@ void _limparDiagnosticos() {
         children: _diagnosticoController.diagnosticos.asMap().entries.map((entry) {
           int index = entry.key;
           Diagnostico diagnostico = entry.value;
-          
+
           return AnimatedContainer(
             duration: Duration(milliseconds: 300 + (index * 100)),
             curve: Curves.easeOutBack,
@@ -632,14 +626,14 @@ void _limparDiagnosticos() {
         color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: diagnostico.isSucesso 
+          color: diagnostico.isSucesso
               ? const Color(0xFF00FF88).withValues(alpha: 0.5)
               : Colors.red.withValues(alpha: 0.5),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: diagnostico.isSucesso 
+            color: diagnostico.isSucesso
                 ? const Color(0xFF00FF88).withValues(alpha: 0.1)
                 : Colors.red.withValues(alpha: 0.1),
             blurRadius: 20,
@@ -667,7 +661,7 @@ void _limparDiagnosticos() {
           duration: const Duration(milliseconds: 500),
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: diagnostico.isSucesso 
+            color: diagnostico.isSucesso
                 ? const Color(0xFF00FF88).withValues(alpha: 0.2)
                 : Colors.red.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
@@ -961,17 +955,17 @@ void _limparDiagnosticos() {
       onTap: () async {
         if (_perguntaController.text.isNotEmpty) {
           await HapticFeedback.mediumImpact();
-          
+
           // Simular envio de mensagem
           String pergunta = _perguntaController.text;
           _perguntaController.clear();
-          
+
           _showSnackbar(
             'Mensagem Enviada',
             'Pergunta: "$pergunta" - Chat será implementado em breve',
             SnackbarType.success,
           );
-          
+
           setState(() {
             _showFloatingInput = false;
           });
@@ -995,12 +989,12 @@ void _limparDiagnosticos() {
                 shape: BoxShape.circle,
                 boxShadow: _perguntaController.text.isNotEmpty
                     ? [
-                        BoxShadow(
-                          color: const Color(0xFF00FF88).withValues(alpha: 0.4),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
-                      ]
+                  BoxShadow(
+                    color: const Color(0xFF00FF88).withValues(alpha: 0.4),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
                     : [],
               ),
               child: Icon(
@@ -1162,7 +1156,7 @@ abstract class DiagnosticoCommand {
 class GenerateDiagnosticoCommand implements DiagnosticoCommand {
   final DiagnosticoController _controller;
   final List<Checkmark> _checkmarks;
-  
+
   GenerateDiagnosticoCommand(this._controller, this._checkmarks);
 
   @override

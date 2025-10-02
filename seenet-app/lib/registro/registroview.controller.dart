@@ -1,87 +1,65 @@
-// lib/registro/registroview.controller.dart - VERSÃO FINAL CORRIGIDA
+// lib/registro/registroview.controller.dart
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../controllers/usuario_controller.dart';
 import '../services/auth_service.dart';
 
 class RegistroController extends GetxController {
+  // ========== TEXT CONTROLLERS ==========
   TextEditingController nomeInput = TextEditingController();
   TextEditingController emailInput = TextEditingController();
   TextEditingController senhaInput = TextEditingController();
-  TextEditingController tokenEmpresaController = TextEditingController();
-  
+  TextEditingController tokenEmpresaController = TextEditingController();//tokenEmpresaController
+
+  // ========== OBSERVÁVEIS ==========
   RxBool isLoading = false.obs;
-  RxString tokenEmpresa = ''.obs;
-  RxBool tokenValido = false.obs;
-  RxBool verificandoToken = false.obs;
-  RxBool registroSucesso = false.obs;
-  Rx<Map<String, dynamic>?> empresaInfo = Rx<Map<String, dynamic>?>(null);
   RxString nome = ''.obs;
   RxString email = ''.obs;
   RxString senha = ''.obs;
-  
-  // Instâncias dos serviços
+  RxString tokenEmpresa = ''.obs;//tokenEmpresa
+  RxBool tokenValido = false.obs;//tokenValido
+  RxBool verificandoToken = false.obs;//verificandoToken
+  RxBool registroSucesso = false.obs;
+  Rx<Map<String, dynamic>?> empresaInfo = Rx<Map<String, dynamic>?>(null);
+
+  // ========== DEPENDÊNCIAS ==========
   final UsuarioController usuarioController = Get.find<UsuarioController>();
-  late AuthService authService;
+  final AuthService authService = Get.find<AuthService>();
 
   @override
   void onInit() {
     super.onInit();
-    
-    try {
-      authService = Get.find<AuthService>();
-    } catch (e) {
-      print('⚠️ AuthService não encontrado, usando fallback');
-    }
 
-      // Listeners com debug
-  nomeInput.addListener(() {
-    print('🔍 Nome mudou: "${nomeInput.text}" (${nomeInput.text.trim().length} chars)');
-  });
-  
-  emailInput.addListener(() {
-    print('🔍 Email mudou: "${emailInput.text}"');
-  });
-  
-  senhaInput.addListener(() {
-    print('🔍 Senha mudou: ${senhaInput.text.length} chars');
-  });
-  
-  tokenEmpresaController.addListener(() {
-    String newValue = tokenEmpresaController.text.toUpperCase();
-    print('🔍 Token mudou: "$newValue"');
-    if (tokenEmpresa.value != newValue) {
-      tokenEmpresa.value = newValue;
-      
-      if (newValue.length >= 4) {
-        verificarToken(newValue);
-      } else {
-        empresaInfo.value = null;
-        tokenValido.value = false;
-      }
-    }
-  });
-    
-    // Listeners que atualizam observables
+    // Listeners para sincronizar os campos
     nomeInput.addListener(() {
       nome.value = nomeInput.text;
-      print('🔍 Nome mudou: "${nomeInput.text}" (${nomeInput.text.trim().length} chars)');
     });
-    
+
     emailInput.addListener(() {
       email.value = emailInput.text;
-      print('🔍 Email mudou: "${emailInput.text}"');
     });
-    
+
     senhaInput.addListener(() {
       senha.value = senhaInput.text;
-      print('🔍 Senha mudou: ${senhaInput.text.length} chars');
+    });
+
+    tokenEmpresaController.addListener(() {
+      String codigo = tokenEmpresaController.text.toUpperCase();
+      if (codigo != tokenEmpresa.value) {
+        tokenEmpresa.value = codigo;
+        if (codigo.length >= 4) {
+          verificarCodigo(codigo);
+        } else {
+          empresaInfo.value = null;
+          tokenValido.value = false;
+        }
+      }
     });
   }
 
-  // Método para verificar token da empresa
-  Future<void> verificarToken(String token) async {
-    if (token.length < 4) {
+  // ========== VERIFICAR CÓDIGO DA EMPRESA ==========
+  Future<void> verificarCodigo(String codigo) async {
+    if (codigo.length < 4) {
       empresaInfo.value = null;
       tokenValido.value = false;
       return;
@@ -89,75 +67,62 @@ class RegistroController extends GetxController {
 
     try {
       verificandoToken.value = true;
-      
-      // Simular verificação se AuthService não estiver disponível
-      if (authService == null) {
-        await Future.delayed(const Duration(seconds: 1));
-        
-        if (token == 'DEMO2024' || token == 'TECH2024') {
-          empresaInfo.value = {
-            'nome': token == 'DEMO2024' ? 'SeeNet Demo' : 'TechCorp Ltda',
-            'plano': 'profissional'
-          };
-          tokenValido.value = true;
-          print('✅ Token válido (simulado): ${empresaInfo.value!['nome']}');
-        } else {
-          empresaInfo.value = null;
-          tokenValido.value = false;
-          print('❌ Token inválido (simulado): $token');
-        }
-        return;
-      }
-      
-      final empresa = await authService.verificarCodigoEmpresa(token);
-      
+
+      final empresa = await authService.verificarCodigoEmpresa(codigo);
+
       if (empresa != null) {
         empresaInfo.value = empresa;
         tokenValido.value = true;
-        print('✅ Token válido: ${empresa['nome']}');
+        print('✅ Código válido: ${empresa['nome']}');
+
+        _showInfo(
+          '🏢 Empresa Encontrada',
+          '${empresa['nome']}\nPlano: ${empresa['plano']}\n\nVocê será cadastrado nesta empresa.',
+        );
       } else {
         empresaInfo.value = null;
         tokenValido.value = false;
-        print('❌ Token inválido: $token');
+        print('❌ Código inválido: $codigo');
       }
     } catch (e) {
       empresaInfo.value = null;
       tokenValido.value = false;
-      print('❌ Erro ao verificar token: $e');
+      print('❌ Erro ao verificar código: $e');
     } finally {
       verificandoToken.value = false;
     }
   }
 
-  // Método de registro
+  // ========== REGISTRO VIA API ==========
   Future<void> tryToRegister() async {
-    // Validações básicas
+    // Validações
     if (!_validarCampos()) return;
 
     try {
       isLoading.value = true;
-      
-      // Tentar registro via API se disponível
-      if (authService != null) {
-        bool sucesso = await authService.register(
-          nomeInput.text.trim(),
-          emailInput.text.trim(),
-          senhaInput.text,
-          tokenEmpresaController.text.trim().toUpperCase(),
+
+      // Registro via UsuarioController (que usa AuthService internamente)
+      bool sucesso = await usuarioController.registrar(
+        nomeInput.text.trim(),
+        emailInput.text.trim(),
+        senhaInput.text,
+        tokenEmpresaController.text.trim().toUpperCase(),
+      );
+
+      if (sucesso) {
+        registroSucesso.value = true;
+
+        _showSuccess(
+            '✅ Conta criada com sucesso!\n\n'
+                'Empresa: ${empresaInfo.value?['nome']}\n\n'
+                'Agora você pode fazer login com suas credenciais.'
         );
-        
-        if (sucesso) {
-        _showSuccess('Conta criada com sucesso!\n\nAgora você pode fazer login com suas credenciais.');
-          // Aguardar um pouco para mostrar a mensagem, depois redirecionar
-        Future.delayed(const Duration(seconds: 2), () {
-          Get.offAllNamed('/login');
-        });
+
+        // Aguardar e redirecionar
+        await Future.delayed(const Duration(seconds: 3));
+        Get.offAllNamed('/login');
       }
-      } else {
-        // Fallback para registro local
-        await _registroLocal();
-      }
-      
+
     } catch (e) {
       _showError('Erro ao conectar com servidor');
       print('❌ Erro no registro: $e');
@@ -166,7 +131,8 @@ class RegistroController extends GetxController {
     }
   }
 
-  // Validar campos
+  // ========== VALIDAÇÕES ==========
+
   bool _validarCampos() {
     if (nomeInput.text.trim().length < 2) {
       _showError('Nome deve ter pelo menos 2 caracteres');
@@ -184,62 +150,75 @@ class RegistroController extends GetxController {
     }
 
     if (tokenEmpresaController.text.trim().isEmpty) {
-      _showError('Token da empresa é obrigatório');
+      _showError('Código da empresa é obrigatório');
       return false;
     }
 
     if (!tokenValido.value) {
-      _showError('Token da empresa inválido');
+      _showError('Código da empresa inválido ou não verificado');
       return false;
     }
 
     return true;
   }
 
-  // Registro local (fallback)
-  Future<void> _registroLocal() async {
-    bool sucesso = await usuarioController.registrar(
-      nomeInput.text.trim(),
-      emailInput.text.trim(),
-      senhaInput.text
-    );
-
-    if (sucesso) {
-      registroSucesso.value = true;
-      _showSuccess('✅ Conta criada com sucesso!\n\nAgora você pode fazer login com suas credenciais.');
-    } else {
-      _showError('Erro ao registrar usuário. Email pode já estar em uso.');
-    }
+  bool get podeRegistrar {
+    return nome.value.trim().length >= 2 &&
+        email.value.trim().isNotEmpty &&
+        senha.value.length >= 6 &&
+        tokenEmpresa.value.length >= 4 &&
+        tokenValido.value &&
+        !isLoading.value;
   }
 
-  // Limpar campos
-  void _limparCampos() {
+  // ========== MÉTODOS AUXILIARES ==========
+
+  void limparCampos() {
     nomeInput.clear();
     emailInput.clear();
     senhaInput.clear();
     tokenEmpresaController.clear();
-    
+
+    nome.value = '';
+    email.value = '';
+    senha.value = '';
     tokenEmpresa.value = '';
-    tokenValido.value = false;
     empresaInfo.value = null;
+    tokenValido.value = false;
+    registroSucesso.value = false;
   }
 
-  // Getter reativo
-  bool get podeRegistrar {
-    return nome.value.trim().isNotEmpty &&
-          email.value.trim().isNotEmpty &&
-          senha.value.length >= 6 &&
-          tokenEmpresa.isNotEmpty &&
-          tokenValido.value &&
-          !isLoading.value;
+  void irParaLogin() {
+    Get.offAllNamed('/login');
   }
-  
 
   void login() {
-    Get.toNamed('/login');
+    Get.offAllNamed('/login');
   }
 
-  // Métodos auxiliares para snackbars
+  void criarNovaConta() {
+    registroSucesso.value = false;
+    limparCampos();
+  }
+
+  // ========== TESTES ==========
+
+  void preencherTeste() {
+    nomeInput.text = 'Técnico Teste';
+    emailInput.text = 'teste@empresa.com';
+    senhaInput.text = '123456';
+    tokenEmpresaController.text = 'DEMO2024';
+
+    nome.value = 'Técnico Teste';
+    email.value = 'teste@empresa.com';
+    senha.value = '123456';
+    tokenEmpresa.value = 'DEMO2024';
+
+    verificarCodigo('DEMO2024');
+  }
+
+  // ========== SNACKBARS ==========
+
   void _showError(String message) {
     Get.snackbar(
       'Erro',
@@ -254,14 +233,6 @@ class RegistroController extends GetxController {
     );
   }
 
-  void irParaLogin() {
-    Get.offAllNamed('/login');
-  }
-
-  void criarNovaConta() {
-    registroSucesso.value = false;
-    _limparCampos();
-}
   void _showSuccess(String message) {
     Get.snackbar(
       'Sucesso',
@@ -273,6 +244,20 @@ class RegistroController extends GetxController {
       margin: const EdgeInsets.all(20),
       borderRadius: 12,
       icon: const Icon(Icons.check_circle, color: Colors.black),
+    );
+  }
+
+  void _showInfo(String title, String message) {
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.blue,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 5),
+      margin: const EdgeInsets.all(20),
+      borderRadius: 12,
+      icon: const Icon(Icons.info, color: Colors.white),
     );
   }
 

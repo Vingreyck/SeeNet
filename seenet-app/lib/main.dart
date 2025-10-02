@@ -43,8 +43,8 @@ void main() async {
   
   // Inicializar controllers
   Get.put(ApiService());
-  Get.put(UsuarioController(), permanent: true);
   Get.put(AuthService());
+  Get.put(UsuarioController(), permanent: true);
   Get.put(CheckmarkController(), permanent: true);
   Get.put(DiagnosticoController(), permanent: true);
   Get.put(TranscricaoController(), permanent: true);

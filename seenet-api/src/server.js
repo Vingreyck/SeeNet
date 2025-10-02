@@ -65,13 +65,13 @@ async function startServer() {
     console.log('📁 Carregando rotas...');
 
     try {
-      const checkmarksRoutes = require('./routes/checkmarks');
-      app.use('/api/checkmarks', checkmarksRoutes);
+      const checkmarksRoutes = require('./routes/checkmark');
+      app.use('/api/checkmark', checkmarksRoutes);
       console.log('✅ Rotas checkmarks carregadas');
     } catch (error) {
       console.error('❌ Erro ao carregar rotas checkmarks:', error.message);
     }
-    
+
     try {
       const tenantRoutes = require('./routes/tenant');
       app.use('/api/tenant', tenantRoutes);

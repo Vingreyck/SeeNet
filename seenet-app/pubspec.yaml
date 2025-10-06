@@ -22,10 +22,6 @@ dependencies:
   
   # ✅ ADICIONADO: PostgreSQL
   postgres: ^2.4.6
-
-  # Banco de dados SQLite para mobile (mantido para compatibilidade)
-  sqflite: ^2.3.0
-  path: ^1.8.3
   
   # HTTP para ChatGPT
   http: ^1.1.0

@@ -5,17 +5,17 @@ import '../services/api_service.dart';
 
 class DiagnosticoController extends GetxController {
   final ApiService _api = ApiService.instance;
-
+  
   RxList<Diagnostico> diagnosticos = <Diagnostico>[].obs;
   RxBool isLoading = false.obs;
   RxString statusMensagem = ''.obs;
 
   // ========== GERAR DIAGNÓSTICO VIA API ==========
   Future<bool> gerarDiagnostico(
-      int avaliacaoId,
-      int categoriaId,
-      List<int> checkmarksMarcados,
-      ) async {
+    int avaliacaoId,
+    int categoriaId,
+    List<int> checkmarksMarcados,
+  ) async {
     try {
       isLoading.value = true;
       statusMensagem.value = 'Gerando diagnóstico com IA...';
@@ -28,43 +28,43 @@ class DiagnosticoController extends GetxController {
 
       if (response['success']) {
         statusMensagem.value = 'Diagnóstico gerado com sucesso!';
-
+        
         // Recarregar diagnósticos
         await carregarDiagnosticos(avaliacaoId);
-
+        
         print('✅ Diagnóstico gerado via API');
-
+        
         Get.snackbar(
           'Sucesso',
           'Diagnóstico gerado com sucesso!',
           duration: const Duration(seconds: 3),
         );
-
+        
         return true;
       } else {
         statusMensagem.value = 'Erro ao gerar diagnóstico';
-
+        
         print('❌ Erro ao gerar diagnóstico: ${response['error']}');
-
+        
         Get.snackbar(
           'Erro',
           response['error'] ?? 'Falha ao gerar diagnóstico',
           duration: const Duration(seconds: 4),
         );
-
+        
         return false;
       }
     } catch (e) {
       statusMensagem.value = 'Erro de conexão';
-
+      
       print('❌ Erro ao gerar diagnóstico: $e');
-
+      
       Get.snackbar(
         'Erro de Conexão',
         'Não foi possível gerar o diagnóstico',
         duration: const Duration(seconds: 4),
       );
-
+      
       return false;
     } finally {
       isLoading.value = false;
@@ -80,7 +80,7 @@ class DiagnosticoController extends GetxController {
 
       if (response['success']) {
         final List<dynamic> data = response['data']['diagnosticos'];
-
+        
         diagnosticos.value = data
             .map((json) => Diagnostico.fromMap(json))
             .toList();
@@ -131,7 +131,7 @@ class DiagnosticoController extends GetxController {
   }
 
   // ========== GETTERS ==========
-
+  
   bool get temDiagnosticos => diagnosticos.isNotEmpty;
 
   Diagnostico? get ultimoDiagnostico {
@@ -144,7 +144,7 @@ class DiagnosticoController extends GetxController {
   }
 
   // ========== INFO SOBRE SERVIÇO ==========
-
+  
   Map<String, String> get infoServico {
     return {
       'Nome': 'Google Gemini via API',

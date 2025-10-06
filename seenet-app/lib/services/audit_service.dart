@@ -1,9 +1,6 @@
-// lib/services/audit_service.dart
-import 'package:sqflite/sqflite.dart';
-import 'dart:convert';
-import '../models/log_sistema.dart';
-import 'database_helper.dart';
-import 'security_service.dart';
+// lib/services/audit_service.dart - VERSÃO API COMPLETA E CORRIGIDA
+import 'package:get/get.dart';
+import 'api_service.dart';
 
 /// Tipos de ações para auditoria
 enum AuditAction {
@@ -57,45 +54,19 @@ enum AuditAction {
 
   const AuditAction(this.code, this.level);
   final String code;
-  final String level; // info, warning, error
+  final String level;
 }
 
-/// Serviço de Auditoria e Logs
-class AuditService {
-  static const String _tableName = 'logs_sistema';
+/// Serviço de Auditoria via API
+class AuditService extends GetxService {
+  final ApiService _api = ApiService.instance;
   
   // Singleton
+  static AuditService? _instance;
+  static AuditService get instance => _instance ??= AuditService._();
   AuditService._();
-  static final AuditService instance = AuditService._();
   
-  /// Criar tabela de logs
-  static Future<void> createTable(Database db) async {
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS $_tableName (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        usuario_id INTEGER,
-        acao TEXT NOT NULL,
-        nivel TEXT NOT NULL,
-        tabela_afetada TEXT,
-        registro_id INTEGER,
-        dados_anteriores TEXT,
-        dados_novos TEXT,
-        ip_address TEXT,
-        user_agent TEXT,
-        detalhes TEXT,
-        data_acao TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-      )
-    ''');
-    
-    // Criar índices para performance
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_logs_usuario ON $_tableName(usuario_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_logs_acao ON $_tableName(acao)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_logs_data ON $_tableName(data_acao)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_logs_nivel ON $_tableName(nivel)');
-  }
-  
-  /// Registrar log de auditoria
+  /// Registrar log de auditoria na API
   Future<void> log({
     required AuditAction action,
     int? usuarioId,
@@ -108,45 +79,37 @@ class AuditService {
     String? userAgent,
   }) async {
     try {
-      final db = await DatabaseHelper.instance.database;
-      
-      // Preparar dados para JSON
-      String? dadosAnterioresJson;
-      String? dadosNovosJson;
-      
+      // Sanitizar dados sensíveis
       if (dadosAnteriores != null) {
-        // Remover dados sensíveis antes de salvar
         dadosAnteriores = _sanitizarDadosSensiveis(dadosAnteriores);
-        dadosAnterioresJson = json.encode(dadosAnteriores);
       }
       
       if (dadosNovos != null) {
         dadosNovos = _sanitizarDadosSensiveis(dadosNovos);
-        dadosNovosJson = json.encode(dadosNovos);
       }
       
-      await db.insert(_tableName, {
+      // Enviar para API
+      final response = await _api.post('/admin/logs', {
         'usuario_id': usuarioId,
         'acao': action.code,
         'nivel': action.level,
         'tabela_afetada': tabelaAfetada,
         'registro_id': registroId,
-        'dados_anteriores': dadosAnterioresJson,
-        'dados_novos': dadosNovosJson,
+        'dados_anteriores': dadosAnteriores,
+        'dados_novos': dadosNovos,
         'detalhes': detalhes,
         'ip_address': ipAddress ?? 'N/A',
         'user_agent': userAgent ?? 'Flutter App',
-        'data_acao': DateTime.now().toIso8601String(),
       });
       
-      // Log no console em desenvolvimento
-      _logConsole(action, usuarioId, detalhes);
-      
-      // Verificar atividades suspeitas
-      await _verificarAtividadeSuspeita(usuarioId, action);
+      if (response['success']) {
+        _logConsole(action, usuarioId, detalhes);
+      } else {
+        print('⚠️ Falha ao registrar auditoria: ${response['error']}');
+      }
       
     } catch (e) {
-      print('❌ Erro ao registrar log de auditoria: $e');
+      print('⚠️ Erro ao registrar log: $e');
     }
   }
   
@@ -162,8 +125,8 @@ class AuditService {
       action: sucesso ? AuditAction.login : AuditAction.loginFailed,
       usuarioId: usuarioId,
       detalhes: sucesso 
-          ? 'Login bem-sucedido para: ${SecurityService.maskSensitiveData(email)}'
-          : 'Falha no login para: ${SecurityService.maskSensitiveData(email)}. Motivo: $motivo',
+          ? 'Login bem-sucedido para: ${_maskEmail(email)}'
+          : 'Falha no login para: ${_maskEmail(email)}. Motivo: $motivo',
       ipAddress: ipAddress,
     );
   }
@@ -171,7 +134,7 @@ class AuditService {
   /// Registrar mudança de senha
   Future<void> logPasswordChange({
     required int usuarioId,
-    required String tipo, // 'change' ou 'reset'
+    required String tipo,
     String? adminId,
   }) async {
     await log(
@@ -185,7 +148,7 @@ class AuditService {
   
   /// Registrar CRUD de usuários
   Future<void> logUserChange({
-    required String operacao, // create, update, delete
+    required String operacao,
     required int? usuarioId,
     required int? operadorId,
     Map<String, dynamic>? dadosAnteriores,
@@ -216,8 +179,8 @@ class AuditService {
     );
   }
   
-  /// Buscar logs com filtros
-  Future<List<LogSistema>> buscarLogs({
+  /// Buscar logs da API com filtros
+  Future<List<Map<String, dynamic>>> buscarLogs({
     int? usuarioId,
     String? acao,
     String? nivel,
@@ -227,200 +190,133 @@ class AuditService {
     int offset = 0,
   }) async {
     try {
-      final db = await DatabaseHelper.instance.database;
+      // Construir URL com query string manualmente
+      List<String> params = [];
+      params.add('limite=$limite');
+      params.add('offset=$offset');
       
-      String query = 'SELECT * FROM $_tableName WHERE 1=1';
-      List<dynamic> args = [];
+      if (usuarioId != null) params.add('usuario_id=$usuarioId');
+      if (acao != null) params.add('acao=$acao');
+      if (nivel != null) params.add('nivel=$nivel');
+      if (dataInicio != null) params.add('data_inicio=${dataInicio.toIso8601String()}');
+      if (dataFim != null) params.add('data_fim=${dataFim.toIso8601String()}');
       
-      if (usuarioId != null) {
-        query += ' AND usuario_id = ?';
-        args.add(usuarioId);
+      String endpoint = '/admin/logs?${params.join('&')}';
+      
+      final response = await _api.get(endpoint);
+      
+      if (response['success']) {
+        List<dynamic> logsData = response['data']['logs'] ?? [];
+        return List<Map<String, dynamic>>.from(logsData);
       }
       
-      if (acao != null) {
-        query += ' AND acao = ?';
-        args.add(acao);
-      }
-      
-      if (nivel != null) {
-        query += ' AND nivel = ?';
-        args.add(nivel);
-      }
-      
-      if (dataInicio != null) {
-        query += ' AND data_acao >= ?';
-        args.add(dataInicio.toIso8601String());
-      }
-      
-      if (dataFim != null) {
-        query += ' AND data_acao <= ?';
-        args.add(dataFim.toIso8601String());
-      }
-      
-      query += ' ORDER BY data_acao DESC LIMIT ? OFFSET ?';
-      args.addAll([limite, offset]);
-      
-      List<Map<String, dynamic>> results = await db.rawQuery(query, args);
-      
-      return results.map((map) => LogSistema.fromMap(map)).toList();
-      
+      print('⚠️ Erro ao buscar logs: ${response['error']}');
+      return [];
     } catch (e) {
       print('❌ Erro ao buscar logs: $e');
       return [];
     }
   }
   
-  /// Gerar relatório de auditoria
+  /// Gerar relatório de auditoria via API
   Future<Map<String, dynamic>> gerarRelatorio({
     DateTime? dataInicio,
     DateTime? dataFim,
   }) async {
     try {
-      final db = await DatabaseHelper.instance.database;
+      List<String> params = [];
       
-      String whereClause = '';
-      List<dynamic> whereArgs = [];
+      if (dataInicio != null) params.add('data_inicio=${dataInicio.toIso8601String()}');
+      if (dataFim != null) params.add('data_fim=${dataFim.toIso8601String()}');
       
-      if (dataInicio != null && dataFim != null) {
-        whereClause = 'WHERE data_acao BETWEEN ? AND ?';
-        whereArgs = [dataInicio.toIso8601String(), dataFim.toIso8601String()];
+      String endpoint = '/admin/stats';
+      if (params.isNotEmpty) {
+        endpoint += '?${params.join('&')}';
       }
       
-      // Total por ação
-      var totalPorAcao = await db.rawQuery('''
-        SELECT acao, COUNT(*) as total 
-        FROM $_tableName 
-        $whereClause 
-        GROUP BY acao 
-        ORDER BY total DESC
-      ''', whereArgs);
+      final response = await _api.get(endpoint);
       
-      // Total por nível
-      var totalPorNivel = await db.rawQuery('''
-        SELECT nivel, COUNT(*) as total 
-        FROM $_tableName 
-        $whereClause 
-        GROUP BY nivel
-      ''', whereArgs);
+      if (response['success']) {
+        return response['data'];
+      }
       
-      // Usuários mais ativos
-      var usuariosMaisAtivos = await db.rawQuery('''
-        SELECT u.nome, u.email, COUNT(l.id) as total_acoes
-        FROM $_tableName l
-        LEFT JOIN usuarios u ON l.usuario_id = u.id
-        $whereClause
-        ${whereClause.isEmpty ? 'WHERE' : 'AND'} l.usuario_id IS NOT NULL
-        GROUP BY l.usuario_id
-        ORDER BY total_acoes DESC
-        LIMIT 10
-      ''', whereArgs);
-      
-      // Ações suspeitas
-      var acoesSuspeitas = await db.rawQuery('''
-        SELECT * FROM $_tableName 
-        WHERE nivel IN ('warning', 'error')
-        ${whereClause.isEmpty ? '' : 'AND'} $whereClause
-        ORDER BY data_acao DESC
-        LIMIT 50
-      ''', whereArgs);
-      
-      return {
-        'periodo': {
-          'inicio': dataInicio?.toIso8601String() ?? 'Início',
-          'fim': dataFim?.toIso8601String() ?? 'Agora',
-        },
-        'resumo': {
-          'total_logs': totalPorAcao.fold(0, (sum, item) => sum + (item['total'] as int)),
-          'por_acao': totalPorAcao,
-          'por_nivel': totalPorNivel,
-        },
-        'usuarios_ativos': usuariosMaisAtivos,
-        'acoes_suspeitas': acoesSuspeitas,
-      };
-      
+      return {'erro': response['error'] ?? 'Falha ao gerar relatório'};
     } catch (e) {
       print('❌ Erro ao gerar relatório: $e');
-      return {};
+      return {'erro': e.toString()};
     }
   }
   
-  /// Limpar logs antigos
+  /// Limpar logs antigos (via API)
   Future<void> limparLogsAntigos({int diasParaManter = 90}) async {
     try {
-      final db = await DatabaseHelper.instance.database;
-      final dataLimite = DateTime.now().subtract(Duration(days: diasParaManter));
+      String endpoint = '/admin/logs/cleanup?dias=$diasParaManter';
       
-      int deletados = await db.delete(
-        _tableName,
-        where: 'data_acao < ? AND nivel = ?',
-        whereArgs: [dataLimite.toIso8601String(), 'info'],
-      );
+      final response = await _api.delete(endpoint);
       
-      await log(
-        action: AuditAction.dataExported,
-        detalhes: 'Limpeza automática: $deletados logs antigos removidos',
-      );
-      
-      print('🧹 $deletados logs antigos removidos');
-      
+      if (response['success']) {
+        print('🧹 Logs antigos removidos');
+        
+        await log(
+          action: AuditAction.dataExported,
+          detalhes: 'Limpeza automática: logs com mais de $diasParaManter dias removidos',
+        );
+      }
     } catch (e) {
       print('❌ Erro ao limpar logs: $e');
     }
   }
   
-  /// Exportar logs para análise
+  /// Exportar logs via API
   Future<String> exportarLogs({
     DateTime? dataInicio,
     DateTime? dataFim,
-    String formato = 'json', // json ou csv
+    String formato = 'json',
   }) async {
     try {
-      List<LogSistema> logs = await buscarLogs(
-        dataInicio: dataInicio,
-        dataFim: dataFim,
-        limite: 10000,
-      );
+      List<String> params = [];
+      params.add('formato=$formato');
       
-      if (formato == 'csv') {
-        // Cabeçalho CSV
-        StringBuffer csv = StringBuffer();
-        csv.writeln('ID,Usuario ID,Acao,Nivel,Tabela,Registro ID,Detalhes,IP,Data');
-        
-        // Dados
-        for (var log in logs) {
-          csv.writeln(
-            '${log.id},'
-            '${log.usuarioId ?? ""},'
-            '"${log.acao}",'
-            '"${log.nivel ?? ""}",'
-            '"${log.tabelaAfetada ?? ""}",'
-            '${log.registroId ?? ""},'
-            '"${log.detalhes ?? ""}",'
-            '"${log.ipAddress ?? ""}",'
-            '"${log.dataAcao ?? ""}"'
-          );
-        }
-        
-        return csv.toString();
-      } else {
-        // JSON
-        List<Map<String, dynamic>> jsonLogs = logs.map((l) => l.toMap()).toList();
-        return json.encode(jsonLogs);
+      if (dataInicio != null) params.add('data_inicio=${dataInicio.toIso8601String()}');
+      if (dataFim != null) params.add('data_fim=${dataFim.toIso8601String()}');
+      
+      String endpoint = '/admin/logs/export?${params.join('&')}';
+      
+      final response = await _api.get(endpoint);
+      
+      if (response['success']) {
+        return response['data']['export'] ?? '';
       }
       
+      return '';
     } catch (e) {
       print('❌ Erro ao exportar logs: $e');
       return '';
     }
   }
   
+  /// Obter estatísticas rápidas
+  Future<Map<String, dynamic>> getEstatisticasRapidas() async {
+    try {
+      final response = await _api.get('/admin/stats/quick');
+      
+      if (response['success']) {
+        return response['data'];
+      }
+      
+      return {'logs_24h': 0, 'acoes_criticas': 0};
+    } catch (e) {
+      print('❌ Erro ao obter estatísticas: $e');
+      return {'logs_24h': 0, 'acoes_criticas': 0};
+    }
+  }
+  
   // ===== MÉTODOS PRIVADOS =====
   
-  /// Sanitizar dados sensíveis antes de salvar
+  /// Sanitizar dados sensíveis
   Map<String, dynamic> _sanitizarDadosSensiveis(Map<String, dynamic> dados) {
     Map<String, dynamic> dadosSanitizados = Map.from(dados);
     
-    // Lista de campos sensíveis
     const camposSensiveis = ['senha', 'password', 'token', 'api_key', 'secret'];
     
     for (String campo in camposSensiveis) {
@@ -429,17 +325,31 @@ class AuditService {
       }
     }
     
-    // Mascarar emails
     if (dadosSanitizados.containsKey('email')) {
-      dadosSanitizados['email'] = SecurityService.maskSensitiveData(
-        dadosSanitizados['email'].toString()
-      );
+      dadosSanitizados['email'] = _maskEmail(dadosSanitizados['email'].toString());
     }
     
     return dadosSanitizados;
   }
   
-  /// Log no console para desenvolvimento
+  /// Mascarar email
+  String _maskEmail(String email) {
+    if (email.length <= 4) return '***';
+    
+    int atIndex = email.indexOf('@');
+    if (atIndex <= 0) return '***';
+    
+    String username = email.substring(0, atIndex);
+    String domain = email.substring(atIndex);
+    
+    if (username.length <= 2) {
+      return '***$domain';
+    }
+    
+    return '${username.substring(0, 2)}***$domain';
+  }
+  
+  /// Log no console
   void _logConsole(AuditAction action, int? usuarioId, String? detalhes) {
     String emoji;
     switch (action.level) {
@@ -456,97 +366,22 @@ class AuditService {
     print('$emoji AUDIT [${action.code}] User: $usuarioId - $detalhes');
   }
   
-  /// Verificar padrões suspeitos
-  Future<void> _verificarAtividadeSuspeita(int? usuarioId, AuditAction action) async {
-    if (usuarioId == null) return;
-    
-    try {
-      final db = await DatabaseHelper.instance.database;
-      
-      // Verificar múltiplas falhas de login
-      if (action == AuditAction.loginFailed) {
-        var falhas = await db.rawQuery('''
-          SELECT COUNT(*) as total 
-          FROM $_tableName 
-          WHERE usuario_id = ? 
-            AND acao = ? 
-            AND data_acao > ?
-        ''', [
-          usuarioId,
-          AuditAction.loginFailed.code,
-          DateTime.now().subtract(const Duration(minutes: 15)).toIso8601String()
-        ]);
-        
-        int totalFalhas = falhas.first['total'] as int;
-        if (totalFalhas >= 5) {
-          await log(
-            action: AuditAction.suspiciousActivity,
-            usuarioId: usuarioId,
-            detalhes: 'Múltiplas falhas de login detectadas: $totalFalhas tentativas em 15 minutos',
-          );
-        }
-      }
-      
-      // Verificar ações administrativas fora do horário
-      if (action.code.contains('DELETE') || action.code.contains('RESET')) {
-        int hora = DateTime.now().hour;
-        if (hora < 6 || hora > 22) {
-          await log(
-            action: AuditAction.suspiciousActivity,
-            usuarioId: usuarioId,
-            detalhes: 'Ação administrativa fora do horário comercial: ${action.code}',
-          );
-        }
-      }
-      
-    } catch (e) {
-      print('❌ Erro ao verificar atividade suspeita: $e');
-    }
+  /// Info sobre o serviço
+  Map<String, String> get infoServico {
+    return {
+      'Nome': 'Auditoria via API',
+      'Modo': 'Produção (PostgreSQL/Railway)',
+      'Storage': 'Banco remoto',
+      'Status': 'Ativo',
+    };
   }
   
-  /// Obter estatísticas rápidas
-  Future<Map<String, dynamic>> getEstatisticasRapidas() async {
-    try {
-      final db = await DatabaseHelper.instance.database;
-      
-      // Logs das últimas 24h
-      var logs24h = await db.rawQuery('''
-        SELECT COUNT(*) as total 
-        FROM $_tableName 
-        WHERE data_acao > ?
-      ''', [DateTime.now().subtract(const Duration(hours: 24)).toIso8601String()]);
-      
-      // Ações críticas hoje
-      var acoesCriticas = await db.rawQuery('''
-        SELECT COUNT(*) as total 
-        FROM $_tableName 
-        WHERE nivel IN ('warning', 'error') 
-          AND data_acao > ?
-      ''', [DateTime.now().subtract(const Duration(hours: 24)).toIso8601String()]);
-      
-      return {
-        'logs_24h': logs24h.first['total'],
-        'acoes_criticas': acoesCriticas.first['total'],
-      };
-      
-    } catch (e) {
-      print('❌ Erro ao obter estatísticas: $e');
-      return {'logs_24h': 0, 'acoes_criticas': 0};
-    }
+  /// Debug info
+  void debugInfo() {
+    print('\n🔍 === AUDITORIA DEBUG ===');
+    print('📡 Modo: API (Railway PostgreSQL)');
+    print('🔐 Sanitização: Ativa');
+    print('📊 Console logs: Ativo');
+    print('============================\n');
   }
-}
-
-// Extension para adicionar nível ao LogSistema
-extension LogSistemaExtension on LogSistema {
-  String? get nivel {
-    // Extrair nível baseado na ação
-    for (var action in AuditAction.values) {
-      if (action.code == acao) {
-        return action.level;
-      }
-    }
-    return 'info';
-  }
-  
-  String? get detalhes => dadosNovos; // Usar dadosNovos como detalhes temporariamente
 }

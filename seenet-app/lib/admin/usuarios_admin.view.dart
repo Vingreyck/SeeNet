@@ -1,11 +1,8 @@
-// lib/admin/usuarios_admin.view.dart
+// lib/admin/usuarios_admin.view.dart - VERSÃO 100% API
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/usuario.dart';
-import '../services/database_helper.dart';
-import 'package:crypto/crypto.dart';
 import '../services/api_service.dart';
-import 'dart:convert';
 
 class UsuariosAdminView extends StatefulWidget {
   const UsuariosAdminView({super.key});
@@ -15,6 +12,8 @@ class UsuariosAdminView extends StatefulWidget {
 }
 
 class _UsuariosAdminViewState extends State<UsuariosAdminView> {
+  final ApiService _api = ApiService.instance;
+  
   List<Usuario> usuarios = [];
   bool isLoading = true;
 
@@ -26,15 +25,12 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
 
   Future<void> carregarUsuarios() async {
     try {
-      setState(() {
-        isLoading = true;
-      });
+      setState(() => isLoading = true);
 
-      // Buscar usuários da API
-      final apiService = Get.find<ApiService>();
-      final response = await apiService.get('/auth/debug/usuarios', requireAuth: false);
+      // ✅ Buscar usuários da API
+      final response = await _api.get('/admin/users');
       
-      if (response['success'] && response['data'] != null) {
+      if (response['success']) {
         List<dynamic> usuariosData = response['data']['usuarios'];
         
         usuarios = usuariosData.map((userData) => Usuario(
@@ -43,56 +39,24 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
           email: userData['email'],
           senha: '', // Não vem da API
           tipoUsuario: userData['tipo_usuario'],
-          ativo: userData['ativo'] == 1,
+          ativo: userData['ativo'] == 1 || userData['ativo'] == true,
           dataCriacao: DateTime.tryParse(userData['data_criacao'] ?? '') ?? DateTime.now(),
         )).toList();
         
         print('📊 ${usuarios.length} usuários carregados da API');
       } else {
-        print('❌ Erro na resposta da API: ${response['error']}');
-        Get.snackbar(
-          'Erro',
-          'Erro ao conectar com servidor: ${response['error']}',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        
-        // Fallback para SQLite local se API falhar
-        await _carregarUsuariosLocal();
+        throw Exception(response['error'] ?? 'Erro desconhecido');
       }
     } catch (e) {
-      print('❌ Erro ao carregar usuários da API: $e');
-      
-      // Fallback para SQLite local
-      await _carregarUsuariosLocal();
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
-
-  // Método fallback para SQLite local
-  Future<void> _carregarUsuariosLocal() async {
-    try {
-      print('⚠️ Usando SQLite local como fallback');
-      
-      final db = await DatabaseHelper.instance.database;
-      List<Map<String, dynamic>> results = await db.query(
-        'usuarios',
-        orderBy: 'data_criacao DESC',
-      );
-
-      usuarios = results.map((map) => Usuario.fromMap(map)).toList();
-      print('📊 ${usuarios.length} usuários carregados do SQLite local');
-    } catch (e) {
-      print('❌ Erro no fallback SQLite: $e');
+      print('❌ Erro ao carregar usuários: $e');
       Get.snackbar(
         'Erro',
-        'Erro ao carregar usuários',
+        'Erro ao conectar com servidor',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
@@ -112,19 +76,12 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       ),
       backgroundColor: const Color(0xFF1A1A1A),
       body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF00FF88),
-              ),
-            )
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF00FF88)))
           : usuarios.isEmpty
               ? const Center(
                   child: Text(
                     'Nenhum usuário encontrado',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                 )
               : Column(
@@ -137,11 +94,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildStatCard(
-                            'Total',
-                            usuarios.length.toString(),
-                            Colors.blue,
-                          ),
+                          _buildStatCard('Total', usuarios.length.toString(), Colors.blue),
                           _buildStatCard(
                             'Técnicos',
                             usuarios.where((u) => u.tipoUsuario == 'tecnico').length.toString(),
@@ -193,10 +146,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         ),
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
         ),
       ],
     );
@@ -208,9 +158,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       color: const Color(0xFF2A2A2A),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: usuario.isAdmin 
-              ? Colors.orange 
-              : const Color(0xFF00FF88),
+          backgroundColor: usuario.isAdmin ? Colors.orange : const Color(0xFF00FF88),
           child: Icon(
             usuario.isAdmin ? Icons.admin_panel_settings : Icons.person,
             color: Colors.black,
@@ -218,18 +166,12 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         ),
         title: Text(
           usuario.nome,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              usuario.email,
-              style: const TextStyle(color: Colors.white70),
-            ),
+            Text(usuario.email, style: const TextStyle(color: Colors.white70)),
             const SizedBox(height: 4),
             Row(
               children: [
@@ -349,9 +291,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
             ),
           ],
         ),
-        onTap: () {
-          _mostrarDetalhesUsuario(usuario);
-        },
+        onTap: () => _mostrarDetalhesUsuario(usuario),
       ),
     );
   }
@@ -361,10 +301,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text(
-          'Detalhes do Usuário',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Detalhes do Usuário', style: TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,17 +313,12 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
             _buildDetailRow('Status', usuario.ativo ? 'Ativo' : 'Inativo'),
             if (usuario.dataCriacao != null)
               _buildDetailRow('Criado em', _formatarDataCompleta(usuario.dataCriacao!)),
-            if (usuario.dataAtualizacao != null)
-              _buildDetailRow('Atualizado em', _formatarDataCompleta(usuario.dataAtualizacao!)),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Fechar',
-              style: TextStyle(color: Color(0xFF00FF88)),
-            ),
+            child: const Text('Fechar', style: TextStyle(color: Color(0xFF00FF88))),
           ),
         ],
       ),
@@ -403,34 +335,23 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
             width: 80,
             child: Text(
               '$label:',
-              style: const TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(color: Colors.white),
-            ),
+            child: Text(value, style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  String _formatarData(DateTime data) {
-    return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
-  }
-
   String _formatarDataCompleta(DateTime data) {
     return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year} às ${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
   }
 
-  // ========== MÉTODOS DE GERENCIAMENTO DE USUÁRIOS (MIGRADOS PARA API) ==========
+  // ========== MÉTODOS COM API ==========
 
-  // Editar usuário
   void _editarUsuario(Usuario usuario) {
     final TextEditingController nomeController = TextEditingController(text: usuario.nome);
     final TextEditingController emailController = TextEditingController(text: usuario.email);
@@ -443,70 +364,48 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       builder: (context) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
           backgroundColor: const Color(0xFF2A2A2A),
-          title: const Text(
-            'Editar Usuário',
-            style: TextStyle(color: Colors.white),
-          ),
+          title: const Text('Editar Usuário', style: TextStyle(color: Colors.white)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Campo Nome
                 TextField(
                   controller: nomeController,
                   style: const TextStyle(color: Colors.white),
                   decoration: const InputDecoration(
                     labelText: 'Nome',
                     labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white54),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF00FF88)),
-                    ),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
                   ),
                 ),
                 const SizedBox(height: 16),
-                
-                // Campo Email
                 TextField(
                   controller: emailController,
                   style: const TextStyle(color: Colors.white),
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white54),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF00FF88)),
-                    ),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
                   ),
                 ),
                 const SizedBox(height: 16),
-                
-                // Campo Nova Senha
                 TextField(
                   controller: senhaController,
                   style: const TextStyle(color: Colors.white),
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'Nova Senha',
+                    labelText: 'Nova Senha (opcional)',
                     labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white54),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF00FF88)),
-                    ),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
                     helperText: 'Deixe vazio para manter a senha atual',
                     helperStyle: TextStyle(color: Colors.white54, fontSize: 12),
                     prefixIcon: Icon(Icons.lock, color: Colors.white54),
                   ),
                 ),
                 const SizedBox(height: 16),
-                
-                // Dropdown Tipo
                 DropdownButtonFormField<String>(
                   value: tipoSelecionado,
                   style: const TextStyle(color: Colors.white),
@@ -514,40 +413,27 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
                   decoration: const InputDecoration(
                     labelText: 'Tipo de Usuário',
                     labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white54),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF00FF88)),
-                    ),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
                   ),
                   items: const [
                     DropdownMenuItem(value: 'tecnico', child: Text('Técnico')),
                     DropdownMenuItem(value: 'administrador', child: Text('Administrador')),
                   ],
                   onChanged: (value) {
-                    setStateDialog(() {
-                      tipoSelecionado = value!;
-                    });
+                    setStateDialog(() => tipoSelecionado = value!);
                   },
                 ),
                 const SizedBox(height: 16),
-                
-                // Switch Ativo
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Usuário Ativo',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
+                    const Text('Usuário Ativo', style: TextStyle(color: Colors.white, fontSize: 16)),
                     Switch(
                       value: ativoSelecionado,
                       activeColor: const Color(0xFF00FF88),
                       onChanged: (value) {
-                        setStateDialog(() {
-                          ativoSelecionado = value;
-                        });
+                        setStateDialog(() => ativoSelecionado = value);
                       },
                     ),
                   ],
@@ -558,10 +444,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Cancelar',
-                style: TextStyle(color: Colors.white54),
-              ),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -587,12 +470,8 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     );
   }
 
-  // Salvar edição do usuário (MIGRADO PARA API)
   Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String novaSenha, String tipo, bool ativo) async {
     try {
-      final apiService = Get.find<ApiService>();
-      
-      // Preparar dados para envio
       Map<String, dynamic> dadosAtualizacao = {
         'nome': nome,
         'email': email.toLowerCase(),
@@ -600,111 +479,31 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         'ativo': ativo,
       };
 
-      // Se nova senha foi fornecida, incluir
       if (novaSenha.isNotEmpty) {
         dadosAtualizacao['senha'] = novaSenha;
       }
       
-      // Enviar para API
-      final response = await apiService.put('/auth/usuarios/$id', dadosAtualizacao);
+      final response = await _api.put('/admin/users/$id', dadosAtualizacao);
       
       if (response['success']) {
-        String mensagemSucesso = 'Usuário atualizado com sucesso!';
+        String mensagem = 'Usuário atualizado com sucesso!';
         if (novaSenha.isNotEmpty) {
-          mensagemSucesso += '\n🔐 Senha alterada';
+          mensagem += '\n🔐 Senha alterada';
         }
 
-        Get.snackbar(
-          'Sucesso',
-          mensagemSucesso,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-
+        Get.snackbar('Sucesso', mensagem,
+          backgroundColor: Colors.green, colorText: Colors.white);
         await carregarUsuarios();
       } else {
-        String mensagem = response['error'] ?? 'Erro ao atualizar usuário';
-        
-        Get.snackbar(
-          'Erro',
-          mensagem,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
+        throw Exception(response['error']);
       }
     } catch (e) {
-      print('❌ Erro ao editar usuário via API: $e');
-      
-      // Fallback para SQLite se API falhar
-      await _salvarEdicaoUsuarioLocal(id, nome, email, novaSenha, tipo, ativo);
+      print('❌ Erro ao editar usuário: $e');
+      Get.snackbar('Erro', 'Erro ao atualizar usuário',
+        backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 
-  // Fallback para SQLite local
-  Future<void> _salvarEdicaoUsuarioLocal(int id, String nome, String email, String novaSenha, String tipo, bool ativo) async {
-    try {
-      print('⚠️ Usando SQLite local para edição - fallback');
-      
-      final db = await DatabaseHelper.instance.database;
-      
-      Map<String, dynamic> dadosAtualizacao = {
-        'nome': nome,
-        'email': email.toLowerCase(),
-        'tipo_usuario': tipo,
-        'ativo': ativo ? 1 : 0,
-        'data_atualizacao': DateTime.now().toIso8601String(),
-      };
-
-      if (novaSenha.isNotEmpty) {
-        dadosAtualizacao['senha'] = _hashPassword(novaSenha);
-        print('✅ Senha será atualizada para usuário ID: $id');
-      }
-      
-      await db.update(
-        'usuarios',
-        dadosAtualizacao,
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-
-      String mensagemSucesso = 'Usuário atualizado com sucesso! (Offline)';
-      if (novaSenha.isNotEmpty) {
-        mensagemSucesso += '\n🔐 Senha alterada';
-      }
-
-      Get.snackbar(
-        'Sucesso',
-        mensagemSucesso,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-
-      await carregarUsuarios();
-    } catch (e) {
-      print('❌ Erro no fallback SQLite para edição: $e');
-      
-      String mensagem = 'Erro ao atualizar usuário';
-      if (e.toString().contains('UNIQUE constraint failed')) {
-        mensagem = 'Este email já está em uso por outro usuário';
-      }
-      
-      Get.snackbar(
-        'Erro',
-        mensagem,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    }
-  }
-
-  // Método para hash de senha
-  String _hashPassword(String password) {
-    var bytes = utf8.encode(password);
-    var digest = sha256.convert(bytes);
-    return digest.toString();
-  }
-
-  // Resetar senha do usuário
   void _resetarSenhaUsuario(Usuario usuario) {
     final TextEditingController novaSenhaController = TextEditingController();
     final TextEditingController confirmarSenhaController = TextEditingController();
@@ -713,10 +512,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF2A2A2A),
-        title: Text(
-          'Resetar Senha - ${usuario.nome}',
-          style: const TextStyle(color: Colors.white),
-        ),
+        title: Text('Resetar Senha - ${usuario.nome}', style: const TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -726,8 +522,6 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            
-            // Campo Nova Senha
             TextField(
               controller: novaSenhaController,
               style: const TextStyle(color: Colors.white),
@@ -735,18 +529,12 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
               decoration: const InputDecoration(
                 labelText: 'Nova Senha',
                 labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white54),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF00FF88)),
-                ),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
                 prefixIcon: Icon(Icons.lock, color: Colors.white54),
               ),
             ),
             const SizedBox(height: 16),
-            
-            // Campo Confirmar Senha
             TextField(
               controller: confirmarSenhaController,
               style: const TextStyle(color: Colors.white),
@@ -754,12 +542,8 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
               decoration: const InputDecoration(
                 labelText: 'Confirmar Nova Senha',
                 labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white54),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF00FF88)),
-                ),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
                 prefixIcon: Icon(Icons.lock_outline, color: Colors.white54),
               ),
             ),
@@ -768,40 +552,25 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: Colors.white54),
-            ),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
             onPressed: () async {
               if (novaSenhaController.text.isEmpty) {
-                Get.snackbar(
-                  'Erro',
-                  'Nova senha não pode ser vazia',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
+                Get.snackbar('Erro', 'Nova senha não pode ser vazia',
+                  backgroundColor: Colors.red, colorText: Colors.white);
                 return;
               }
 
               if (novaSenhaController.text.length < 6) {
-                Get.snackbar(
-                  'Erro',
-                  'Nova senha deve ter pelo menos 6 caracteres',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
+                Get.snackbar('Erro', 'Nova senha deve ter pelo menos 6 caracteres',
+                  backgroundColor: Colors.red, colorText: Colors.white);
                 return;
               }
 
               if (novaSenhaController.text != confirmarSenhaController.text) {
-                Get.snackbar(
-                  'Erro',
-                  'Senhas não coincidem',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
+                Get.snackbar('Erro', 'Senhas não coincidem',
+                  backgroundColor: Colors.red, colorText: Colors.white);
                 return;
               }
 
@@ -819,12 +588,9 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     );
   }
 
-  // Confirmar reset de senha (MIGRADO PARA API)
   Future<void> _confirmarResetarSenha(int userId, String novaSenha) async {
     try {
-      final apiService = Get.find<ApiService>();
-      
-      final response = await apiService.put('/auth/usuarios/$userId/resetar-senha', {
+      final response = await _api.put('/admin/users/$userId/reset-password', {
         'nova_senha': novaSenha,
       });
       
@@ -840,49 +606,12 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         throw Exception(response['error']);
       }
     } catch (e) {
-      print('❌ Erro ao resetar senha via API: $e');
-      
-      // Fallback para SQLite
-      await _confirmarResetarSenhaLocal(userId, novaSenha);
+      print('❌ Erro ao resetar senha: $e');
+      Get.snackbar('Erro', 'Erro ao resetar senha',
+        backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 
-  // Fallback para reset de senha no SQLite
-  Future<void> _confirmarResetarSenhaLocal(int userId, String novaSenha) async {
-    try {
-      print('⚠️ Usando SQLite local para reset de senha - fallback');
-      
-      final db = await DatabaseHelper.instance.database;
-      
-      await db.update(
-        'usuarios',
-        {
-          'senha': _hashPassword(novaSenha),
-          'data_atualizacao': DateTime.now().toIso8601String(),
-        },
-        where: 'id = ?',
-        whereArgs: [userId],
-      );
-
-      Get.snackbar(
-        'Sucesso',
-        '🔐 Senha resetada com sucesso! (Offline)\nO usuário deve fazer login com a nova senha.',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 4),
-      );
-    } catch (e) {
-      print('❌ Erro no fallback SQLite para reset de senha: $e');
-      Get.snackbar(
-        'Erro',
-        'Erro ao resetar senha',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    }
-  }
-
-  // Alternar status do usuário
   Future<void> _alternarStatusUsuario(Usuario usuario) async {
     bool novoStatus = !usuario.ativo;
     
@@ -903,10 +632,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: Colors.white54),
-            ),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -924,12 +650,9 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     );
   }
 
-  // Atualizar status do usuário (MIGRADO PARA API)
   Future<void> _atualizarStatusUsuario(int id, bool ativo) async {
     try {
-      final apiService = Get.find<ApiService>();
-      
-      final response = await apiService.put('/auth/usuarios/$id/status', {
+      final response = await _api.put('/admin/users/$id/status', {
         'ativo': ativo,
       });
       
@@ -940,65 +663,23 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
           backgroundColor: ativo ? Colors.green : Colors.orange,
           colorText: Colors.white,
         );
-
         await carregarUsuarios();
       } else {
         throw Exception(response['error']);
       }
     } catch (e) {
-      print('❌ Erro ao atualizar status via API: $e');
-      
-      // Fallback para SQLite
-      await _atualizarStatusUsuarioLocal(id, ativo);
+      print('❌ Erro ao atualizar status: $e');
+      Get.snackbar('Erro', 'Erro ao atualizar status do usuário',
+        backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 
-  // Fallback para atualizar status no SQLite
-  Future<void> _atualizarStatusUsuarioLocal(int id, bool ativo) async {
-    try {
-      print('⚠️ Usando SQLite local para atualizar status - fallback');
-      
-      final db = await DatabaseHelper.instance.database;
-      
-      await db.update(
-        'usuarios',
-        {
-          'ativo': ativo ? 1 : 0,
-          'data_atualizacao': DateTime.now().toIso8601String(),
-        },
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-
-      Get.snackbar(
-        'Sucesso',
-        'Status do usuário ${ativo ? 'ativado' : 'desativado'} com sucesso! (Offline)',
-        backgroundColor: ativo ? Colors.green : Colors.orange,
-        colorText: Colors.white,
-      );
-
-      await carregarUsuarios();
-    } catch (e) {
-      print('❌ Erro no fallback SQLite para atualizar status: $e');
-      Get.snackbar(
-        'Erro',
-        'Erro ao atualizar status do usuário',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    }
-  }
-
-  // Remover usuário
   void _removerUsuario(Usuario usuario) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text(
-          'Remover Usuário',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Remover Usuário', style: TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1018,24 +699,15 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '👤 ${usuario.nome}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '📧 ${usuario.email}',
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  Text(
-                    '👔 ${usuario.tipoUsuario}',
-                    style: const TextStyle(color: Colors.white70),
-                  ),
+                  Text('👤 ${usuario.nome}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text('📧 ${usuario.email}', style: const TextStyle(color: Colors.white70)),
+                  Text('👔 ${usuario.tipoUsuario}', style: const TextStyle(color: Colors.white70)),
                 ],
               ),
             ),
             const SizedBox(height: 16),
             const Text(
-              '⚠️ Esta ação não pode ser desfeita!\n\nTodos os dados relacionados a este usuário (avaliações, diagnósticos, etc.) serão perdidos.',
+              '⚠️ Esta ação não pode ser desfeita!',
               style: TextStyle(color: Colors.red, fontSize: 12),
             ),
           ],
@@ -1043,10 +715,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: Colors.white54),
-            ),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1064,62 +733,21 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     );
   }
 
-  // Confirmar remoção do usuário (MIGRADO PARA API)
   Future<void> _confirmarRemocaoUsuario(int id) async {
     try {
-      final apiService = Get.find<ApiService>();
-      
-      final response = await apiService.delete('/auth/usuarios/$id');
+      final response = await _api.delete('/admin/users/$id');
       
       if (response['success']) {
-        Get.snackbar(
-          'Sucesso',
-          'Usuário removido com sucesso!',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-
+        Get.snackbar('Sucesso', 'Usuário removido com sucesso!',
+          backgroundColor: Colors.green, colorText: Colors.white);
         await carregarUsuarios();
       } else {
         throw Exception(response['error']);
       }
     } catch (e) {
-      print('❌ Erro ao remover usuário via API: $e');
-      
-      // Fallback para SQLite
-      await _confirmarRemocaoUsuarioLocal(id);
-    }
-  }
-
-  // Fallback para remoção no SQLite
-  Future<void> _confirmarRemocaoUsuarioLocal(int id) async {
-    try {
-      print('⚠️ Usando SQLite local para remoção - fallback');
-      
-      final db = await DatabaseHelper.instance.database;
-      
-      await db.delete(
-        'usuarios',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-
-      Get.snackbar(
-        'Sucesso',
-        'Usuário removido com sucesso! (Offline)',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-
-      await carregarUsuarios();
-    } catch (e) {
-      print('❌ Erro no fallback SQLite para remoção: $e');
-      Get.snackbar(
-        'Erro',
-        'Erro ao remover usuário',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      print('❌ Erro ao remover usuário: $e');
+      Get.snackbar('Erro', 'Erro ao remover usuário',
+        backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 }

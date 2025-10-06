@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:seenet/checklist/screen/ChecklistAppsScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistIptvScreen.dart';
@@ -21,10 +20,10 @@ import 'package:seenet/registro/widgets/registro.bindings.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 
-// Importe a configuração de ambiente
+// Configuração de ambiente
 import 'package:seenet/config/environment.dart';
 
-// Importar controllers
+// Controllers (SÓ API - SEM SQLite)
 import 'controllers/usuario_controller.dart';
 import 'controllers/checkmark_controller.dart';
 import 'controllers/diagnostico_controller.dart';
@@ -32,23 +31,24 @@ import 'controllers/diagnostico_controller.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Configurar ambiente
+  // ✅ Configurar ambiente
   Environment.printConfiguration();
   GeminiConfig.printStatus();
   
-  // Verificar configuração
+  // ✅ Verificar configuração
   if (Environment.isProduction && !Environment.isConfigured) {
-    throw Exception(' Configuração incompleta para produção');
+    throw Exception('⚠️ Configuração incompleta para produção');
   }
   
-  // Inicializar controllers
-  Get.put(ApiService());
-  Get.put(AuthService());
+  // ✅ Inicializar SOMENTE controllers de API
+  Get.put(ApiService(), permanent: true);
+  Get.put(AuthService(), permanent: true);
   Get.put(UsuarioController(), permanent: true);
   Get.put(CheckmarkController(), permanent: true);
   Get.put(DiagnosticoController(), permanent: true);
   Get.put(TranscricaoController(), permanent: true);
 
+  print('✅ App inicializado - Modo 100% API');
   
   runApp(const MyApp());
 }
@@ -101,7 +101,6 @@ class MyApp extends StatelessWidget {
           name: '/diagnostico',
           page: () => const DiagnosticoView(),
         ),
-        // ← NOVA ROTA PARA ADMIN
         GetPage(
           name: '/admin/usuarios',
           page: () => const UsuariosAdminView(),

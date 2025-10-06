@@ -1,4 +1,4 @@
-// lib/controllers/transcricao_controller.dart - VERSÃO API (CORRIGIDA)
+// lib/controllers/transcricao_controller.dart - VERSÃO 100% API
 import 'package:get/get.dart';
 import '../models/transcricao_tecnica.dart';
 import '../services/transcricao_service.dart';
@@ -44,9 +44,11 @@ class TranscricaoController extends GetxController {
     _transcricaoService.onTranscriptionComplete = (texto) async {
       textoTranscrito.value = texto;
       _textoCompleto = texto;
-
+      
       if (texto.isNotEmpty) {
-        await _processarComIA(texto);
+        // Não processamos mais localmente - será processado ao salvar na API
+        statusMensagem.value = 'Transcrição concluída! Pronto para salvar.';
+        textoProcessado.value = _criarMensagemPreProcessamento();
       }
     };
 
@@ -62,9 +64,9 @@ class TranscricaoController extends GetxController {
     try {
       limpar();
       statusMensagem.value = 'Iniciando gravação...';
-
+      
       bool sucesso = await _transcricaoService.startListening();
-
+      
       if (sucesso) {
         isGravando.value = true;
         _inicioGravacao = DateTime.now();
@@ -86,10 +88,10 @@ class TranscricaoController extends GetxController {
     try {
       await _transcricaoService.stopListening();
       isGravando.value = false;
-
+      
       if (_textoCompleto.isNotEmpty) {
-        statusMensagem.value = 'Processando com IA...';
-        await _processarComIA(_textoCompleto);
+        statusMensagem.value = 'Transcrição concluída! Salve para processar com IA.';
+        textoProcessado.value = _criarMensagemPreProcessamento();
       } else {
         statusMensagem.value = 'Nenhum texto capturado';
       }
@@ -109,53 +111,32 @@ class TranscricaoController extends GetxController {
     }
   }
 
-  Future<void> _processarComIA(String textoOriginal) async {
-    try {
-      isProcessando.value = true;
-      statusMensagem.value = 'Organizando ações com IA...';
-
-      String? textoProcessadoIA = await _transcricaoService.processarComGemini(textoOriginal);
-
-      if (textoProcessadoIA != null && textoProcessadoIA.isNotEmpty) {
-        textoProcessado.value = textoProcessadoIA;
-        statusMensagem.value = 'Ações organizadas com sucesso!';
-        print('✅ Texto processado pela IA');
-      } else {
-        textoProcessado.value = _criarTextoBasico(textoOriginal);
-        statusMensagem.value = 'Processamento básico concluído';
-        print('⚠️ IA não disponível, usando processamento básico');
-      }
-    } catch (e) {
-      print('❌ Erro no processamento: $e');
-      textoProcessado.value = _criarTextoBasico(textoOriginal);
-      statusMensagem.value = 'Erro no processamento, texto básico criado';
-    } finally {
-      isProcessando.value = false;
-    }
-  }
-
-  String _criarTextoBasico(String textoOriginal) {
+  /// Mensagem antes do processamento (não fazemos mais localmente)
+  String _criarMensagemPreProcessamento() {
     DateTime agora = DateTime.now();
+    
+    return """📝 **Transcrição capturada com sucesso!**
 
-    return """**CATEGORIA:** Atendimento Técnico
+**TEXTO GRAVADO:**
+"${textoTranscrito.value}"
 
-**AÇÕES REALIZADAS:**
-1. Documentação registrada conforme relato do técnico
-2. Procedimentos executados conforme protocolo padrão
-3. Verificações técnicas realizadas no sistema
-
-**RESULTADO:** Atendimento documentado com sucesso
-
-**OBSERVAÇÕES:**
-• Transcrição original: "$textoOriginal"
+**INFORMAÇÕES:**
 • Data/Hora: ${_formatarDataHora(agora)}
 • Duração: ${_calcularDuracao()}
 
 ---
-💡 **Dica:** A IA está processando via API Node.js para melhor detalhamento.""";
+
+🤖 **Processamento Inteligente:**
+Ao salvar esta documentação, nossa IA irá:
+✅ Organizar as ações em pontos profissionais
+✅ Identificar a categoria do problema
+✅ Estruturar o relatório técnico
+✅ Adicionar observações relevantes
+
+💡 **Dica:** Clique em "Salvar Documentação" para processar com IA!""";
   }
 
-  // ========== SALVAR TRANSCRIÇÃO VIA API ==========
+  // ========== SALVAR TRANSCRIÇÃO VIA API (COM PROCESSAMENTO IA) ==========
   Future<bool> salvarTranscricao(String titulo) async {
     try {
       if (_usuarioController.idUsuario == null) {
@@ -169,34 +150,46 @@ class TranscricaoController extends GetxController {
       }
 
       isLoading.value = true;
+      statusMensagem.value = 'Salvando e processando com IA...';
 
+      // A API fará o processamento com IA automaticamente
       final response = await _api.post('/transcriptions', {
         'titulo': titulo,
         'transcricao_original': textoTranscrito.value,
-        'pontos_da_acao': textoProcessado.value,
         'duracao_segundos': _calcularDuracaoSegundos(),
         'descricao': 'Documentação técnica',
       });
 
       if (response['success']) {
+        // Recarregar histórico para pegar a transcrição processada
         await carregarHistorico();
-        print('✅ Transcrição salva na API');
-
+        
+        // Pegar a última transcrição (recém-criada) para mostrar o resultado processado
+        if (historico.isNotEmpty) {
+          final transcricaoSalva = historico.first;
+          textoProcessado.value = transcricaoSalva.pontosDaAcao;
+        }
+        
+        print('✅ Transcrição salva e processada pela API');
+        
         Get.snackbar(
           'Sucesso',
-          'Documentação salva com sucesso!',
-          duration: const Duration(seconds: 2),
+          'Documentação salva e processada com IA!',
+          duration: const Duration(seconds: 3),
         );
-
+        
+        statusMensagem.value = 'Documentação salva com sucesso!';
         return true;
       } else {
         print('❌ Erro ao salvar: ${response['error']}');
         Get.snackbar('Erro', 'Falha ao salvar documentação');
+        statusMensagem.value = 'Erro ao salvar';
         return false;
       }
     } catch (e) {
       print('❌ Erro ao salvar: $e');
       Get.snackbar('Erro', 'Erro de conexão ao salvar');
+      statusMensagem.value = 'Erro de conexão';
       return false;
     } finally {
       isLoading.value = false;
@@ -207,14 +200,14 @@ class TranscricaoController extends GetxController {
   Future<void> carregarHistorico() async {
     try {
       if (_usuarioController.idUsuario == null) return;
-
+      
       isLoading.value = true;
 
       final response = await _api.get('/transcriptions/minhas');
 
       if (response['success']) {
         final List<dynamic> data = response['data']['transcricoes'];
-
+        
         historico.value = data
             .map((json) => TranscricaoTecnica.fromMap(json))
             .toList();
@@ -230,6 +223,107 @@ class TranscricaoController extends GetxController {
     }
   }
 
+  // ========== BUSCAR TRANSCRIÇÃO ESPECÍFICA ==========
+  Future<TranscricaoTecnica?> buscarTranscricao(int transcricaoId) async {
+    try {
+      final response = await _api.get('/transcriptions/$transcricaoId');
+      
+      if (response['success']) {
+        return TranscricaoTecnica.fromMap(response['data']['transcricao']);
+      }
+      return null;
+    } catch (e) {
+      print('❌ Erro ao buscar transcrição: $e');
+      return null;
+    }
+  }
+
+  // ========== REMOVER TRANSCRIÇÃO ==========
+  Future<bool> removerTranscricao(int transcricaoId) async {
+    try {
+      final response = await _api.delete('/transcriptions/$transcricaoId');
+      
+      if (response['success']) {
+        historico.removeWhere((t) => t.id == transcricaoId);
+        Get.snackbar('Removido', 'Documentação removida');
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('❌ Erro ao remover: $e');
+      return false;
+    }
+  }
+
+  // ========== BUSCAR NO HISTÓRICO (LOCAL) ==========
+  List<TranscricaoTecnica> buscarNoHistorico(String termo) {
+    if (termo.isEmpty) return historico;
+    
+    String termoBusca = termo.toLowerCase();
+    
+    return historico.where((transcricao) {
+      return transcricao.titulo.toLowerCase().contains(termoBusca) ||
+             transcricao.transcricaoOriginal.toLowerCase().contains(termoBusca) ||
+             transcricao.pontosDaAcao.toLowerCase().contains(termoBusca);
+    }).toList();
+  }
+
+  // ========== ESTATÍSTICAS ==========
+  Map<String, dynamic> get estatisticasHistorico {
+    if (historico.isEmpty) {
+      return {
+        'total': 0,
+        'esteMes': 0,
+        'tempoTotal': '00:00',
+        'mediaMinutos': 0.0,
+      };
+    }
+
+    DateTime agora = DateTime.now();
+    DateTime inicioMes = DateTime(agora.year, agora.month, 1);
+    
+    int esteMes = historico.where((t) => 
+        t.dataCriacao != null && t.dataCriacao!.isAfter(inicioMes)
+    ).length;
+    
+    int tempoTotalSegundos = historico
+        .where((t) => t.duracaoSegundos != null)
+        .map((t) => t.duracaoSegundos!)
+        .fold(0, (a, b) => a + b);
+    
+    double mediaMinutos = historico.isNotEmpty 
+        ? tempoTotalSegundos / 60.0 / historico.length 
+        : 0.0;
+    
+    int minutos = tempoTotalSegundos ~/ 60;
+    int segundos = tempoTotalSegundos % 60;
+    String tempoTotal = '${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
+    
+    return {
+      'total': historico.length,
+      'esteMes': esteMes,
+      'tempoTotal': tempoTotal,
+      'mediaMinutos': mediaMinutos,
+    };
+  }
+
+  // ========== ESTATÍSTICAS DA API ==========
+  Future<Map<String, dynamic>> buscarEstatisticasCompletas() async {
+    try {
+      final response = await _api.get('/transcriptions/stats/resumo');
+      
+      if (response['success']) {
+        return response['data'];
+      }
+      return {};
+    } catch (e) {
+      print('❌ Erro ao buscar estatísticas: $e');
+      return {};
+    }
+  }
+
+  // ========== UTILITÁRIOS ==========
+  
   void limpar() {
     isGravando.value = false;
     isProcessando.value = false;
@@ -242,11 +336,11 @@ class TranscricaoController extends GetxController {
 
   String _calcularDuracao() {
     if (_inicioGravacao == null) return 'N/A';
-
+    
     Duration duracao = DateTime.now().difference(_inicioGravacao!);
     int minutos = duracao.inMinutes;
     int segundos = duracao.inSeconds % 60;
-
+    
     return '${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
   }
 
@@ -268,79 +362,14 @@ class TranscricaoController extends GetxController {
     }
   }
 
-  Map<String, dynamic> get estatisticasHistorico {
-    if (historico.isEmpty) {
-      return {
-        'total': 0,
-        'esteMes': 0,
-        'tempoTotal': '00:00',
-        'mediaMinutos': 0.0,
-      };
-    }
-
-    DateTime agora = DateTime.now();
-    DateTime inicioMes = DateTime(agora.year, agora.month, 1);
-
-    int esteMes = historico.where((t) =>
-    t.dataCriacao != null && t.dataCriacao!.isAfter(inicioMes)
-    ).length;
-
-    int tempoTotalSegundos = historico
-        .where((t) => t.duracaoSegundos != null)
-        .map((t) => t.duracaoSegundos!)
-        .fold(0, (a, b) => a + b);
-
-    double mediaMinutos = historico.isNotEmpty
-        ? tempoTotalSegundos / 60.0 / historico.length
-        : 0.0;
-
-    int minutos = tempoTotalSegundos ~/ 60;
-    int segundos = tempoTotalSegundos % 60;
-    String tempoTotal = '${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
-
-    return {
-      'total': historico.length,
-      'esteMes': esteMes,
-      'tempoTotal': tempoTotal,
-      'mediaMinutos': mediaMinutos,
-    };
-  }
-
-  Future<bool> removerTranscricao(int transcricaoId) async {
-    try {
-      final response = await _api.delete('/transcriptions/$transcricaoId');
-
-      if (response['success']) {
-        historico.removeWhere((t) => t.id == transcricaoId);
-        Get.snackbar('Removido', 'Documentação removida');
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print('❌ Erro ao remover: $e');
-      return false;
-    }
-  }
-
-  List<TranscricaoTecnica> buscarNoHistorico(String termo) {
-    if (termo.isEmpty) return historico;
-
-    String termoBusca = termo.toLowerCase();
-
-    return historico.where((transcricao) {
-      return transcricao.titulo.toLowerCase().contains(termoBusca) ||
-          transcricao.transcricaoOriginal.toLowerCase().contains(termoBusca) ||
-          transcricao.pontosDaAcao.toLowerCase().contains(termoBusca);
-    }).toList();
-  }
-
   void debugInfo() {
-    print('\n🔍 === TRANSCRIÇÃO DEBUG ===');
+    print('\n🔍 === TRANSCRIÇÃO DEBUG (API) ===');
     print('🎤 Gravando: ${isGravando.value}');
     print('🤖 Processando: ${isProcessando.value}');
     print('📝 Texto: "${textoTranscrito.value}"');
     print('📊 Histórico: ${historico.length} itens');
     print('👤 Usuário: ${_usuarioController.idUsuario}');
-    print('=============================\n');
+    print('🌐 Modo: 100% API (Backend processa IA)');
+    print('==================================\n');
   }
 }

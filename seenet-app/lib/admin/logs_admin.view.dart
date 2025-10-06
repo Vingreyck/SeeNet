@@ -1,10 +1,8 @@
-// lib/admin/logs_admin.view.dart
+// lib/admin/logs_admin.view.dart - VERSÃO API (ATUALIZADO)
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import '../models/log_sistema.dart';
 import '../services/audit_service.dart';
-import '../services/database_helper.dart';
 
 class LogsAdminView extends StatefulWidget {
   const LogsAdminView({super.key});
@@ -15,7 +13,9 @@ class LogsAdminView extends StatefulWidget {
 
 class _LogsAdminViewState extends State<LogsAdminView> 
     with SingleTickerProviderStateMixin {
-  List<LogSistema> logs = [];
+  final AuditService _audit = AuditService.instance;
+  
+  List<Map<String, dynamic>> logs = [];
   Map<String, dynamic> estatisticas = {};
   bool isLoading = true;
   
@@ -48,8 +48,8 @@ class _LogsAdminViewState extends State<LogsAdminView>
     try {
       setState(() => isLoading = true);
       
-      // Carregar logs
-      logs = await AuditService.instance.buscarLogs(
+      // Carregar logs via API
+      logs = await _audit.buscarLogs(
         nivel: filtroNivel,
         acao: filtroAcao,
         dataInicio: filtroDataInicio,
@@ -58,22 +58,22 @@ class _LogsAdminViewState extends State<LogsAdminView>
         offset: paginaAtual * itensPorPagina,
       );
       
-      // Carregar estatísticas
-      estatisticas = await AuditService.instance.gerarRelatorio(
+      // Carregar estatísticas via API
+      estatisticas = await _audit.gerarRelatorio(
         dataInicio: filtroDataInicio,
         dataFim: filtroDataFim,
       );
       
       // Estatísticas rápidas
-      var stats = await AuditService.instance.getEstatisticasRapidas();
+      var stats = await _audit.getEstatisticasRapidas();
       estatisticas['rapidas'] = stats;
       
-      print('📊 ${logs.length} logs carregados');
+      print('📊 ${logs.length} logs carregados da API');
     } catch (e) {
       print('❌ Erro ao carregar logs: $e');
       Get.snackbar(
         'Erro',
-        'Erro ao carregar logs',
+        'Erro ao carregar logs da API',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -104,9 +104,6 @@ class _LogsAdminViewState extends State<LogsAdminView>
                 case 'limpar':
                   _limparLogsAntigos();
                   break;
-                case 'integridade':
-                  _verificarIntegridade();
-                  break;
               }
             },
             itemBuilder: (context) => [
@@ -127,16 +124,6 @@ class _LogsAdminViewState extends State<LogsAdminView>
                     Icon(Icons.cleaning_services, color: Colors.orange),
                     SizedBox(width: 8),
                     Text('Limpar Logs Antigos'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'integridade',
-                child: Row(
-                  children: [
-                    Icon(Icons.security, color: Colors.green),
-                    SizedBox(width: 8),
-                    Text('Verificar Integridade'),
                   ],
                 ),
               ),
@@ -177,10 +164,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
   Widget _buildLogsTab() {
     return Column(
       children: [
-        // Filtros
         _buildFiltros(),
-        
-        // Lista de logs
         Expanded(
           child: logs.isEmpty
               ? const Center(
@@ -197,8 +181,6 @@ class _LogsAdminViewState extends State<LogsAdminView>
                   },
                 ),
         ),
-        
-        // Paginação
         if (logs.isNotEmpty) _buildPaginacao(),
       ],
     );
@@ -223,7 +205,6 @@ class _LogsAdminViewState extends State<LogsAdminView>
           
           Row(
             children: [
-              // Filtro por nível
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: filtroNivel,
@@ -260,7 +241,6 @@ class _LogsAdminViewState extends State<LogsAdminView>
               
               const SizedBox(width: 16),
               
-              // Filtro por ação
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: filtroAcao,
@@ -285,7 +265,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
                     ...AuditAction.values.map((action) => DropdownMenuItem(
                       value: action.code,
                       child: Text(
-                        StringCapitalize(action.code.replaceAll('_', ' ').toLowerCase()).capitalize,
+                        _formatarAcao(action.code),
                         overflow: TextOverflow.ellipsis,
                       ),
                     )),
@@ -306,7 +286,6 @@ class _LogsAdminViewState extends State<LogsAdminView>
           
           Row(
             children: [
-              // Data início
               Expanded(
                 child: InkWell(
                   onTap: () => _selecionarData(true),
@@ -335,7 +314,6 @@ class _LogsAdminViewState extends State<LogsAdminView>
               
               const SizedBox(width: 16),
               
-              // Data fim
               Expanded(
                 child: InkWell(
                   onTap: () => _selecionarData(false),
@@ -364,7 +342,6 @@ class _LogsAdminViewState extends State<LogsAdminView>
               
               const SizedBox(width: 16),
               
-              // Botão limpar filtros
               IconButton(
                 onPressed: () {
                   setState(() {
@@ -386,9 +363,15 @@ class _LogsAdminViewState extends State<LogsAdminView>
     );
   }
   
-  Widget _buildLogCard(LogSistema log) {
-    Color corNivel = _getCorNivel(log.nivel ?? 'info');
-    IconData iconeAcao = _getIconeAcao(log.acao);
+  Widget _buildLogCard(Map<String, dynamic> log) {
+    String nivel = log['nivel'] ?? 'info';
+    String acao = log['acao'] ?? 'N/A';
+    String? detalhes = log['detalhes'];
+    dynamic dataAcao = log['data_acao'];
+    String usuarioNome = log['usuario_nome'] ?? 'Sistema';
+    
+    Color corNivel = _getCorNivel(nivel);
+    IconData iconeAcao = _getIconeAcao(acao);
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -410,7 +393,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
           children: [
             Expanded(
               child: Text(
-                _formatarAcao(log.acao),
+                _formatarAcao(acao),
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -418,7 +401,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
               ),
             ),
             Text(
-              _formatarDataHora(log.dataAcao),
+              _formatarDataHora(dataAcao),
               style: const TextStyle(
                 color: Colors.white54,
                 fontSize: 12,
@@ -427,7 +410,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
           ],
         ),
         subtitle: Text(
-          log.detalhes ?? 'Sem detalhes',
+          detalhes ?? 'Sem detalhes',
           style: const TextStyle(color: Colors.white70),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -438,70 +421,41 @@ class _LogsAdminViewState extends State<LogsAdminView>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildDetalheRow('ID', log.id.toString()),
-                if (log.usuarioId != null)
-                  _buildDetalheRow('Usuário ID', log.usuarioId.toString()),
-                _buildDetalheRow('Ação', log.acao),
-                _buildDetalheRow('Nível', log.nivel ?? 'info'),
-                if (log.tabelaAfetada != null)
-                  _buildDetalheRow('Tabela', log.tabelaAfetada!),
-                if (log.registroId != null)
-                  _buildDetalheRow('Registro ID', log.registroId.toString()),
-                if (log.ipAddress != null)
-                  _buildDetalheRow('IP', log.ipAddress!),
-                if (log.userAgent != null)
-                  _buildDetalheRow('User Agent', log.userAgent!),
-                _buildDetalheRow('Data/Hora', _formatarDataHoraCompleta(log.dataAcao)),
+                _buildDetalheRow('ID', log['id'].toString()),
+                if (log['usuario_id'] != null)
+                  _buildDetalheRow('Usuário', '$usuarioNome (ID: ${log['usuario_id']})'),
+                _buildDetalheRow('Ação', acao),
+                _buildDetalheRow('Nível', nivel.toUpperCase()),
+                if (log['tabela_afetada'] != null)
+                  _buildDetalheRow('Tabela', log['tabela_afetada']),
+                if (log['registro_id'] != null)
+                  _buildDetalheRow('Registro ID', log['registro_id'].toString()),
+                if (log['ip_address'] != null)
+                  _buildDetalheRow('IP', log['ip_address']),
+                _buildDetalheRow('Data/Hora', _formatarDataHoraCompleta(dataAcao)),
                 
-                if (log.dadosAnteriores != null) ...[
+                if (detalhes != null && detalhes.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   const Text(
-                    'Dados Anteriores:',
+                    'Detalhes:',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  const SizedBox(height: 8),
                   Container(
-                    margin: const EdgeInsets.only(top: 8),
+                    width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: const Color(0xFF1A1A1A),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      log.dadosAnteriores!,
+                      detalhes,
                       style: const TextStyle(
                         color: Colors.white70,
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ),
-                ],
-                
-                if (log.dadosNovos != null) ...[
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Dados Novos:',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      log.dadosNovos!,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontFamily: 'monospace',
+                        fontSize: 13,
                       ),
                     ),
                   ),
@@ -637,22 +591,24 @@ class _LogsAdminViewState extends State<LogsAdminView>
             const SizedBox(height: 20),
             
             // Logs por nível
-            const Text(
-              'Logs por Nível',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            if (estatisticas['resumo']['por_nivel'] != null) ...[
+              const Text(
+                'Logs por Nível',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            
-            ...((estatisticas['resumo']['por_nivel'] as List?) ?? [])
-                .map((item) => _buildNivelBar(
-                      item['nivel'] ?? 'unknown',
-                      item['total'] ?? 0,
-                      estatisticas['resumo']['total_logs'] ?? 1,
-                    )),
+              const SizedBox(height: 12),
+              
+              ...((estatisticas['resumo']['por_nivel'] as List?) ?? [])
+                  .map((item) => _buildNivelBar(
+                        item['nivel'] ?? 'unknown',
+                        item['total'] ?? 0,
+                        estatisticas['resumo']['total_logs'] ?? 1,
+                      )),
+            ],
           ],
           
           const SizedBox(height: 30),
@@ -748,7 +704,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
   }
   
   Widget _buildNivelBar(String nivel, int total, int totalGeral) {
-    double percentual = (total / totalGeral) * 100;
+    double percentual = totalGeral > 0 ? (total / totalGeral) * 100 : 0;
     Color cor = _getCorNivel(nivel);
     
     return Container(
@@ -805,19 +761,20 @@ class _LogsAdminViewState extends State<LogsAdminView>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  user['nome'] ?? 'Usuário ${user['usuario_id']}',
+                  user['nome'] ?? 'Usuário',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(
-                  user['email'] ?? '',
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 12,
+                if (user['email'] != null)
+                  Text(
+                    user['email'],
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -835,8 +792,8 @@ class _LogsAdminViewState extends State<LogsAdminView>
   
   // ========== TAB ALERTAS ==========
   Widget _buildAlertasTab() {
-    List<LogSistema> alertas = logs
-        .where((log) => log.nivel == 'warning' || log.nivel == 'error')
+    List<Map<String, dynamic>> alertas = logs
+        .where((log) => log['nivel'] == 'warning' || log['nivel'] == 'error')
         .toList();
     
     if (alertas.isEmpty) {
@@ -873,8 +830,8 @@ class _LogsAdminViewState extends State<LogsAdminView>
       padding: const EdgeInsets.all(16),
       itemCount: alertas.length,
       itemBuilder: (context, index) {
-        LogSistema alerta = alertas[index];
-        bool isError = alerta.nivel == 'error';
+        var alerta = alertas[index];
+        bool isError = alerta['nivel'] == 'error';
         
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
@@ -888,7 +845,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
               size: 32,
             ),
             title: Text(
-              _formatarAcao(alerta.acao),
+              _formatarAcao(alerta['acao']),
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -898,12 +855,12 @@ class _LogsAdminViewState extends State<LogsAdminView>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  alerta.detalhes ?? 'Sem detalhes',
+                  alerta['detalhes'] ?? 'Sem detalhes',
                   style: const TextStyle(color: Colors.white70),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _formatarDataHora(alerta.dataAcao),
+                  _formatarDataHora(alerta['data_acao']),
                   style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 12,
@@ -924,7 +881,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
   // ========== MÉTODOS AUXILIARES ==========
   
   Color _getCorNivel(String nivel) {
-    switch (nivel) {
+    switch (nivel.toLowerCase()) {
       case 'error':
         return Colors.red;
       case 'warning':
@@ -936,35 +893,49 @@ class _LogsAdminViewState extends State<LogsAdminView>
   }
   
   IconData _getIconeAcao(String acao) {
-    if (acao.contains('LOGIN')) return Icons.login;
-    if (acao.contains('LOGOUT')) return Icons.logout;
-    if (acao.contains('USER')) return Icons.person;
-    if (acao.contains('PASSWORD')) return Icons.lock;
-    if (acao.contains('CHECKMARK')) return Icons.check_box;
-    if (acao.contains('CATEGORY')) return Icons.folder;
-    if (acao.contains('EVALUATION')) return Icons.assessment;
-    if (acao.contains('DIAGNOSTIC')) return Icons.medical_services;
-    if (acao.contains('DATA')) return Icons.storage;
-    if (acao.contains('CONFIG')) return Icons.settings;
-    if (acao.contains('UNAUTHORIZED')) return Icons.block;
-    if (acao.contains('SUSPICIOUS')) return Icons.warning;
+    String acaoUpper = acao.toUpperCase();
+    if (acaoUpper.contains('LOGIN')) return Icons.login;
+    if (acaoUpper.contains('LOGOUT')) return Icons.logout;
+    if (acaoUpper.contains('USER')) return Icons.person;
+    if (acaoUpper.contains('PASSWORD')) return Icons.lock;
+    if (acaoUpper.contains('CHECKMARK')) return Icons.check_box;
+    if (acaoUpper.contains('CATEGORY')) return Icons.folder;
+    if (acaoUpper.contains('EVALUATION')) return Icons.assessment;
+    if (acaoUpper.contains('DIAGNOSTIC')) return Icons.medical_services;
+    if (acaoUpper.contains('TRANSCRIPTION') || acaoUpper.contains('DOCUMENT')) return Icons.description;
+    if (acaoUpper.contains('DATA')) return Icons.storage;
+    if (acaoUpper.contains('CONFIG')) return Icons.settings;
+    if (acaoUpper.contains('UNAUTHORIZED')) return Icons.block;
+    if (acaoUpper.contains('SUSPICIOUS')) return Icons.warning;
     return Icons.info;
   }
   
   String _formatarAcao(String acao) {
     return acao.replaceAll('_', ' ').toLowerCase().split(' ')
-        .map((word) => StringCapitalize(word).capitalize)
+        .map((word) => word.isEmpty ? '' : '${word[0].toUpperCase()}${word.substring(1)}')
         .join(' ');
   }
   
-  String _formatarDataHora(DateTime? data) {
+  String _formatarDataHora(dynamic data) {
     if (data == null) return 'N/A';
-    return DateFormat('dd/MM HH:mm').format(data);
+    
+    try {
+      DateTime dt = data is DateTime ? data : DateTime.parse(data.toString());
+      return DateFormat('dd/MM HH:mm').format(dt);
+    } catch (e) {
+      return 'Data inválida';
+    }
   }
   
-  String _formatarDataHoraCompleta(DateTime? data) {
+  String _formatarDataHoraCompleta(dynamic data) {
     if (data == null) return 'N/A';
-    return DateFormat('dd/MM/yyyy HH:mm:ss').format(data);
+    
+    try {
+      DateTime dt = data is DateTime ? data : DateTime.parse(data.toString());
+      return DateFormat('dd/MM/yyyy HH:mm:ss').format(dt);
+    } catch (e) {
+      return 'Data inválida';
+    }
   }
   
   Future<void> _selecionarData(bool isInicio) async {
@@ -1001,7 +972,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
     }
   }
   
-  void _mostrarDetalhesAlerta(LogSistema alerta) {
+  void _mostrarDetalhesAlerta(Map<String, dynamic> alerta) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1009,8 +980,8 @@ class _LogsAdminViewState extends State<LogsAdminView>
         title: Row(
           children: [
             Icon(
-              alerta.nivel == 'error' ? Icons.error : Icons.warning,
-              color: alerta.nivel == 'error' ? Colors.red : Colors.orange,
+              alerta['nivel'] == 'error' ? Icons.error : Icons.warning,
+              color: alerta['nivel'] == 'error' ? Colors.red : Colors.orange,
             ),
             const SizedBox(width: 12),
             const Text(
@@ -1024,11 +995,11 @@ class _LogsAdminViewState extends State<LogsAdminView>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildDetalheRow('Ação', alerta.acao),
-              _buildDetalheRow('Nível', alerta.nivel ?? 'N/A'),
-              _buildDetalheRow('Data/Hora', _formatarDataHoraCompleta(alerta.dataAcao)),
-              if (alerta.usuarioId != null)
-                _buildDetalheRow('Usuário ID', alerta.usuarioId.toString()),
+              _buildDetalheRow('Ação', alerta['acao']),
+              _buildDetalheRow('Nível', alerta['nivel'] ?? 'N/A'),
+              _buildDetalheRow('Data/Hora', _formatarDataHoraCompleta(alerta['data_acao'])),
+              if (alerta['usuario_id'] != null)
+                _buildDetalheRow('Usuário ID', alerta['usuario_id'].toString()),
               const SizedBox(height: 12),
               const Text(
                 'Detalhes:',
@@ -1045,7 +1016,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  alerta.detalhes ?? 'Sem detalhes adicionais',
+                  alerta['detalhes'] ?? 'Sem detalhes adicionais',
                   style: const TextStyle(color: Colors.white70),
                 ),
               ),
@@ -1067,23 +1038,93 @@ class _LogsAdminViewState extends State<LogsAdminView>
   
   Future<void> _exportarLogs() async {
     try {
-      String dados = await AuditService.instance.exportarLogs(
+      Get.dialog(
+        const Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+      
+      String dados = await _audit.exportarLogs(
         dataInicio: filtroDataInicio,
         dataFim: filtroDataFim,
         formato: 'csv',
       );
       
-      // Aqui você implementaria salvar o arquivo ou compartilhar
-      // Por enquanto, apenas mostrar mensagem
+      Get.back(); // Fechar loading
       
-      Get.snackbar(
-        'Exportação',
-        'Logs preparados para exportação (${dados.length} bytes)',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-      
+      if (dados.isNotEmpty) {
+        // Mostrar preview
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: const Color(0xFF2A2A2A),
+            title: const Row(
+              children: [
+                Icon(Icons.download, color: Color(0xFF00FF88)),
+                SizedBox(width: 12),
+                Text(
+                  'Logs Exportados',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Logs exportados com sucesso!\n\nTamanho: ${dados.length} caracteres',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Preview (primeiras linhas):',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      dados.substring(0, dados.length > 500 ? 500 : dados.length) + '...',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Fechar',
+                  style: TextStyle(color: Color(0xFF00FF88)),
+                ),
+              ),
+            ],
+          ),
+        );
+        
+        Get.snackbar(
+          'Sucesso',
+          'Logs exportados!',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      }
     } catch (e) {
+      Get.back();
+      print('❌ Erro ao exportar: $e');
       Get.snackbar(
         'Erro',
         'Erro ao exportar logs',
@@ -1102,9 +1143,33 @@ class _LogsAdminViewState extends State<LogsAdminView>
           'Limpar Logs Antigos',
           style: TextStyle(color: Colors.white),
         ),
-        content: const Text(
-          'Isso removerá logs informativos com mais de 90 dias.\n\nLogs de aviso e erro serão mantidos.\n\nDeseja continuar?',
-          style: TextStyle(color: Colors.white70),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Isso removerá logs informativos com mais de 90 dias.',
+              style: TextStyle(color: Colors.white70),
+            ),
+            SizedBox(height: 16),
+            Text(
+              '✅ Logs de INFO com mais de 90 dias serão removidos',
+              style: TextStyle(color: Colors.green, fontSize: 13),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '⚠️ Logs de WARNING e ERROR serão mantidos',
+              style: TextStyle(color: Colors.orange, fontSize: 13),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Deseja continuar?',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -1117,14 +1182,34 @@ class _LogsAdminViewState extends State<LogsAdminView>
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await AuditService.instance.limparLogsAntigos();
-              Get.snackbar(
-                'Sucesso',
-                'Logs antigos removidos',
-                backgroundColor: Colors.green,
-                colorText: Colors.white,
-              );
-              carregarDados();
+              
+              try {
+                Get.dialog(
+                  const Center(child: CircularProgressIndicator()),
+                  barrierDismissible: false,
+                );
+                
+                await _audit.limparLogsAntigos(diasParaManter: 90);
+                
+                Get.back(); // Fechar loading
+                
+                Get.snackbar(
+                  'Sucesso',
+                  'Logs antigos removidos com sucesso!',
+                  backgroundColor: Colors.green,
+                  colorText: Colors.white,
+                );
+                
+                carregarDados();
+              } catch (e) {
+                Get.back();
+                Get.snackbar(
+                  'Erro',
+                  'Erro ao limpar logs',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
@@ -1134,106 +1219,5 @@ class _LogsAdminViewState extends State<LogsAdminView>
         ],
       ),
     );
-  }
-  
-  Future<void> _verificarIntegridade() async {
-    setState(() => isLoading = true);
-    
-    try {
-      var resultado = await DatabaseHelper.instance.verificarIntegridade();
-      
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: const Color(0xFF2A2A2A),
-          title: const Text(
-            'Verificação de Integridade',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildIntegridadeItem(
-                'Senhas Fracas',
-                resultado['senhas_fracas']?.toString() ?? '0',
-                int.parse(resultado['senhas_fracas']?.toString() ?? '0') > 0
-                    ? Colors.orange
-                    : Colors.green,
-              ),
-              const SizedBox(height: 12),
-              _buildIntegridadeItem(
-                'Usuários Bloqueados',
-                (resultado['usuarios_bloqueados'] as List?)?.length.toString() ?? '0',
-                (resultado['usuarios_bloqueados'] as List?)?.isNotEmpty == true
-                    ? Colors.red
-                    : Colors.green,
-              ),
-              const SizedBox(height: 12),
-              _buildIntegridadeItem(
-                'Logs Suspeitos (7 dias)',
-                resultado['logs_suspeitos']?.toString() ?? '0',
-                int.parse(resultado['logs_suspeitos']?.toString() ?? '0') > 0
-                    ? Colors.orange
-                    : Colors.green,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Fechar',
-                style: TextStyle(color: Color(0xFF00FF88)),
-              ),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      Get.snackbar(
-        'Erro',
-        'Erro ao verificar integridade',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      setState(() => isLoading = false);
-    }
-  }
-  
-  Widget _buildIntegridadeItem(String label, String value, Color color) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color),
-          ),
-          child: Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Extension para capitalizar strings
-extension StringCapitalize on String {
-  String get capitalize {
-    if (isEmpty) return this;
-    return '${this[0].toUpperCase()}${substring(1)}';
   }
 }

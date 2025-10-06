@@ -1,3 +1,4 @@
+// lib/controllers/checkmark_controller.dart - VERSÃO 100% API
 import 'package:get/get.dart';
 import '../models/categoria_checkmark.dart';
 import '../models/checkmark.dart';
@@ -25,7 +26,7 @@ class CheckmarkController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.get('/checkmark/categorias');
+      final response = await _api.get('/checkmarks/categorias'); // ✅ Endpoint correto
 
       if (response['success']) {
         final List<dynamic> data = response['data']['categorias'];
@@ -52,7 +53,7 @@ class CheckmarkController extends GetxController {
       isLoading.value = true;
       categoriaAtual.value = categoriaId;
 
-      final response = await _api.get('/checkmark/categoria/$categoriaId');
+      final response = await _api.get('checkmarksPorCategoria/$categoriaId');
 
       if (response['success']) {
         final List<dynamic> data = response['data']['checkmarks'];
@@ -79,7 +80,7 @@ class CheckmarkController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.post('/avaliacoes', {
+      final response = await _api.post('avaliacoes', {
         'titulo': titulo,
         'descricao': 'Avaliação técnica',
       });
@@ -125,7 +126,6 @@ class CheckmarkController extends GetxController {
         return false;
       }
 
-      // Obter apenas os checkmarks marcados
       List<int> checkmarksMarcados = respostas.entries
           .where((entry) => entry.value == true)
           .map((entry) => entry.key)
@@ -139,7 +139,7 @@ class CheckmarkController extends GetxController {
       isLoading.value = true;
 
       final response = await _api.post(
-        '/avaliacoes/${avaliacaoAtual.value!.id}/respostas',
+        'avaliacoes/${avaliacaoAtual.value!.id}/respostas',
         {'checkmarks_marcados': checkmarksMarcados},
       );
 
@@ -168,7 +168,7 @@ class CheckmarkController extends GetxController {
       isLoading.value = true;
 
       final response = await _api.put(
-        '/avaliacoes/${avaliacaoAtual.value!.id}/finalizar',
+        'avaliacoes/${avaliacaoAtual.value!.id}/finalizar',
         {},
       );
 

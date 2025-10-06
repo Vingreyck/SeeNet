@@ -1,9 +1,6 @@
-// lib/services/transcricao_service.dart
+// lib/services/transcricao_service.dart - VERSÃO 100% API
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
-import '../models/transcricao_tecnica.dart';
-import '../services/gemini_service.dart';
-import '../services/database_helper.dart';
 
 class TranscricaoService {
   static TranscricaoService? _instance;
@@ -124,116 +121,14 @@ class TranscricaoService {
     }
   }
 
-  /// Processar texto com Gemini IA
+  /// Processar texto com IA
+  /// NOTA: O processamento com IA agora é feito no BACKEND
+  /// Este método retorna null para indicar que o processamento será feito na API
   Future<String?> processarComGemini(String transcricaoOriginal) async {
-    try {
-      String prompt = _montarPromptProcessamento(transcricaoOriginal);
-      
-      print('🤖 Enviando para Gemini...');
-      String? resultado = await GeminiService.gerarDiagnostico(prompt);
-      
-      if (resultado != null) {
-        print('✅ Texto processado pela IA');
-        return resultado;
-      } else {
-        print('❌ Falha no processamento IA');
-        return _criarProcessamentoSimulado(transcricaoOriginal);
-      }
-    } catch (e) {
-      print('❌ Erro no processamento: $e');
-      return _criarProcessamentoSimulado(transcricaoOriginal);
-    }
-  }
-
-  /// Montar prompt específico para processamento de ações técnicas
-  String _montarPromptProcessamento(String transcricao) {
-    return '''
-TAREFA: Transforme esta descrição técnica em pontos de ação organizados e profissionais.
-
-TEXTO ORIGINAL:
-"$transcricao"
-
-INSTRUÇÕES:
-1. Extraia as ações técnicas realizadas
-2. Organize em pontos numerados
-3. Use linguagem técnica e profissional
-4. Inclua detalhes importantes (equipamentos, configurações, resultados)
-5. Mantenha ordem cronológica das ações
-6. Adicione categoria do problema se identificável
-
-FORMATO DE SAÍDA:
-
-**CATEGORIA:** [Tipo do problema identificado]
-
-**AÇÕES REALIZADAS:**
-1. [Primeira ação com detalhes técnicos]
-2. [Segunda ação com resultados]
-3. [Terceira ação e verificações]
-...
-
-**RESULTADO:** [Status final e observações]
-
-**OBSERVAÇÕES:** [Informações adicionais relevantes]
-
-Seja conciso mas completo. Foque nas ações técnicas específicas.
-''';
-  }
-
-  /// Criar processamento simulado se Gemini falhar
-  String _criarProcessamentoSimulado(String transcricao) {
-    return '''
-**CATEGORIA:** Atendimento Técnico
-
-**AÇÕES REALIZADAS:**
-1. Registrada solicitação do cliente conforme relato
-2. Realizada análise inicial da situação reportada
-3. Executados procedimentos técnicos conforme protocolo
-4. Verificados resultados e funcionalidade do sistema
-
-**RESULTADO:** Atendimento documentado com sucesso
-
-**OBSERVAÇÕES:** 
-• Texto original: "$transcricao"
-• Processamento realizado em modo local (IA não disponível)
-• Para melhor detalhamento, configure Google Gemini
-
----
-💡 **Dica:** Configure a chave do Google Gemini para processamento automático mais detalhado das ações técnicas.
-''';
-  }
-
-  /// Salvar transcrição no banco
-  Future<bool> salvarTranscricao(TranscricaoTecnica transcricao) async {
-    try {
-      final db = await DatabaseHelper.instance.database;
-      
-      await db.insert('transcricoes_tecnicas', transcricao.toMap());
-      
-      print('✅ Transcrição salva no banco');
-      return true;
-    } catch (e) {
-      print('❌ Erro ao salvar transcrição: $e');
-      return false;
-    }
-  }
-
-  /// Buscar transcrições do técnico
-  Future<List<TranscricaoTecnica>> buscarTranscricoesTecnico(int tecnicoId) async {
-    try {
-      final db = await DatabaseHelper.instance.database;
-      
-      List<Map<String, dynamic>> results = await db.query(
-        'transcricoes_tecnicas',
-        where: 'tecnico_id = ?',
-        whereArgs: [tecnicoId],
-        orderBy: 'data_criacao DESC',
-      );
-      
-      return results.map((map) => TranscricaoTecnica.fromMap(map)).toList();
-    } catch (e) {
-      print('❌ Erro ao buscar transcrições: $e');
-      return [];
-    }
+    // O processamento com IA agora é feito no backend quando salva a transcrição
+    // Retornamos null para indicar que deve usar o processamento do servidor
+    print('ℹ️ Processamento com IA será feito no backend');
+    return null;
   }
 
   /// Verificar se está gravando

@@ -133,13 +133,21 @@ class ApiService extends GetxService {
     }
   }
   
-  // DELETE
+  // DELETE (✅ AGORA COM queryParams)
   Future<Map<String, dynamic>> delete(
     String endpoint, {
+    Map<String, String>? queryParams,
     bool requireAuth = true,
   }) async {
     try {
       String url = ApiConfig.getUrl(ApiConfig.endpoints[endpoint] ?? endpoint);
+      
+      // ✅ Adicionar query params se existirem
+      if (queryParams != null && queryParams.isNotEmpty) {
+        url += '?' + queryParams.entries
+            .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+            .join('&');
+      }
       
       print('🌐 DELETE: $url');
       
@@ -252,4 +260,4 @@ class ApiService extends GetxService {
     
     print('================================\n');
   }
-} 
+}

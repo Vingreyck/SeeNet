@@ -582,10 +582,10 @@ Entre em contato com a operadora informando os testes realizados.
                   gradient: LinearGradient(
                     begin: Alignment(-1.0 - _shimmerAnimation.value, 0.0),
                     end: Alignment(1.0 - _shimmerAnimation.value, 0.0),
-                    colors: [
-                      const Color(0xFF2A2A2A),
-                      const Color(0xFF3A3A3A),
-                      const Color(0xFF2A2A2A),
+                    colors: const [
+                      Color(0xFF2A2A2A),
+                      Color(0xFF3A3A3A),
+                      Color(0xFF2A2A2A),
                     ],
                     stops: const [0.0, 0.5, 1.0],
                   ),

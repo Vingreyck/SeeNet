@@ -10,7 +10,7 @@ class ApiConfig {
     return Environment.isDevelopment ? _devBaseUrl : _prodBaseUrl;
   }
   
-  // Endpoints 
+  // ✅ ENDPOINTS CORRIGIDOS E COMPLETOS
   static const Map<String, String> endpoints = {
     // Health
     'health': '/health',
@@ -28,11 +28,16 @@ class ApiConfig {
     'users': '/users',
     'profile': '/users/profile',
     
-    // Checkmarks
-    'categorias': '/checkmarks/categorias',
-    'checkmarksPorCategoria': '/checkmarks/categoria',
-    'criarCategoria': '/checkmarks/categorias',
-    'criarCheckmark': '/checkmarks/checkmarks',
+    // ✅ CHECKMARKS - CORRIGIDO (SINGULAR!)
+    'categorias': '/checkmark/categorias',
+    'checkmarksPorCategoria': '/checkmark/categoria', // Base - adicionar /:id
+    'criarCategoria': '/checkmark/categorias',
+    'criarCheckmark': '/checkmark/checkmarks',
+    
+    // ✅ AVALIAÇÕES - ADICIONADO
+    'criarAvaliacao': '/avaliacoes',
+    'salvarRespostas': '/avaliacoes', // Base - adicionar /:id/respostas
+    'finalizarAvaliacao': '/avaliacoes', // Base - adicionar /:id/finalizar
     
     // Diagnósticos
     'gerarDiagnostico': '/diagnostics/gerar',
@@ -49,13 +54,13 @@ class ApiConfig {
     'adminStats': '/admin/stats',
     'adminLogs': '/admin/logs',
     
-    // ✅ NOVOS: Auditoria
-    'auditLog': '/admin/logs',                    // POST - Registrar log
-    'auditLogs': '/admin/logs',                   // GET - Buscar logs
-    'auditStats': '/admin/stats',                 // GET - Estatísticas
-    'auditStatsQuick': '/admin/stats/quick',      // GET - Estatísticas rápidas
-    'auditExport': '/admin/logs/export',          // GET - Exportar logs
-    'auditCleanup': '/admin/logs/cleanup',        // DELETE - Limpar logs antigos
+    // Auditoria
+    'auditLog': '/admin/logs',
+    'auditLogs': '/admin/logs',
+    'auditStats': '/admin/stats',
+    'auditStatsQuick': '/admin/stats/quick',
+    'auditExport': '/admin/logs/export',
+    'auditCleanup': '/admin/logs/cleanup',
   };
   
   // Headers padrão
@@ -92,7 +97,10 @@ class ApiConfig {
     print('🏗️ Ambiente: ${Environment.isDevelopment ? "DEV" : "PROD"}');
     print('⏰ Timeout: ${requestTimeout.inSeconds}s');
     print('📊 Total endpoints: ${endpoints.length}');
-    print('🔍 Endpoints de Auditoria: ${endpoints.keys.where((k) => k.startsWith('audit')).length}');
+    print('🔍 Endpoints disponíveis:');
+    endpoints.forEach((key, value) {
+      print('  • $key -> $baseUrl$value');
+    });
     if (Environment.isDevelopment) {
       print('🤖 Emulador Android: 10.0.2.2');
       print('📱 Dispositivo físico: Ajuste o IP em _devBaseUrl');

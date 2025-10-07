@@ -3,14 +3,32 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:seenet/checklist/widgets/checklist_categoria_card.widget.dart';
 import 'package:get/get.dart';
 import '../controllers/usuario_controller.dart';
+import '../controllers/checkmark_controller.dart'; // ✅ ADICIONAR
 
-class Checklistview extends StatelessWidget {
+class Checklistview extends StatefulWidget {
   const Checklistview({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final UsuarioController usuarioController = Get.find<UsuarioController>();
+  State<Checklistview> createState() => _ChecklistviewState();
+}
 
+class _ChecklistviewState extends State<Checklistview> {
+  final UsuarioController usuarioController = Get.find<UsuarioController>();
+  final CheckmarkController checkmarkController = Get.find<CheckmarkController>(); // ✅ ADICIONAR
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ Carregar categorias quando a tela abrir
+    _carregarCategorias();
+  }
+
+  Future<void> _carregarCategorias() async {
+    await checkmarkController.carregarCategorias();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
@@ -20,6 +38,7 @@ class Checklistview extends StatelessWidget {
       backgroundColor: const Color(0xFF1A1A1A),
       body: Stack(
         children: [
+          // Header verde
           Positioned(
             top: 0,
             left: 0,
@@ -97,6 +116,8 @@ class Checklistview extends StatelessWidget {
               ),
             ),
           ),
+          
+          // Título
           Positioned(
             top: 180, 
             left: 24,
@@ -121,6 +142,8 @@ class Checklistview extends StatelessWidget {
               ),
             ),
           ),
+          
+          // Subtítulo
           const Positioned(
             top: 220, 
             left: 24,
@@ -133,46 +156,150 @@ class Checklistview extends StatelessWidget {
               ),
             ),
           ),
+          
+          // ✅ LISTA DE CATEGORIAS DINÂMICA DA API
           Positioned(
             top: 270, 
             left: 0,
             right: 0,
             bottom: 0,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  ChecklistCategoriaCardWidget(
-                    title: 'Lentidão',
-                    description: 'Problema de velocidade, latência alta, conexão instável',
-                    assetIcon: 'assets/images/snail.svg',
-                    onTap: () {
-                      Get.toNamed('/checklist/lentidao');
-                    },
+            child: Obx(() {
+              // Loading
+              if (checkmarkController.isLoading.value) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF00FF88),
                   ),
-                  ChecklistCategoriaCardWidget(
-                    title: 'IPTV',
-                    description: 'Travamento, buffering, canais fora do ar, qualidade baixa',
-                    assetIcon: 'assets/images/iptv.svg',
-                    onTap: () {
-                      Get.toNamed('/checklist/iptv');
-                    },
+                );
+              }
+
+              // Erro ou vazio - mostrar categorias fixas como fallback
+              if (checkmarkController.categorias.isEmpty) {
+                return SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // ⚠️ Categorias fixas como fallback
+                      ChecklistCategoriaCardWidget(
+                        title: 'Lentidão',
+                        description: 'Problema de velocidade, latência alta, conexão instável',
+                        assetIcon: 'assets/images/snail.svg',
+                        onTap: () {
+                          Get.toNamed('/checklist/lentidao');
+                        },
+                      ),
+                      ChecklistCategoriaCardWidget(
+                        title: 'IPTV',
+                        description: 'Travamento, buffering, canais fora do ar, qualidade baixa',
+                        assetIcon: 'assets/images/iptv.svg',
+                        onTap: () {
+                          Get.toNamed('/checklist/iptv');
+                        },
+                      ),
+                      ChecklistCategoriaCardWidget(
+                        title: 'Aplicativos',
+                        description: 'Apps não funcionam, erro de conexão, problemas de login',
+                        assetIcon: 'assets/images/app.svg',
+                        onTap: () {
+                          Get.toNamed('/checklist/apps');
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      // Botão de recarregar
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: ElevatedButton.icon(
+                          onPressed: _carregarCategorias,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Recarregar Categorias'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00FF88),
+                            foregroundColor: Colors.black,
+                            minimumSize: const Size(double.infinity, 50),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
                   ),
-                  ChecklistCategoriaCardWidget(
-                    title: 'Aplicativos',
-                    description: 'Apps não funcionam, erro de conexão, problemas de login',
-                    assetIcon: 'assets/images/app.svg',
-                    onTap: () {
-                      Get.toNamed('/checklist/apps');
-                    },
+                );
+              }
+
+              // ✅ Categorias carregadas da API
+              return RefreshIndicator(
+                onRefresh: _carregarCategorias,
+                color: const Color(0xFF00FF88),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      // Mapear categorias da API
+                      ...checkmarkController.categorias.map((categoria) {
+                        // Definir ícone baseado no nome (você pode melhorar isso)
+                        String icone = _getIconeParaCategoria(categoria.nome);
+                        
+                        return ChecklistCategoriaCardWidget(
+                          title: categoria.nome,
+                          description: categoria.descricao ?? 'Categoria de diagnóstico',
+                          assetIcon: icone,
+                          onTap: () {
+                            // ✅ Verificar se id não é nulo antes de usar
+                            if (categoria.id != null) {
+                              // Navegar para tela de checkmarks desta categoria
+                              checkmarkController.carregarCheckmarks(categoria.id!);
+                              
+                              // TODO: Criar tela genérica de checkmarks
+                              // Get.toNamed('/checklist/checkmarks', arguments: categoria.id);
+                              
+                              // Por enquanto, manter navegação fixa
+                              if (categoria.nome.toLowerCase().contains('lentidão')) {
+                                Get.toNamed('/checklist/lentidao');
+                              } else if (categoria.nome.toLowerCase().contains('iptv')) {
+                                Get.toNamed('/checklist/iptv');
+                              } else if (categoria.nome.toLowerCase().contains('app')) {
+                                Get.toNamed('/checklist/apps');
+                              } else {
+                                Get.snackbar(
+                                  'Em desenvolvimento',
+                                  'Tela de checkmarks para ${categoria.nome} em breve!',
+                                  backgroundColor: Colors.orange,
+                                );
+                              }
+                            } else {
+                              Get.snackbar(
+                                'Erro',
+                                'Categoria inválida',
+                                backgroundColor: Colors.red,
+                              );
+                            }
+                          },
+                        );
+                      }).toList(),
+                      const SizedBox(height: 20),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
+                ),
+              );
+            }),
           ),
         ],
       ),
     );
+  }
+
+  // ✅ Helper para definir ícone baseado no nome da categoria
+  String _getIconeParaCategoria(String nomeCategoria) {
+    final nome = nomeCategoria.toLowerCase();
+    
+    if (nome.contains('lentidão') || nome.contains('lentidao') || nome.contains('velocidade')) {
+      return 'assets/images/snail.svg';
+    } else if (nome.contains('iptv') || nome.contains('tv')) {
+      return 'assets/images/iptv.svg';
+    } else if (nome.contains('app') || nome.contains('aplicativo')) {
+      return 'assets/images/app.svg';
+    } else {
+      // Ícone padrão
+      return 'assets/images/logo.svg';
+    }
   }
 
   void _mostrarMenuUsuario(BuildContext context, UsuarioController usuarioController) {
@@ -279,7 +406,6 @@ class Checklistview extends StatelessWidget {
                   color: Colors.blue,
                 ),
                 const SizedBox(height: 12),
-                // ← LOGS APENAS PARA ADMIN
                 _buildMenuOption(
                   icon: Icons.security,
                   title: 'Logs de Auditoria',

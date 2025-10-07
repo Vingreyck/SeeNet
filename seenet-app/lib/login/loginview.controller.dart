@@ -10,7 +10,7 @@ class LoginController extends GetxController {
   TextEditingController senhaInput = TextEditingController();
   TextEditingController codigoEmpresaController = TextEditingController();
   FocusNode codigoEmpresaFocusNode = FocusNode();
-
+  
   RxBool isLoading = false.obs;
   RxString email = ''.obs;
   RxString senha = ''.obs;
@@ -18,7 +18,7 @@ class LoginController extends GetxController {
   RxBool empresaValida = false.obs;
   RxBool verificandoEmpresa = false.obs;
   Rx<Map<String, dynamic>?> empresaInfo = Rx<Map<String, dynamic>?>(null);
-
+  
   final UsuarioController usuarioController = Get.find<UsuarioController>();
   final AuthService authService = Get.find<AuthService>();
   final ApiService apiService = Get.find<ApiService>();
@@ -26,16 +26,16 @@ class LoginController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-
+    
     // Listeners
     loginInput.addListener(() {
       email.value = loginInput.text;
     });
-
+    
     senhaInput.addListener(() {
       senha.value = senhaInput.text;
     });
-
+    
     codigoEmpresaController.addListener(() {
       String codigo = codigoEmpresaController.text.toUpperCase();
       if (codigo != codigoEmpresa.value) {
@@ -60,14 +60,14 @@ class LoginController extends GetxController {
 
     try {
       verificandoEmpresa.value = true;
-
+      
       final empresa = await authService.verificarCodigoEmpresa(codigo);
-
+      
       if (empresa != null) {
         empresaInfo.value = empresa;
         empresaValida.value = true;
         print('✅ Empresa encontrada: ${empresa['nome']}');
-
+        
         _showInfo(
           '🏢 Empresa Encontrada',
           '${empresa['nome']}\nPlano: ${empresa['plano']}',
@@ -111,7 +111,7 @@ class LoginController extends GetxController {
 
     try {
       isLoading.value = true;
-
+      
       // Login via AuthService (que usa UsuarioController internamente)
       bool loginSucesso = await usuarioController.login(
         loginInput.text.trim(),
@@ -121,16 +121,16 @@ class LoginController extends GetxController {
 
       if (loginSucesso) {
         _showSuccess('Login realizado com sucesso!');
-
+        
         // Debug
         print('✅ Usuário logado: ${usuarioController.nomeUsuario}');
         print('🏢 Empresa: ${empresaInfo.value?['nome']}');
-
+        
         // Navegar para checklist
         Get.offAllNamed('/checklist');
       }
       // AuthService já mostra erros
-
+      
     } catch (e) {
       _showError('Erro ao conectar com servidor');
       print('❌ Erro no login: $e');
@@ -140,13 +140,13 @@ class LoginController extends GetxController {
   }
 
   // ========== MÉTODOS DE TESTE ==========
-
+  
   Future<void> testarBackend() async {
     try {
       isLoading.value = true;
-
+      
       bool conectado = await apiService.checkConnectivity();
-
+      
       if (conectado) {
         _showSuccess('✅ Backend conectado!\n\nAPI respondendo corretamente.');
         await apiService.debugEndpoints();
@@ -168,7 +168,7 @@ class LoginController extends GetxController {
     );
 
     await Future.delayed(const Duration(milliseconds: 500));
-
+    
     if (empresaValida.value) {
       await tryToLogin();
     } else {
@@ -184,7 +184,7 @@ class LoginController extends GetxController {
     );
 
     await Future.delayed(const Duration(milliseconds: 500));
-
+    
     if (empresaValida.value) {
       await tryToLogin();
     } else {
@@ -195,7 +195,7 @@ class LoginController extends GetxController {
   Future<void> testarEmpresas() async {
     try {
       isLoading.value = true;
-
+      
       var demo = await authService.verificarCodigoEmpresa('DEMO2024');
       var tech = await authService.verificarCodigoEmpresa('TECH2024');
       var invalid = await authService.verificarCodigoEmpresa('INVALID');
@@ -207,14 +207,14 @@ class LoginController extends GetxController {
       } else {
         message += '❌ DEMO2024: Não encontrada\n\n';
       }
-
+      
       if (tech != null) {
         message += '✅ TECH2024: ${tech['nome']}\n';
         message += '   Plano: ${tech['plano']}\n\n';
       } else {
         message += '❌ TECH2024: Não encontrada\n\n';
       }
-
+      
       message += '❌ INVALID: Não encontrada (esperado)';
 
       _showInfo('🏢 Teste de Empresas', message);
@@ -232,7 +232,7 @@ class LoginController extends GetxController {
   }
 
   // ========== MÉTODOS AUXILIARES ==========
-
+  
   void preencherTeste({
     required String email,
     required String senha,
@@ -241,11 +241,11 @@ class LoginController extends GetxController {
     loginInput.text = email;
     senhaInput.text = senha;
     codigoEmpresaController.text = codigo;
-
+    
     this.email.value = email;
     this.senha.value = senha;
     codigoEmpresa.value = codigo;
-
+    
     verificarEmpresa(codigo);
   }
 
@@ -253,7 +253,7 @@ class LoginController extends GetxController {
     loginInput.clear();
     senhaInput.clear();
     codigoEmpresaController.clear();
-
+    
     email.value = '';
     senha.value = '';
     codigoEmpresa.value = '';
@@ -266,15 +266,15 @@ class LoginController extends GetxController {
   }
 
   bool get podeLogar {
-    return email.value.trim().isNotEmpty &&
-        senha.value.isNotEmpty &&
-        codigoEmpresa.value.isNotEmpty &&
-        empresaValida.value &&
-        !isLoading.value;
+    return email.value.trim().isNotEmpty && 
+           senha.value.isNotEmpty && 
+           codigoEmpresa.value.isNotEmpty && 
+           empresaValida.value &&
+           !isLoading.value;
   }
 
   // ========== SNACKBARS ==========
-
+  
   void _showError(String message) {
     Get.snackbar(
       'Erro',

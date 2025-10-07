@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'dart:async';
 import '../controllers/transcricao_controller.dart';
-import '../models/transcricao_tecnica.dart';
 import 'historico_transcricao.view.dart';
 
 class TranscricaoView extends StatefulWidget {

@@ -143,18 +143,18 @@ class RegistrarView extends GetView<RegistroController> {
                 const SizedBox(height: 30),
 
                 // Link para login
-                Row(
+                const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'Já tem uma conta?',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 16,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    const LoginButton(),
+                    SizedBox(width: 8),
+                    LoginButton(),
                   ],
                 ),
               ],
@@ -711,18 +711,18 @@ class RegistrarView extends GetView<RegistroController> {
 
   // ← NOVA: Link para login (versão original)
   Widget _buildLoginLink() {
-    return Row(
+    return const Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text(
+        Text(
           'Já tem uma conta?',
           style: TextStyle(
             color: Colors.white70,
             fontSize: 16,
           ),
         ),
-        const SizedBox(width: 8),
-        const LoginButton(),
+        SizedBox(width: 8),
+        LoginButton(),
       ],
     );
   }

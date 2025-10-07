@@ -1,4 +1,3 @@
-// routes/admin.routes.js - ADICIONAR ESTES ENDPOINTS
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');

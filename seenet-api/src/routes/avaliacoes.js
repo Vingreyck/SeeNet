@@ -12,87 +12,42 @@ router.post('/', [
   body('descricao').optional().trim().isLength({ max: 1000 }),
 ], async (req, res) => {
   try {
-    console.log('📊 ========== DEBUG CRIAR AVALIAÇÃO ==========');
-    console.log('📦 req.body:', req.body);
-    console.log('👤 req.user:', req.user);
-    console.log('🏢 req.tenantId:', req.tenantId);
-    console.log('🏷️  req.tenantCode:', req.tenantCode);
-    console.log('===============================================');
-
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ Erros de validação:', errors.array());
       return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
     }
 
     const { titulo, descricao } = req.body;
 
-    // ✅ Verificar se req.user e req.tenantId existem
-    if (!req.user || !req.user.id) {
-      console.log('❌ ERRO: req.user não está definido!');
-      return res.status(401).json({ error: 'Usuário não autenticado' });
-    }
-
-    if (!req.tenantId) {
-      console.log('❌ ERRO: req.tenantId não está definido!');
-      return res.status(401).json({ error: 'Tenant não identificado' });
-    }
-
-    const dadosAvaliacao = {
+    const [avaliacaoId] = await db('avaliacoes').insert({
       tenant_id: req.tenantId,
       tecnico_id: req.user.id,
       titulo: titulo || `Avaliação ${new Date().toLocaleString('pt-BR')}`,
-      descricao: descricao || null,
+      descricao,
       status: 'em_andamento',
       data_inicio: new Date().toISOString(),
       data_criacao: new Date().toISOString(),
-    };
+    });
 
-    console.log('💾 Tentando inserir avaliação:', dadosAvaliacao);
-
-    const [avaliacaoId] = await db('avaliacoes').insert(dadosAvaliacao);
-
-    console.log('✅ Avaliação criada com ID:', avaliacaoId);
-
-    // ✅ Tentar log de auditoria (com tratamento de erro separado)
-    try {
-      await auditService.log({
-        action: 'EVALUATION_STARTED',
-        usuario_id: req.user.id,
-        tenant_id: req.tenantId,
-        tabela_afetada: 'avaliacoes',
-        registro_id: avaliacaoId,
-        details: `Avaliação iniciada: ${titulo}`,
-        ip_address: req.ip,
-      });
-      console.log('✅ Log de auditoria salvo');
-    } catch (auditError) {
-      console.log('⚠️ Erro ao salvar log de auditoria (continuando):', auditError.message);
-      // Não impedir a criação da avaliação se o log falhar
-    }
+    await auditService.log({
+      action: 'EVALUATION_STARTED',
+      usuario_id: req.user.id,
+      tenant_id: req.tenantId,
+      tabela_afetada: 'avaliacoes',
+      registro_id: avaliacaoId,
+      details: `Avaliação iniciada: ${titulo}`,
+      ip_address: req.ip,
+    });
 
     logger.info(`✅ Avaliação criada: ${avaliacaoId} (Tenant: ${req.tenantCode})`);
 
     res.status(201).json({
-      success: true,
       message: 'Avaliação criada com sucesso',
-      data: {
-        id: avaliacaoId,
-      }
+      id: avaliacaoId,
     });
   } catch (error) {
-    console.log('❌ ========== ERRO CRÍTICO ==========');
-    console.log('Mensagem:', error.message);
-    console.log('Stack:', error.stack);
-    console.log('Código:', error.code);
-    console.log('=====================================');
-    
     logger.error('Erro ao criar avaliação:', error);
-    
-    res.status(500).json({ 
-      error: 'Erro interno do servidor',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -120,26 +75,19 @@ router.put('/:avaliacaoId/finalizar', async (req, res) => {
         data_atualizacao: new Date().toISOString(),
       });
 
-    try {
-      await auditService.log({
-        action: 'EVALUATION_COMPLETED',
-        usuario_id: req.user.id,
-        tenant_id: req.tenantId,
-        tabela_afetada: 'avaliacoes',
-        registro_id: avaliacaoId,
-        details: 'Avaliação finalizada',
-        ip_address: req.ip,
-      });
-    } catch (auditError) {
-      console.log('⚠️ Erro ao salvar log de auditoria:', auditError.message);
-    }
+    await auditService.log({
+      action: 'EVALUATION_COMPLETED',
+      usuario_id: req.user.id,
+      tenant_id: req.tenantId,
+      tabela_afetada: 'avaliacoes',
+      registro_id: avaliacaoId,
+      details: 'Avaliação finalizada',
+      ip_address: req.ip,
+    });
 
     logger.info(`✅ Avaliação finalizada: ${avaliacaoId}`);
 
-    res.json({ 
-      success: true,
-      message: 'Avaliação finalizada com sucesso' 
-    });
+    res.json({ message: 'Avaliação finalizada com sucesso' });
   } catch (error) {
     logger.error('Erro ao finalizar avaliação:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -183,16 +131,13 @@ router.get('/minhas', [
       );
 
     res.json({
-      success: true,
-      data: {
-        avaliacoes,
-        pagination: {
-          page,
-          limit,
-          total: total.count,
-          pages: Math.ceil(total.count / limit),
-        },
-      }
+      avaliacoes,
+      pagination: {
+        page,
+        limit,
+        total: total.count,
+        pages: Math.ceil(total.count / limit),
+      },
     });
   } catch (error) {
     logger.error('Erro ao listar avaliações:', error);
@@ -215,10 +160,7 @@ router.get('/:avaliacaoId', async (req, res) => {
       return res.status(404).json({ error: 'Avaliação não encontrada' });
     }
 
-    res.json({ 
-      success: true,
-      data: { avaliacao } 
-    });
+    res.json({ avaliacao });
   } catch (error) {
     logger.error('Erro ao buscar avaliação:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -237,8 +179,6 @@ router.post('/:avaliacaoId/respostas', [
 
     const { avaliacaoId } = req.params;
     const { checkmarks_marcados } = req.body;
-
-    console.log(`📊 Salvando respostas - Avaliação: ${avaliacaoId}, Checkmarks: ${checkmarks_marcados.length}`);
 
     // Verificar se avaliação pertence ao tenant
     const avaliacao = await db('avaliacoes')
@@ -264,14 +204,10 @@ router.post('/:avaliacaoId/respostas', [
     logger.info(`✅ Respostas salvas para avaliação ${avaliacaoId}`);
 
     res.json({
-      success: true,
       message: 'Respostas salvas com sucesso',
-      data: {
-        total: checkmarks_marcados.length,
-      }
+      total: checkmarks_marcados.length,
     });
   } catch (error) {
-    console.log('❌ Erro ao salvar respostas:', error);
     logger.error('Erro ao salvar respostas:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }

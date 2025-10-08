@@ -50,50 +50,6 @@ class ApiService extends GetxService {
         : ApiConfig.defaultHeaders;
   }
   
-  // ✅ RESOLVER ENDPOINT - VERSÃO SIMPLIFICADA E FUNCIONAL
-  String _resolveEndpoint(String endpoint) {
-    print('🔍 Resolvendo endpoint: "$endpoint"');
-    
-    // 1. Se começa com '/', é um caminho completo direto
-    if (endpoint.startsWith('/')) {
-      final url = '${ApiConfig.baseUrl}$endpoint';
-      print('   → Caminho direto: $url');
-      return url;
-    }
-    
-    // 2. Se contém '/', é chave/id (ex: "checkmarksPorCategoria/1")
-    if (endpoint.contains('/')) {
-      final parts = endpoint.split('/');
-      final key = parts[0];
-      final rest = parts.sublist(1).join('/');
-      
-      if (ApiConfig.endpoints.containsKey(key)) {
-        final basePath = ApiConfig.endpoints[key]!;
-        final url = '${ApiConfig.baseUrl}$basePath/$rest';
-        print('   → Chave+ID: $key → $url');
-        return url;
-      } else {
-        // Fallback: adicionar /api/ se não tiver
-        final url = '${ApiConfig.baseUrl}/$endpoint';
-        print('   ⚠️ Chave não encontrada: $key, usando: $url');
-        return url;
-      }
-    }
-    
-    // 3. É uma chave simples (ex: "categorias")
-    if (ApiConfig.endpoints.containsKey(endpoint)) {
-      final path = ApiConfig.endpoints[endpoint]!;
-      final url = '${ApiConfig.baseUrl}$path';
-      print('   → Chave: $endpoint → $url');
-      return url;
-    }
-    
-    // 4. Fallback: tratar como caminho e adicionar /api/
-    final url = '${ApiConfig.baseUrl}/$endpoint';
-    print('   ⚠️ Endpoint não encontrado no mapa: $endpoint, usando: $url');
-    return url;
-  }
-  
   // GET
   Future<Map<String, dynamic>> get(
     String endpoint, {
@@ -101,7 +57,7 @@ class ApiService extends GetxService {
     bool requireAuth = true,
   }) async {
     try {
-      String url = _resolveEndpoint(endpoint);
+      String url = ApiConfig.getUrl(ApiConfig.endpoints[endpoint] ?? endpoint);
       
       if (queryParams != null && queryParams.isNotEmpty) {
         url += '?' + queryParams.entries
@@ -131,7 +87,7 @@ class ApiService extends GetxService {
     bool requireAuth = true,
   }) async {
     try {
-      String url = _resolveEndpoint(endpoint);
+      String url = ApiConfig.getUrl(ApiConfig.endpoints[endpoint] ?? endpoint);
       
       print('🌐 POST: $url');
       if (Environment.enableDebugLogs) {
@@ -159,7 +115,7 @@ class ApiService extends GetxService {
     bool requireAuth = true,
   }) async {
     try {
-      String url = _resolveEndpoint(endpoint);
+      String url = ApiConfig.getUrl(ApiConfig.endpoints[endpoint] ?? endpoint);
       
       print('🌐 PUT: $url');
       
@@ -177,13 +133,21 @@ class ApiService extends GetxService {
     }
   }
   
-  // DELETE
+  // DELETE (✅ AGORA COM queryParams)
   Future<Map<String, dynamic>> delete(
     String endpoint, {
+    Map<String, String>? queryParams,
     bool requireAuth = true,
   }) async {
     try {
-      String url = _resolveEndpoint(endpoint);
+      String url = ApiConfig.getUrl(ApiConfig.endpoints[endpoint] ?? endpoint);
+      
+      // ✅ Adicionar query params se existirem
+      if (queryParams != null && queryParams.isNotEmpty) {
+        url += '?' + queryParams.entries
+            .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+            .join('&');
+      }
       
       print('🌐 DELETE: $url');
       
@@ -273,7 +237,7 @@ class ApiService extends GetxService {
   // Verificar conectividade
   Future<bool> checkConnectivity() async {
     try {
-      final response = await get('health', requireAuth: false);
+      final response = await get('/health', requireAuth: false);
       return response['success'] == true;
     } catch (e) {
       return false;
@@ -284,7 +248,7 @@ class ApiService extends GetxService {
   Future<void> debugEndpoints() async {
     if (!Environment.enableDebugLogs) return;
     
-    print('\n🧪 === TESTE DE ENDPOINTS ===');
+    print('🧪 === TESTE DE ENDPOINTS ===');
     
     // Testar health check
     try {
@@ -293,26 +257,6 @@ class ApiService extends GetxService {
     } catch (e) {
       print('🏥 Health check: ERRO - $e');
     }
-    
-    // Testar resolução de endpoints
-    print('\n🔍 Testando resolução de endpoints:');
-    final testes = {
-      'categorias': '${ApiConfig.baseUrl}/checkmark/categorias',
-      'checkmarksPorCategoria/1': '${ApiConfig.baseUrl}/checkmark/categoria/1',
-      'criarAvaliacao': '${ApiConfig.baseUrl}/avaliacoes',
-      '/checkmark/categorias': '${ApiConfig.baseUrl}/checkmark/categorias',
-    };
-    
-    testes.forEach((input, expected) {
-      final result = _resolveEndpoint(input);
-      final status = result == expected ? '✅' : '❌';
-      print('  $status "$input"');
-      print('     Esperado: $expected');
-      print('     Obtido:   $result');
-      if (result != expected) {
-        print('     ⚠️ DIVERGÊNCIA!');
-      }
-    });
     
     print('================================\n');
   }

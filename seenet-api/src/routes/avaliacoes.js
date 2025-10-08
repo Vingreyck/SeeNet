@@ -1,10 +1,14 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
 const { db } = require('../config/database');
+const authMiddleware = require('../middleware/auth'); // ✅ IMPORTAR
 const auditService = require('../services/auditService');
 const logger = require('../config/logger');
 
 const router = express.Router();
+
+// ✅ APLICAR MIDDLEWARE EM TODAS AS ROTAS
+router.use(authMiddleware);
 
 // ========== CRIAR AVALIAÇÃO ==========
 router.post('/', [
@@ -19,6 +23,7 @@ router.post('/', [
 
     const { titulo, descricao } = req.body;
 
+    // ✅ AGORA req.user.id e req.tenantId existem!
     const [avaliacaoId] = await db('avaliacoes').insert({
       tenant_id: req.tenantId,
       tecnico_id: req.user.id,
@@ -27,7 +32,7 @@ router.post('/', [
       status: 'em_andamento',
       data_inicio: new Date().toISOString(),
       data_criacao: new Date().toISOString(),
-    });
+    }).returning('id'); // ✅ ADICIONAR .returning('id') para PostgreSQL
 
     await auditService.log({
       action: 'EVALUATION_STARTED',
@@ -46,7 +51,7 @@ router.post('/', [
       id: avaliacaoId,
     });
   } catch (error) {
-    logger.error('Erro ao criar avaliação:', error);
+    logger.error('❌ Erro ao criar avaliação:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -56,7 +61,6 @@ router.put('/:avaliacaoId/finalizar', async (req, res) => {
   try {
     const { avaliacaoId } = req.params;
 
-    // Verificar se avaliação pertence ao tenant e técnico
     const avaliacao = await db('avaliacoes')
       .where('id', avaliacaoId)
       .where('tenant_id', req.tenantId)
@@ -89,7 +93,7 @@ router.put('/:avaliacaoId/finalizar', async (req, res) => {
 
     res.json({ message: 'Avaliação finalizada com sucesso' });
   } catch (error) {
-    logger.error('Erro ao finalizar avaliação:', error);
+    logger.error('❌ Erro ao finalizar avaliação:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -135,12 +139,12 @@ router.get('/minhas', [
       pagination: {
         page,
         limit,
-        total: total.count,
-        pages: Math.ceil(total.count / limit),
+        total: parseInt(total.count),
+        pages: Math.ceil(parseInt(total.count) / limit),
       },
     });
   } catch (error) {
-    logger.error('Erro ao listar avaliações:', error);
+    logger.error('❌ Erro ao listar avaliações:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -162,7 +166,7 @@ router.get('/:avaliacaoId', async (req, res) => {
 
     res.json({ avaliacao });
   } catch (error) {
-    logger.error('Erro ao buscar avaliação:', error);
+    logger.error('❌ Erro ao buscar avaliação:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -180,7 +184,6 @@ router.post('/:avaliacaoId/respostas', [
     const { avaliacaoId } = req.params;
     const { checkmarks_marcados } = req.body;
 
-    // Verificar se avaliação pertence ao tenant
     const avaliacao = await db('avaliacoes')
       .where('id', avaliacaoId)
       .where('tenant_id', req.tenantId)
@@ -191,15 +194,20 @@ router.post('/:avaliacaoId/respostas', [
       return res.status(404).json({ error: 'Avaliação não encontrada' });
     }
 
-    // Inserir respostas
-    for (const checkmarkId of checkmarks_marcados) {
-      await db('respostas_checkmark').insert({
-        avaliacao_id: avaliacaoId,
-        checkmark_id: checkmarkId,
-        marcado: true,
-        data_resposta: new Date().toISOString(),
-      }).onConflict(['avaliacao_id', 'checkmark_id']).merge();
-    }
+    // ✅ MELHOR: Usar transação para consistência
+    await db.transaction(async (trx) => {
+      for (const checkmarkId of checkmarks_marcados) {
+        await trx('respostas_checkmark')
+          .insert({
+            avaliacao_id: avaliacaoId,
+            checkmark_id: checkmarkId,
+            marcado: true,
+            data_resposta: new Date().toISOString(),
+          })
+          .onConflict(['avaliacao_id', 'checkmark_id'])
+          .merge();
+      }
+    });
 
     logger.info(`✅ Respostas salvas para avaliação ${avaliacaoId}`);
 
@@ -208,7 +216,7 @@ router.post('/:avaliacaoId/respostas', [
       total: checkmarks_marcados.length,
     });
   } catch (error) {
-    logger.error('Erro ao salvar respostas:', error);
+    logger.error('❌ Erro ao salvar respostas:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

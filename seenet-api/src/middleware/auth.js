@@ -39,13 +39,7 @@ const authMiddleware = async (req, res, next) => {
     }
 
     // Adicionar informações do usuário e tenant à requisição
-    req.user = {
-      id: user.id,
-      nome: user.nome,
-      email: user.email,
-      tipo_usuario: user.tipo_usuario,
-      tenant_id: user.tenant_id
-    };
+    req.user = user;
     req.tenantId = user.tenant_id;
     req.tenantCode = user.tenant_code;
 

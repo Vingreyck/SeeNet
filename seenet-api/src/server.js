@@ -1,4 +1,58 @@
-// seenet-api/src/server.js - SEÇÃO DE ROTAS CORRIGIDA
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const compression = require('compression');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.set('trust proxy', 1); // Confiar apenas no primeiro proxy (Railway)
+console.log('🚀 Iniciando servidor SeeNet API...');
+
+// ========== MIDDLEWARES GLOBAIS ==========
+app.use(helmet());
+app.use(compression()); 
+app.use(morgan('combined'));
+
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? '*'
+    : [
+        'http://localhost:3000',
+        'http://localhost:8080',
+        'http://127.0.0.1:3000',
+        'http://10.0.2.2:3000',
+        'http://10.0.0.6:3000',
+        'http://10.0.1.112:3000'
+      ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Code']
+}));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ========== ROTAS BÁSICAS ==========
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    message: 'SeeNet API está funcionando!'
+  });
+});
+
+app.get('/api/test', (req, res) => {
+  res.json({
+    message: 'API funcionando!',
+    timestamp: new Date().toISOString(),
+    ip: req.ip
+  });
+});
 
 // ========== INICIALIZAR BANCO E ROTAS ==========
 async function startServer() {
@@ -10,7 +64,22 @@ async function startServer() {
     
     console.log('📁 Carregando rotas...');
 
-    // ✅ ROTAS PÚBLICAS (sem autenticação)
+    try {
+      const checkmarksRoutes = require('./routes/checkmark');
+      app.use('/api/checkmark', checkmarksRoutes);
+      console.log('✅ Rotas checkmarks carregadas');
+    } catch (error) {
+      console.error('❌ Erro ao carregar rotas checkmarks:', error.message);
+    }
+    
+    try {
+      const avaliacoesRoutes = require('./routes/avaliacoes');
+      app.use('/api/avaliacoes', avaliacoesRoutes);
+      console.log('✅ Rotas avaliacoes carregadas');
+    } catch (error) {
+      console.error('❌ Erro ao carregar rotas avaliacoes:', error.message);
+    }
+
     try {
       const tenantRoutes = require('./routes/tenant');
       app.use('/api/tenant', tenantRoutes);
@@ -24,50 +93,9 @@ async function startServer() {
       app.use('/api/auth', authRoutes);
       console.log('✅ Rotas auth carregadas');
     } catch (error) {
-      console.error('❌ Erro ao carregar rotas auth:', error.message);
-    }
-
-    // ✅ ADICIONAR MIDDLEWARE DE AUTENTICAÇÃO AQUI
-    const authMiddleware = require('./middleware/auth');
-    app.use('/api', authMiddleware); // Protege todas as rotas abaixo
-    console.log('🔐 Middleware de autenticação aplicado');
-
-    // ✅ ROTAS PROTEGIDAS (precisam de autenticação)
-    
-    // ✅ CORRIGIDO: Usar 'checkmark' (singular) conforme o arquivo
-    try {
-      const checkmarkRoutes = require('./routes/checkmark');
-      app.use('/api/checkmark', checkmarkRoutes); // SINGULAR!
-      console.log('✅ Rotas checkmark carregadas');
-    } catch (error) {
-      console.error('❌ Erro ao carregar rotas checkmark:', error.message);
+      console.error('⚠️ Rotas auth não encontradas');
     }
     
-    try {
-      const avaliacoesRoutes = require('./routes/avaliacoes');
-      app.use('/api/avaliacoes', avaliacoesRoutes);
-      console.log('✅ Rotas avaliacoes carregadas');
-    } catch (error) {
-      console.error('❌ Erro ao carregar rotas avaliacoes:', error.message);
-    }
-
-    try {
-      const diagnosticsRoutes = require('./routes/diagnostics');
-      app.use('/api/diagnostics', diagnosticsRoutes);
-      console.log('✅ Rotas diagnostics carregadas');
-    } catch (error) {
-      console.error('❌ Erro ao carregar rotas diagnostics:', error.message);
-    }
-
-    try {
-      const transcriptionsRoutes = require('./routes/transcriptions');
-      app.use('/api/transcriptions', transcriptionsRoutes);
-      console.log('✅ Rotas transcriptions carregadas');
-    } catch (error) {
-      console.error('❌ Erro ao carregar rotas transcriptions:', error.message);
-    }
-
-    // Health check
     app.get('/api/health', (req, res) => {
       res.json({ 
         status: 'OK', 
@@ -76,25 +104,6 @@ async function startServer() {
         environment: process.env.NODE_ENV || 'development',
         database: 'PostgreSQL conectado',
         gemini: process.env.GEMINI_API_KEY ? 'Configurado' : 'Não configurado'
-      });
-    });
-
-    // Debug endpoints
-    app.get('/api/debug/routes', (req, res) => {
-      res.json({
-        message: 'Rotas disponíveis',
-        routes: [
-          'GET  /health',
-          'GET  /api/health',
-          'POST /api/auth/login',
-          'POST /api/auth/register',
-          'GET  /api/tenant/verify/:codigo',
-          'GET  /api/checkmark/categorias', // CORRIGIDO!
-          'GET  /api/checkmark/categoria/:id',
-          'POST /api/avaliacoes',
-          'POST /api/diagnostics/gerar',
-          'POST /api/transcriptions'
-        ]
       });
     });
 
@@ -117,7 +126,39 @@ async function startServer() {
       }
     });
 
-    // 404 Handler
+    app.get('/api/debug/connection', async (req, res) => {
+      try {
+        const Tenant = require('./models/Tenant');
+        const isConnected = await Tenant.testConnection();
+        res.json({
+          success: isConnected,
+          message: isConnected ? 'Conexão OK' : 'Conexão falhou'
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: error.message
+        });
+      }
+    });
+
+    app.get('/api/debug/tenants', async (req, res) => {
+      try {
+        const Tenant = require('./models/Tenant');
+        const tenants = await Tenant.getAllTenants();
+        res.json({
+          success: true,
+          count: tenants.length,
+          tenants: tenants
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: error.message
+        });
+      }
+    });
+
     app.use('*', (req, res) => {
       res.status(404).json({ 
         error: 'Endpoint não encontrado',
@@ -129,17 +170,12 @@ async function startServer() {
           'GET /api/test',
           'GET /api/tenant/verify/:codigo',
           'GET /api/tenant/list',
-          'POST /api/auth/login',
-          'POST /api/auth/register',
-          'GET /api/checkmark/categorias', // CORRIGIDO!
-          'GET /api/checkmark/categoria/:id',
           'GET /api/debug/database',
-          'GET /api/debug/routes'
+          'GET /api/debug/tenants'
         ]
       });
     });
 
-    // Error handler
     app.use((error, req, res, next) => {
       console.error('❌ Erro na aplicação:', error);
       res.status(500).json({
@@ -148,21 +184,10 @@ async function startServer() {
       });
     });
 
-    // Iniciar servidor
+    // Só inicia o servidor se não estiver no Vercel
     if (process.env.VERCEL !== '1') {
       app.listen(PORT, '0.0.0.0', () => {
-        console.log(`
-╔══════════════════════════════════════════════════════════╗
-║              🚀 SEENET API INICIADA 🚀                  ║
-║  Porta:        ${PORT}                                   ║
-║  Rotas disponíveis:                                     ║
-║  • POST /api/auth/login                                 ║
-║  • POST /api/auth/register                              ║
-║  • GET  /api/tenant/verify/:codigo                      ║
-║  • GET  /api/checkmark/categorias (CORRIGIDO!)          ║
-║  • GET  /api/checkmark/categoria/:id                    ║
-╚══════════════════════════════════════════════════════════╝
-        `);
+        console.log(`🚀 SeeNet API rodando na porta ${PORT}`);
       });
     }
 
@@ -171,3 +196,9 @@ async function startServer() {
     process.exit(1);
   }
 }
+
+// Iniciar servidor
+startServer();
+
+// Export para Vercel (serverless)
+module.exports = app;

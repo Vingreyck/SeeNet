@@ -1,4 +1,4 @@
-// lib/controllers/checkmark_controller.dart - VERSÃO CORRIGIDA
+// lib/controllers/checkmark_controller.dart - VERSÃO 100% API
 import 'package:get/get.dart';
 import '../models/categoria_checkmark.dart';
 import '../models/checkmark.dart';
@@ -15,13 +15,10 @@ class CheckmarkController extends GetxController {
   RxInt categoriaAtual = 0.obs;
   RxBool isLoading = false.obs;
 
-  // ✅ REMOVIDO onInit que carregava automaticamente
-  // As categorias só serão carregadas quando o usuário estiver logado
-  
   @override
   void onInit() {
     super.onInit();
-    print('📋 CheckmarkController inicializado (aguardando login)');
+    carregarCategorias();
   }
 
   // ========== CARREGAR CATEGORIAS DA API ==========
@@ -29,33 +26,13 @@ class CheckmarkController extends GetxController {
     try {
       isLoading.value = true;
 
-      // ✅ CORRIGIDO: Endpoint conforme definido no backend
-      final response = await _api.get('categorias');
+      final response = await _api.get('/checkmarks/categorias'); // ✅ Endpoint correto
 
       if (response['success']) {
-        // ✅ VERIFICAR estrutura da resposta
-        final dynamic data = response['data'];
-        
-        // Se data já é a lista de categorias
-        if (data is List) {
-          categorias.value = data
-              .map((json) => CategoriaCheckmark.fromMap(json))
-              .toList();
-        } 
-        // Se data é um objeto com a chave 'categorias'
-        else if (data is Map && data.containsKey('categorias')) {
-          final List<dynamic> catList = data['categorias'];
-          categorias.value = catList
-              .map((json) => CategoriaCheckmark.fromMap(json))
-              .toList();
-        }
-        // Se response tem 'categorias' direto
-        else if (response.containsKey('categorias')) {
-          final List<dynamic> catList = response['categorias'];
-          categorias.value = catList
-              .map((json) => CategoriaCheckmark.fromMap(json))
-              .toList();
-        }
+        final List<dynamic> data = response['data']['categorias'];
+        categorias.value = data
+            .map((json) => CategoriaCheckmark.fromMap(json))
+            .toList();
 
         print('✅ ${categorias.length} categorias carregadas da API');
       } else {
@@ -79,19 +56,8 @@ class CheckmarkController extends GetxController {
       final response = await _api.get('checkmarksPorCategoria/$categoriaId');
 
       if (response['success']) {
-        final dynamic data = response['data'];
-        
-        List<dynamic> checkmarksList = [];
-        
-        if (data is List) {
-          checkmarksList = data;
-        } else if (data is Map && data.containsKey('checkmarks')) {
-          checkmarksList = data['checkmarks'];
-        } else if (response.containsKey('checkmarks')) {
-          checkmarksList = response['checkmarks'];
-        }
-        
-        checkmarksAtivos.value = checkmarksList
+        final List<dynamic> data = response['data']['checkmarks'];
+        checkmarksAtivos.value = data
             .map((json) => Checkmark.fromMap(json))
             .toList();
 
@@ -114,7 +80,7 @@ class CheckmarkController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.post('criarAvaliacao', {
+      final response = await _api.post('avaliacoes', {
         'titulo': titulo,
         'descricao': 'Avaliação técnica',
       });
@@ -173,7 +139,7 @@ class CheckmarkController extends GetxController {
       isLoading.value = true;
 
       final response = await _api.post(
-        'salvarRespostas/${avaliacaoAtual.value!.id}',
+        'avaliacoes/${avaliacaoAtual.value!.id}/respostas',
         {'checkmarks_marcados': checkmarksMarcados},
       );
 
@@ -202,7 +168,7 @@ class CheckmarkController extends GetxController {
       isLoading.value = true;
 
       final response = await _api.put(
-        'finalizarAvaliacao/${avaliacaoAtual.value!.id}',
+        'avaliacoes/${avaliacaoAtual.value!.id}/finalizar',
         {},
       );
 

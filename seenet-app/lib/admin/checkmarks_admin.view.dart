@@ -1,4 +1,4 @@
-// lib/admin/checkmarks_admin.view.dart - VERSÃO CORRIGIDA 100% API
+// lib/admin/checkmarks_admin.view.dart - VERSÃO COMPLETA 100% API
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/categoria_checkmark.dart';
@@ -37,48 +37,28 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
     try {
       setState(() => isLoading = true);
 
-      // ✅ CORRIGIDO: Usar chave do mapa de endpoints
-      final responseCategorias = await _api.get('categorias');
+      // Carregar categorias
+      final responseCategorias = await _api.get('/checkmarks/categorias');
       
       if (responseCategorias['success']) {
-        final dynamic data = responseCategorias['data'];
+        final List<dynamic> data = responseCategorias['data']['categorias'];
+        categorias = data.map((json) => CategoriaCheckmark.fromMap(json)).toList();
         
-        // Tratar diferentes estruturas de resposta
-        List<dynamic> categoriasData = [];
-        if (data is List) {
-          categoriasData = data;
-        } else if (data is Map && data.containsKey('categorias')) {
-          categoriasData = data['categorias'];
-        }
-        
-        categorias = categoriasData.map((json) => CategoriaCheckmark.fromMap(json)).toList();
-        
-        if (categorias.isNotEmpty) {
-          _tabController = TabController(length: categorias.length, vsync: this);
+        _tabController = TabController(length: categorias.length, vsync: this);
 
-          // Carregar checkmarks para cada categoria
-          checkmarksPorCategoria.clear();
-          for (var categoria in categorias) {
-            // ✅ CORRIGIDO: Usar chave com ID
-            final responseCheckmarks = await _api.get('checkmarksPorCategoria/${categoria.id}');
-            
-            if (responseCheckmarks['success']) {
-              final dynamic checkData = responseCheckmarks['data'];
-              List<dynamic> checkmarksData = [];
-              
-              if (checkData is List) {
-                checkmarksData = checkData;
-              } else if (checkData is Map && checkData.containsKey('checkmarks')) {
-                checkmarksData = checkData['checkmarks'];
-              }
-              
-              checkmarksPorCategoria[categoria.id!] = 
-                  checkmarksData.map((json) => Checkmark.fromMap(json)).toList();
-            }
+        // Carregar checkmarks para cada categoria
+        checkmarksPorCategoria.clear();
+        for (var categoria in categorias) {
+          final responseCheckmarks = await _api.get('/checkmarks/categoria/${categoria.id}');
+          
+          if (responseCheckmarks['success']) {
+            final List<dynamic> checkmarksData = responseCheckmarks['data']['checkmarks'];
+            checkmarksPorCategoria[categoria.id!] = 
+                checkmarksData.map((json) => Checkmark.fromMap(json)).toList();
           }
-
-          print('📊 ${categorias.length} categorias carregadas');
         }
+
+        print('📊 ${categorias.length} categorias carregadas');
       }
     } catch (e) {
       print('❌ Erro ao carregar dados: $e');
@@ -380,8 +360,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
       return;
     }
     try {
-      // ✅ CORRIGIDO: Endpoint temporário (criar no backend se não existir)
-      final res = await _api.put('/checkmark/checkmarks/$id', {
+      final res = await _api.put('/checkmarks/checkmarks/$id', {
         'titulo': titulo, 'descricao': desc.isEmpty ? null : desc,
         'prompt_chatgpt': prompt, 'ativo': ativo,
       });
@@ -396,8 +375,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
 
   Future<void> _alternarStatusCheckmark(Checkmark checkmark) async {
     try {
-      // ✅ CORRIGIDO
-      final res = await _api.put('/checkmark/checkmarks/${checkmark.id}/status', {'ativo': !checkmark.ativo});
+      final res = await _api.put('/checkmarks/checkmarks/${checkmark.id}/status', {'ativo': !checkmark.ativo});
       if (res['success']) {
         Get.snackbar('Sucesso', '${!checkmark.ativo ? 'Ativado' : 'Desativado'}!',
           backgroundColor: !checkmark.ativo ? Colors.green : Colors.orange, colorText: Colors.white);
@@ -434,8 +412,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
 
   Future<void> _confirmarRemocao(int id) async {
     try {
-      // ✅ CORRIGIDO
-      final res = await _api.delete('/checkmark/checkmarks/$id');
+      final res = await _api.delete('/checkmarks/checkmarks/$id');
       if (res['success']) {
         Get.snackbar('Sucesso', 'Removido!', backgroundColor: Colors.green, colorText: Colors.white);
         await carregarDados();
@@ -523,8 +500,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
       return;
     }
     try {
-      // ✅ CORRIGIDO
-      final res = await _api.post('criarCheckmark', {
+      final res = await _api.post('/checkmarks/checkmarks', {
         'categoria_id': catId, 'titulo': titulo,
         'descricao': desc.isEmpty ? null : desc,
         'prompt_chatgpt': prompt, 'ativo': true,
@@ -585,8 +561,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
       return;
     }
     try {
-      // ✅ CORRIGIDO
-      final res = await _api.put('/checkmark/categorias/$id', {
+      final res = await _api.put('/checkmarks/categorias/$id', {
         'nome': nome, 'descricao': desc.isEmpty ? null : desc,
       });
       if (res['success']) {

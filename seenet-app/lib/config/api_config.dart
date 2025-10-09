@@ -10,7 +10,7 @@ class ApiConfig {
     return Environment.isDevelopment ? _devBaseUrl : _prodBaseUrl;
   }
   
-  // ✅ ENDPOINTS CORRIGIDOS E COMPLETOS
+  // Endpoints 
   static const Map<String, String> endpoints = {
     // Health
     'health': '/health',
@@ -56,13 +56,13 @@ class ApiConfig {
     'adminStats': '/admin/stats',
     'adminLogs': '/admin/logs',
     
-    // Auditoria
-    'auditLog': '/admin/logs',
-    'auditLogs': '/admin/logs',
-    'auditStats': '/admin/stats',
-    'auditStatsQuick': '/admin/stats/quick',
-    'auditExport': '/admin/logs/export',
-    'auditCleanup': '/admin/logs/cleanup',
+    // ✅ NOVOS: Auditoria
+    'auditLog': '/admin/logs',                    // POST - Registrar log
+    'auditLogs': '/admin/logs',                   // GET - Buscar logs
+    'auditStats': '/admin/stats',                 // GET - Estatísticas
+    'auditStatsQuick': '/admin/stats/quick',      // GET - Estatísticas rápidas
+    'auditExport': '/admin/logs/export',          // GET - Exportar logs
+    'auditCleanup': '/admin/logs/cleanup',        // DELETE - Limpar logs antigos
   };
   
   // Headers padrão
@@ -99,10 +99,7 @@ class ApiConfig {
     print('🏗️ Ambiente: ${Environment.isDevelopment ? "DEV" : "PROD"}');
     print('⏰ Timeout: ${requestTimeout.inSeconds}s');
     print('📊 Total endpoints: ${endpoints.length}');
-    print('🔍 Endpoints disponíveis:');
-    endpoints.forEach((key, value) {
-      print('  • $key -> $baseUrl$value');
-    });
+    print('🔍 Endpoints de Auditoria: ${endpoints.keys.where((k) => k.startsWith('audit')).length}');
     if (Environment.isDevelopment) {
       print('🤖 Emulador Android: 10.0.2.2');
       print('📱 Dispositivo físico: Ajuste o IP em _devBaseUrl');

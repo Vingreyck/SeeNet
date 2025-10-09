@@ -49,40 +49,10 @@ void main() async {
   Get.put(CheckmarkController(), permanent: true);
   Get.put(DiagnosticoController(), permanent: true);
   Get.put(TranscricaoController(), permanent: true);
-  await Get.find<ApiService>().debugEndpoints();
-
-
-  _testarEndpoints();
 
   print('✅ App inicializado - Modo 100% API');
   
   runApp(const MyApp());
-}
-void _testarEndpoints() {
-  print('\n🧪 === TESTE DE RESOLUÇÃO DE ENDPOINTS ===');
-  
-  final apiService = Get.find<ApiService>();
-  
-  // Testar diferentes tipos de endpoints
-  final testes = [
-    'categorias',
-    'checkmarksPorCategoria/1',
-    'criarAvaliacao',
-    'salvarRespostas/123',
-    '/checkmark/categorias',
-    '/avaliacoes',
-  ];
-  
-  for (var endpoint in testes) {
-    try {
-      // Chamar o método privado indiretamente via reflection ou fazer público
-      print('📍 "$endpoint" -> [resultado depende do código]');
-    } catch (e) {
-      print('❌ Erro ao resolver "$endpoint": $e');
-    }
-  }
-  
-  print('================================\n');
 }
 
 class MyApp extends StatelessWidget {
@@ -91,7 +61,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      debugShowCheckedModeBanner: false,  
+      debugShowCheckedModeBanner: false,
       title: 'SeeNet',
       theme: ThemeData(
         primarySwatch: Colors.green,

@@ -36,8 +36,10 @@ class ApiConfig {
     
     // ✅ AVALIAÇÕES - ADICIONADO
     'criarAvaliacao': '/avaliacoes',
-    'salvarRespostas': '/avaliacoes', // Base - adicionar /:id/respostas
-    'finalizarAvaliacao': '/avaliacoes', // Base - adicionar /:id/finalizar
+    'finalizarAvaliacao': '/avaliacoes', // + /:id/finalizar
+    'minhasAvaliacoes': '/avaliacoes/minhas',
+    'verAvaliacao': '/avaliacoes', // + /:id
+    'salvarRespostas': '/avaliacoes', // + /:id/respostas
     
     // Diagnósticos
     'gerarDiagnostico': '/diagnostics/gerar',

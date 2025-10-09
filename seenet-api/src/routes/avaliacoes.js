@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
 const { db } = require('../config/database');
-const authMiddleware = require('../middleware/auth'); // ✅ IMPORTAR
+const authMiddleware = require('../middleware/auth');
 const auditService = require('../services/auditService');
 const logger = require('../config/logger');
 
@@ -23,8 +23,8 @@ router.post('/', [
 
     const { titulo, descricao } = req.body;
 
-    // ✅ AGORA req.user.id e req.tenantId existem!
-    const [avaliacaoId] = await db('avaliacoes').insert({
+    // ✅ CORREÇÃO: .returning() retorna array [id], precisamos do primeiro elemento
+    const result = await db('avaliacoes').insert({
       tenant_id: req.tenantId,
       tecnico_id: req.user.id,
       titulo: titulo || `Avaliação ${new Date().toLocaleString('pt-BR')}`,
@@ -32,7 +32,14 @@ router.post('/', [
       status: 'em_andamento',
       data_inicio: new Date().toISOString(),
       data_criacao: new Date().toISOString(),
-    }).returning('id'); // ✅ ADICIONAR .returning('id') para PostgreSQL
+    }).returning('id');
+    
+    // ✅ Extrair o ID corretamente (pode ser [123] ou [{id: 123}])
+    const avaliacaoId = Array.isArray(result) 
+      ? (typeof result[0] === 'object' ? result[0].id : result[0])
+      : result;
+
+    logger.info(`✅ Avaliação criada: ${avaliacaoId} (Tenant: ${req.tenantCode})`);
 
     await auditService.log({
       action: 'EVALUATION_STARTED',
@@ -40,19 +47,22 @@ router.post('/', [
       tenant_id: req.tenantId,
       tabela_afetada: 'avaliacoes',
       registro_id: avaliacaoId,
-      details: `Avaliação iniciada: ${titulo}`,
+      details: `Avaliação iniciada: ${titulo || 'Sem título'}`,
       ip_address: req.ip,
     });
 
-    logger.info(`✅ Avaliação criada: ${avaliacaoId} (Tenant: ${req.tenantCode})`);
-
+    // ✅ IMPORTANTE: Retornar o ID como número inteiro
     res.status(201).json({
       message: 'Avaliação criada com sucesso',
-      id: avaliacaoId,
+      id: parseInt(avaliacaoId), // Garantir que é número
     });
   } catch (error) {
     logger.error('❌ Erro ao criar avaliação:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    logger.error('Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -194,7 +204,7 @@ router.post('/:avaliacaoId/respostas', [
       return res.status(404).json({ error: 'Avaliação não encontrada' });
     }
 
-    // ✅ MELHOR: Usar transação para consistência
+    // ✅ Usar transação para consistência
     await db.transaction(async (trx) => {
       for (const checkmarkId of checkmarks_marcados) {
         await trx('respostas_checkmark')
@@ -209,7 +219,7 @@ router.post('/:avaliacaoId/respostas', [
       }
     });
 
-    logger.info(`✅ Respostas salvas para avaliação ${avaliacaoId}`);
+    logger.info(`✅ ${checkmarks_marcados.length} respostas salvas para avaliação ${avaliacaoId}`);
 
     res.json({
       message: 'Respostas salvas com sucesso',

@@ -14,6 +14,7 @@ import 'package:get/get.dart';
 import 'package:seenet/config/gemini_config.dart'; 
 import 'package:seenet/login/login.view.dart';
 import 'package:seenet/checklist/checklist.view.dart';
+import 'services/avaliacao_service.dart';
 import 'package:seenet/admin/logs_admin.view.dart';
 import 'package:seenet/diagnostico/diagnostico.view.dart';
 import 'package:seenet/registro/widgets/registro.bindings.dart';
@@ -42,6 +43,7 @@ void main() async {
   
   // ✅ Inicializar SOMENTE controllers de API
   Get.put(ApiService(), permanent: true);
+  Get.put(AvaliacaoService(), permanent: true);
   Get.put(AuthService(), permanent: true);
   Get.put(UsuarioController(), permanent: true);
   Get.put(CheckmarkController(), permanent: true);

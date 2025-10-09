@@ -28,11 +28,18 @@ class ApiConfig {
     'users': '/users',
     'profile': '/users/profile',
     
-    // Checkmarks
-    'categorias': '/checkmarks/categorias',
-    'checkmarksPorCategoria': '/checkmarks/categoria',
-    'criarCategoria': '/checkmarks/categorias',
-    'criarCheckmark': '/checkmarks/checkmarks',
+    // ✅ CHECKMARKS - CORRIGIDO (SINGULAR!)
+    'categorias': '/checkmark/categorias',
+    'checkmarksPorCategoria': '/checkmark/categoria', // Base - adicionar /:id
+    'criarCategoria': '/checkmark/categorias',
+    'criarCheckmark': '/checkmark/checkmarks',
+    
+    // ✅ AVALIAÇÕES - ADICIONADO
+    'criarAvaliacao': '/avaliacoes',
+    'finalizarAvaliacao': '/avaliacoes', // + /:id/finalizar
+    'minhasAvaliacoes': '/avaliacoes/minhas',
+    'verAvaliacao': '/avaliacoes', // + /:id
+    'salvarRespostas': '/avaliacoes', // + /:id/respostas
     
     // Diagnósticos
     'gerarDiagnostico': '/diagnostics/gerar',

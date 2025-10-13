@@ -232,4 +232,5 @@ async function startServer() {
 startServer();
 
 // Export para Vercel (serverless)
-module.exports = app;
+module.exports = app; 
+

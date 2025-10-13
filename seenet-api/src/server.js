@@ -89,11 +89,11 @@ async function startServer() {
     }
     
     try {
-      const adminRoutes = require('./routes/admin.routes');
-      app.use('/api/admin', adminRoutes);
-      console.log('✅ Rotas admin carregadas');
+      const authRoutes = require('./routes/auth');
+      app.use('/api/auth', authRoutes);
+      console.log('✅ Rotas auth carregadas');
     } catch (error) {
-      console.error('❌ Erro ao carregar rotas admin:', error.message);
+      console.error('⚠️ Rotas auth não encontradas');
     }
     
     app.get('/api/health', (req, res) => {

@@ -1,13 +1,10 @@
-// seenet-api/src/routes/admin.routes.js - VERSÃO CORRIGIDA PARA KNEX/POSTGRESQL
+// seenet-api/src/routes/admin.routes.js - SEM MIDDLEWARE GLOBAL
 const express = require('express');
 const router = express.Router();
 const { db } = require('../config/database');
 const { authMiddleware } = require('../middleware/auth');
 
-// Middleware de autenticação
-router.use(authMiddleware);
-
-// Middleware para verificar se é admin (adicione no seu auth middleware se ainda não existe)
+// Middleware para verificar se é admin
 const requireAdmin = (req, res, next) => {
   if (!req.user || !req.user.is_admin) {
     return res.status(403).json({
@@ -19,7 +16,8 @@ const requireAdmin = (req, res, next) => {
 };
 
 // ========== REGISTRAR LOG DE AUDITORIA ==========
-router.post('/logs', async (req, res) => {
+// Qualquer usuário autenticado pode registrar log
+router.post('/logs', authMiddleware, async (req, res) => {
   try {
     const {
       usuario_id,
@@ -34,7 +32,6 @@ router.post('/logs', async (req, res) => {
       user_agent
     } = req.body;
     
-    // Inserir log no banco PostgreSQL
     await db('logs_sistema').insert({
       usuario_id: usuario_id || req.user.id,
       acao,
@@ -64,8 +61,8 @@ router.post('/logs', async (req, res) => {
   }
 });
 
-// ========== BUSCAR LOGS COM FILTROS ==========
-router.get('/logs', requireAdmin, async (req, res) => {
+// ========== BUSCAR LOGS COM FILTROS (ADMIN) ==========
+router.get('/logs', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const {
       usuario_id,
@@ -86,28 +83,12 @@ router.get('/logs', requireAdmin, async (req, res) => {
       )
       .where('l.tenant_id', req.user.tenant_id);
     
-    // Aplicar filtros
-    if (usuario_id) {
-      query = query.where('l.usuario_id', usuario_id);
-    }
+    if (usuario_id) query = query.where('l.usuario_id', usuario_id);
+    if (acao) query = query.where('l.acao', acao);
+    if (nivel) query = query.where('l.nivel', nivel);
+    if (data_inicio) query = query.where('l.data_acao', '>=', data_inicio);
+    if (data_fim) query = query.where('l.data_acao', '<=', data_fim);
     
-    if (acao) {
-      query = query.where('l.acao', acao);
-    }
-    
-    if (nivel) {
-      query = query.where('l.nivel', nivel);
-    }
-    
-    if (data_inicio) {
-      query = query.where('l.data_acao', '>=', data_inicio);
-    }
-    
-    if (data_fim) {
-      query = query.where('l.data_acao', '<=', data_fim);
-    }
-    
-    // Aplicar paginação e ordenação
     const logs = await query
       .orderBy('l.data_acao', 'desc')
       .limit(parseInt(limite))
@@ -133,8 +114,8 @@ router.get('/logs', requireAdmin, async (req, res) => {
   }
 });
 
-// ========== ESTATÍSTICAS GERAIS ==========
-router.get('/stats', requireAdmin, async (req, res) => {
+// ========== ESTATÍSTICAS GERAIS (ADMIN) ==========
+router.get('/stats', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { data_inicio, data_fim } = req.query;
     
@@ -145,7 +126,6 @@ router.get('/stats', requireAdmin, async (req, res) => {
       baseQuery = baseQuery.whereBetween('data_acao', [data_inicio, data_fim]);
     }
     
-    // Total por ação
     const totalPorAcao = await db('logs_sistema')
       .where('tenant_id', req.user.tenant_id)
       .modify((qb) => {
@@ -158,7 +138,6 @@ router.get('/stats', requireAdmin, async (req, res) => {
       .groupBy('acao')
       .orderBy('total', 'desc');
     
-    // Total por nível
     const totalPorNivel = await db('logs_sistema')
       .where('tenant_id', req.user.tenant_id)
       .modify((qb) => {
@@ -170,7 +149,6 @@ router.get('/stats', requireAdmin, async (req, res) => {
       .count('* as total')
       .groupBy('nivel');
     
-    // Usuários mais ativos
     const usuariosMaisAtivos = await db('logs_sistema as l')
       .join('usuarios as u', 'l.usuario_id', 'u.id')
       .where('l.tenant_id', req.user.tenant_id)
@@ -185,7 +163,6 @@ router.get('/stats', requireAdmin, async (req, res) => {
       .orderBy('total_acoes', 'desc')
       .limit(10);
     
-    // Ações suspeitas
     const acoesSuspeitas = await db('logs_sistema')
       .whereIn('nivel', ['warning', 'error'])
       .where('tenant_id', req.user.tenant_id)
@@ -197,7 +174,6 @@ router.get('/stats', requireAdmin, async (req, res) => {
       .orderBy('data_acao', 'desc')
       .limit(50);
     
-    // Calcular total de logs
     const totalLogs = totalPorAcao.reduce((sum, item) => sum + parseInt(item.total), 0);
     
     res.json({
@@ -227,17 +203,15 @@ router.get('/stats', requireAdmin, async (req, res) => {
   }
 });
 
-// ========== ESTATÍSTICAS RÁPIDAS ==========
-router.get('/stats/quick', async (req, res) => {
+// ========== ESTATÍSTICAS RÁPIDAS (ADMIN) ==========
+router.get('/stats/quick', authMiddleware, requireAdmin, async (req, res) => {
   try {
-    // Logs das últimas 24h
     const logs24h = await db('logs_sistema')
       .where('tenant_id', req.user.tenant_id)
       .where('data_acao', '>', db.raw("NOW() - INTERVAL '24 HOURS'"))
       .count('* as total')
       .first();
     
-    // Ações críticas hoje
     const acoesCriticas = await db('logs_sistema')
       .where('tenant_id', req.user.tenant_id)
       .whereIn('nivel', ['warning', 'error'])
@@ -263,8 +237,8 @@ router.get('/stats/quick', async (req, res) => {
   }
 });
 
-// ========== EXPORTAR LOGS ==========
-router.get('/logs/export', requireAdmin, async (req, res) => {
+// ========== EXPORTAR LOGS (ADMIN) ==========
+router.get('/logs/export', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { data_inicio, data_fim, formato = 'json' } = req.query;
     
@@ -278,7 +252,6 @@ router.get('/logs/export', requireAdmin, async (req, res) => {
     const logs = await query.orderBy('data_acao', 'desc');
     
     if (formato === 'csv') {
-      // Converter para CSV
       const csv = [
         'ID,Usuario ID,Acao,Nivel,Tabela,Registro ID,Detalhes,IP,Data',
         ...logs.map(log => 
@@ -291,7 +264,6 @@ router.get('/logs/export', requireAdmin, async (req, res) => {
         data: { export: csv }
       });
     } else {
-      // JSON
       res.json({
         success: true,
         data: { export: JSON.stringify(logs, null, 2) }
@@ -308,19 +280,17 @@ router.get('/logs/export', requireAdmin, async (req, res) => {
   }
 });
 
-// ========== LIMPAR LOGS ANTIGOS ==========
-router.delete('/logs/cleanup', requireAdmin, async (req, res) => {
+// ========== LIMPAR LOGS ANTIGOS (ADMIN) ==========
+router.delete('/logs/cleanup', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { dias = 90 } = req.query;
     
-    // Deletar logs antigos
     const result = await db('logs_sistema')
       .where('tenant_id', req.user.tenant_id)
       .where('data_acao', '<', db.raw(`NOW() - INTERVAL '${parseInt(dias)} DAYS'`))
       .where('nivel', 'info')
       .delete();
     
-    // Registrar limpeza
     await db('logs_sistema').insert({
       usuario_id: req.user.id,
       acao: 'DATA_CLEANUP',

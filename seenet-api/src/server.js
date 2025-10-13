@@ -64,6 +64,26 @@ async function startServer() {
     
     console.log('📁 Carregando rotas...');
 
+    // ========== ROTAS PÚBLICAS (SEM AUTENTICAÇÃO) ==========
+    
+    try {
+      const tenantRoutes = require('./routes/tenant');
+      app.use('/api/tenant', tenantRoutes);
+      console.log('✅ Rotas tenant carregadas');
+    } catch (error) {
+      console.error('❌ Erro ao carregar rotas tenant:', error.message);
+    }
+    
+    try {
+      const authRoutes = require('./routes/auth');
+      app.use('/api/auth', authRoutes);
+      console.log('✅ Rotas auth carregadas');
+    } catch (error) {
+      console.error('⚠️ Rotas auth não encontradas');
+    }
+
+    // ========== ROTAS PROTEGIDAS (COM AUTENTICAÇÃO) ==========
+    
     try {
       const checkmarksRoutes = require('./routes/checkmark');
       app.use('/api/checkmark', checkmarksRoutes);
@@ -81,20 +101,14 @@ async function startServer() {
     }
 
     try {
-      const tenantRoutes = require('./routes/tenant');
-      app.use('/api/tenant', tenantRoutes);
-      console.log('✅ Rotas tenant carregadas');
+      const adminRoutes = require('./routes/admin.routes');
+      app.use('/api/admin', adminRoutes);
+      console.log('✅ Rotas admin carregadas');
     } catch (error) {
-      console.error('❌ Erro ao carregar rotas tenant:', error.message);
+      console.error('❌ Erro ao carregar rotas admin:', error.message);
     }
     
-    try {
-      const authRoutes = require('./routes/auth');
-      app.use('/api/auth', authRoutes);
-      console.log('✅ Rotas auth carregadas');
-    } catch (error) {
-      console.error('⚠️ Rotas auth não encontradas');
-    }
+    // ========== ROTAS DE DEBUG E HEALTH ==========
     
     app.get('/api/health', (req, res) => {
       res.json({ 

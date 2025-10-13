@@ -1,12 +1,25 @@
+// seenet-api/src/routes/admin.routes.js - VERSÃO CORRIGIDA PARA KNEX/POSTGRESQL
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { db } = require('../config/database');
+const { authMiddleware } = require('../middleware/auth');
+
+// Middleware de autenticação
+router.use(authMiddleware);
+
+// Middleware para verificar se é admin (adicione no seu auth middleware se ainda não existe)
+const requireAdmin = (req, res, next) => {
+  if (!req.user || !req.user.is_admin) {
+    return res.status(403).json({
+      success: false,
+      error: 'Acesso negado. Apenas administradores.'
+    });
+  }
+  next();
+};
 
 // ========== REGISTRAR LOG DE AUDITORIA ==========
-router.post('/logs', authenticateToken, async (req, res) => {
-  const connection = await pool.getConnection();
-  
+router.post('/logs', async (req, res) => {
   try {
     const {
       usuario_id,
@@ -21,27 +34,21 @@ router.post('/logs', authenticateToken, async (req, res) => {
       user_agent
     } = req.body;
     
-    // Inserir log
-    await connection.query(
-      `INSERT INTO logs_sistema (
-        usuario_id, acao, nivel, tabela_afetada, registro_id,
-        dados_anteriores, dados_novos, detalhes, ip_address, user_agent,
-        tenant_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        usuario_id || req.user.id,
-        acao,
-        nivel || 'info',
-        tabela_afetada,
-        registro_id,
-        dados_anteriores ? JSON.stringify(dados_anteriores) : null,
-        dados_novos ? JSON.stringify(dados_novos) : null,
-        detalhes,
-        ip_address || req.ip,
-        user_agent || req.get('User-Agent'),
-        req.user.tenant_id
-      ]
-    );
+    // Inserir log no banco PostgreSQL
+    await db('logs_sistema').insert({
+      usuario_id: usuario_id || req.user.id,
+      acao,
+      nivel: nivel || 'info',
+      tabela_afetada,
+      registro_id,
+      dados_anteriores: dados_anteriores ? JSON.stringify(dados_anteriores) : null,
+      dados_novos: dados_novos ? JSON.stringify(dados_novos) : null,
+      detalhes,
+      ip_address: ip_address || req.ip,
+      user_agent: user_agent || req.get('User-Agent'),
+      tenant_id: req.user.tenant_id,
+      data_acao: db.fn.now()
+    });
     
     res.json({
       success: true,
@@ -54,15 +61,11 @@ router.post('/logs', authenticateToken, async (req, res) => {
       success: false,
       error: 'Erro ao registrar log de auditoria'
     });
-  } finally {
-    connection.release();
   }
 });
 
 // ========== BUSCAR LOGS COM FILTROS ==========
-router.get('/logs', authenticateToken, requireAdmin, async (req, res) => {
-  const connection = await pool.getConnection();
-  
+router.get('/logs', requireAdmin, async (req, res) => {
   try {
     const {
       usuario_id,
@@ -74,50 +77,49 @@ router.get('/logs', authenticateToken, requireAdmin, async (req, res) => {
       offset = 0
     } = req.query;
     
-    let query = `
-      SELECT l.*, u.nome as usuario_nome, u.email as usuario_email
-      FROM logs_sistema l
-      LEFT JOIN usuarios u ON l.usuario_id = u.id
-      WHERE l.tenant_id = ?
-    `;
+    let query = db('logs_sistema as l')
+      .leftJoin('usuarios as u', 'l.usuario_id', 'u.id')
+      .select(
+        'l.*',
+        'u.nome as usuario_nome',
+        'u.email as usuario_email'
+      )
+      .where('l.tenant_id', req.user.tenant_id);
     
-    const params = [req.user.tenant_id];
-    
+    // Aplicar filtros
     if (usuario_id) {
-      query += ' AND l.usuario_id = ?';
-      params.push(usuario_id);
+      query = query.where('l.usuario_id', usuario_id);
     }
     
     if (acao) {
-      query += ' AND l.acao = ?';
-      params.push(acao);
+      query = query.where('l.acao', acao);
     }
     
     if (nivel) {
-      query += ' AND l.nivel = ?';
-      params.push(nivel);
+      query = query.where('l.nivel', nivel);
     }
     
     if (data_inicio) {
-      query += ' AND l.data_acao >= ?';
-      params.push(data_inicio);
+      query = query.where('l.data_acao', '>=', data_inicio);
     }
     
     if (data_fim) {
-      query += ' AND l.data_acao <= ?';
-      params.push(data_fim);
+      query = query.where('l.data_acao', '<=', data_fim);
     }
     
-    query += ' ORDER BY l.data_acao DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limite), parseInt(offset));
-    
-    const [logs] = await connection.query(query, params);
+    // Aplicar paginação e ordenação
+    const logs = await query
+      .orderBy('l.data_acao', 'desc')
+      .limit(parseInt(limite))
+      .offset(parseInt(offset));
     
     res.json({
       success: true,
       data: {
         logs,
-        total: logs.length
+        total: logs.length,
+        limite: parseInt(limite),
+        offset: parseInt(offset)
       }
     });
     
@@ -125,69 +127,78 @@ router.get('/logs', authenticateToken, requireAdmin, async (req, res) => {
     console.error('❌ Erro ao buscar logs:', error);
     res.status(500).json({
       success: false,
-      error: 'Erro ao buscar logs'
+      error: 'Erro ao buscar logs',
+      details: error.message
     });
-  } finally {
-    connection.release();
   }
 });
 
 // ========== ESTATÍSTICAS GERAIS ==========
-router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
-  const connection = await pool.getConnection();
-  
+router.get('/stats', requireAdmin, async (req, res) => {
   try {
     const { data_inicio, data_fim } = req.query;
     
-    let whereClause = 'WHERE tenant_id = ?';
-    const params = [req.user.tenant_id];
+    let baseQuery = db('logs_sistema')
+      .where('tenant_id', req.user.tenant_id);
     
     if (data_inicio && data_fim) {
-      whereClause += ' AND data_acao BETWEEN ? AND ?';
-      params.push(data_inicio, data_fim);
+      baseQuery = baseQuery.whereBetween('data_acao', [data_inicio, data_fim]);
     }
     
     // Total por ação
-    const [totalPorAcao] = await connection.query(
-      `SELECT acao, COUNT(*) as total 
-       FROM logs_sistema 
-       ${whereClause}
-       GROUP BY acao 
-       ORDER BY total DESC`,
-      params
-    );
+    const totalPorAcao = await db('logs_sistema')
+      .where('tenant_id', req.user.tenant_id)
+      .modify((qb) => {
+        if (data_inicio && data_fim) {
+          qb.whereBetween('data_acao', [data_inicio, data_fim]);
+        }
+      })
+      .select('acao')
+      .count('* as total')
+      .groupBy('acao')
+      .orderBy('total', 'desc');
     
     // Total por nível
-    const [totalPorNivel] = await connection.query(
-      `SELECT nivel, COUNT(*) as total 
-       FROM logs_sistema 
-       ${whereClause}
-       GROUP BY nivel`,
-      params
-    );
+    const totalPorNivel = await db('logs_sistema')
+      .where('tenant_id', req.user.tenant_id)
+      .modify((qb) => {
+        if (data_inicio && data_fim) {
+          qb.whereBetween('data_acao', [data_inicio, data_fim]);
+        }
+      })
+      .select('nivel')
+      .count('* as total')
+      .groupBy('nivel');
     
     // Usuários mais ativos
-    const [usuariosMaisAtivos] = await connection.query(
-      `SELECT u.nome, u.email, COUNT(l.id) as total_acoes
-       FROM logs_sistema l
-       JOIN usuarios u ON l.usuario_id = u.id
-       ${whereClause}
-       GROUP BY l.usuario_id
-       ORDER BY total_acoes DESC
-       LIMIT 10`,
-      params
-    );
+    const usuariosMaisAtivos = await db('logs_sistema as l')
+      .join('usuarios as u', 'l.usuario_id', 'u.id')
+      .where('l.tenant_id', req.user.tenant_id)
+      .modify((qb) => {
+        if (data_inicio && data_fim) {
+          qb.whereBetween('l.data_acao', [data_inicio, data_fim]);
+        }
+      })
+      .select('u.nome', 'u.email')
+      .count('l.id as total_acoes')
+      .groupBy('l.usuario_id', 'u.nome', 'u.email')
+      .orderBy('total_acoes', 'desc')
+      .limit(10);
     
     // Ações suspeitas
-    const [acoesSuspeitas] = await connection.query(
-      `SELECT * FROM logs_sistema 
-       WHERE nivel IN ('warning', 'error')
-       AND tenant_id = ?
-       ${data_inicio && data_fim ? 'AND data_acao BETWEEN ? AND ?' : ''}
-       ORDER BY data_acao DESC
-       LIMIT 50`,
-      data_inicio && data_fim ? [req.user.tenant_id, data_inicio, data_fim] : [req.user.tenant_id]
-    );
+    const acoesSuspeitas = await db('logs_sistema')
+      .whereIn('nivel', ['warning', 'error'])
+      .where('tenant_id', req.user.tenant_id)
+      .modify((qb) => {
+        if (data_inicio && data_fim) {
+          qb.whereBetween('data_acao', [data_inicio, data_fim]);
+        }
+      })
+      .orderBy('data_acao', 'desc')
+      .limit(50);
+    
+    // Calcular total de logs
+    const totalLogs = totalPorAcao.reduce((sum, item) => sum + parseInt(item.total), 0);
     
     res.json({
       success: true,
@@ -197,7 +208,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
           fim: data_fim || 'Agora'
         },
         resumo: {
-          total_logs: totalPorAcao.reduce((sum, item) => sum + item.total, 0),
+          total_logs: totalLogs,
           por_acao: totalPorAcao,
           por_nivel: totalPorNivel
         },
@@ -210,42 +221,35 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
     console.error('❌ Erro ao gerar estatísticas:', error);
     res.status(500).json({
       success: false,
-      error: 'Erro ao gerar estatísticas'
+      error: 'Erro ao gerar estatísticas',
+      details: error.message
     });
-  } finally {
-    connection.release();
   }
 });
 
 // ========== ESTATÍSTICAS RÁPIDAS ==========
-router.get('/stats/quick', authenticateToken, async (req, res) => {
-  const connection = await pool.getConnection();
-  
+router.get('/stats/quick', async (req, res) => {
   try {
     // Logs das últimas 24h
-    const [logs24h] = await connection.query(
-      `SELECT COUNT(*) as total 
-       FROM logs_sistema 
-       WHERE tenant_id = ? 
-       AND data_acao > DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
-      [req.user.tenant_id]
-    );
+    const logs24h = await db('logs_sistema')
+      .where('tenant_id', req.user.tenant_id)
+      .where('data_acao', '>', db.raw("NOW() - INTERVAL '24 HOURS'"))
+      .count('* as total')
+      .first();
     
     // Ações críticas hoje
-    const [acoesCriticas] = await connection.query(
-      `SELECT COUNT(*) as total 
-       FROM logs_sistema 
-       WHERE tenant_id = ?
-       AND nivel IN ('warning', 'error')
-       AND data_acao > DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
-      [req.user.tenant_id]
-    );
+    const acoesCriticas = await db('logs_sistema')
+      .where('tenant_id', req.user.tenant_id)
+      .whereIn('nivel', ['warning', 'error'])
+      .where('data_acao', '>', db.raw("NOW() - INTERVAL '24 HOURS'"))
+      .count('* as total')
+      .first();
     
     res.json({
       success: true,
       data: {
-        logs_24h: logs24h[0].total,
-        acoes_criticas: acoesCriticas[0].total
+        logs_24h: parseInt(logs24h?.total || 0),
+        acoes_criticas: parseInt(acoesCriticas?.total || 0)
       }
     });
     
@@ -253,38 +257,32 @@ router.get('/stats/quick', authenticateToken, async (req, res) => {
     console.error('❌ Erro ao obter estatísticas rápidas:', error);
     res.status(500).json({
       success: false,
-      error: 'Erro ao obter estatísticas'
+      error: 'Erro ao obter estatísticas',
+      details: error.message
     });
-  } finally {
-    connection.release();
   }
 });
 
 // ========== EXPORTAR LOGS ==========
-router.get('/logs/export', authenticateToken, requireAdmin, async (req, res) => {
-  const connection = await pool.getConnection();
-  
+router.get('/logs/export', requireAdmin, async (req, res) => {
   try {
     const { data_inicio, data_fim, formato = 'json' } = req.query;
     
-    let query = 'SELECT * FROM logs_sistema WHERE tenant_id = ?';
-    const params = [req.user.tenant_id];
+    let query = db('logs_sistema')
+      .where('tenant_id', req.user.tenant_id);
     
     if (data_inicio && data_fim) {
-      query += ' AND data_acao BETWEEN ? AND ?';
-      params.push(data_inicio, data_fim);
+      query = query.whereBetween('data_acao', [data_inicio, data_fim]);
     }
     
-    query += ' ORDER BY data_acao DESC';
-    
-    const [logs] = await connection.query(query, params);
+    const logs = await query.orderBy('data_acao', 'desc');
     
     if (formato === 'csv') {
       // Converter para CSV
       const csv = [
         'ID,Usuario ID,Acao,Nivel,Tabela,Registro ID,Detalhes,IP,Data',
         ...logs.map(log => 
-          `${log.id},${log.usuario_id || ''},"${log.acao}","${log.nivel || ''}","${log.tabela_afetada || ''}",${log.registro_id || ''},"${log.detalhes || ''}","${log.ip_address || ''}","${log.data_acao}"`
+          `${log.id},${log.usuario_id || ''},"${log.acao}","${log.nivel || ''}","${log.tabela_afetada || ''}",${log.registro_id || ''},"${(log.detalhes || '').replace(/"/g, '""')}","${log.ip_address || ''}","${log.data_acao}"`
         )
       ].join('\n');
       
@@ -304,44 +302,38 @@ router.get('/logs/export', authenticateToken, requireAdmin, async (req, res) => 
     console.error('❌ Erro ao exportar logs:', error);
     res.status(500).json({
       success: false,
-      error: 'Erro ao exportar logs'
+      error: 'Erro ao exportar logs',
+      details: error.message
     });
-  } finally {
-    connection.release();
   }
 });
 
 // ========== LIMPAR LOGS ANTIGOS ==========
-router.delete('/logs/cleanup', authenticateToken, requireAdmin, async (req, res) => {
-  const connection = await pool.getConnection();
-  
+router.delete('/logs/cleanup', requireAdmin, async (req, res) => {
   try {
     const { dias = 90 } = req.query;
     
-    const [result] = await connection.query(
-      `DELETE FROM logs_sistema 
-       WHERE tenant_id = ?
-       AND data_acao < DATE_SUB(NOW(), INTERVAL ? DAY)
-       AND nivel = 'info'`,
-      [req.user.tenant_id, parseInt(dias)]
-    );
+    // Deletar logs antigos
+    const result = await db('logs_sistema')
+      .where('tenant_id', req.user.tenant_id)
+      .where('data_acao', '<', db.raw(`NOW() - INTERVAL '${parseInt(dias)} DAYS'`))
+      .where('nivel', 'info')
+      .delete();
     
     // Registrar limpeza
-    await connection.query(
-      `INSERT INTO logs_sistema (
-        usuario_id, acao, nivel, detalhes, tenant_id
-      ) VALUES (?, 'DATA_CLEANUP', 'info', ?, ?)`,
-      [
-        req.user.id,
-        `Limpeza automática: ${result.affectedRows} logs antigos removidos`,
-        req.user.tenant_id
-      ]
-    );
+    await db('logs_sistema').insert({
+      usuario_id: req.user.id,
+      acao: 'DATA_CLEANUP',
+      nivel: 'info',
+      detalhes: `Limpeza automática: ${result} logs antigos removidos`,
+      tenant_id: req.user.tenant_id,
+      data_acao: db.fn.now()
+    });
     
     res.json({
       success: true,
       data: {
-        logs_removidos: result.affectedRows
+        logs_removidos: result
       }
     });
     
@@ -349,10 +341,9 @@ router.delete('/logs/cleanup', authenticateToken, requireAdmin, async (req, res)
     console.error('❌ Erro ao limpar logs:', error);
     res.status(500).json({
       success: false,
-      error: 'Erro ao limpar logs'
+      error: 'Erro ao limpar logs',
+      details: error.message
     });
-  } finally {
-    connection.release();
   }
 });
 

@@ -89,7 +89,7 @@ app.use('/api/transcriptions', require('./routes/transcriptions'));
 // app.use('/api/users', require('./routes/users'));
 
 // Admin (futuramente)
-// app.use('/api/admin', adminMiddleware, require('./routes/admin'));
+app.use('/api/admin', require('./routes/admin.routes'));
 
 // ========== ROTA 404 ==========
 app.use((req, res) => {

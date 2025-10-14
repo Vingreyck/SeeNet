@@ -2,6 +2,7 @@
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 
+
 class TranscricaoService {
   static TranscricaoService? _instance;
   static TranscricaoService get instance => _instance ??= TranscricaoService._();

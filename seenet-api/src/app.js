@@ -184,6 +184,7 @@ async function startServer() {
   }
 }
 
+
 // Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM recebido. Encerrando servidor...');

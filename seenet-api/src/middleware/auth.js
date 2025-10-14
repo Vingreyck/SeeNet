@@ -37,6 +37,7 @@ const authMiddleware = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({ error: 'Usuário não encontrado ou inativo' });
     }
+    
 
     // Adicionar informações do usuário e tenant à requisição
     req.user = user;

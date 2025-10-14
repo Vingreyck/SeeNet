@@ -9,6 +9,7 @@ class GeminiService {
     this.retryDelay = 2000; // 2 segundos
   }
 
+  
   async gerarDiagnostico(prompt) {
     if (!this.apiKey) {
       throw new Error('Chave da API Gemini não configurada');

@@ -9,6 +9,7 @@ class AuthService extends GetxService {
 
   // Getter lazy - busca o controller apenas quando necessário
   UsuarioController get _usuarioController => Get.find<UsuarioController>();
+  
 
   // Login com código da empresa
   Future<bool> login(String email, String senha, String codigoEmpresa) async {

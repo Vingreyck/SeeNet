@@ -138,6 +138,7 @@ class _ChecklistviewState extends State<Checklistview> {
                 );
               }
 
+
               // ✅ Categorias da API
               return RefreshIndicator(
                 onRefresh: _carregarCategorias,

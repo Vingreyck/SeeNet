@@ -74,6 +74,7 @@ class CheckmarkController extends GetxController {
       isLoading.value = false;
     }
   }
+  
 
   // ========== INICIAR NOVA AVALIAÇÃO NA API ==========
   Future<bool> iniciarAvaliacao(int tecnicoId, String titulo) async {

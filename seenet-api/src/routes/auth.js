@@ -19,6 +19,7 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+
 // ========== REGISTRO DE USUÁRIO ==========
 router.post('/register', [
   body('nome').trim().isLength({ min: 2, max: 100 }).withMessage('Nome deve ter entre 2 e 100 caracteres'),

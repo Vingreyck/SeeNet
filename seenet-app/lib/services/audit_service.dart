@@ -336,6 +336,7 @@ class AuditService extends GetxService {
   String _maskEmail(String email) {
     if (email.length <= 4) return '***';
     
+    
     int atIndex = email.indexOf('@');
     if (atIndex <= 0) return '***';
     

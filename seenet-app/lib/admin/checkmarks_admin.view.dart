@@ -555,6 +555,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
     );
   }
 
+
   Future<void> _salvarEdicaoCategoria(int id, String nome, String desc) async {
     if (nome.isEmpty) {
       Get.snackbar('Erro', 'Nome obrigatório', backgroundColor: Colors.red, colorText: Colors.white);

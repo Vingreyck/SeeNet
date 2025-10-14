@@ -7,6 +7,7 @@ const { adminMiddleware } = require('../middleware/auth');
 const auditService = require('../services/auditService');
 const logger = require('../config/logger');
 
+
 const router = express.Router();
 router.use(authMiddleware);
 

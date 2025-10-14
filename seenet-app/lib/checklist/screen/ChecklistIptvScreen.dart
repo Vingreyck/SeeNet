@@ -17,6 +17,7 @@ class _ChecklistIptvScreenState extends State<ChecklistIptvScreen> {
   final CheckmarkController checkmarkController = Get.find<CheckmarkController>();
   final UsuarioController usuarioController = Get.find<UsuarioController>();
 
+
   @override
   void initState() {
     super.initState();

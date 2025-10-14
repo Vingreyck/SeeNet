@@ -714,6 +714,7 @@ Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String tipo
       ),
     );
   }
+  
 
   Future<void> _confirmarRemocaoUsuario(int id) async {
     try {

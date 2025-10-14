@@ -41,6 +41,7 @@ class UsuarioController extends GetxController {
         return true;
       }
       
+      
       return false;
     } catch (e) {
       print('❌ Erro no login: $e');

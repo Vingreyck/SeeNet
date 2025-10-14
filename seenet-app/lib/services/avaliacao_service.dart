@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import '../config/api_config.dart';
 import 'api_service.dart';
 
+
 class AvaliacaoService extends GetxService {
   final ApiService _api = ApiService.instance;
 

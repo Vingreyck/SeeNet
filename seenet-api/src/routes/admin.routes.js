@@ -2,11 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const { db } = require('../config/database');
-const { authMiddleware } = require('../middleware/auth');
-
+const authMiddleware = require('../middleware/auth');
 // Middleware para verificar se é admin
 const requireAdmin = (req, res, next) => {
-  if (!req.user || !req.user.is_admin) {
+  if (!req.user || req.user.tipo_usuario !== 'administrador') {
     return res.status(403).json({
       success: false,
       error: 'Acesso negado. Apenas administradores.'

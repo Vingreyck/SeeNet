@@ -100,12 +100,29 @@ async function startServer() {
       console.error('❌ Erro ao carregar rotas avaliacoes:', error.message);
     }
 
+    // ========== ADMIN - COM DEBUG DETALHADO ==========
     try {
+      console.log('🔍 Tentando carregar rotas admin...');
+      console.log('📂 Caminho: ./routes/admin.routes');
+      
       const adminRoutes = require('./routes/admin.routes');
+      
+      console.log('✅ Arquivo admin.routes carregado');
+      console.log('📊 Tipo:', typeof adminRoutes);
+      
       app.use('/api/admin', adminRoutes);
-      console.log('✅ Rotas admin carregadas');
+      
+      console.log('✅ Rotas admin registradas em /api/admin');
+      console.log('🔗 Endpoints disponíveis:');
+      console.log('   - GET  /api/admin/logs');
+      console.log('   - GET  /api/admin/stats');
+      console.log('   - GET  /api/admin/stats/quick');
+      console.log('   - POST /api/admin/logs');
+      
     } catch (error) {
-      console.error('❌ Erro ao carregar rotas admin:', error.message);
+      console.error('❌ ERRO AO CARREGAR ROTAS ADMIN:');
+      console.error('   Mensagem:', error.message);
+      console.error('   Stack:', error.stack);
     }
     
     // ========== ROTAS DE DEBUG E HEALTH ==========
@@ -215,4 +232,5 @@ async function startServer() {
 startServer();
 
 // Export para Vercel (serverless)
-module.exports = app;
+module.exports = app; 
+

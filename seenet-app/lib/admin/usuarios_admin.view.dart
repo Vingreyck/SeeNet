@@ -462,7 +462,7 @@ Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String tipo
       'ativo': ativo,
     };
     
-    final response = await _api.put('adminUserEdit/$id', dadosAtualizacao);
+    final response = await _api.put('/auth/usuarios/$id', dadosAtualizacao);
     
     if (response['success']) {
       Get.snackbar(
@@ -634,7 +634,7 @@ Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String tipo
 
   Future<void> _atualizarStatusUsuario(int id, bool ativo) async {
     try {
-      final response = await _api.put('adminUserStatus/$id/status', {
+      final response = await _api.put('/auth/usuarios/$id/status', {
         'ativo': ativo,
       });
       
@@ -717,7 +717,7 @@ Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String tipo
 
   Future<void> _confirmarRemocaoUsuario(int id) async {
     try {
-      final response = await _api.delete('adminUserDelete/$id');
+      final response = await _api.delete('/auth/usuarios/$id');
       
       if (response['success']) {
         Get.snackbar('Sucesso', 'Usuário removido com sucesso!',

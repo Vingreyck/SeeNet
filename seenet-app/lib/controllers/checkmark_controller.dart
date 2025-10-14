@@ -26,7 +26,7 @@ class CheckmarkController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.get('/checkmarks/categorias'); // ✅ Endpoint correto
+      final response = await _api.get('/checkmark/categorias'); // ✅ Endpoint correto
 
       if (response['success']) {
         final List<dynamic> data = response['data']['categorias'];
@@ -53,7 +53,7 @@ class CheckmarkController extends GetxController {
       isLoading.value = true;
       categoriaAtual.value = categoriaId;
 
-      final response = await _api.get('checkmarksPorCategoria/$categoriaId');
+      final response = await _api.get('/checkmark/categoria/$categoriaId');
 
       if (response['success']) {
         final List<dynamic> data = response['data']['checkmarks'];
@@ -80,7 +80,7 @@ class CheckmarkController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.post('avaliacoes', {
+      final response = await _api.post('/avaliacoes', {
         'titulo': titulo,
         'descricao': 'Avaliação técnica',
       });

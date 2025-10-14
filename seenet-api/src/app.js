@@ -162,8 +162,8 @@ async function startServer() {
 ║  • POST /api/auth/login                                 ║
 ║  • POST /api/auth/register                              ║
 ║  • GET  /api/tenant/verify/:codigo                      ║
-║  • GET  /api/checkmarks/categorias                      ║
-║  • GET  /api/checkmarks/categoria/:id                   ║
+║  • GET  /api/checkmark/categorias                      ║
+║  • GET  /api/checkmark/categoria/:id                   ║
 ║  • POST /api/avaliacoes                                 ║
 ║  • POST /api/diagnostics/gerar                          ║
 ║  • POST /api/transcriptions                             ║

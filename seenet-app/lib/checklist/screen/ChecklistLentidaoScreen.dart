@@ -1,4 +1,4 @@
-// lib/checklist/screen/ChecklistLentidaoScreen.dart - ATUALIZADA
+// lib/checklist/screen/ChecklistLentidaoScreen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:seenet/checklist/widgets/checklistlentidao.widget.dart';
@@ -14,20 +14,20 @@ class ChecklistLentidaoScreen extends StatefulWidget {
 }
 
 class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
-  final CheckmarkController checkmarkController = Get.put(CheckmarkController());
+  final CheckmarkController checkmarkController = Get.find<CheckmarkController>();
   final UsuarioController usuarioController = Get.find<UsuarioController>();
 
   @override
   void initState() {
     super.initState();
-    _inicializarDados();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _inicializarDados();
+    });
   }
 
   void _inicializarDados() async {
-    // Carregar checkmarks da categoria Lentidão (ID = 1)
-    await checkmarkController.carregarCheckmarks(1);
+    print('📋 Checkmarks já carregados: ${checkmarkController.checkmarksAtivos.length}');
     
-    // Iniciar nova avaliação
     if (usuarioController.usuarioLogado.value != null) {
       await checkmarkController.iniciarAvaliacao(
         usuarioController.usuarioLogado.value!.id!,
@@ -64,7 +64,10 @@ class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
                     color: Colors.white,
                     size: 28,
                   ),
-                  onPressed: () => Get.back(),
+                  onPressed: () {
+                    // ✅ Usar Navigator.pop em vez de Get.back
+                    Navigator.of(context).pop();
+                  },
                 ),
                 const SizedBox(width: 16),
                 const Text(
@@ -78,7 +81,7 @@ class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
               ],
             ),
           ),
-          // Lista de checkboxes dinâmica do banco
+          // Lista de checkboxes
           Expanded(
             child: Column(
               children: [
@@ -124,31 +127,32 @@ class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
   }
 
   void _enviarDiagnostico() async {
-    // Salvar respostas
     bool salvou = await checkmarkController.salvarRespostas();
     
     if (salvou) {
-      // Finalizar avaliação
       await checkmarkController.finalizarAvaliacao();
       
-      Get.snackbar(
-        'Sucesso',
-        'Respostas salvas! Gerando diagnóstico...',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-      
-      // Navegar para diagnóstico
-      Get.toNamed('/diagnostico');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Respostas salvas! Gerando diagnóstico...'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
+        Get.toNamed('/diagnostico');
+      }
     } else {
-      Get.snackbar(
-        'Erro',
-        'Erro ao salvar respostas',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao salvar respostas'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 }

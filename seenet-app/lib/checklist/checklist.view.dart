@@ -3,14 +3,31 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:seenet/checklist/widgets/checklist_categoria_card.widget.dart';
 import 'package:get/get.dart';
 import '../controllers/usuario_controller.dart';
+import '../controllers/checkmark_controller.dart';
 
-class Checklistview extends StatelessWidget {
+class Checklistview extends StatefulWidget {
   const Checklistview({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final UsuarioController usuarioController = Get.find<UsuarioController>();
+  State<Checklistview> createState() => _ChecklistviewState();
+}
 
+class _ChecklistviewState extends State<Checklistview> {
+  final UsuarioController usuarioController = Get.find<UsuarioController>();
+  final CheckmarkController checkmarkController = Get.find<CheckmarkController>();
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarCategorias();
+  }
+
+  Future<void> _carregarCategorias() async {
+    await checkmarkController.carregarCategorias();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
@@ -20,6 +37,7 @@ class Checklistview extends StatelessWidget {
       backgroundColor: const Color(0xFF1A1A1A),
       body: Stack(
         children: [
+          // Header verde (mantém igual)
           Positioned(
             top: 0,
             left: 0,
@@ -48,47 +66,24 @@ class Checklistview extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        SvgPicture.asset(
-                          'assets/images/logo.svg',
-                          width: 48,
-                          height: 48,
-                        ),
+                        SvgPicture.asset('assets/images/logo.svg', width: 48, height: 48),
                         const SizedBox(width: 3),
-                        const Text(
-                          'SeeNet',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                        const Text('SeeNet', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
                       ],
                     ),
                     GestureDetector(
-                      onTap: () {
-                        _mostrarMenuUsuario(context, usuarioController);
-                      },
+                      onTap: () => _mostrarMenuUsuario(context, usuarioController),
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.white.withOpacity(0.2),
-                          border: usuarioController.isAdmin 
-                              ? Border.all(color: Colors.orange, width: 2)
-                              : null,
+                          border: usuarioController.isAdmin ? Border.all(color: Colors.orange, width: 2) : null,
                         ),
                         child: CircleAvatar(
                           radius: 20,
-                          backgroundColor: usuarioController.isAdmin 
-                              ? Colors.orange.withOpacity(0.3)
-                              : Colors.white.withOpacity(0.2),
-                          child: Icon(
-                            usuarioController.isAdmin 
-                                ? Icons.admin_panel_settings 
-                                : Icons.person_outline, 
-                            color: Colors.white, 
-                            size: 24
-                          ),
+                          backgroundColor: usuarioController.isAdmin ? Colors.orange.withOpacity(0.3) : Colors.white.withOpacity(0.2),
+                          child: Icon(usuarioController.isAdmin ? Icons.admin_panel_settings : Icons.person_outline, color: Colors.white, size: 24),
                         ),
                       ),
                     ),
@@ -97,83 +92,111 @@ class Checklistview extends StatelessWidget {
               ),
             ),
           ),
+          
+          // Título
           Positioned(
-            top: 180, 
-            left: 24,
-            right: 24,
+            top: 180, left: 24, right: 24,
             child: ShaderMask(
-              shaderCallback: (Rect bounds) {
-                return const LinearGradient(
-                  colors: [
-                    Color(0xFF00FF88),
-                    Color(0xFFFFFFFF),
-                  ],
-                ).createShader(Rect.fromLTWH(0.0, 0.0, bounds.width, bounds.height));
-              },
-              child: const Text(
-                'Checklist Técnico',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.left,
-              ),
+              shaderCallback: (Rect bounds) => const LinearGradient(colors: [Color(0xFF00FF88), Color(0xFFFFFFFF)]).createShader(Rect.fromLTWH(0.0, 0.0, bounds.width, bounds.height)),
+              child: const Text('Checklist Técnico', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w500), textAlign: TextAlign.left),
             ),
           ),
+          
+          // Subtítulo
           const Positioned(
-            top: 220, 
-            left: 24,
-            right: 24,
-            child: Text(
-              'Selecione a categoria para diagnóstico',
-              style: TextStyle(
-                color: Color(0XFF888888),
-                fontSize: 16,
-              ),
-            ),
+            top: 220, left: 24, right: 24,
+            child: Text('Selecione a categoria para diagnóstico', style: TextStyle(color: Color(0XFF888888), fontSize: 16)),
           ),
+          
+          // ✅ LISTA DINÂMICA DA API
           Positioned(
-            top: 270, 
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  ChecklistCategoriaCardWidget(
-                    title: 'Lentidão',
-                    description: 'Problema de velocidade, latência alta, conexão instável',
-                    assetIcon: 'assets/images/snail.svg',
-                    onTap: () {
-                      Get.toNamed('/checklist/lentidao');
-                    },
+            top: 270, left: 0, right: 0, bottom: 0,
+            child: Obx(() {
+              if (checkmarkController.isLoading.value) {
+                return const Center(child: CircularProgressIndicator(color: Color(0xFF00FF88)));
+              }
+
+              if (checkmarkController.categorias.isEmpty) {
+                return SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      ChecklistCategoriaCardWidget(title: 'Lentidão', description: 'Problemas de velocidade', assetIcon: 'assets/images/snail.svg', onTap: () => Get.toNamed('/checklist/lentidao')),
+                      ChecklistCategoriaCardWidget(title: 'IPTV', description: 'Travamento, buffering', assetIcon: 'assets/images/iptv.svg', onTap: () => Get.toNamed('/checklist/iptv')),
+                      ChecklistCategoriaCardWidget(title: 'Aplicativos', description: 'Apps não funcionam', assetIcon: 'assets/images/app.svg', onTap: () => Get.toNamed('/checklist/apps')),
+                      const SizedBox(height: 20),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: ElevatedButton.icon(
+                          onPressed: _carregarCategorias,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Recarregar'),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF88), foregroundColor: Colors.black, minimumSize: const Size(double.infinity, 50)),
+                        ),
+                      ),
+                    ],
                   ),
-                  ChecklistCategoriaCardWidget(
-                    title: 'IPTV',
-                    description: 'Travamento, buffering, canais fora do ar, qualidade baixa',
-                    assetIcon: 'assets/images/iptv.svg',
-                    onTap: () {
-                      Get.toNamed('/checklist/iptv');
-                    },
+                );
+              }
+
+              // ✅ Categorias da API
+              return RefreshIndicator(
+                onRefresh: _carregarCategorias,
+                color: const Color(0xFF00FF88),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      ...checkmarkController.categorias.map((categoria) {
+                        String icone = _getIconeParaCategoria(categoria.nome);
+                        return ChecklistCategoriaCardWidget(
+                          title: categoria.nome,
+                          description: categoria.descricao ?? 'Categoria de diagnóstico',
+                          assetIcon: icone,
+                          onTap: () {
+                            if (categoria.id != null) {
+                              print('🎯 Categoria: ${categoria.nome} (ID: ${categoria.id})');
+                              
+                              // ✅ EXECUTAR DEPOIS DO BUILD
+                              Future.microtask(() async {
+                                // Carregar checkmarks
+                                await checkmarkController.carregarCheckmarks(categoria.id!);
+                                
+                                // Navegar
+                                final nomeLower = categoria.nome.toLowerCase();
+                                if (nomeLower.contains('lentidão') || nomeLower.contains('lentidao')) {
+                                  Get.toNamed('/checklist/lentidao');
+                                } else if (nomeLower.contains('iptv') || nomeLower.contains('tv')) {
+                                  Get.toNamed('/checklist/iptv');
+                                } else if (nomeLower.contains('app') || nomeLower.contains('aplicativo')) {
+                                  Get.toNamed('/checklist/apps');
+                                } else {
+                                  Get.snackbar('Em desenvolvimento', 'Tela para "${categoria.nome}" em breve!', backgroundColor: Colors.orange);
+                                }
+                              });
+                            }
+                          },
+                        );
+                      }).toList(),
+                      const SizedBox(height: 20),
+                    ],
                   ),
-                  ChecklistCategoriaCardWidget(
-                    title: 'Aplicativos',
-                    description: 'Apps não funcionam, erro de conexão, problemas de login',
-                    assetIcon: 'assets/images/app.svg',
-                    onTap: () {
-                      Get.toNamed('/checklist/apps');
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
+                ),
+              );
+            }),
           ),
         ],
       ),
     );
   }
+
+  String _getIconeParaCategoria(String nomeCategoria) {
+    final nome = nomeCategoria.toLowerCase();
+    if (nome.contains('lentidão') || nome.contains('lentidao')) return 'assets/images/snail.svg';
+    if (nome.contains('iptv') || nome.contains('tv')) return 'assets/images/iptv.svg';
+    if (nome.contains('app') || nome.contains('aplicativo')) return 'assets/images/app.svg';
+    return 'assets/images/logo.svg';
+  }
+
 
   void _mostrarMenuUsuario(BuildContext context, UsuarioController usuarioController) {
     showModalBottomSheet(

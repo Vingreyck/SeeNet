@@ -38,7 +38,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
       setState(() => isLoading = true);
 
       // Carregar categorias
-      final responseCategorias = await _api.get('/checkmarks/categorias');
+      final responseCategorias = await _api.get('/checkmark/categorias');
       
       if (responseCategorias['success']) {
         final List<dynamic> data = responseCategorias['data']['categorias'];
@@ -49,7 +49,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
         // Carregar checkmarks para cada categoria
         checkmarksPorCategoria.clear();
         for (var categoria in categorias) {
-          final responseCheckmarks = await _api.get('/checkmarks/categoria/${categoria.id}');
+          final responseCheckmarks = await _api.get('/checkmark/categoria/${categoria.id}');
           
           if (responseCheckmarks['success']) {
             final List<dynamic> checkmarksData = responseCheckmarks['data']['checkmarks'];
@@ -360,7 +360,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
       return;
     }
     try {
-      final res = await _api.put('/checkmarks/checkmarks/$id', {
+      final res = await _api.put('/checkmark/checkmark/$id', {
         'titulo': titulo, 'descricao': desc.isEmpty ? null : desc,
         'prompt_chatgpt': prompt, 'ativo': ativo,
       });
@@ -375,7 +375,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
 
   Future<void> _alternarStatusCheckmark(Checkmark checkmark) async {
     try {
-      final res = await _api.put('/checkmarks/checkmarks/${checkmark.id}/status', {'ativo': !checkmark.ativo});
+      final res = await _api.put('/checkmark/checkmark/${checkmark.id}/status', {'ativo': !checkmark.ativo});
       if (res['success']) {
         Get.snackbar('Sucesso', '${!checkmark.ativo ? 'Ativado' : 'Desativado'}!',
           backgroundColor: !checkmark.ativo ? Colors.green : Colors.orange, colorText: Colors.white);
@@ -412,7 +412,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
 
   Future<void> _confirmarRemocao(int id) async {
     try {
-      final res = await _api.delete('/checkmarks/checkmarks/$id');
+      final res = await _api.delete('/checkmark/checkmark/$id');
       if (res['success']) {
         Get.snackbar('Sucesso', 'Removido!', backgroundColor: Colors.green, colorText: Colors.white);
         await carregarDados();
@@ -500,7 +500,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
       return;
     }
     try {
-      final res = await _api.post('/checkmarks/checkmarks', {
+      final res = await _api.post('/checkmark/checkmark', {
         'categoria_id': catId, 'titulo': titulo,
         'descricao': desc.isEmpty ? null : desc,
         'prompt_chatgpt': prompt, 'ativo': true,
@@ -561,7 +561,7 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
       return;
     }
     try {
-      final res = await _api.put('/checkmarks/categorias/$id', {
+      final res = await _api.put('/checkmark/categorias/$id', {
         'nome': nome, 'descricao': desc.isEmpty ? null : desc,
       });
       if (res['success']) {

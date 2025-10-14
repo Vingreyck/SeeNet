@@ -1,3 +1,4 @@
+// lib/checklist/screen/ChecklistAppsScreen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:seenet/checklist/widgets/checklistapps.widget.dart';
@@ -13,20 +14,20 @@ class ChecklistAppsScreen extends StatefulWidget {
 }
 
 class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
-  final CheckmarkController checkmarkController = Get.put(CheckmarkController());
+  final CheckmarkController checkmarkController = Get.find<CheckmarkController>();
   final UsuarioController usuarioController = Get.find<UsuarioController>();
 
   @override
   void initState() {
     super.initState();
-    _inicializarDados();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _inicializarDados();
+    });
   }
 
   void _inicializarDados() async {
-    // Carregar checkmarks da categoria Apps (ID = 3, ajuste se necessário)
-    await checkmarkController.carregarCheckmarks(3);
+    print('📋 Checkmarks já carregados: ${checkmarkController.checkmarksAtivos.length}');
 
-    // Iniciar nova avaliação
     if (usuarioController.usuarioLogado.value != null) {
       await checkmarkController.iniciarAvaliacao(
         usuarioController.usuarioLogado.value!.id!,
@@ -41,7 +42,6 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
       backgroundColor: const Color(0xFF1A1A1A),
       body: Column(
         children: [
-          // Header verde
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 50, 16, 20),
@@ -63,7 +63,9 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
                     color: Colors.white,
                     size: 28,
                   ),
-                  onPressed: () => Get.back(),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
                 ),
                 const SizedBox(width: 16),
                 const Text(
@@ -77,7 +79,6 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
               ],
             ),
           ),
-          // Lista de checkboxes dinâmica do banco
           Expanded(
             child: Column(
               children: [
@@ -123,31 +124,32 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
   }
 
   void _enviarDiagnostico() async {
-    // Salvar respostas
     bool salvou = await checkmarkController.salvarRespostas();
 
     if (salvou) {
-      // Finalizar avaliação
       await checkmarkController.finalizarAvaliacao();
 
-      Get.snackbar(
-        'Sucesso',
-        'Respostas salvas! Gerando diagnóstico...',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-
-      // Navegar para diagnóstico
-      Get.toNamed('/diagnostico');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Respostas salvas! Gerando diagnóstico...'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
+        Get.toNamed('/diagnostico');
+      }
     } else {
-      Get.snackbar(
-        'Erro',
-        'Erro ao salvar respostas',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao salvar respostas'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 }

@@ -135,25 +135,47 @@ router.post('/checkmarks', adminMiddleware, [
   body('prompt_chatgpt').trim().isLength({ min: 10, max: 5000 }),
   body('ordem').optional().isInt({ min: 0 })
 ], async (req, res) => {
+  console.log('🔵 === INICIANDO CRIAÇÃO DE CHECKMARK ===');
+  
   try {
+    // 1. Validação
+    console.log('🔍 Etapa 1: Validando dados...');
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validação falhou:', JSON.stringify(errors.array(), null, 2));
       return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
     }
+    console.log('✅ Validação OK');
 
+    // 2. Extrair dados
+    console.log('🔍 Etapa 2: Extraindo dados do body...');
     const { categoria_id, titulo, descricao, prompt_chatgpt, ordem = 0 } = req.body;
+    console.log('📦 Dados extraídos:', {
+      categoria_id,
+      titulo,
+      descricao,
+      prompt_chatgpt_length: prompt_chatgpt?.length,
+      ordem,
+      tenant_id: req.tenantId,
+      user_id: req.user?.id
+    });
 
-    // Verificar se categoria pertence ao tenant
+    // 3. Verificar categoria
+    console.log('🔍 Etapa 3: Verificando categoria...');
     const categoria = await db('categorias_checkmark')
       .where('id', categoria_id)
       .where('tenant_id', req.tenantId)
       .first();
 
     if (!categoria) {
+      console.log('❌ Categoria não encontrada:', { categoria_id, tenant_id: req.tenantId });
       return res.status(400).json({ error: 'Categoria não encontrada ou não pertence a esta empresa' });
     }
+    console.log('✅ Categoria encontrada:', categoria.nome);
 
-    const [checkmarkId] = await db('checkmarks').insert({
+    // 4. Inserir no banco
+    console.log('🔍 Etapa 4: Inserindo no banco...');
+    const insertData = {
       tenant_id: req.tenantId,
       categoria_id,
       titulo,
@@ -162,28 +184,62 @@ router.post('/checkmarks', adminMiddleware, [
       ordem,
       ativo: true,
       data_criacao: new Date().toISOString()
-    });
+    };
+    console.log('📝 Dados para inserção:', insertData);
 
-    // Log de auditoria
-    await auditService.log({
-      action: 'CHECKMARK_CREATED',
-      usuario_id: req.user.id,
-      tenant_id: req.tenantId,
-      tabela_afetada: 'checkmarks',
-      registro_id: checkmarkId,
-      dados_novos: { titulo, categoria_id, prompt_chatgpt },
-      ip_address: req.ip
-    });
+    let checkmarkId;
+    try {
+      const result = await db('checkmarks').insert(insertData);
+      checkmarkId = result[0];
+      console.log('✅ Checkmark inserido, ID:', checkmarkId);
+    } catch (dbError) {
+      console.error('❌ ERRO NO BANCO DE DADOS:');
+      console.error('   Mensagem:', dbError.message);
+      console.error('   Código:', dbError.code);
+      console.error('   Stack:', dbError.stack);
+      throw dbError;
+    }
 
-    logger.info(`✅ Checkmark criado: ${titulo} (Tenant: ${req.tenantCode})`);
+    // 5. Log de auditoria
+    console.log('🔍 Etapa 5: Registrando auditoria...');
+    try {
+      await auditService.log({
+        action: 'CHECKMARK_CREATED',
+        usuario_id: req.user.id,
+        tenant_id: req.tenantId,
+        tabela_afetada: 'checkmarks',
+        registro_id: checkmarkId,
+        dados_novos: { titulo, categoria_id, prompt_chatgpt },
+        ip_address: req.ip
+      });
+      console.log('✅ Auditoria registrada');
+    } catch (auditError) {
+      console.error('⚠️ Erro na auditoria (não crítico):', auditError.message);
+    }
+
+    // 6. Sucesso
+    logger.info(`✅ Checkmark criado: ${titulo} (ID: ${checkmarkId}, Tenant: ${req.tenantCode})`);
+    console.log('🟢 === CHECKMARK CRIADO COM SUCESSO ===');
 
     res.status(201).json({
       message: 'Checkmark criado com sucesso',
       id: checkmarkId
     });
+
   } catch (error) {
+    console.error('🔴 === ERRO FATAL AO CRIAR CHECKMARK ===');
+    console.error('Tipo do erro:', error.constructor.name);
+    console.error('Mensagem:', error.message);
+    console.error('Código:', error.code);
+    console.error('Stack completo:', error.stack);
+    console.error('==========================================');
+    
     logger.error('Erro ao criar checkmark:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

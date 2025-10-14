@@ -500,23 +500,44 @@ Future<void> _confirmarRemocao(int id) async {
 
 Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) async {
   if (titulo.isEmpty || prompt.isEmpty) {
-    Get.snackbar('Erro', 'Título e Prompt obrigatórios', backgroundColor: Colors.red, colorText: Colors.white);
+    Get.snackbar('Erro', 'Título e Prompt obrigatórios', 
+      backgroundColor: Colors.red, colorText: Colors.white);
     return;
   }
+  
   try {
-    final res = await _api.post('/checkmark/checkmarks', {  // ✅ CORRIGIDO: plural
+    // ✅ ADICIONAR LOGS PARA DEBUG
+    final payload = {
       'categoria_id': catId, 
       'titulo': titulo,
       'descricao': desc.isEmpty ? null : desc,
       'prompt_chatgpt': prompt, 
       'ativo': true,
-    });
+    };
+    
+    print('📤 Enviando para criar checkmark:');
+    print('   URL: /checkmark/checkmarks');
+    print('   Payload: $payload');
+    
+    final res = await _api.post('/checkmark/checkmarks', payload);
+    
+    print('📥 Resposta recebida:');
+    print('   Success: ${res['success']}');
+    print('   Response completa: $res');
+    
     if (res['success']) {
-      Get.snackbar('Sucesso', 'Criado!', backgroundColor: Colors.green, colorText: Colors.white);
+      Get.snackbar('Sucesso', 'Criado!', 
+        backgroundColor: Colors.green, colorText: Colors.white);
       await carregarDados();
+    } else {
+      print('❌ Erro do servidor: ${res['error']}');
+      Get.snackbar('Erro', res['error'] ?? 'Falha ao criar',
+        backgroundColor: Colors.red, colorText: Colors.white);
     }
   } catch (e) {
-    Get.snackbar('Erro', 'Falha ao criar', backgroundColor: Colors.red, colorText: Colors.white);
+    print('❌ Exceção ao criar: $e');
+    Get.snackbar('Erro', 'Falha ao criar', 
+      backgroundColor: Colors.red, colorText: Colors.white);
   }
 }
 

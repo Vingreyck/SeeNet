@@ -354,37 +354,41 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
     );
   }
 
-  Future<void> _salvarEdicaoCheckmark(int id, String titulo, String desc, String prompt, bool ativo) async {
-    if (titulo.isEmpty || prompt.isEmpty) {
-      Get.snackbar('Erro', 'Título e Prompt obrigatórios', backgroundColor: Colors.red, colorText: Colors.white);
-      return;
-    }
-    try {
-      final res = await _api.put('/checkmark/checkmark/$id', {
-        'titulo': titulo, 'descricao': desc.isEmpty ? null : desc,
-        'prompt_chatgpt': prompt, 'ativo': ativo,
-      });
-      if (res['success']) {
-        Get.snackbar('Sucesso', 'Atualizado!', backgroundColor: Colors.green, colorText: Colors.white);
-        await carregarDados();
-      }
-    } catch (e) {
-      Get.snackbar('Erro', 'Falha ao atualizar', backgroundColor: Colors.red, colorText: Colors.white);
-    }
+Future<void> _salvarEdicaoCheckmark(int id, String titulo, String desc, String prompt, bool ativo) async {
+  if (titulo.isEmpty || prompt.isEmpty) {
+    Get.snackbar('Erro', 'Título e Prompt obrigatórios', backgroundColor: Colors.red, colorText: Colors.white);
+    return;
   }
+  try {
+    final res = await _api.put('/checkmark/checkmarks/$id', {  // ✅ CORRIGIDO: plural
+      'titulo': titulo, 
+      'descricao': desc.isEmpty ? null : desc,
+      'prompt_chatgpt': prompt, 
+      'ativo': ativo,
+    });
+    if (res['success']) {
+      Get.snackbar('Sucesso', 'Atualizado!', backgroundColor: Colors.green, colorText: Colors.white);
+      await carregarDados();
+    }
+  } catch (e) {
+    Get.snackbar('Erro', 'Falha ao atualizar', backgroundColor: Colors.red, colorText: Colors.white);
+  }
+}
 
-  Future<void> _alternarStatusCheckmark(Checkmark checkmark) async {
-    try {
-      final res = await _api.put('/checkmark/checkmark/${checkmark.id}/status', {'ativo': !checkmark.ativo});
-      if (res['success']) {
-        Get.snackbar('Sucesso', '${!checkmark.ativo ? 'Ativado' : 'Desativado'}!',
-          backgroundColor: !checkmark.ativo ? Colors.green : Colors.orange, colorText: Colors.white);
-        await carregarDados();
-      }
-    } catch (e) {
-      Get.snackbar('Erro', 'Falha', backgroundColor: Colors.red, colorText: Colors.white);
+Future<void> _alternarStatusCheckmark(Checkmark checkmark) async {
+  try {
+    final res = await _api.put('/checkmark/checkmarks/${checkmark.id}/status', {  // ✅ CORRIGIDO: plural
+      'ativo': !checkmark.ativo
+    });
+    if (res['success']) {
+      Get.snackbar('Sucesso', '${!checkmark.ativo ? 'Ativado' : 'Desativado'}!',
+        backgroundColor: !checkmark.ativo ? Colors.green : Colors.orange, colorText: Colors.white);
+      await carregarDados();
     }
+  } catch (e) {
+    Get.snackbar('Erro', 'Falha', backgroundColor: Colors.red, colorText: Colors.white);
   }
+}
 
   void _removerCheckmark(Checkmark checkmark) {
     showDialog(
@@ -410,17 +414,17 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
     );
   }
 
-  Future<void> _confirmarRemocao(int id) async {
-    try {
-      final res = await _api.delete('/checkmark/checkmark/$id');
-      if (res['success']) {
-        Get.snackbar('Sucesso', 'Removido!', backgroundColor: Colors.green, colorText: Colors.white);
-        await carregarDados();
-      }
-    } catch (e) {
-      Get.snackbar('Erro', 'Falha ao remover', backgroundColor: Colors.red, colorText: Colors.white);
+Future<void> _confirmarRemocao(int id) async {
+  try {
+    final res = await _api.delete('/checkmark/checkmarks/$id');  // ✅ CORRIGIDO: plural
+    if (res['success']) {
+      Get.snackbar('Sucesso', 'Removido!', backgroundColor: Colors.green, colorText: Colors.white);
+      await carregarDados();
     }
+  } catch (e) {
+    Get.snackbar('Erro', 'Falha ao remover', backgroundColor: Colors.red, colorText: Colors.white);
   }
+}
 
   void _adicionarCheckmark() {
     if (categorias.isEmpty) {
@@ -494,25 +498,27 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
     );
   }
 
-  Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) async {
-    if (titulo.isEmpty || prompt.isEmpty) {
-      Get.snackbar('Erro', 'Título e Prompt obrigatórios', backgroundColor: Colors.red, colorText: Colors.white);
-      return;
-    }
-    try {
-      final res = await _api.post('/checkmark/checkmark', {
-        'categoria_id': catId, 'titulo': titulo,
-        'descricao': desc.isEmpty ? null : desc,
-        'prompt_chatgpt': prompt, 'ativo': true,
-      });
-      if (res['success']) {
-        Get.snackbar('Sucesso', 'Criado!', backgroundColor: Colors.green, colorText: Colors.white);
-        await carregarDados();
-      }
-    } catch (e) {
-      Get.snackbar('Erro', 'Falha ao criar', backgroundColor: Colors.red, colorText: Colors.white);
-    }
+Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) async {
+  if (titulo.isEmpty || prompt.isEmpty) {
+    Get.snackbar('Erro', 'Título e Prompt obrigatórios', backgroundColor: Colors.red, colorText: Colors.white);
+    return;
   }
+  try {
+    final res = await _api.post('/checkmark/checkmarks', {  // ✅ CORRIGIDO: plural
+      'categoria_id': catId, 
+      'titulo': titulo,
+      'descricao': desc.isEmpty ? null : desc,
+      'prompt_chatgpt': prompt, 
+      'ativo': true,
+    });
+    if (res['success']) {
+      Get.snackbar('Sucesso', 'Criado!', backgroundColor: Colors.green, colorText: Colors.white);
+      await carregarDados();
+    }
+  } catch (e) {
+    Get.snackbar('Erro', 'Falha ao criar', backgroundColor: Colors.red, colorText: Colors.white);
+  }
+}
 
   void _editarCategoria(CategoriaCheckmark categoria) {
     final nomeCtrl = TextEditingController(text: categoria.nome);

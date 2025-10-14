@@ -1,4 +1,4 @@
-// =====================================
+// routes/checkmark.js (ou checkmark.routes.js)
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
 const { db } = require('../config/database');
@@ -6,7 +6,6 @@ const authMiddleware = require('../middleware/auth');
 const { adminMiddleware } = require('../middleware/auth');
 const auditService = require('../services/auditService');
 const logger = require('../config/logger');
-
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -184,6 +183,215 @@ router.post('/checkmarks', adminMiddleware, [
     });
   } catch (error) {
     logger.error('Erro ao criar checkmark:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// ========== EDITAR CHECKMARK (ADMIN APENAS) ========== ✅ NOVO
+router.put('/checkmarks/:id', adminMiddleware, [
+  body('titulo').optional().trim().isLength({ min: 2, max: 255 }),
+  body('descricao').optional().trim().isLength({ max: 1000 }),
+  body('prompt_chatgpt').optional().trim().isLength({ min: 10, max: 5000 }),
+  body('ativo').optional().isBoolean(),
+  body('ordem').optional().isInt({ min: 0 })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
+    }
+
+    const { id } = req.params;
+    const { titulo, descricao, prompt_chatgpt, ativo, ordem } = req.body;
+
+    // Verificar se checkmark pertence ao tenant
+    const checkmark = await db('checkmarks')
+      .where('id', id)
+      .where('tenant_id', req.tenantId)
+      .first();
+
+    if (!checkmark) {
+      return res.status(404).json({ error: 'Checkmark não encontrado' });
+    }
+
+    // Montar objeto de atualização (só campos fornecidos)
+    const updateData = {};
+    if (titulo !== undefined) updateData.titulo = titulo;
+    if (descricao !== undefined) updateData.descricao = descricao;
+    if (prompt_chatgpt !== undefined) updateData.prompt_chatgpt = prompt_chatgpt;
+    if (ativo !== undefined) updateData.ativo = ativo;
+    if (ordem !== undefined) updateData.ordem = ordem;
+
+    await db('checkmarks')
+      .where('id', id)
+      .where('tenant_id', req.tenantId)
+      .update(updateData);
+
+    // Log de auditoria
+    await auditService.log({
+      action: 'CHECKMARK_UPDATED',
+      usuario_id: req.user.id,
+      tenant_id: req.tenantId,
+      tabela_afetada: 'checkmarks',
+      registro_id: parseInt(id),
+      dados_antigos: checkmark,
+      dados_novos: updateData,
+      ip_address: req.ip
+    });
+
+    logger.info(`✅ Checkmark atualizado: ${id} (Tenant: ${req.tenantCode})`);
+
+    res.json({ message: 'Checkmark atualizado com sucesso' });
+  } catch (error) {
+    logger.error('Erro ao atualizar checkmark:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// ========== DELETAR CHECKMARK (ADMIN APENAS) ========== ✅ NOVO
+router.delete('/checkmarks/:id', adminMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se checkmark pertence ao tenant
+    const checkmark = await db('checkmarks')
+      .where('id', id)
+      .where('tenant_id', req.tenantId)
+      .first();
+
+    if (!checkmark) {
+      return res.status(404).json({ error: 'Checkmark não encontrado' });
+    }
+
+    await db('checkmarks')
+      .where('id', id)
+      .where('tenant_id', req.tenantId)
+      .delete();
+
+    // Log de auditoria
+    await auditService.log({
+      action: 'CHECKMARK_DELETED',
+      usuario_id: req.user.id,
+      tenant_id: req.tenantId,
+      tabela_afetada: 'checkmarks',
+      registro_id: parseInt(id),
+      dados_antigos: checkmark,
+      ip_address: req.ip
+    });
+
+    logger.info(`✅ Checkmark deletado: ${id} (Tenant: ${req.tenantCode})`);
+
+    res.json({ message: 'Checkmark removido com sucesso' });
+  } catch (error) {
+    logger.error('Erro ao deletar checkmark:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// ========== EDITAR CATEGORIA (ADMIN APENAS) ========== ✅ NOVO
+router.put('/categorias/:id', adminMiddleware, [
+  body('nome').optional().trim().isLength({ min: 2, max: 255 }),
+  body('descricao').optional().trim().isLength({ max: 1000 }),
+  body('ordem').optional().isInt({ min: 0 })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
+    }
+
+    const { id } = req.params;
+    const { nome, descricao, ordem } = req.body;
+
+    // Verificar se categoria pertence ao tenant
+    const categoria = await db('categorias_checkmark')
+      .where('id', id)
+      .where('tenant_id', req.tenantId)
+      .first();
+
+    if (!categoria) {
+      return res.status(404).json({ error: 'Categoria não encontrada' });
+    }
+
+    const updateData = {};
+    if (nome !== undefined) updateData.nome = nome;
+    if (descricao !== undefined) updateData.descricao = descricao;
+    if (ordem !== undefined) updateData.ordem = ordem;
+
+    await db('categorias_checkmark')
+      .where('id', id)
+      .where('tenant_id', req.tenantId)
+      .update(updateData);
+
+    await auditService.log({
+      action: 'CATEGORY_UPDATED',
+      usuario_id: req.user.id,
+      tenant_id: req.tenantId,
+      tabela_afetada: 'categorias_checkmark',
+      registro_id: parseInt(id),
+      dados_antigos: categoria,
+      dados_novos: updateData,
+      ip_address: req.ip
+    });
+
+    logger.info(`✅ Categoria atualizada: ${id} (Tenant: ${req.tenantCode})`);
+
+    res.json({ message: 'Categoria atualizada com sucesso' });
+  } catch (error) {
+    logger.error('Erro ao atualizar categoria:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// ========== DELETAR CATEGORIA (ADMIN APENAS) ========== ✅ NOVO
+router.delete('/categorias/:id', adminMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se categoria pertence ao tenant
+    const categoria = await db('categorias_checkmark')
+      .where('id', id)
+      .where('tenant_id', req.tenantId)
+      .first();
+
+    if (!categoria) {
+      return res.status(404).json({ error: 'Categoria não encontrada' });
+    }
+
+    // Verificar se há checkmarks usando esta categoria
+    const checkmarksCount = await db('checkmarks')
+      .where('categoria_id', id)
+      .where('tenant_id', req.tenantId)
+      .count('* as total')
+      .first();
+
+    if (checkmarksCount && checkmarksCount.total > 0) {
+      return res.status(400).json({ 
+        error: 'Não é possível deletar categoria com checkmarks associados',
+        details: `Existem ${checkmarksCount.total} checkmark(s) nesta categoria`
+      });
+    }
+
+    await db('categorias_checkmark')
+      .where('id', id)
+      .where('tenant_id', req.tenantId)
+      .delete();
+
+    await auditService.log({
+      action: 'CATEGORY_DELETED',
+      usuario_id: req.user.id,
+      tenant_id: req.tenantId,
+      tabela_afetada: 'categorias_checkmark',
+      registro_id: parseInt(id),
+      dados_antigos: categoria,
+      ip_address: req.ip
+    });
+
+    logger.info(`✅ Categoria deletada: ${id} (Tenant: ${req.tenantCode})`);
+
+    res.json({ message: 'Categoria removida com sucesso' });
+  } catch (error) {
+    logger.error('Erro ao deletar categoria:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

@@ -38,7 +38,7 @@ static const Map<String, String> endpoints = {
   'categorias': '/checkmark/categorias',
   'checkmarksPorCategoria': '/checkmark/categoria',
   'criarCategoria': '/checkmark/categorias',
-  'criarCheckmark': '/checkmark/checkmarks',
+  'criarCheckmark': '/checkmark/checkmark',
   
   // AVALIAÇÕES
   'criarAvaliacao': '/avaliacoes',

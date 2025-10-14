@@ -28,7 +28,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       setState(() => isLoading = true);
 
       // ✅ Buscar usuários da API
-      final response = await _api.get('/admin/users');
+      final response = await _api.get('adminUsers');
       
       if (response['success']) {
         List<dynamic> usuariosData = response['data']['usuarios'];
@@ -355,7 +355,6 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
   void _editarUsuario(Usuario usuario) {
     final TextEditingController nomeController = TextEditingController(text: usuario.nome);
     final TextEditingController emailController = TextEditingController(text: usuario.email);
-    final TextEditingController senhaController = TextEditingController();
     String tipoSelecionado = usuario.tipoUsuario;
     bool ativoSelecionado = usuario.ativo;
 
@@ -388,21 +387,6 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
                     labelStyle: TextStyle(color: Colors.white70),
                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
                     focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: senhaController,
-                  style: const TextStyle(color: Colors.white),
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Nova Senha (opcional)',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
-                    helperText: 'Deixe vazio para manter a senha atual',
-                    helperStyle: TextStyle(color: Colors.white54, fontSize: 12),
-                    prefixIcon: Icon(Icons.lock, color: Colors.white54),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -452,7 +436,6 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
                   usuario.id!,
                   nomeController.text.trim(),
                   emailController.text.trim(),
-                  senhaController.text.trim(),
                   tipoSelecionado,
                   ativoSelecionado,
                 );
@@ -470,39 +453,38 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     );
   }
 
-  Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String novaSenha, String tipo, bool ativo) async {
-    try {
-      Map<String, dynamic> dadosAtualizacao = {
-        'nome': nome,
-        'email': email.toLowerCase(),
-        'tipo_usuario': tipo,
-        'ativo': ativo,
-      };
-
-      if (novaSenha.isNotEmpty) {
-        dadosAtualizacao['senha'] = novaSenha;
-      }
-      
-      final response = await _api.put('/admin/users/$id', dadosAtualizacao);
-      
-      if (response['success']) {
-        String mensagem = 'Usuário atualizado com sucesso!';
-        if (novaSenha.isNotEmpty) {
-          mensagem += '\n🔐 Senha alterada';
-        }
-
-        Get.snackbar('Sucesso', mensagem,
-          backgroundColor: Colors.green, colorText: Colors.white);
-        await carregarUsuarios();
-      } else {
-        throw Exception(response['error']);
-      }
-    } catch (e) {
-      print('❌ Erro ao editar usuário: $e');
-      Get.snackbar('Erro', 'Erro ao atualizar usuário',
-        backgroundColor: Colors.red, colorText: Colors.white);
+Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String tipo, bool ativo) async {
+  try {
+    Map<String, dynamic> dadosAtualizacao = {
+      'nome': nome,
+      'email': email.toLowerCase(),
+      'tipo_usuario': tipo,
+      'ativo': ativo,
+    };
+    
+    final response = await _api.put('adminUserEdit/$id', dadosAtualizacao);
+    
+    if (response['success']) {
+      Get.snackbar(
+        'Sucesso', 
+        'Usuário atualizado com sucesso!',
+        backgroundColor: Colors.green, 
+        colorText: Colors.white
+      );
+      await carregarUsuarios();
+    } else {
+      throw Exception(response['error']);
     }
+  } catch (e) {
+    print('❌ Erro ao editar usuário: $e');
+    Get.snackbar(
+      'Erro', 
+      'Erro ao atualizar usuário',
+      backgroundColor: Colors.red, 
+      colorText: Colors.white
+    );
   }
+}
 
   void _resetarSenhaUsuario(Usuario usuario) {
     final TextEditingController novaSenhaController = TextEditingController();
@@ -590,9 +572,9 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
 
   Future<void> _confirmarResetarSenha(int userId, String novaSenha) async {
     try {
-      final response = await _api.put('/admin/users/$userId/reset-password', {
-        'nova_senha': novaSenha,
-      });
+        final response = await _api.put('/auth/usuarios/$userId/resetar-senha', {
+          'nova_senha': novaSenha,
+        });
       
       if (response['success']) {
         Get.snackbar(
@@ -652,7 +634,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
 
   Future<void> _atualizarStatusUsuario(int id, bool ativo) async {
     try {
-      final response = await _api.put('/admin/users/$id/status', {
+      final response = await _api.put('adminUserStatus/$id/status', {
         'ativo': ativo,
       });
       
@@ -735,7 +717,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
 
   Future<void> _confirmarRemocaoUsuario(int id) async {
     try {
-      final response = await _api.delete('/admin/users/$id');
+      final response = await _api.delete('adminUserDelete/$id');
       
       if (response['success']) {
         Get.snackbar('Sucesso', 'Usuário removido com sucesso!',

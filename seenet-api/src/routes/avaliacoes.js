@@ -201,10 +201,7 @@ router.post('/:avaliacaoId/respostas', [
     console.log('   Avaliação ID:', avaliacaoId);
     console.log('   Checkmarks marcados:', checkmarks_marcados);
     console.log('   Tenant ID:', req.tenantId);
-    console.log('   Técnico ID:', req.user.id);
 
-    // Verificar avaliação
-    console.log('🔍 Verificando se avaliação existe...');
     const avaliacao = await db('avaliacoes')
       .where('id', avaliacaoId)
       .where('tenant_id', req.tenantId)
@@ -217,25 +214,6 @@ router.post('/:avaliacaoId/respostas', [
     }
 
     console.log('✅ Avaliação encontrada:', avaliacao.titulo);
-
-    // ✅ Verificar se a tabela respostas_checkmark existe
-    console.log('🔍 Verificando estrutura da tabela...');
-    try {
-      const tabelaExiste = await db.schema.hasTable('respostas_checkmark');
-      console.log('   Tabela respostas_checkmark existe?', tabelaExiste);
-      
-      if (!tabelaExiste) {
-        console.error('❌ Tabela respostas_checkmark não existe!');
-        return res.status(500).json({ 
-          error: 'Configuração do banco incorreta',
-          details: 'Tabela respostas_checkmark não existe'
-        });
-      }
-    } catch (schemaError) {
-      console.error('❌ Erro ao verificar schema:', schemaError);
-    }
-
-    // ✅ Inserir respostas
     console.log('📝 Iniciando transação para salvar respostas...');
     
     await db.transaction(async (trx) => {
@@ -246,13 +224,17 @@ router.post('/:avaliacaoId/respostas', [
         try {
           await trx('respostas_checkmark')
             .insert({
+              tenant_id: req.tenantId,  // ✅ ADICIONAR ISSO!
               avaliacao_id: parseInt(avaliacaoId),
               checkmark_id: parseInt(checkmarkId),
               marcado: true,
               data_resposta: new Date().toISOString(),
             })
             .onConflict(['avaliacao_id', 'checkmark_id'])
-            .merge();
+            .merge({  // ✅ Especificar o que atualizar no conflito
+              marcado: true,
+              data_resposta: new Date().toISOString(),
+            });
           
           console.log(`   ✅ Checkmark ${checkmarkId} salvo`);
         } catch (insertError) {

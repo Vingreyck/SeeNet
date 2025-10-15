@@ -243,7 +243,7 @@ router.post('/checkmarks', adminMiddleware, [
   }
 });
 
-// ========== EDITAR CHECKMARK (ADMIN APENAS) ========== ✅ NOVO
+// ========== EDITAR CHECKMARK (ADMIN APENAS) ========== ✅ COM LOGS
 router.put('/checkmarks/:id', adminMiddleware, [
   body('titulo').optional().trim().isLength({ min: 2, max: 255 }),
   body('descricao').optional().trim().isLength({ max: 1000 }),
@@ -251,14 +251,27 @@ router.put('/checkmarks/:id', adminMiddleware, [
   body('ativo').optional().isBoolean(),
   body('ordem').optional().isInt({ min: 0 })
 ], async (req, res) => {
+  console.log('🔵 === EDITANDO CHECKMARK ===');
+  
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validação falhou:', errors.array());
       return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
     }
 
     const { id } = req.params;
     const { titulo, descricao, prompt_chatgpt, ativo, ordem } = req.body;
+
+    // ✅ LOG: Ver o que chegou
+    console.log('📥 Dados recebidos:');
+    console.log('   ID:', id);
+    console.log('   titulo:', titulo);
+    console.log('   descricao:', descricao);
+    console.log('   prompt_chatgpt:', prompt_chatgpt?.substring(0, 50) + '...');
+    console.log('   ativo:', ativo, '(tipo:', typeof ativo, ')');
+    console.log('   ordem:', ordem);
+    console.log('   req.body completo:', JSON.stringify(req.body, null, 2));
 
     // Verificar se checkmark pertence ao tenant
     const checkmark = await db('checkmarks')
@@ -267,8 +280,13 @@ router.put('/checkmarks/:id', adminMiddleware, [
       .first();
 
     if (!checkmark) {
+      console.log('❌ Checkmark não encontrado:', id);
       return res.status(404).json({ error: 'Checkmark não encontrado' });
     }
+
+    console.log('✅ Checkmark encontrado:');
+    console.log('   Status ANTES:', checkmark.ativo);
+    console.log('   Título ANTES:', checkmark.titulo);
 
     // Montar objeto de atualização (só campos fornecidos)
     const updateData = {};
@@ -278,27 +296,52 @@ router.put('/checkmarks/:id', adminMiddleware, [
     if (ativo !== undefined) updateData.ativo = ativo;
     if (ordem !== undefined) updateData.ordem = ordem;
 
-    await db('checkmarks')
+    console.log('📝 Objeto updateData preparado:', JSON.stringify(updateData, null, 2));
+
+    // ✅ EXECUTAR UPDATE
+    const numRowsUpdated = await db('checkmarks')
       .where('id', id)
       .where('tenant_id', req.tenantId)
       .update(updateData);
 
-    // Log de auditoria
-    await auditService.log({
-      action: 'CHECKMARK_UPDATED',
-      usuario_id: req.user.id,
-      tenant_id: req.tenantId,
-      tabela_afetada: 'checkmarks',
-      registro_id: parseInt(id),
-      dados_antigos: checkmark,
-      dados_novos: updateData,
-      ip_address: req.ip
-    });
+    console.log('✅ UPDATE executado, linhas afetadas:', numRowsUpdated);
+
+    // ✅ VERIFICAR SE REALMENTE ATUALIZOU
+    const checkmarkAtualizado = await db('checkmarks')
+      .where('id', id)
+      .where('tenant_id', req.tenantId)
+      .first();
+
+    console.log('🔍 Checkmark APÓS atualização:');
+    console.log('   Status DEPOIS:', checkmarkAtualizado.ativo);
+    console.log('   Título DEPOIS:', checkmarkAtualizado.titulo);
+
+    // Log de auditoria com try-catch
+    try {
+      await auditService.log({
+        action: 'CHECKMARK_UPDATED',
+        usuario_id: req.user.id,
+        tenant_id: req.tenantId,
+        tabela_afetada: 'checkmarks',
+        registro_id: parseInt(id),
+        dados_antigos: checkmark,
+        dados_novos: updateData,
+        ip_address: req.ip
+      });
+      console.log('✅ Auditoria registrada');
+    } catch (auditError) {
+      console.error('⚠️ Erro na auditoria (não crítico):', auditError.message);
+    }
 
     logger.info(`✅ Checkmark atualizado: ${id} (Tenant: ${req.tenantCode})`);
+    console.log('🟢 === EDIÇÃO CONCLUÍDA ===\n');
 
     res.json({ message: 'Checkmark atualizado com sucesso' });
   } catch (error) {
+    console.error('🔴 === ERRO AO EDITAR ===');
+    console.error('Mensagem:', error.message);
+    console.error('Stack:', error.stack);
+    
     logger.error('Erro ao atualizar checkmark:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }

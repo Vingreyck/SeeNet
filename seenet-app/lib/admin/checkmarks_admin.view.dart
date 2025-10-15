@@ -1,4 +1,4 @@
-// lib/admin/checkmarks_admin.view.dart - VERSÃO COMPLETA 100% API
+// lib/admin/checkmarks_admin.view.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/categoria_checkmark.dart';
@@ -12,14 +12,16 @@ class CheckmarksAdminView extends StatefulWidget {
   State<CheckmarksAdminView> createState() => _CheckmarksAdminViewState();
 }
 
-class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTickerProviderStateMixin {
+class _CheckmarksAdminViewState extends State<CheckmarksAdminView> 
+    with TickerProviderStateMixin {  // ✅ MUDOU: Removeu "Single"
+  
   final ApiService _api = ApiService.instance;
   
   List<CategoriaCheckmark> categorias = [];
   Map<int, List<Checkmark>> checkmarksPorCategoria = {};
   bool isLoading = true;
   
-  late TabController _tabController;
+  TabController? _tabController;
 
   @override
   void initState() {
@@ -29,45 +31,94 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
-  Future<void> carregarDados() async {
-    try {
-      setState(() => isLoading = true);
-
-      // Carregar categorias
-      final responseCategorias = await _api.get('/checkmark/categorias');
+Future<void> recarregarCheckmarks() async {
+  try {
+    checkmarksPorCategoria.clear();
+    
+    for (var categoria in categorias) {
+      // ✅ ADICIONAR: ?incluir_inativos=true
+      final responseCheckmarks = await _api.get(
+        '/checkmark/categoria/${categoria.id}?incluir_inativos=true'
+      );
       
-      if (responseCategorias['success']) {
-        final List<dynamic> data = responseCategorias['data']['categorias'];
-        categorias = data.map((json) => CategoriaCheckmark.fromMap(json)).toList();
-        
-        _tabController = TabController(length: categorias.length, vsync: this);
-
-        // Carregar checkmarks para cada categoria
-        checkmarksPorCategoria.clear();
-        for (var categoria in categorias) {
-          final responseCheckmarks = await _api.get('/checkmark/categoria/${categoria.id}');
-          
-          if (responseCheckmarks['success']) {
-            final List<dynamic> checkmarksData = responseCheckmarks['data']['checkmarks'];
-            checkmarksPorCategoria[categoria.id!] = 
-                checkmarksData.map((json) => Checkmark.fromMap(json)).toList();
-          }
-        }
-
-        print('📊 ${categorias.length} categorias carregadas');
+      if (responseCheckmarks['success']) {
+        final List<dynamic> checkmarksData = responseCheckmarks['data']['checkmarks'];
+        checkmarksPorCategoria[categoria.id!] = 
+            checkmarksData.map((json) => Checkmark.fromMap(json)).toList();
       }
-    } catch (e) {
-      print('❌ Erro ao carregar dados: $e');
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+    
+    print('♻️ Checkmarks recarregados (manteve tabs)');
+  } catch (e) {
+    print('❌ Erro ao recarregar checkmarks: $e');
+  }
+}
+
+
+
+Future<void> carregarDados() async {
+  try {
+    setState(() => isLoading = true);
+
+    final responseCategorias = await _api.get('/checkmark/categorias');
+    
+    if (responseCategorias['success']) {
+      final List<dynamic> data = responseCategorias['data']['categorias'];
+      final novasCategorias = data.map((json) => CategoriaCheckmark.fromMap(json)).toList();
+      
+      final indiceAtual = _tabController?.index ?? 0;
+      
+      final precisaRecriarTabs = _tabController == null || 
+                                   _tabController!.length != novasCategorias.length;
+      
+      if (precisaRecriarTabs) {
+        _tabController?.dispose();
+        _tabController = TabController(
+          length: novasCategorias.length, 
+          vsync: this,
+          initialIndex: indiceAtual.clamp(0, novasCategorias.length - 1),
+        );
+        print('🔄 TabController recriado (${novasCategorias.length} tabs)');
+      }
+      
+      categorias = novasCategorias;
+
+      // ✅ ADICIONAR: ?incluir_inativos=true
+      checkmarksPorCategoria.clear();
+      for (var categoria in categorias) {
+        final responseCheckmarks = await _api.get(
+          '/checkmark/categoria/${categoria.id}?incluir_inativos=true'
+        );
+        
+        if (responseCheckmarks['success']) {
+          final List<dynamic> checkmarksData = responseCheckmarks['data']['checkmarks'];
+          checkmarksPorCategoria[categoria.id!] = 
+              checkmarksData.map((json) => Checkmark.fromMap(json)).toList();
+        }
+      }
+
+      print('📊 ${categorias.length} categorias carregadas');
+    }
+  } catch (e) {
+    print('❌ Erro ao carregar dados: $e');
+    if (mounted) {
       Get.snackbar('Erro', 'Erro ao carregar dados',
         backgroundColor: Colors.red, colorText: Colors.white);
-    } finally {
+    }
+  } finally {
+    if (mounted) {
       setState(() => isLoading = false);
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -80,14 +131,16 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
           IconButton(icon: const Icon(Icons.refresh), onPressed: carregarDados),
           IconButton(icon: const Icon(Icons.add), onPressed: _adicionarCheckmark),
         ],
-        bottom: isLoading || categorias.isEmpty ? null : TabBar(
-          controller: _tabController,
-          labelColor: Colors.black,
-          unselectedLabelColor: Colors.black54,
-          indicatorColor: Colors.black,
-          isScrollable: true,
-          tabs: categorias.map((c) => Tab(text: c.nome)).toList(),
-        ),
+        bottom: isLoading || categorias.isEmpty || _tabController == null 
+            ? null 
+            : TabBar(
+                controller: _tabController,
+                labelColor: Colors.black,
+                unselectedLabelColor: Colors.black54,
+                indicatorColor: Colors.black,
+                isScrollable: true,
+                tabs: categorias.map((c) => Tab(text: c.nome)).toList(),
+              ),
       ),
       backgroundColor: const Color(0xFF1A1A1A),
       body: isLoading
@@ -95,13 +148,15 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
           : categorias.isEmpty
               ? const Center(child: Text('Nenhuma categoria encontrada', 
                   style: TextStyle(color: Colors.white, fontSize: 18)))
-              : TabBarView(
-                  controller: _tabController,
-                  children: categorias.map((cat) {
-                    final checks = checkmarksPorCategoria[cat.id!] ?? [];
-                    return _buildCategoriaTab(cat, checks);
-                  }).toList(),
-                ),
+              : _tabController == null
+                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF00FF88)))
+                  : TabBarView(
+                      controller: _tabController,
+                      children: categorias.map((cat) {
+                        final checks = checkmarksPorCategoria[cat.id!] ?? [];
+                        return _buildCategoriaTab(cat, checks);
+                      }).toList(),
+                    ),
       floatingActionButton: FloatingActionButton(
         onPressed: _adicionarCheckmark,
         backgroundColor: const Color(0xFF00FF88),
@@ -110,6 +165,8 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
     );
   }
 
+  // ... resto do código continua igual ...
+  
   Widget _buildCategoriaTab(CategoriaCheckmark categoria, List<Checkmark> checkmarks) {
     return Column(
       children: [
@@ -356,37 +413,89 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView> with SingleTi
 
 Future<void> _salvarEdicaoCheckmark(int id, String titulo, String desc, String prompt, bool ativo) async {
   if (titulo.isEmpty || prompt.isEmpty) {
-    Get.snackbar('Erro', 'Título e Prompt obrigatórios', backgroundColor: Colors.red, colorText: Colors.white);
+    Get.snackbar('Erro', 'Título e Prompt obrigatórios', 
+      backgroundColor: Colors.red, colorText: Colors.white);
     return;
   }
+  
   try {
-    final res = await _api.put('/checkmark/checkmarks/$id', {  // ✅ CORRIGIDO: plural
+    // ✅ ADICIONAR LOGS DETALHADOS
+    final payload = {
       'titulo': titulo, 
       'descricao': desc.isEmpty ? null : desc,
       'prompt_chatgpt': prompt, 
       'ativo': ativo,
-    });
+    };
+    
+    print('📤 Enviando para editar checkmark:');
+    print('   ID: $id');
+    print('   URL: /checkmark/checkmarks/$id');
+    print('   Payload: $payload');
+    print('   Título length: ${titulo.length}');
+    print('   Descrição length: ${desc.length}');
+    print('   Prompt length: ${prompt.length}');
+    
+    final res = await _api.put('/checkmark/checkmarks/$id', payload);
+    
+    print('📥 Resposta da edição:');
+    print('   Success: ${res['success']}');
+    print('   Error: ${res['error']}');
+    print('   Details: ${res['details']}');
+    print('   Response completa: $res');
+    
     if (res['success']) {
-      Get.snackbar('Sucesso', 'Atualizado!', backgroundColor: Colors.green, colorText: Colors.white);
-      await carregarDados();
+      Get.snackbar('Sucesso', 'Atualizado!', 
+        backgroundColor: Colors.green, colorText: Colors.white);
+      await recarregarCheckmarks();
+    } else {
+      // ✅ MOSTRAR DETALHES DO ERRO
+      final errorMsg = res['error'] ?? 'Falha ao atualizar';
+      final details = res['details'];
+      
+      print('❌ Erro do servidor ao editar:');
+      print('   Mensagem: $errorMsg');
+      print('   Detalhes: $details');
+      
+      Get.snackbar(
+        'Erro', 
+        details != null ? '$errorMsg\n$details' : errorMsg,
+        backgroundColor: Colors.red, 
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
     }
   } catch (e) {
-    Get.snackbar('Erro', 'Falha ao atualizar', backgroundColor: Colors.red, colorText: Colors.white);
+    print('❌ Exceção ao editar: $e');
+    Get.snackbar('Erro', 'Falha ao atualizar', 
+      backgroundColor: Colors.red, colorText: Colors.white);
   }
 }
 
 Future<void> _alternarStatusCheckmark(Checkmark checkmark) async {
   try {
-    final res = await _api.put('/checkmark/checkmarks/${checkmark.id}/status', {  // ✅ CORRIGIDO: plural
-      'ativo': !checkmark.ativo
+    // ✅ USAR O MESMO ENDPOINT DE EDIÇÃO (não tem rota /status)
+    final novoStatus = !checkmark.ativo;
+    
+    final res = await _api.put('/checkmark/checkmarks/${checkmark.id}', {
+      'ativo': novoStatus  // ✅ Só envia o status
     });
+    
     if (res['success']) {
-      Get.snackbar('Sucesso', '${!checkmark.ativo ? 'Ativado' : 'Desativado'}!',
-        backgroundColor: !checkmark.ativo ? Colors.green : Colors.orange, colorText: Colors.white);
-      await carregarDados();
+      Get.snackbar(
+        'Sucesso', 
+        novoStatus ? 'Checkmark ativado!' : 'Checkmark desativado!',
+        backgroundColor: novoStatus ? Colors.green : Colors.orange, 
+        colorText: Colors.white,
+      );
+      await recarregarCheckmarks();
+    } else {
+      Get.snackbar('Erro', res['error'] ?? 'Falha ao alterar status', 
+        backgroundColor: Colors.red, colorText: Colors.white);
     }
   } catch (e) {
-    Get.snackbar('Erro', 'Falha', backgroundColor: Colors.red, colorText: Colors.white);
+    print('❌ Erro ao alternar status: $e');
+    Get.snackbar('Erro', 'Falha ao alterar status', 
+      backgroundColor: Colors.red, colorText: Colors.white);
   }
 }
 
@@ -419,7 +528,7 @@ Future<void> _confirmarRemocao(int id) async {
     final res = await _api.delete('/checkmark/checkmarks/$id');  // ✅ CORRIGIDO: plural
     if (res['success']) {
       Get.snackbar('Sucesso', 'Removido!', backgroundColor: Colors.green, colorText: Colors.white);
-      await carregarDados();
+        await recarregarCheckmarks();  // ✅ MUDOU: usa recarregarCheckmarks
     }
   } catch (e) {
     Get.snackbar('Erro', 'Falha ao remover', backgroundColor: Colors.red, colorText: Colors.white);
@@ -528,7 +637,7 @@ Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) a
     if (res['success']) {
       Get.snackbar('Sucesso', 'Criado!', 
         backgroundColor: Colors.green, colorText: Colors.white);
-      await carregarDados();
+        await recarregarCheckmarks();  // ✅ MUDOU: usa recarregarCheckmarks
     } else {
       print('❌ Erro do servidor: ${res['error']}');
       Get.snackbar('Erro', res['error'] ?? 'Falha ao criar',
@@ -594,7 +703,7 @@ Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) a
       });
       if (res['success']) {
         Get.snackbar('Sucesso', 'Categoria atualizada!', backgroundColor: Colors.green, colorText: Colors.white);
-        await carregarDados();
+        await recarregarCheckmarks();  // ✅ MUDOU: usa recarregarCheckmarks
       }
     } catch (e) {
       Get.snackbar('Erro', 'Falha', backgroundColor: Colors.red, colorText: Colors.white);

@@ -81,7 +81,7 @@ class CheckmarkController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.post('/avaliacoes', {
+     final response = await _api.post('/avaliacoes', {  // ✅ Barra no início
         'titulo': titulo,
         'descricao': 'Avaliação técnica',
       });
@@ -119,47 +119,62 @@ class CheckmarkController extends GetxController {
   }
 
   // ========== SALVAR RESPOSTAS NA API ==========
-  Future<bool> salvarRespostas() async {
-    try {
-      if (avaliacaoAtual.value == null) {
-        print('❌ Nenhuma avaliação ativa');
-        Get.snackbar('Erro', 'Nenhuma avaliação ativa');
-        return false;
-      }
+  // lib/controllers/checkmark_controller.dart
 
-      List<int> checkmarksMarcados = respostas.entries
-          .where((entry) => entry.value == true)
-          .map((entry) => entry.key)
-          .toList();
-
-      if (checkmarksMarcados.isEmpty) {
-        Get.snackbar('Aviso', 'Marque pelo menos um problema');
-        return false;
-      }
-
-      isLoading.value = true;
-
-      final response = await _api.post(
-        'avaliacoes/${avaliacaoAtual.value!.id}/respostas',
-        {'checkmarks_marcados': checkmarksMarcados},
-      );
-
-      if (response['success']) {
-        print('✅ ${checkmarksMarcados.length} respostas salvas na API');
-        return true;
-      } else {
-        print('❌ Erro ao salvar respostas: ${response['error']}');
-        Get.snackbar('Erro', 'Falha ao salvar respostas');
-        return false;
-      }
-    } catch (e) {
-      print('❌ Erro ao salvar respostas: $e');
-      Get.snackbar('Erro', 'Erro de conexão ao salvar respostas');
+Future<bool> salvarRespostas() async {
+  try {
+    if (avaliacaoAtual.value == null) {
+      print('❌ Nenhuma avaliação ativa');
+      Get.snackbar('Erro', 'Nenhuma avaliação ativa');
       return false;
-    } finally {
-      isLoading.value = false;
     }
+
+    List<int> checkmarksMarcados = respostas.entries
+        .where((entry) => entry.value == true)
+        .map((entry) => entry.key)
+        .toList();
+
+    if (checkmarksMarcados.isEmpty) {
+      Get.snackbar('Aviso', 'Marque pelo menos um problema');
+      return false;
+    }
+
+    // ✅ LOGS DETALHADOS
+    print('📤 Salvando respostas:');
+    print('   Avaliação ID: ${avaliacaoAtual.value!.id}');
+    print('   Total marcados: ${checkmarksMarcados.length}');
+    print('   IDs marcados: $checkmarksMarcados');
+
+    isLoading.value = true;
+
+    final payload = {'checkmarks_marcados': checkmarksMarcados};
+    print('   Payload: $payload');
+
+    final response = await _api.post(
+      '/avaliacoes/${avaliacaoAtual.value!.id}/respostas',
+      payload,
+    );
+
+    print('📥 Resposta:');
+    print('   Success: ${response['success']}');
+    print('   Response completo: $response');
+
+    if (response['success']) {
+      print('✅ ${checkmarksMarcados.length} respostas salvas na API');
+      return true;
+    } else {
+      print('❌ Erro ao salvar respostas: ${response['error']}');
+      Get.snackbar('Erro', 'Falha ao salvar respostas');
+      return false;
+    }
+  } catch (e) {
+    print('❌ Erro ao salvar respostas: $e');
+    Get.snackbar('Erro', 'Erro de conexão ao salvar respostas');
+    return false;
+  } finally {
+    isLoading.value = false;
   }
+}
 
   // ========== FINALIZAR AVALIAÇÃO NA API ==========
   Future<bool> finalizarAvaliacao() async {
@@ -169,7 +184,7 @@ class CheckmarkController extends GetxController {
       isLoading.value = true;
 
       final response = await _api.put(
-        'avaliacoes/${avaliacaoAtual.value!.id}/finalizar',
+        '/avaliacoes/${avaliacaoAtual.value!.id}/finalizar',  // ✅ Barra no início
         {},
       );
 

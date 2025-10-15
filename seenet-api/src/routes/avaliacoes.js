@@ -185,15 +185,26 @@ router.get('/:avaliacaoId', async (req, res) => {
 router.post('/:avaliacaoId/respostas', [
   body('checkmarks_marcados').isArray({ min: 1 }),
 ], async (req, res) => {
+  console.log('🔵 === SALVANDO RESPOSTAS DE CHECKMARKS ===');
+  
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validação falhou:', errors.array());
       return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
     }
 
     const { avaliacaoId } = req.params;
     const { checkmarks_marcados } = req.body;
 
+    console.log('📥 Dados recebidos:');
+    console.log('   Avaliação ID:', avaliacaoId);
+    console.log('   Checkmarks marcados:', checkmarks_marcados);
+    console.log('   Tenant ID:', req.tenantId);
+    console.log('   Técnico ID:', req.user.id);
+
+    // Verificar avaliação
+    console.log('🔍 Verificando se avaliação existe...');
     const avaliacao = await db('avaliacoes')
       .where('id', avaliacaoId)
       .where('tenant_id', req.tenantId)
@@ -201,33 +212,78 @@ router.post('/:avaliacaoId/respostas', [
       .first();
 
     if (!avaliacao) {
+      console.log('❌ Avaliação não encontrada');
       return res.status(404).json({ error: 'Avaliação não encontrada' });
     }
 
-    // ✅ Usar transação para consistência
+    console.log('✅ Avaliação encontrada:', avaliacao.titulo);
+
+    // ✅ Verificar se a tabela respostas_checkmark existe
+    console.log('🔍 Verificando estrutura da tabela...');
+    try {
+      const tabelaExiste = await db.schema.hasTable('respostas_checkmark');
+      console.log('   Tabela respostas_checkmark existe?', tabelaExiste);
+      
+      if (!tabelaExiste) {
+        console.error('❌ Tabela respostas_checkmark não existe!');
+        return res.status(500).json({ 
+          error: 'Configuração do banco incorreta',
+          details: 'Tabela respostas_checkmark não existe'
+        });
+      }
+    } catch (schemaError) {
+      console.error('❌ Erro ao verificar schema:', schemaError);
+    }
+
+    // ✅ Inserir respostas
+    console.log('📝 Iniciando transação para salvar respostas...');
+    
     await db.transaction(async (trx) => {
-      for (const checkmarkId of checkmarks_marcados) {
-        await trx('respostas_checkmark')
-          .insert({
-            avaliacao_id: avaliacaoId,
-            checkmark_id: checkmarkId,
-            marcado: true,
-            data_resposta: new Date().toISOString(),
-          })
-          .onConflict(['avaliacao_id', 'checkmark_id'])
-          .merge();
+      for (let i = 0; i < checkmarks_marcados.length; i++) {
+        const checkmarkId = checkmarks_marcados[i];
+        console.log(`   Salvando checkmark ${i + 1}/${checkmarks_marcados.length}: ID ${checkmarkId}`);
+        
+        try {
+          await trx('respostas_checkmark')
+            .insert({
+              avaliacao_id: parseInt(avaliacaoId),
+              checkmark_id: parseInt(checkmarkId),
+              marcado: true,
+              data_resposta: new Date().toISOString(),
+            })
+            .onConflict(['avaliacao_id', 'checkmark_id'])
+            .merge();
+          
+          console.log(`   ✅ Checkmark ${checkmarkId} salvo`);
+        } catch (insertError) {
+          console.error(`   ❌ Erro ao salvar checkmark ${checkmarkId}:`, insertError.message);
+          throw insertError;
+        }
       }
     });
 
+    console.log('✅ Todas as respostas salvas com sucesso');
+
     logger.info(`✅ ${checkmarks_marcados.length} respostas salvas para avaliação ${avaliacaoId}`);
+    console.log('🟢 === SALVAMENTO CONCLUÍDO ===\n');
 
     res.json({
       message: 'Respostas salvas com sucesso',
       total: checkmarks_marcados.length,
     });
   } catch (error) {
+    console.error('🔴 === ERRO AO SALVAR RESPOSTAS ===');
+    console.error('Tipo:', error.constructor.name);
+    console.error('Mensagem:', error.message);
+    console.error('Código:', error.code);
+    console.error('Stack:', error.stack);
+    console.error('=======================================\n');
+    
     logger.error('❌ Erro ao salvar respostas:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

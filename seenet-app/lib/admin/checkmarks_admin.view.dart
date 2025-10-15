@@ -40,9 +40,9 @@ Future<void> recarregarCheckmarks() async {
     checkmarksPorCategoria.clear();
     
     for (var categoria in categorias) {
-      // ✅ ADICIONAR: ?incluir_inativos=true
+      // ✅ REMOVER ?incluir_inativos=true
       final responseCheckmarks = await _api.get(
-        '/checkmark/categoria/${categoria.id}?incluir_inativos=true'
+        '/checkmark/categoria/${categoria.id}'  // Sem query param
       );
       
       if (responseCheckmarks['success']) {
@@ -56,13 +56,11 @@ Future<void> recarregarCheckmarks() async {
       setState(() {});
     }
     
-    print('♻️ Checkmarks recarregados (manteve tabs)');
+    print('♻️ Checkmarks recarregados');
   } catch (e) {
     print('❌ Erro ao recarregar checkmarks: $e');
   }
 }
-
-
 
 Future<void> carregarDados() async {
   try {
@@ -91,11 +89,11 @@ Future<void> carregarDados() async {
       
       categorias = novasCategorias;
 
-      // ✅ ADICIONAR: ?incluir_inativos=true
       checkmarksPorCategoria.clear();
       for (var categoria in categorias) {
+        // ✅ REMOVER ?incluir_inativos=true
         final responseCheckmarks = await _api.get(
-          '/checkmark/categoria/${categoria.id}?incluir_inativos=true'
+          '/checkmark/categoria/${categoria.id}'  // Sem query param
         );
         
         if (responseCheckmarks['success']) {
@@ -230,110 +228,158 @@ Future<void> carregarDados() async {
     );
   }
 
-  Widget _buildCheckmarkCard(Checkmark checkmark, int index) {
-    return Card(
-      key: ValueKey(checkmark.id),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      color: const Color(0xFF2A2A2A),
-      child: ListTile(
-        leading: Container(
-          width: 30, height: 30,
-          decoration: BoxDecoration(
-            color: const Color(0xFF00FF88),
-            borderRadius: BorderRadius.circular(15),
+Widget _buildCheckmarkCard(Checkmark checkmark, int index) {
+  return Card(
+    key: ValueKey(checkmark.id),
+    margin: const EdgeInsets.symmetric(vertical: 4),
+    color: const Color(0xFF2A2A2A),
+    child: ListTile(
+      leading: Container(
+        width: 30, 
+        height: 30,
+        decoration: BoxDecoration(
+          color: const Color(0xFF00FF88),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Center(
+          child: Text(
+            '${index + 1}',
+            style: const TextStyle(
+              color: Colors.black, 
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          child: Center(child: Text('${index + 1}',
-            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
         ),
-        title: Text(checkmark.titulo,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        subtitle: checkmark.descricao != null
-            ? Text(checkmark.descricao!, style: const TextStyle(color: Colors.white70),
-                maxLines: 2, overflow: TextOverflow.ellipsis)
-            : null,
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: Colors.white),
-          color: const Color(0xFF3A3A3A),
-          onSelected: (value) {
-            switch (value) {
-              case 'detalhes': _mostrarDetalhesCheckmark(checkmark); break;
-              case 'editar': _editarCheckmark(checkmark); break;
-              case 'ativar_desativar': _alternarStatusCheckmark(checkmark); break;
-              case 'remover': _removerCheckmark(checkmark); break;
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(value: 'detalhes',
-              child: Row(children: [
-                Icon(Icons.info, color: Colors.blue), SizedBox(width: 8),
-                Text('Ver Detalhes', style: TextStyle(color: Colors.white)),
-              ])),
-            const PopupMenuItem(value: 'editar',
-              child: Row(children: [
-                Icon(Icons.edit, color: Colors.orange), SizedBox(width: 8),
-                Text('Editar', style: TextStyle(color: Colors.white)),
-              ])),
-            PopupMenuItem(value: 'ativar_desativar',
-              child: Row(children: [
-                Icon(checkmark.ativo ? Icons.visibility_off : Icons.visibility,
-                  color: checkmark.ativo ? Colors.orange : Colors.green),
-                const SizedBox(width: 8),
-                Text(checkmark.ativo ? 'Desativar' : 'Ativar',
-                  style: const TextStyle(color: Colors.white)),
-              ])),
-            const PopupMenuItem(value: 'remover',
-              child: Row(children: [
-                Icon(Icons.delete, color: Colors.red), SizedBox(width: 8),
-                Text('Remover', style: TextStyle(color: Colors.white)),
-              ])),
-          ],
-        ),
-        onTap: () => _mostrarDetalhesCheckmark(checkmark),
       ),
-    );
-  }
-
-  void _mostrarDetalhesCheckmark(Checkmark checkmark) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text('Detalhes do Checkmark', style: TextStyle(color: Colors.white)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDetailRow('ID', checkmark.id.toString()),
-              _buildDetailRow('Título', checkmark.titulo),
-              if (checkmark.descricao != null) _buildDetailRow('Descrição', checkmark.descricao!),
-              _buildDetailRow('Status', checkmark.ativo ? 'Ativo' : 'Inativo'),
-              const SizedBox(height: 16),
-              const Text('Prompt ChatGPT:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: Text(checkmark.promptChatgpt, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              ),
-            ],
-          ),
+      title: Text(
+        checkmark.titulo,
+        style: const TextStyle(
+          color: Colors.white, 
+          fontWeight: FontWeight.bold,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar', style: TextStyle(color: Color(0xFF00FF88))),
+      ),
+      subtitle: checkmark.descricao != null
+          ? Text(
+              checkmark.descricao!, 
+              style: const TextStyle(color: Colors.white70),
+              maxLines: 2, 
+              overflow: TextOverflow.ellipsis,
+            )
+          : null,
+      trailing: PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert, color: Colors.white),
+        color: const Color(0xFF3A3A3A),
+        onSelected: (value) {
+          switch (value) {
+            case 'detalhes': 
+              _mostrarDetalhesCheckmark(checkmark); 
+              break;
+            case 'editar': 
+              _editarCheckmark(checkmark); 
+              break;
+            case 'remover': 
+              _removerCheckmark(checkmark); 
+              break;
+          }
+        },
+        itemBuilder: (context) => [
+          const PopupMenuItem(
+            value: 'detalhes',
+            child: Row(
+              children: [
+                Icon(Icons.info, color: Colors.blue), 
+                SizedBox(width: 8),
+                Text('Ver Detalhes', style: TextStyle(color: Colors.white)),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'editar',
+            child: Row(
+              children: [
+                Icon(Icons.edit, color: Colors.orange), 
+                SizedBox(width: 8),
+                Text('Editar', style: TextStyle(color: Colors.white)),
+              ],
+            ),
+          ),
+          // ✅ REMOVER opção 'ativar_desativar'
+          const PopupMenuItem(
+            value: 'remover',
+            child: Row(
+              children: [
+                Icon(Icons.delete, color: Colors.red), 
+                SizedBox(width: 8),
+                Text('Remover', style: TextStyle(color: Colors.white)),
+              ],
+            ),
           ),
         ],
       ),
-    );
-  }
+      onTap: () => _mostrarDetalhesCheckmark(checkmark),
+    ),
+  );
+}
 
+void _mostrarDetalhesCheckmark(Checkmark checkmark) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF2A2A2A),
+      title: const Text(
+        'Detalhes do Checkmark', 
+        style: TextStyle(color: Colors.white),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow('ID', checkmark.id.toString()),
+            _buildDetailRow('Título', checkmark.titulo),
+            if (checkmark.descricao != null) 
+              _buildDetailRow('Descrição', checkmark.descricao!),
+            // ✅ REMOVER linha de Status
+            const SizedBox(height: 16),
+            const Text(
+              'Prompt ChatGPT:', 
+              style: TextStyle(
+                color: Colors.white, 
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: Text(
+                checkmark.promptChatgpt, 
+                style: const TextStyle(
+                  color: Colors.white70, 
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Fechar', 
+            style: TextStyle(color: Color(0xFF00FF88)),
+          ),
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -352,129 +398,82 @@ void _editarCheckmark(Checkmark checkmark) {
   final tituloCtrl = TextEditingController(text: checkmark.titulo);
   final descCtrl = TextEditingController(text: checkmark.descricao ?? '');
   final promptCtrl = TextEditingController(text: checkmark.promptChatgpt);
-  
-  // ✅ ADICIONAR LOG para ver o valor que está vindo
-  print('🔍 Abrindo edição do checkmark ${checkmark.id}');
-  print('   Título: ${checkmark.titulo}');
-  print('   Ativo inicial: ${checkmark.ativo}');  // ← VER ISSO
-  
-  bool ativoAtual = checkmark.ativo;
 
   showDialog(
     context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (dialogContext, setDialogState) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: Text(
-          'Editar Checkmark (Ativo: $ativoAtual)',  // ✅ Mostrar no título
-          style: const TextStyle(color: Colors.white),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: tituloCtrl, 
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Título *',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
-                ),
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF2A2A2A),
+      title: const Text('Editar Checkmark', style: TextStyle(color: Colors.white)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: tituloCtrl, 
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: 'Título *',
+                labelStyle: TextStyle(color: Colors.white70),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descCtrl, 
-                style: const TextStyle(color: Colors.white), 
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: promptCtrl, 
-                style: const TextStyle(color: Colors.white), 
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Prompt ChatGPT *',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Ativo', style: TextStyle(color: Colors.white, fontSize: 16)),
-                      Text(
-                        ativoAtual ? 'Checkmark ativo' : 'Checkmark inativo',  // ✅ Texto explicativo
-                        style: TextStyle(
-                          color: ativoAtual ? Colors.green : Colors.orange, 
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Switch(
-                    value: ativoAtual,
-                    activeColor: const Color(0xFF00FF88),
-                    inactiveThumbColor: Colors.orange,  // ✅ Cor quando desativado
-                    inactiveTrackColor: Colors.orange.withOpacity(0.3),
-                    onChanged: (v) {
-                      setDialogState(() {
-                        ativoAtual = v;
-                      });
-                      print('🔄 Switch alterado de ${!v} para: $v');  // ✅ Mostrar mudança
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              print('💾 Salvando:');
-              print('   ID: ${checkmark.id}');
-              print('   Ativo: $ativoAtual');
-              print('   Mudou? ${checkmark.ativo != ativoAtual}');
-              
-              await _salvarEdicaoCheckmark(
-                checkmark.id!, 
-                tituloCtrl.text.trim(),
-                descCtrl.text.trim(), 
-                promptCtrl.text.trim(), 
-                ativoAtual,
-              );
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF88), 
-              foregroundColor: Colors.black,
             ),
-            child: const Text('Salvar'),
-          ),
-        ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: descCtrl, 
+              style: const TextStyle(color: Colors.white), 
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Descrição',
+                labelStyle: TextStyle(color: Colors.white70),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: promptCtrl, 
+              style: const TextStyle(color: Colors.white), 
+              maxLines: 5,
+              decoration: const InputDecoration(
+                labelText: 'Prompt ChatGPT *',
+                labelStyle: TextStyle(color: Colors.white70),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
+                helperText: 'Este prompt será usado para gerar o diagnóstico com IA',
+                helperStyle: TextStyle(color: Colors.white38, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            await _salvarEdicaoCheckmark(
+              checkmark.id!, 
+              tituloCtrl.text.trim(),
+              descCtrl.text.trim(), 
+              promptCtrl.text.trim(),
+            );
+            Navigator.pop(context);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00FF88), 
+            foregroundColor: Colors.black,
+          ),
+          child: const Text('Salvar'),
+        ),
+      ],
     ),
   );
 }
 
-Future<void> _salvarEdicaoCheckmark(int id, String titulo, String desc, String prompt, bool ativo) async {
+Future<void> _salvarEdicaoCheckmark(int id, String titulo, String desc, String prompt) async {
   if (titulo.isEmpty || prompt.isEmpty) {
     Get.snackbar('Erro', 'Título e Prompt obrigatórios', 
       backgroundColor: Colors.red, colorText: Colors.white);
@@ -482,82 +481,23 @@ Future<void> _salvarEdicaoCheckmark(int id, String titulo, String desc, String p
   }
   
   try {
-    // ✅ ADICIONAR LOGS DETALHADOS
-    final payload = {
+    final res = await _api.put('/checkmark/checkmarks/$id', {
       'titulo': titulo, 
       'descricao': desc.isEmpty ? null : desc,
-      'prompt_chatgpt': prompt, 
-      'ativo': ativo,
-    };
-    
-    print('📤 Enviando para editar checkmark:');
-    print('   ID: $id');
-    print('   URL: /checkmark/checkmarks/$id');
-    print('   Payload: $payload');
-    print('   Título length: ${titulo.length}');
-    print('   Descrição length: ${desc.length}');
-    print('   Prompt length: ${prompt.length}');
-    
-    final res = await _api.put('/checkmark/checkmarks/$id', payload);
-    
-    print('📥 Resposta da edição:');
-    print('   Success: ${res['success']}');
-    print('   Error: ${res['error']}');
-    print('   Details: ${res['details']}');
-    print('   Response completa: $res');
+      'prompt_chatgpt': prompt,
+      // ✅ Não enviar mais 'ativo'
+    });
     
     if (res['success']) {
       Get.snackbar('Sucesso', 'Atualizado!', 
         backgroundColor: Colors.green, colorText: Colors.white);
       await recarregarCheckmarks();
     } else {
-      // ✅ MOSTRAR DETALHES DO ERRO
-      final errorMsg = res['error'] ?? 'Falha ao atualizar';
-      final details = res['details'];
-      
-      print('❌ Erro do servidor ao editar:');
-      print('   Mensagem: $errorMsg');
-      print('   Detalhes: $details');
-      
-      Get.snackbar(
-        'Erro', 
-        details != null ? '$errorMsg\n$details' : errorMsg,
-        backgroundColor: Colors.red, 
-        colorText: Colors.white,
-        duration: const Duration(seconds: 5),
-      );
-    }
-  } catch (e) {
-    print('❌ Exceção ao editar: $e');
-    Get.snackbar('Erro', 'Falha ao atualizar', 
-      backgroundColor: Colors.red, colorText: Colors.white);
-  }
-}
-
-Future<void> _alternarStatusCheckmark(Checkmark checkmark) async {
-  try {
-    // ✅ USAR O MESMO ENDPOINT DE EDIÇÃO (não tem rota /status)
-    final novoStatus = !checkmark.ativo;
-    
-    final res = await _api.put('/checkmark/checkmarks/${checkmark.id}', {
-      'ativo': novoStatus  // ✅ Só envia o status
-    });
-    
-    if (res['success']) {
-      Get.snackbar(
-        'Sucesso', 
-        novoStatus ? 'Checkmark ativado!' : 'Checkmark desativado!',
-        backgroundColor: novoStatus ? Colors.green : Colors.orange, 
-        colorText: Colors.white,
-      );
-      await recarregarCheckmarks();
-    } else {
-      Get.snackbar('Erro', res['error'] ?? 'Falha ao alterar status', 
+      Get.snackbar('Erro', res['error'] ?? 'Falha ao atualizar',
         backgroundColor: Colors.red, colorText: Colors.white);
     }
   } catch (e) {
-    print('❌ Erro ao alternar status: $e');
-    Get.snackbar('Erro', 'Falha ao alterar status', 
+    Get.snackbar('Erro', 'Falha ao atualizar', 
       backgroundColor: Colors.red, colorText: Colors.white);
   }
 }

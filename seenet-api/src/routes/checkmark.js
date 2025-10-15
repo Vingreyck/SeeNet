@@ -243,7 +243,7 @@ router.post('/checkmarks', adminMiddleware, [
   }
 });
 
-// ========== EDITAR CHECKMARK (ADMIN APENAS) ========== ✅ COM LOGS
+// ========== EDITAR CHECKMARK - VERSÃO CORRIGIDA ==========
 router.put('/checkmarks/:id', adminMiddleware, [
   body('titulo').optional().trim().isLength({ min: 2, max: 255 }),
   body('descricao').optional().trim().isLength({ max: 1000 }),
@@ -263,15 +263,10 @@ router.put('/checkmarks/:id', adminMiddleware, [
     const { id } = req.params;
     const { titulo, descricao, prompt_chatgpt, ativo, ordem } = req.body;
 
-    // ✅ LOG: Ver o que chegou
     console.log('📥 Dados recebidos:');
     console.log('   ID:', id);
-    console.log('   titulo:', titulo);
-    console.log('   descricao:', descricao);
-    console.log('   prompt_chatgpt:', prompt_chatgpt?.substring(0, 50) + '...');
     console.log('   ativo:', ativo, '(tipo:', typeof ativo, ')');
-    console.log('   ordem:', ordem);
-    console.log('   req.body completo:', JSON.stringify(req.body, null, 2));
+    console.log('   req.body:', JSON.stringify(req.body, null, 2));
 
     // Verificar se checkmark pertence ao tenant
     const checkmark = await db('checkmarks')
@@ -284,39 +279,55 @@ router.put('/checkmarks/:id', adminMiddleware, [
       return res.status(404).json({ error: 'Checkmark não encontrado' });
     }
 
-    console.log('✅ Checkmark encontrado:');
-    console.log('   Status ANTES:', checkmark.ativo);
-    console.log('   Título ANTES:', checkmark.titulo);
+    console.log('✅ Status ANTES da atualização:', checkmark.ativo);
 
-    // Montar objeto de atualização (só campos fornecidos)
+    // ✅ IMPORTANTE: Montar objeto garantindo que campos booleanos sejam explícitos
     const updateData = {};
     if (titulo !== undefined) updateData.titulo = titulo;
     if (descricao !== undefined) updateData.descricao = descricao;
     if (prompt_chatgpt !== undefined) updateData.prompt_chatgpt = prompt_chatgpt;
-    if (ativo !== undefined) updateData.ativo = ativo;
+    
+    // ✅ CRÍTICO: Garantir que boolean seja tratado corretamente
+    if (ativo !== undefined) {
+      updateData.ativo = Boolean(ativo);  // Forçar conversão para boolean
+      console.log('⚠️ Campo ativo será atualizado para:', updateData.ativo);
+    }
+    
     if (ordem !== undefined) updateData.ordem = ordem;
 
-    console.log('📝 Objeto updateData preparado:', JSON.stringify(updateData, null, 2));
+    console.log('📝 updateData:', JSON.stringify(updateData, null, 2));
 
-    // ✅ EXECUTAR UPDATE
-    const numRowsUpdated = await db('checkmarks')
+    // ✅ EXECUTAR UPDATE com returning para PostgreSQL
+    const result = await db('checkmarks')
       .where('id', id)
       .where('tenant_id', req.tenantId)
-      .update(updateData);
+      .update(updateData)
+      .returning('*');  // ✅ IMPORTANTE: PostgreSQL precisa disso
 
-    console.log('✅ UPDATE executado, linhas afetadas:', numRowsUpdated);
+    console.log('✅ Resultado do UPDATE:', result);
+    console.log('   Linhas retornadas:', result.length);
+    
+    if (result.length > 0) {
+      console.log('   Status DEPOIS (do returning):', result[0].ativo);
+    }
 
-    // ✅ VERIFICAR SE REALMENTE ATUALIZOU
+    // ✅ VERIFICAR NOVAMENTE no banco
     const checkmarkAtualizado = await db('checkmarks')
       .where('id', id)
-      .where('tenant_id', req.tenantId)
       .first();
 
-    console.log('🔍 Checkmark APÓS atualização:');
-    console.log('   Status DEPOIS:', checkmarkAtualizado.ativo);
-    console.log('   Título DEPOIS:', checkmarkAtualizado.titulo);
+    console.log('🔍 Verificação final no banco:');
+    console.log('   Status atual:', checkmarkAtualizado.ativo);
+    console.log('   Título atual:', checkmarkAtualizado.titulo);
 
-    // Log de auditoria com try-catch
+    // ✅ Se ainda não mudou, há um problema de trigger ou constraint
+    if (ativo !== undefined && checkmarkAtualizado.ativo !== ativo) {
+      console.error('🚨 ALERTA: Valor não foi atualizado no banco!');
+      console.error('   Esperado:', ativo);
+      console.error('   Obtido:', checkmarkAtualizado.ativo);
+    }
+
+    // Log de auditoria
     try {
       await auditService.log({
         action: 'CHECKMARK_UPDATED',
@@ -328,15 +339,22 @@ router.put('/checkmarks/:id', adminMiddleware, [
         dados_novos: updateData,
         ip_address: req.ip
       });
-      console.log('✅ Auditoria registrada');
     } catch (auditError) {
-      console.error('⚠️ Erro na auditoria (não crítico):', auditError.message);
+      console.error('⚠️ Erro na auditoria:', auditError.message);
     }
 
-    logger.info(`✅ Checkmark atualizado: ${id} (Tenant: ${req.tenantCode})`);
+    logger.info(`✅ Checkmark atualizado: ${id}`);
     console.log('🟢 === EDIÇÃO CONCLUÍDA ===\n');
 
-    res.json({ message: 'Checkmark atualizado com sucesso' });
+    res.json({ 
+      message: 'Checkmark atualizado com sucesso',
+      // ✅ Retornar o dado atualizado para o Flutter
+      checkmark: {
+        id: checkmarkAtualizado.id,
+        ativo: checkmarkAtualizado.ativo,
+        titulo: checkmarkAtualizado.titulo
+      }
+    });
   } catch (error) {
     console.error('🔴 === ERRO AO EDITAR ===');
     console.error('Mensagem:', error.message);

@@ -79,8 +79,8 @@ app.use('/api/checkmarks', require('./routes/checkmark'));
 // Avaliações
 app.use('/api/avaliacoes', require('./routes/avaliacoes'));
 
-// Diagnósticos
-app.use('/api/diagnostics', require('./routes/diagnostics'));
+const diagnosticsRoutes = require('./routes/diagnostics');
+app.use('/api/diagnostics', diagnosticsRoutes);
 
 // Transcrições
 app.use('/api/transcriptions', require('./routes/transcriptions'));

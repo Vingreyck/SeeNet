@@ -253,7 +253,13 @@ app.post('/api/diagnostics/gerar',
 });
 
 logger.info('✅ Rota POST /api/diagnostics/gerar registrada (inline)');
-
+// ✅ ADICIONAR ESTE LOG DE DEBUG:
+console.log('🔍 DEBUG: Rota de diagnósticos registrada com sucesso');
+app._router.stack.forEach(function(r){
+  if (r.route && r.route.path && r.route.path.includes('diagnostic')){
+    console.log('   Rota encontrada:', Object.keys(r.route.methods), r.route.path);
+  }
+});
 // Transcrições
 app.use('/api/transcriptions', require('./routes/transcriptions'));
 

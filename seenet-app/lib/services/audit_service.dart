@@ -440,17 +440,64 @@ Future<String> exportarLogs({
     if (dataInicio != null) queryParams['data_inicio'] = dataInicio.toIso8601String();
     if (dataFim != null) queryParams['data_fim'] = dataFim.toIso8601String();
     
+    print('🔍 Exportando logs com params: $queryParams');
+    
     final response = await _api.get(
       '/admin/logs/export',
       queryParams: queryParams,
       requireAuth: true,
     );
     
-    if (response['success']) {
-      return response['data']['export']?.toString() ?? '';
+    print('🔍 Response success: ${response['success']}');
+    print('🔍 Response data type: ${response['data'].runtimeType}');
+    print('🔍 Response data: ${response['data']}');
+    
+    if (!response['success']) {
+      throw Exception(response['error'] ?? 'Erro ao exportar');
     }
     
-    throw Exception(response['error'] ?? 'Erro ao exportar');
+    // Estrutura dupla de data
+    dynamic apiResponse = response['data'];
+    
+    if (apiResponse == null) {
+      print('⚠️ apiResponse é null');
+      return '';
+    }
+    
+    // Verificar se tem camada dupla
+    dynamic innerData;
+    
+    if (apiResponse is Map) {
+      if (apiResponse.containsKey('success') && apiResponse.containsKey('data')) {
+        innerData = apiResponse['data'];
+        print('📊 Estrutura com success/data duplo');
+      } else {
+        innerData = apiResponse;
+        print('📊 Estrutura direta');
+      }
+    } else {
+      innerData = apiResponse;
+    }
+    
+    print('🔍 innerData type: ${innerData.runtimeType}');
+    print('🔍 innerData: $innerData');
+    
+    // Extrair o export
+    if (innerData is Map && innerData.containsKey('export')) {
+      String result = innerData['export']?.toString() ?? '';
+      print('✅ Retornando export: ${result.length} caracteres');
+      return result;
+    }
+    
+    // Se não tem 'export', tentar retornar o conteúdo direto
+    if (innerData is String) {
+      print('✅ Retornando innerData como String: ${innerData.length} caracteres');
+      return innerData;
+    }
+    
+    print('⚠️ Nenhum dado de export encontrado');
+    return '';
+    
   } catch (e) {
     print('❌ Erro ao exportar logs: $e');
     rethrow;

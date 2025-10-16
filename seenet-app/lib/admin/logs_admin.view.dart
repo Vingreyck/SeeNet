@@ -1148,6 +1148,8 @@ Widget _buildNivelBar(String nivel, dynamic total, dynamic totalGeral) {
   
 Future<void> _exportarLogs() async {
   try {
+    developer.log('🔍 Iniciando exportação de logs...');
+    
     // Mostrar loading
     Get.dialog(
       const Center(child: CircularProgressIndicator()),
@@ -1160,10 +1162,17 @@ Future<void> _exportarLogs() async {
       formato: 'csv',
     );
     
+    developer.log('🔍 Dados recebidos da API:');
+    developer.log('   Tamanho: ${dados.length} caracteres');
+    developer.log('   Vazio: ${dados.isEmpty}');
+    developer.log('   Primeiros 100 chars: ${dados.length > 100 ? dados.substring(0, 100) : dados}');
+    
     Navigator.of(Get.overlayContext!).pop();
     await Future.delayed(const Duration(milliseconds: 100));
     
     if (dados.isEmpty) {
+      developer.log('⚠️ Dados vazios - mostrando aviso');
+      
       if (!mounted) return;
       
       Get.snackbar(
@@ -1176,15 +1185,18 @@ Future<void> _exportarLogs() async {
       return;
     }
     
+    developer.log('✅ Dados não vazios - chamando _salvarArquivoCSV');
+    
     // ✅ SALVAR O ARQUIVO
     await _salvarArquivoCSV(dados);
     
-  } catch (e) {
+  } catch (e, stackTrace) {
+    developer.log('❌ ERRO em _exportarLogs: $e');
+    developer.log('Stack trace: $stackTrace');
+    
     try {
       Navigator.of(Get.overlayContext!).pop();
     } catch (_) {}
-    
-    developer.log('❌ Erro ao exportar: $e');
     
     await Future.delayed(const Duration(milliseconds: 100));
     
@@ -1199,47 +1211,70 @@ Future<void> _exportarLogs() async {
     );
   }
 }
-  // ✅ MÉTODO NOVO PARA SALVAR O ARQUIVO
+
 Future<void> _salvarArquivoCSV(String conteudo) async {
   try {
+    developer.log('🔍 Iniciando salvamento do arquivo...');
+    developer.log('🔍 Tamanho do conteúdo: ${conteudo.length} caracteres');
+    
     Directory? directory;
     
     if (Platform.isAndroid) {
+      developer.log('🔍 Plataforma: Android');
+      
       // Para Android, solicitar permissão
       var status = await Permission.storage.status;
+      developer.log('🔍 Status da permissão: $status');
+      
       if (!status.isGranted) {
+        developer.log('⚠️ Solicitando permissão...');
         status = await Permission.storage.request();
+        developer.log('🔍 Nova status: $status');
       }
       
       if (status.isGranted) {
         // Tentar usar o diretório Downloads
         directory = Directory('/storage/emulated/0/Download');
+        developer.log('🔍 Tentando diretório: ${directory.path}');
+        
         if (!await directory.exists()) {
+          developer.log('⚠️ Diretório Download não existe, usando alternativo');
           directory = await getExternalStorageDirectory();
+          developer.log('🔍 Diretório alternativo: ${directory?.path}');
         }
       } else {
+        developer.log('❌ Permissão negada!');
         throw Exception('Permissão de armazenamento negada');
       }
     } else if (Platform.isIOS) {
+      developer.log('🔍 Plataforma: iOS');
       directory = await getApplicationDocumentsDirectory();
     } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      developer.log('🔍 Plataforma: Desktop');
       directory = await getDownloadsDirectory();
     }
     
     if (directory == null) {
+      developer.log('❌ Diretório é null!');
       throw Exception('Não foi possível acessar o diretório de downloads');
     }
+    
+    developer.log('✅ Diretório definido: ${directory.path}');
     
     // Nome do arquivo com timestamp
     String timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     String nomeArquivo = 'logs_auditoria_$timestamp.csv';
     String caminho = '${directory.path}/$nomeArquivo';
     
+    developer.log('📝 Caminho completo: $caminho');
+    
     // Salvar arquivo
     File arquivo = File(caminho);
     await arquivo.writeAsString(conteudo);
     
-    developer.log('✅ Arquivo salvo em: $caminho');
+    developer.log('✅ Arquivo escrito!');
+    developer.log('📊 Tamanho do arquivo: ${arquivo.lengthSync()} bytes');
+    developer.log('✅ Arquivo existe: ${await arquivo.exists()}');
     
     if (!mounted) return;
     
@@ -1278,15 +1313,13 @@ Future<void> _salvarArquivoCSV(String conteudo) async {
                   const Icon(Icons.folder, color: Color(0xFF00FF88), size: 20),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
+                    child: SelectableText(  // ✅ Trocado para poder copiar
                       caminho,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                         fontFamily: 'monospace',
                       ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -1313,14 +1346,15 @@ Future<void> _salvarArquivoCSV(String conteudo) async {
     
     Get.snackbar(
       'Sucesso',
-      'Arquivo salvo em: ${directory.path}',
+      'Arquivo salvo: $nomeArquivo',
       backgroundColor: Colors.green,
       colorText: Colors.white,
       duration: const Duration(seconds: 4),
     );
     
-  } catch (e) {
+  } catch (e, stackTrace) {
     developer.log('❌ Erro ao salvar arquivo: $e');
+    developer.log('Stack trace: $stackTrace');
     
     if (!mounted) return;
     
@@ -1333,90 +1367,112 @@ Future<void> _salvarArquivoCSV(String conteudo) async {
     );
   }
 }
-  void _limparLogsAntigos() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text(
-          'Limpar Logs Antigos',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Isso removerá logs informativos com mais de 90 dias.',
-              style: TextStyle(color: Colors.white70),
-            ),
-            SizedBox(height: 16),
-            Text(
-              '✅ Logs de INFO com mais de 90 dias serão removidos',
-              style: TextStyle(color: Colors.green, fontSize: 13),
-            ),
-            SizedBox(height: 8),
-            Text(
-              '⚠️ Logs de WARNING e ERROR serão mantidos',
-              style: TextStyle(color: Colors.orange, fontSize: 13),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Deseja continuar?',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: Colors.white54),
-            ),
+
+void _limparLogsAntigos() {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF2A2A2A),
+      title: const Text(
+        'Limpar Logs Antigos',
+        style: TextStyle(color: Colors.white),
+      ),
+      content: const Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Isso removerá logs informativos com mais de 90 dias.',
+            style: TextStyle(color: Colors.white70),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              
-              try {
-                Get.dialog(
-                  const Center(child: CircularProgressIndicator()),
-                  barrierDismissible: false,
-                );
-                
-                await _audit.limparLogsAntigos(diasParaManter: 90);
-                
-                Get.back();
-                
-                Get.snackbar(
-                  'Sucesso',
-                  'Logs antigos removidos com sucesso!',
-                  backgroundColor: Colors.green,
-                  colorText: Colors.white,
-                );
-                
-                carregarDados();
-              } catch (e) {
-                Get.back();
-                Get.snackbar(
-                  'Erro',
-                  'Erro ao limpar logs',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
+          SizedBox(height: 16),
+          Text(
+            '✅ Logs de INFO com mais de 90 dias serão removidos',
+            style: TextStyle(color: Colors.green, fontSize: 13),
+          ),
+          SizedBox(height: 8),
+          Text(
+            '⚠️ Logs de WARNING e ERROR serão mantidos',
+            style: TextStyle(color: Colors.orange, fontSize: 13),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Deseja continuar?',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
             ),
-            child: const Text('Limpar'),
           ),
         ],
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Cancelar',
+            style: TextStyle(color: Colors.white54),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(context); // Fecha o dialog de confirmação
+            
+            try {
+              // Mostrar loading
+              Get.dialog(
+                const Center(child: CircularProgressIndicator()),
+                barrierDismissible: false,
+              );
+              
+              await _audit.limparLogsAntigos(diasParaManter: 90);
+              
+              // ✅ Fechar loading APENAS UMA VEZ
+              Navigator.of(Get.overlayContext!).pop();
+              
+              // Aguardar antes de mostrar snackbar
+              await Future.delayed(const Duration(milliseconds: 100));
+              
+              if (!mounted) return;
+              
+              Get.snackbar(
+                'Sucesso',
+                'Logs antigos removidos com sucesso!',
+                backgroundColor: Colors.green,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 3),
+              );
+              
+              // Recarregar dados
+              carregarDados();
+              
+            } catch (e) {
+              // Fechar loading se ainda estiver aberto
+              try {
+                Navigator.of(Get.overlayContext!).pop();
+              } catch (_) {
+                // Ignorar se já foi fechado
+              }
+              
+              await Future.delayed(const Duration(milliseconds: 100));
+              
+              if (!mounted) return;
+              
+              Get.snackbar(
+                'Erro',
+                'Erro ao limpar logs: ${e.toString()}',
+                backgroundColor: Colors.red,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 3),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+          ),
+          child: const Text('Limpar'),
+        ),
+      ],
+    ),
+  );
+}
 }

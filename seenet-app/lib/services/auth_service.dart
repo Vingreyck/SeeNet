@@ -30,6 +30,10 @@ class AuthService extends GetxService {
         // Configurar autenticação no ApiService
         _api.setAuth(token, userData['tenant']['codigo']);
 
+        print('🔐 Token configurado no ApiService');
+        print('📌 Tenant Code: ${userData['tenant']['codigo']}');
+        print('🎫 Token: ${token.substring(0, 20)}...');
+
         // Criar objeto Usuario compatível com seu sistema
         Usuario usuario = Usuario(
           id: userData['id'],

@@ -20,11 +20,7 @@ import 'package:seenet/diagnostico/diagnostico.view.dart';
 import 'package:seenet/registro/widgets/registro.bindings.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
-
-// Configuração de ambiente
 import 'package:seenet/config/environment.dart';
-
-// Controllers (SÓ API - SEM SQLite)
 import 'controllers/usuario_controller.dart';
 import 'controllers/checkmark_controller.dart';
 import 'controllers/diagnostico_controller.dart';
@@ -55,6 +51,43 @@ void main() async {
   runApp(const MyApp());
 }
 
+// ✅ MIDDLEWARE DE AUTENTICAÇÃO MELHORADO
+class AuthMiddleware extends GetMiddleware {
+  @override
+  RouteSettings? redirect(String? route) {
+    // Verificar se a rota requer autenticação
+    List<String> protectedRoutes = ['/admin'];
+    
+    bool isProtected = protectedRoutes.any((r) => route?.startsWith(r) ?? false);
+    
+    if (isProtected) {
+      // Verificar se tem usuário logado
+      try {
+        final usuarioController = Get.find<UsuarioController>();
+        
+        if (!usuarioController.isLoggedIn) {
+          print('❌ Sem autenticação - redirecionando para login');
+          Get.snackbar(
+            '🔒 Acesso Negado',
+            'Faça login para acessar esta área',
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+            snackPosition: SnackPosition.TOP,
+            duration: const Duration(seconds: 3),
+          );
+          return const RouteSettings(name: '/login');
+        }
+        
+        print('✅ Usuário autenticado - permitindo acesso a $route');
+      } catch (e) {
+        print('❌ Erro ao verificar autenticação: $e');
+        return const RouteSettings(name: '/login');
+      }
+    }
+    
+    return null; // Permitir navegação
+  }
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -104,17 +137,21 @@ class MyApp extends StatelessWidget {
           name: '/diagnostico',
           page: () => const DiagnosticoView(),
         ),
+        // ✅ ROTAS ADMIN PROTEGIDAS
         GetPage(
           name: '/admin/usuarios',
           page: () => const UsuariosAdminView(),
+          middlewares: [AuthMiddleware()],
         ),
         GetPage(
           name: '/admin/checkmarks',
           page: () => const CheckmarksAdminView(),
+          middlewares: [AuthMiddleware()],
         ),
         GetPage(
           name: '/admin/logs',
           page: () => const LogsAdminView(),
+          middlewares: [AuthMiddleware()],
         ),
         GetPage(
           name: '/transcricao',

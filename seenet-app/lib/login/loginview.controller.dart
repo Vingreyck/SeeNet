@@ -2,7 +2,9 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../controllers/usuario_controller.dart';
+import '../config/environment.dart';
 import '../services/auth_service.dart';
+import '../services/test_auth_flow.dart';
 import '../services/api_service.dart';
 
 class LoginController extends GetxController {
@@ -119,16 +121,19 @@ class LoginController extends GetxController {
         codigoEmpresaController.text.trim().toUpperCase(),
       );
 
-      if (loginSucesso) {
-        _showSuccess('Login realizado com sucesso!');
-        
-        // Debug
-        print('✅ Usuário logado: ${usuarioController.nomeUsuario}');
-        print('🏢 Empresa: ${empresaInfo.value?['nome']}');
-        
-        // Navegar para checklist
-        Get.offAllNamed('/checklist');
+    if (loginSucesso) {
+      _showSuccess('Login realizado com sucesso!');
+      
+      // ✅ ADICIONAR: Debug do fluxo
+      if (Environment.enableDebugLogs) {
+        await AuthFlowDebugger.testarFluxoCompleto();
       }
+      
+      print('✅ Usuário logado: ${usuarioController.nomeUsuario}');
+      
+      // Navegar para checklist
+      Get.offAllNamed('/checklist');
+    }
       // AuthService já mostra erros
       
     } catch (e) {

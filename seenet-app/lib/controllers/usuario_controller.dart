@@ -5,7 +5,8 @@ import '../models/usuario.dart';
 import '../services/auth_service.dart';
 
 class UsuarioController extends GetxController {
-  final AuthService _authService = Get.find<AuthService>();
+  // ✅ CORREÇÃO: Usar getter lazy ao invés de inicialização direta
+  AuthService get _authService => Get.find<AuthService>();
   
   Rx<Usuario?> usuarioLogado = Rx<Usuario?>(null);
   RxBool isLoading = false.obs;
@@ -15,7 +16,6 @@ class UsuarioController extends GetxController {
     super.onInit();
     print('📱 UsuarioController inicializado (modo API)');
   }
-
   // ========== LOGIN VIA API ==========
   Future<bool> login(String email, String senha, String codigoEmpresa) async {
     try {

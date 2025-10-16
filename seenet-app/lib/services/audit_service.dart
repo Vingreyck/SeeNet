@@ -179,137 +179,283 @@ class AuditService extends GetxService {
     );
   }
   
-  /// Buscar logs da API com filtros
-  Future<List<Map<String, dynamic>>> buscarLogs({
-    int? usuarioId,
-    String? acao,
-    String? nivel,
-    DateTime? dataInicio,
-    DateTime? dataFim,
-    int limite = 100,
-    int offset = 0,
-  }) async {
-    try {
-      // Construir URL com query string manualmente
-      List<String> params = [];
-      params.add('limite=$limite');
-      params.add('offset=$offset');
+/// Buscar logs da API com filtros
+Future<List<Map<String, dynamic>>> buscarLogs({
+  int? usuarioId,
+  String? acao,
+  String? nivel,
+  DateTime? dataInicio,
+  DateTime? dataFim,
+  int limite = 100,
+  int offset = 0,
+}) async {
+  try {
+    Map<String, String> queryParams = {
+      'limite': limite.toString(),
+      'offset': offset.toString(),
+    };
+    
+    if (usuarioId != null) queryParams['usuario_id'] = usuarioId.toString();
+    if (acao != null) queryParams['acao'] = acao;
+    if (nivel != null) queryParams['nivel'] = nivel;
+    if (dataInicio != null) queryParams['data_inicio'] = dataInicio.toIso8601String();
+    if (dataFim != null) queryParams['data_fim'] = dataFim.toIso8601String();
+    
+    final response = await _api.get(
+      '/admin/logs',
+      queryParams: queryParams,
+      requireAuth: true,
+    );
+    
+    if (!response['success']) {
+      String erro = response['error']?.toString() ?? 'Erro desconhecido';
+      print('❌ Erro da API: $erro');
       
-      if (usuarioId != null) params.add('usuario_id=$usuarioId');
-      if (acao != null) params.add('acao=$acao');
-      if (nivel != null) params.add('nivel=$nivel');
-      if (dataInicio != null) params.add('data_inicio=${dataInicio.toIso8601String()}');
-      if (dataFim != null) params.add('data_fim=${dataFim.toIso8601String()}');
-      
-      String endpoint = '/admin/logs?${params.join('&')}';
-      
-      final response = await _api.get(endpoint);
-      
-      if (response['success']) {
-        List<dynamic> logsData = response['data']['logs'] ?? [];
-        return List<Map<String, dynamic>>.from(logsData);
+      if (erro.toLowerCase().contains('token') || 
+          erro.toLowerCase().contains('autenticação') || 
+          erro.toLowerCase().contains('autorização') ||
+          erro.toLowerCase().contains('requerido')) {
+        throw Exception('AUTH_ERROR: $erro');
       }
       
-      print('⚠️ Erro ao buscar logs: ${response['error']}');
+      throw Exception(erro);
+    }
+    
+    // ✅ CORREÇÃO: A API retorna { success, data: { logs, total, ... } }
+    // O ApiService já extrai 'data', mas a API está retornando outra camada
+    
+    dynamic apiResponse = response['data'];
+    
+    if (apiResponse == null) {
+      print('⚠️ Resposta sem dados');
       return [];
-    } catch (e) {
-      print('❌ Erro ao buscar logs: $e');
+    }
+    
+    // ✅ A resposta tem DUAS camadas de 'data':
+    // response['data'] = { success: true, data: { logs: [...] } }
+    // Precisamos acessar response['data']['data']['logs']
+    
+    dynamic innerData;
+    
+    if (apiResponse is Map) {
+      // Se tem 'success' na resposta, pegar o 'data' interno
+      if (apiResponse.containsKey('success') && apiResponse.containsKey('data')) {
+        innerData = apiResponse['data'];
+        print('📊 Estrutura: resposta com success/data duplo');
+      } else if (apiResponse.containsKey('logs')) {
+        innerData = apiResponse;
+        print('📊 Estrutura: resposta direta com logs');
+      } else {
+        innerData = apiResponse;
+      }
+    } else {
+      innerData = apiResponse;
+    }
+    
+    // Agora extrair os logs
+    List<dynamic> logsData = [];
+    
+    if (innerData is Map && innerData.containsKey('logs')) {
+      logsData = innerData['logs'] ?? [];
+      print('✅ ${logsData.length} logs encontrados!');
+    } else if (innerData is List) {
+      logsData = innerData;
+      print('✅ ${logsData.length} logs encontrados (lista direta)!');
+    } else {
+      print('⚠️ Estrutura não reconhecida');
+      print('🔍 innerData type: ${innerData.runtimeType}');
+      print('🔍 innerData: $innerData');
       return [];
     }
-  }
-  
-  /// Gerar relatório de auditoria via API
-  Future<Map<String, dynamic>> gerarRelatorio({
-    DateTime? dataInicio,
-    DateTime? dataFim,
-  }) async {
-    try {
-      List<String> params = [];
-      
-      if (dataInicio != null) params.add('data_inicio=${dataInicio.toIso8601String()}');
-      if (dataFim != null) params.add('data_fim=${dataFim.toIso8601String()}');
-      
-      String endpoint = '/admin/stats';
-      if (params.isNotEmpty) {
-        endpoint += '?${params.join('&')}';
-      }
-      
-      final response = await _api.get(endpoint);
-      
-      if (response['success']) {
-        return response['data'];
-      }
-      
-      return {'erro': response['error'] ?? 'Falha ao gerar relatório'};
-    } catch (e) {
-      print('❌ Erro ao gerar relatório: $e');
-      return {'erro': e.toString()};
+    
+    print('📊 ${logsData.length} logs carregados da API');
+    return List<Map<String, dynamic>>.from(logsData);
+    
+  } on Exception catch (e) {
+    String errorMsg = e.toString();
+    print('❌ Erro ao buscar logs: $errorMsg');
+    
+    if (errorMsg.contains('AUTH_ERROR') || errorMsg.contains('Autenticação necessária')) {
+      rethrow;
     }
+    
+    return [];
+  } catch (e) {
+    print('❌ Erro inesperado ao buscar logs: $e');
+    print('🔍 Stack trace: ${StackTrace.current}');
+    return [];
   }
-  
-  /// Limpar logs antigos (via API)
-  Future<void> limparLogsAntigos({int diasParaManter = 90}) async {
-    try {
-      String endpoint = '/admin/logs/cleanup?dias=$diasParaManter';
+}
+
+/// Gerar relatório de auditoria via API
+Future<Map<String, dynamic>> gerarRelatorio({
+  DateTime? dataInicio,
+  DateTime? dataFim,
+}) async {
+  try {
+    Map<String, String> queryParams = {};
+    
+    if (dataInicio != null) queryParams['data_inicio'] = dataInicio.toIso8601String();
+    if (dataFim != null) queryParams['data_fim'] = dataFim.toIso8601String();
+    
+    final response = await _api.get(
+      '/admin/stats',
+      queryParams: queryParams.isNotEmpty ? queryParams : null,
+      requireAuth: true,
+    );
+    
+    if (!response['success']) {
+      String erro = response['error']?.toString() ?? 'Erro desconhecido';
       
-      final response = await _api.delete(endpoint);
-      
-      if (response['success']) {
-        print('🧹 Logs antigos removidos');
-        
-        await log(
-          action: AuditAction.dataExported,
-          detalhes: 'Limpeza automática: logs com mais de $diasParaManter dias removidos',
-        );
-      }
-    } catch (e) {
-      print('❌ Erro ao limpar logs: $e');
-    }
-  }
-  
-  /// Exportar logs via API
-  Future<String> exportarLogs({
-    DateTime? dataInicio,
-    DateTime? dataFim,
-    String formato = 'json',
-  }) async {
-    try {
-      List<String> params = [];
-      params.add('formato=$formato');
-      
-      if (dataInicio != null) params.add('data_inicio=${dataInicio.toIso8601String()}');
-      if (dataFim != null) params.add('data_fim=${dataFim.toIso8601String()}');
-      
-      String endpoint = '/admin/logs/export?${params.join('&')}';
-      
-      final response = await _api.get(endpoint);
-      
-      if (response['success']) {
-        return response['data']['export'] ?? '';
+      if (erro.toLowerCase().contains('token') || 
+          erro.toLowerCase().contains('autenticação')) {
+        throw Exception('AUTH_ERROR: $erro');
       }
       
-      return '';
-    } catch (e) {
-      print('❌ Erro ao exportar logs: $e');
-      return '';
+      return {'erro': erro};
     }
+    
+    // ✅ CORREÇÃO: Cast explícito para Map<String, dynamic>
+    dynamic apiResponse = response['data'];
+    
+    if (apiResponse == null) {
+      return <String, dynamic>{};
+    }
+    
+    // Verificar se tem camada dupla
+    if (apiResponse is Map) {
+      if (apiResponse.containsKey('success') && apiResponse.containsKey('data')) {
+        var innerData = apiResponse['data'];
+        return innerData is Map ? Map<String, dynamic>.from(innerData) : <String, dynamic>{};
+      }
+      return Map<String, dynamic>.from(apiResponse);
+    }
+    
+    return <String, dynamic>{};
+  } catch (e) {
+    print('❌ Erro ao gerar relatório: $e');
+    if (e.toString().contains('AUTH_ERROR')) {
+      rethrow;
+    }
+    return {'erro': e.toString()};
   }
-  
-  /// Obter estatísticas rápidas
-  Future<Map<String, dynamic>> getEstatisticasRapidas() async {
-    try {
-      final response = await _api.get('/admin/stats/quick');
+}
+
+/// Obter estatísticas rápidas
+Future<Map<String, dynamic>> getEstatisticasRapidas() async {
+  try {
+    final response = await _api.get(
+      '/admin/stats/quick',
+      requireAuth: true,
+    );
+    
+    if (!response['success']) {
+      String erro = response['error']?.toString() ?? 'Erro desconhecido';
       
-      if (response['success']) {
-        return response['data'];
+      if (erro.toLowerCase().contains('token') || 
+          erro.toLowerCase().contains('autenticação')) {
+        throw Exception('AUTH_ERROR: $erro');
       }
       
       return {'logs_24h': 0, 'acoes_criticas': 0};
-    } catch (e) {
-      print('❌ Erro ao obter estatísticas: $e');
+    }
+    
+    dynamic apiResponse = response['data'];
+    
+    if (apiResponse == null) {
       return {'logs_24h': 0, 'acoes_criticas': 0};
     }
+    
+    // Verificar se tem camada dupla de data
+    dynamic innerData;
+    
+    if (apiResponse is Map) {
+      if (apiResponse.containsKey('success') && apiResponse.containsKey('data')) {
+        innerData = apiResponse['data'];
+        print('📊 Stats Quick: estrutura com success/data duplo');
+      } else {
+        innerData = apiResponse;
+        print('📊 Stats Quick: estrutura direta');
+      }
+    } else {
+      innerData = apiResponse;
+    }
+    
+    // ✅ CORREÇÃO: Garantir conversão para int
+    if (innerData is Map) {
+      var logs24h = innerData['logs_24h'] ?? innerData['logs24h'] ?? 0;
+      var acoesCriticas = innerData['acoes_criticas'] ?? innerData['acoesCriticas'] ?? 0;
+      
+      return {
+        'logs_24h': logs24h is int ? logs24h : (logs24h is String ? int.tryParse(logs24h) ?? 0 : 0),
+        'acoes_criticas': acoesCriticas is int ? acoesCriticas : (acoesCriticas is String ? int.tryParse(acoesCriticas) ?? 0 : 0),
+      };
+    }
+    
+    return {'logs_24h': 0, 'acoes_criticas': 0};
+    
+  } catch (e) {
+    print('❌ Erro ao obter estatísticas: $e');
+    if (e.toString().contains('AUTH_ERROR')) {
+      rethrow;
+    }
+    return {'logs_24h': 0, 'acoes_criticas': 0};
   }
+}
+
+/// Limpar logs antigos (via API)
+Future<void> limparLogsAntigos({int diasParaManter = 90}) async {
+  try {
+    final response = await _api.delete(
+      '/admin/logs/cleanup',
+      queryParams: {'dias': diasParaManter.toString()},
+      requireAuth: true,
+    );
+    
+    if (response['success']) {
+      print('🧹 Logs antigos removidos');
+      
+      await log(
+        action: AuditAction.dataExported,
+        detalhes: 'Limpeza automática: logs com mais de $diasParaManter dias removidos',
+      );
+    } else {
+      throw Exception(response['error'] ?? 'Erro ao limpar logs');
+    }
+  } catch (e) {
+    print('❌ Erro ao limpar logs: $e');
+    rethrow;
+  }
+}
+
+/// Exportar logs via API
+Future<String> exportarLogs({
+  DateTime? dataInicio,
+  DateTime? dataFim,
+  String formato = 'json',
+}) async {
+  try {
+    Map<String, String> queryParams = {'formato': formato};
+    
+    if (dataInicio != null) queryParams['data_inicio'] = dataInicio.toIso8601String();
+    if (dataFim != null) queryParams['data_fim'] = dataFim.toIso8601String();
+    
+    final response = await _api.get(
+      '/admin/logs/export',
+      queryParams: queryParams,
+      requireAuth: true,
+    );
+    
+    if (response['success']) {
+      return response['data']['export']?.toString() ?? '';
+    }
+    
+    throw Exception(response['error'] ?? 'Erro ao exportar');
+  } catch (e) {
+    print('❌ Erro ao exportar logs: $e');
+    rethrow;
+  }
+}
   
   // ===== MÉTODOS PRIVADOS =====
   

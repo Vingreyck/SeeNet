@@ -1,8 +1,12 @@
-// lib/admin/logs_admin.view.dart - VERSÃO API (ATUALIZADO)
+// lib/admin/logs_admin.view.dart - VERSÃO CORRIGIDA
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'package:permission_handler/permission_handler.dart';
 import '../services/audit_service.dart';
+import 'dart:developer' as developer;
 
 class LogsAdminView extends StatefulWidget {
   const LogsAdminView({super.key});
@@ -48,6 +52,31 @@ class _LogsAdminViewState extends State<LogsAdminView>
     try {
       setState(() => isLoading = true);
       
+      // Verificar autenticação
+      try {
+        await _audit.getEstatisticasRapidas();
+        developer.log('✅ Autenticação OK - Token presente');
+      } catch (authError) {
+        developer.log('❌ ERRO DE AUTENTICAÇÃO: $authError');
+        
+        if (!mounted) return;
+        
+        Get.snackbar(
+          '🔒 Sessão Expirada',
+          'Sua sessão expirou. Por favor, faça login novamente.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5),
+          snackPosition: SnackPosition.TOP,
+        );
+        
+        Future.delayed(const Duration(seconds: 2), () {
+          Get.offAllNamed('/login');
+        });
+        
+        return;
+      }
+      
       // Carregar logs via API
       logs = await _audit.buscarLogs(
         nivel: filtroNivel,
@@ -68,9 +97,12 @@ class _LogsAdminViewState extends State<LogsAdminView>
       var stats = await _audit.getEstatisticasRapidas();
       estatisticas['rapidas'] = stats;
       
-      print('📊 ${logs.length} logs carregados da API');
+      developer.log('📊 ${logs.length} logs carregados da API');
     } catch (e) {
-      print('❌ Erro ao carregar logs: $e');
+      developer.log('❌ Erro ao carregar logs: $e');
+      
+      if (!mounted) return;
+      
       Get.snackbar(
         'Erro',
         'Erro ao carregar logs da API',
@@ -78,7 +110,9 @@ class _LogsAdminViewState extends State<LogsAdminView>
         colorText: Colors.white,
       );
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
   
@@ -106,8 +140,8 @@ class _LogsAdminViewState extends State<LogsAdminView>
                   break;
               }
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
+            itemBuilder: (context) => const [
+              PopupMenuItem(
                 value: 'exportar',
                 child: Row(
                   children: [
@@ -117,7 +151,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'limpar',
                 child: Row(
                   children: [
@@ -143,20 +177,43 @@ class _LogsAdminViewState extends State<LogsAdminView>
         ),
       ),
       backgroundColor: const Color(0xFF1A1A1A),
-      body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF00FF88),
-              ),
-            )
-          : TabBarView(
-              controller: _tabController,
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: const Color(0xFF2A2A2A),
+            child: Row(
               children: [
-                _buildLogsTab(),
-                _buildDashboardTab(),
-                _buildAlertasTab(),
+                const Icon(Icons.access_time, color: Colors.white54, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Horários em ${DateTime.now().timeZoneName} (${DateTime.now().timeZoneOffset.inHours > 0 ? '+' : ''}${DateTime.now().timeZoneOffset.inHours}h)',
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
+          ),
+          Expanded(
+            child: isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF00FF88),
+                    ),
+                  )
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildLogsTab(),
+                      _buildDashboardTab(),
+                      _buildAlertasTab(),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
   
@@ -260,15 +317,33 @@ class _LogsAdminViewState extends State<LogsAdminView>
                   dropdownColor: const Color(0xFF3A3A3A),
                   style: const TextStyle(color: Colors.white),
                   isExpanded: true,
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('Todas')),
-                    ...AuditAction.values.map((action) => DropdownMenuItem(
-                      value: action.code,
-                      child: Text(
-                        _formatarAcao(action.code),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    )),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('Todas')),
+                    DropdownMenuItem(value: 'LOGIN_SUCCESS', child: Text('Login')),
+                    DropdownMenuItem(value: 'LOGIN_FAILED', child: Text('Login Falhou')),
+                    DropdownMenuItem(value: 'LOGOUT', child: Text('Logout')),
+                    DropdownMenuItem(value: 'USER_CREATED', child: Text('Usuário Criado')),
+                    DropdownMenuItem(value: 'USER_UPDATED', child: Text('Usuário Atualizado')),
+                    DropdownMenuItem(value: 'USER_DELETED', child: Text('Usuário Deletado')),
+                    DropdownMenuItem(value: 'PASSWORD_CHANGED', child: Text('Senha Alterada')),
+                    DropdownMenuItem(value: 'PASSWORD_RESET', child: Text('Senha Resetada')),
+                    DropdownMenuItem(value: 'CHECKMARK_CREATED', child: Text('Checkmark Criado')),
+                    DropdownMenuItem(value: 'CHECKMARK_UPDATED', child: Text('Checkmark Atualizado')),
+                    DropdownMenuItem(value: 'CHECKMARK_DELETED', child: Text('Checkmark Deletado')),
+                    DropdownMenuItem(value: 'CATEGORY_CREATED', child: Text('Categoria Criada')),
+                    DropdownMenuItem(value: 'CATEGORY_UPDATED', child: Text('Categoria Atualizada')),
+                    DropdownMenuItem(value: 'CATEGORY_DELETED', child: Text('Categoria Deletada')),
+                    DropdownMenuItem(value: 'EVALUATION_STARTED', child: Text('Avaliação Iniciada')),
+                    DropdownMenuItem(value: 'EVALUATION_COMPLETED', child: Text('Avaliação Finalizada')),
+                    DropdownMenuItem(value: 'EVALUATION_CANCELLED', child: Text('Avaliação Cancelada')),
+                    DropdownMenuItem(value: 'DIAGNOSTIC_GENERATED', child: Text('Diagnóstico Gerado')),
+                    DropdownMenuItem(value: 'DIAGNOSTIC_FAILED', child: Text('Diagnóstico Falhou')),
+                    DropdownMenuItem(value: 'DOCUMENT_CREATED', child: Text('Documento Criado')),
+                    DropdownMenuItem(value: 'TRANSCRIPTION_STARTED', child: Text('Transcrição Iniciada')),
+                    DropdownMenuItem(value: 'TRANSCRIPTION_COMPLETED', child: Text('Transcrição Completa')),
+                    DropdownMenuItem(value: 'DATA_EXPORTED', child: Text('Dados Exportados')),
+                    DropdownMenuItem(value: 'CONFIG_CHANGED', child: Text('Config Alterada')),
+                    DropdownMenuItem(value: 'UNAUTHORIZED_ACCESS', child: Text('Acesso Não Autorizado')),
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -380,7 +455,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: corNivel.withOpacity(0.2),
+            color: corNivel.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
@@ -531,93 +606,92 @@ class _LogsAdminViewState extends State<LogsAdminView>
     );
   }
   
-  // ========== TAB DASHBOARD ==========
-  Widget _buildDashboardTab() {
-    if (estatisticas.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF00FF88)),
-      );
-    }
-    
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Cards de estatísticas rápidas
-          if (estatisticas['rapidas'] != null) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    'Logs (24h)',
-                    estatisticas['rapidas']['logs_24h'].toString(),
-                    Icons.history,
-                    Colors.blue,
-                  ),
+// ========== TAB DASHBOARD ==========
+Widget _buildDashboardTab() {
+  if (estatisticas.isEmpty) {
+    return const Center(
+      child: CircularProgressIndicator(color: Color(0xFF00FF88)),
+    );
+  }
+  
+  return SingleChildScrollView(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Cards de estatísticas rápidas
+        if (estatisticas['rapidas'] != null) ...[
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  'Logs (24h)',
+                  (estatisticas['rapidas']['logs_24h'] ?? 0).toString(),
+                  Icons.history,
+                  Colors.blue,
                 ),
-                const SizedBox(width: 16),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildStatCard(
+                  'Ações Críticas',
+                  (estatisticas['rapidas']['acoes_criticas'] ?? 0).toString(),
+                  Icons.warning,
+                  Colors.orange,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ] else ...[
+          // Se não tem dados rápidos, mostrar mensagem
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2A2A2A),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue),
+                SizedBox(width: 12),
                 Expanded(
-                  child: _buildStatCard(
-                    'Ações Críticas',
-                    estatisticas['rapidas']['acoes_criticas'].toString(),
-                    Icons.warning,
-                    Colors.orange,
+                  child: Text(
+                    'Estatísticas rápidas não disponíveis',
+                    style: TextStyle(color: Colors.white70),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-          ],
-          
-          // Resumo geral
-          if (estatisticas['resumo'] != null) ...[
-            const Text(
-              'Resumo Geral',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+          ),
+          const SizedBox(height: 20),
+        ],
+        
+        // Resumo geral
+        if (estatisticas['resumo'] != null) ...[
+          const Text(
+            'Resumo Geral',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 16),
-            
-            _buildResumoCard(
-              'Total de Logs',
-              estatisticas['resumo']['total_logs'].toString(),
-              Icons.list_alt,
-            ),
-            
-            const SizedBox(height: 20),
-            
-            // Logs por nível
-            if (estatisticas['resumo']['por_nivel'] != null) ...[
-              const Text(
-                'Logs por Nível',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              
-              ...((estatisticas['resumo']['por_nivel'] as List?) ?? [])
-                  .map((item) => _buildNivelBar(
-                        item['nivel'] ?? 'unknown',
-                        item['total'] ?? 0,
-                        estatisticas['resumo']['total_logs'] ?? 1,
-                      )),
-            ],
-          ],
+          ),
+          const SizedBox(height: 16),
           
-          const SizedBox(height: 30),
+          _buildResumoCard(
+            'Total de Logs',
+            (estatisticas['resumo']['total_logs'] ?? 0).toString(),
+            Icons.list_alt,
+          ),
           
-          // Usuários mais ativos
-          if (estatisticas['usuarios_ativos'] != null &&
-              (estatisticas['usuarios_ativos'] as List).isNotEmpty) ...[
+          const SizedBox(height: 20),
+          
+          // Logs por nível
+          if (estatisticas['resumo']['por_nivel'] != null && 
+              (estatisticas['resumo']['por_nivel'] as List).isNotEmpty) ...[
             const Text(
-              'Usuários Mais Ativos',
+              'Logs por Nível',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,
@@ -626,13 +700,43 @@ class _LogsAdminViewState extends State<LogsAdminView>
             ),
             const SizedBox(height: 12),
             
-            ...((estatisticas['usuarios_ativos'] as List).take(5))
-                .map((user) => _buildUsuarioAtivoCard(user)),
+          // ✅ CORREÇÃO: Passar valores dinâmicos para _buildNivelBar
+          ...((estatisticas['resumo']['por_nivel'] as List))
+              .map((item) => _buildNivelBar(
+                    item['nivel']?.toString() ?? 'unknown',
+                    item['total'], // ← Não converter aqui, deixar como dynamic
+                    estatisticas['resumo']['total_logs'], // ← Não converter aqui
+                  )),
           ],
+        ] else ...[
+          const Text(
+            'Nenhuma estatística disponível para o período selecionado',
+            style: TextStyle(color: Colors.white54, fontSize: 16),
+          ),
         ],
-      ),
-    );
-  }
+        
+        const SizedBox(height: 30),
+        
+        // Usuários mais ativos
+        if (estatisticas['usuarios_ativos'] != null &&
+            (estatisticas['usuarios_ativos'] as List).isNotEmpty) ...[
+          const Text(
+            'Usuários Mais Ativos',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          ...((estatisticas['usuarios_ativos'] as List).take(5))
+              .map((user) => _buildUsuarioAtivoCard(user)),
+        ],
+      ],
+    ),
+  );
+}
   
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
@@ -640,7 +744,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
       decoration: BoxDecoration(
         color: const Color(0xFF2A2A2A),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -703,42 +807,46 @@ class _LogsAdminViewState extends State<LogsAdminView>
     );
   }
   
-  Widget _buildNivelBar(String nivel, int total, int totalGeral) {
-    double percentual = totalGeral > 0 ? (total / totalGeral) * 100 : 0;
-    Color cor = _getCorNivel(nivel);
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                nivel.toUpperCase(),
-                style: TextStyle(
-                  color: cor,
-                  fontWeight: FontWeight.bold,
-                ),
+Widget _buildNivelBar(String nivel, dynamic total, dynamic totalGeral) {
+  // ✅ Converter para int se vier como String
+  int totalInt = total is int ? total : (total is String ? int.tryParse(total) ?? 0 : 0);
+  int totalGeralInt = totalGeral is int ? totalGeral : (totalGeral is String ? int.tryParse(totalGeral) ?? 1 : 1);
+  
+  double percentual = totalGeralInt > 0 ? (totalInt / totalGeralInt) * 100 : 0;
+  Color cor = _getCorNivel(nivel);
+  
+  return Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              nivel.toUpperCase(),
+              style: TextStyle(
+                color: cor,
+                fontWeight: FontWeight.bold,
               ),
-              Text(
-                '$total (${percentual.toStringAsFixed(1)}%)',
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          LinearProgressIndicator(
-            value: percentual / 100,
-            backgroundColor: Colors.white12,
-            valueColor: AlwaysStoppedAnimation<Color>(cor),
-            minHeight: 8,
-          ),
-        ],
-      ),
-    );
-  }
+            ),
+            Text(
+              '$totalInt (${percentual.toStringAsFixed(1)}%)',
+              style: const TextStyle(color: Colors.white70),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        LinearProgressIndicator(
+          value: percentual / 100,
+          backgroundColor: Colors.white12,
+          valueColor: AlwaysStoppedAnimation<Color>(cor),
+          minHeight: 8,
+        ),
+      ],
+    ),
+  );
+}
   
   Widget _buildUsuarioAtivoCard(Map<String, dynamic> user) {
     return Container(
@@ -836,8 +944,8 @@ class _LogsAdminViewState extends State<LogsAdminView>
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           color: isError 
-              ? Colors.red.withOpacity(0.1)
-              : Colors.orange.withOpacity(0.1),
+              ? Colors.red.withValues(alpha: 0.1)
+              : Colors.orange.withValues(alpha: 0.1),
           child: ListTile(
             leading: Icon(
               isError ? Icons.error : Icons.warning,
@@ -921,7 +1029,8 @@ class _LogsAdminViewState extends State<LogsAdminView>
     
     try {
       DateTime dt = data is DateTime ? data : DateTime.parse(data.toString());
-      return DateFormat('dd/MM HH:mm').format(dt);
+      DateTime dtLocal = dt.toLocal();
+      return DateFormat('dd/MM HH:mm').format(dtLocal);
     } catch (e) {
       return 'Data inválida';
     }
@@ -932,7 +1041,8 @@ class _LogsAdminViewState extends State<LogsAdminView>
     
     try {
       DateTime dt = data is DateTime ? data : DateTime.parse(data.toString());
-      return DateFormat('dd/MM/yyyy HH:mm:ss').format(dt);
+      DateTime dtLocal = dt.toLocal();
+      return DateFormat('dd/MM/yyyy HH:mm:ss').format(dtLocal);
     } catch (e) {
       return 'Data inválida';
     }
@@ -959,7 +1069,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
       },
     );
     
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         if (isInicio) {
           filtroDataInicio = picked;
@@ -1036,104 +1146,193 @@ class _LogsAdminViewState extends State<LogsAdminView>
     );
   }
   
-  Future<void> _exportarLogs() async {
+Future<void> _exportarLogs() async {
+  try {
+    // Mostrar loading
+    Get.dialog(
+      const Center(child: CircularProgressIndicator()),
+      barrierDismissible: false,
+    );
+    
+    String dados = await _audit.exportarLogs(
+      dataInicio: filtroDataInicio,
+      dataFim: filtroDataFim,
+      formato: 'csv',
+    );
+    
+    Navigator.of(Get.overlayContext!).pop();
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    if (dados.isEmpty) {
+      if (!mounted) return;
+      
+      Get.snackbar(
+        'Aviso',
+        'Nenhum dado para exportar no período selecionado',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+    
+    // ✅ SALVAR O ARQUIVO
+    await _salvarArquivoCSV(dados);
+    
+  } catch (e) {
     try {
-      Get.dialog(
-        const Center(child: CircularProgressIndicator()),
-        barrierDismissible: false,
-      );
+      Navigator.of(Get.overlayContext!).pop();
+    } catch (_) {}
+    
+    developer.log('❌ Erro ao exportar: $e');
+    
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    if (!mounted) return;
+    
+    Get.snackbar(
+      'Erro',
+      'Erro ao exportar logs: ${e.toString()}',
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 3),
+    );
+  }
+}
+  // ✅ MÉTODO NOVO PARA SALVAR O ARQUIVO
+Future<void> _salvarArquivoCSV(String conteudo) async {
+  try {
+    Directory? directory;
+    
+    if (Platform.isAndroid) {
+      // Para Android, solicitar permissão
+      var status = await Permission.storage.status;
+      if (!status.isGranted) {
+        status = await Permission.storage.request();
+      }
       
-      String dados = await _audit.exportarLogs(
-        dataInicio: filtroDataInicio,
-        dataFim: filtroDataFim,
-        formato: 'csv',
-      );
-      
-      Get.back(); // Fechar loading
-      
-      if (dados.isNotEmpty) {
-        // Mostrar preview
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: const Color(0xFF2A2A2A),
-            title: const Row(
-              children: [
-                Icon(Icons.download, color: Color(0xFF00FF88)),
-                SizedBox(width: 12),
-                Text(
-                  'Logs Exportados',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ],
+      if (status.isGranted) {
+        // Tentar usar o diretório Downloads
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          directory = await getExternalStorageDirectory();
+        }
+      } else {
+        throw Exception('Permissão de armazenamento negada');
+      }
+    } else if (Platform.isIOS) {
+      directory = await getApplicationDocumentsDirectory();
+    } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      directory = await getDownloadsDirectory();
+    }
+    
+    if (directory == null) {
+      throw Exception('Não foi possível acessar o diretório de downloads');
+    }
+    
+    // Nome do arquivo com timestamp
+    String timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    String nomeArquivo = 'logs_auditoria_$timestamp.csv';
+    String caminho = '${directory.path}/$nomeArquivo';
+    
+    // Salvar arquivo
+    File arquivo = File(caminho);
+    await arquivo.writeAsString(conteudo);
+    
+    developer.log('✅ Arquivo salvo em: $caminho');
+    
+    if (!mounted) return;
+    
+    // Mostrar diálogo de sucesso
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 12),
+            Text(
+              'Arquivo Salvo!',
+              style: TextStyle(color: Colors.white),
             ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'O arquivo foi salvo com sucesso:',
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
                 children: [
-                  Text(
-                    'Logs exportados com sucesso!\n\nTamanho: ${dados.length} caracteres',
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Preview (primeiras linhas):',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                  const Icon(Icons.folder, color: Color(0xFF00FF88), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
                     child: Text(
-                      dados.substring(0, dados.length > 500 ? 500 : dados.length) + '...',
+                      caminho,
                       style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
+                        color: Colors.white,
+                        fontSize: 12,
                         fontFamily: 'monospace',
                       ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'Fechar',
-                  style: TextStyle(color: Color(0xFF00FF88)),
-                ),
-              ),
-            ],
+            const SizedBox(height: 16),
+            Text(
+              'Tamanho: ${(arquivo.lengthSync() / 1024).toStringAsFixed(2)} KB',
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text(
+              'OK',
+              style: TextStyle(color: Color(0xFF00FF88)),
+            ),
           ),
-        );
-        
-        Get.snackbar(
-          'Sucesso',
-          'Logs exportados!',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-      }
-    } catch (e) {
-      Get.back();
-      print('❌ Erro ao exportar: $e');
-      Get.snackbar(
-        'Erro',
-        'Erro ao exportar logs',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    }
+        ],
+      ),
+    );
+    
+    Get.snackbar(
+      'Sucesso',
+      'Arquivo salvo em: ${directory.path}',
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 4),
+    );
+    
+  } catch (e) {
+    developer.log('❌ Erro ao salvar arquivo: $e');
+    
+    if (!mounted) return;
+    
+    Get.snackbar(
+      'Erro',
+      'Erro ao salvar arquivo: ${e.toString()}',
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 4),
+    );
   }
-  
+}
   void _limparLogsAntigos() {
     showDialog(
       context: context,
@@ -1191,7 +1390,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
                 
                 await _audit.limparLogsAntigos(diasParaManter: 90);
                 
-                Get.back(); // Fechar loading
+                Get.back();
                 
                 Get.snackbar(
                   'Sucesso',

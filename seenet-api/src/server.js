@@ -8,7 +8,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.set('trust proxy', 1); // Confiar apenas no primeiro proxy (Railway)
+app.set('trust proxy', 1);
 console.log('🚀 Iniciando servidor SeeNet API...');
 
 // ========== MIDDLEWARES GLOBAIS ==========
@@ -59,7 +59,7 @@ async function startServer() {
   try {
     console.log('🔌 Inicializando banco de dados...');
     
-    const { initDatabase } = require('./config/database');
+    const { initDatabase, db } = require('./config/database');
     await initDatabase();
     
     console.log('📁 Carregando rotas...');
@@ -100,32 +100,192 @@ async function startServer() {
       console.error('❌ Erro ao carregar rotas avaliacoes:', error.message);
     }
 
-    // ========== ADMIN - COM DEBUG DETALHADO ==========
+    // ========== DIAGNÓSTICOS (INLINE) ==========
+    const { body, validationResult } = require('express-validator');
+    const geminiService = require('./services/geminiService');
+    const { authMiddleware } = require('./middleware/auth');
+
+    app.post('/api/diagnostics/gerar', 
+      authMiddleware,
+      [
+        body('avaliacao_id').isInt({ min: 1 }),
+        body('categoria_id').isInt({ min: 1 }),
+        body('checkmarks_marcados').isArray({ min: 1 })
+      ], 
+      async (req, res) => {
+        try {
+          const errors = validationResult(req);
+          if (!errors.isEmpty()) {
+            console.log('❌ Validação falhou:', errors.array());
+            return res.status(400).json({ 
+              success: false, 
+              error: 'Dados inválidos', 
+              details: errors.array() 
+            });
+          }
+
+          const { avaliacao_id, categoria_id, checkmarks_marcados } = req.body;
+
+          console.log('🚀 Gerando diagnóstico...');
+          console.log(`   Avaliação: ${avaliacao_id}`);
+          console.log(`   Categoria: ${categoria_id}`);
+          console.log(`   Checkmarks: ${JSON.stringify(checkmarks_marcados)}`);
+
+          // Verificar avaliação
+          const avaliacao = await db('avaliacoes')
+            .where('id', avaliacao_id)
+            .where('tenant_id', req.tenantId)
+            .first();
+
+          if (!avaliacao) {
+            console.log('❌ Avaliação não encontrada');
+            return res.status(404).json({ 
+              success: false, 
+              error: 'Avaliação não encontrada' 
+            });
+          }
+
+          // Buscar checkmarks
+          const checkmarks = await db('checkmarks')
+            .whereIn('id', checkmarks_marcados)
+            .where('tenant_id', req.tenantId)
+            .select('id', 'titulo', 'descricao', 'prompt_chatgpt');
+
+          if (checkmarks.length === 0) {
+            console.log('❌ Nenhum checkmark encontrado');
+            return res.status(400).json({ 
+              success: false, 
+              error: 'Checkmarks não encontrados' 
+            });
+          }
+
+          console.log(`✅ ${checkmarks.length} checkmarks encontrados`);
+
+          // Montar prompt
+          let prompt = "RELATÓRIO TÉCNICO DE PROBLEMAS IDENTIFICADOS:\n\n";
+          checkmarks.forEach((c, i) => {
+            prompt += `PROBLEMA ${i + 1}:\n`;
+            prompt += `• Título: ${c.titulo}\n`;
+            if (c.descricao) {
+              prompt += `• Descrição: ${c.descricao}\n`;
+            }
+            prompt += `• Contexto técnico: ${c.prompt_chatgpt}\n\n`;
+          });
+          prompt += "TAREFA:\n";
+          prompt += "Analise os problemas listados e forneça um diagnóstico técnico completo. ";
+          prompt += "Considere correlações entre os problemas. ";
+          prompt += "Forneça soluções práticas, começando pelas mais simples.";
+
+          console.log('📝 Prompt montado. Enviando para Gemini...');
+
+          // Gerar com Gemini
+          let resposta;
+          let statusApi = 'sucesso';
+          let modeloIa = 'gemini-2.0-flash';
+          
+          try {
+            resposta = await geminiService.gerarDiagnostico(prompt);
+            
+            if (!resposta) {
+              throw new Error('Gemini retornou resposta vazia');
+            }
+            
+            console.log('✅ Resposta recebida do Gemini');
+          } catch (geminiError) {
+            console.log('⚠️ Gemini falhou, usando fallback:', geminiError.message);
+            statusApi = 'erro';
+            modeloIa = 'fallback';
+            
+            const problemas = checkmarks.map(c => c.titulo).join(', ');
+            resposta = `🔧 DIAGNÓSTICO TÉCNICO (MODO FALLBACK)
+
+📊 PROBLEMAS IDENTIFICADOS: ${problemas}
+
+🛠️ AÇÕES RECOMENDADAS:
+1. Reinicie todos os equipamentos (modem, roteador, dispositivos)
+2. Verifique todas as conexões físicas e cabos
+3. Teste a conectividade em diferentes dispositivos
+4. Documente os resultados de cada teste
+
+📞 PRÓXIMOS PASSOS:
+- Execute as soluções na ordem apresentada
+- Anote o que funcionou ou não funcionou
+- Se problemas persistirem, entre em contato com suporte técnico
+
+---
+⚠️ Este diagnóstico foi gerado em modo fallback devido à indisponibilidade da IA.`;
+          }
+
+          // Extrair resumo
+          const linhas = resposta.split('\n');
+          let resumo = '';
+          for (let linha of linhas) {
+            if (linha.includes('DIAGNÓSTICO') || linha.includes('ANÁLISE') || linha.includes('PROBLEMA')) {
+              resumo = linha.replace(/[🔍📊🎯*#]/g, '').trim();
+              break;
+            }
+          }
+          if (!resumo) {
+            resumo = resposta.substring(0, 120);
+          }
+          if (resumo.length > 120) {
+            resumo = resumo.substring(0, 120) + '...';
+          }
+
+          const tokensUtilizados = Math.ceil((prompt + resposta).length / 4);
+
+          console.log('💾 Salvando diagnóstico no banco...');
+
+          // Salvar no banco
+          const [diagnosticoId] = await db('diagnosticos').insert({
+            tenant_id: req.tenantId,
+            avaliacao_id,
+            categoria_id,
+            prompt_enviado: prompt,
+            resposta_chatgpt: resposta,
+            resumo_diagnostico: resumo,
+            status_api: statusApi,
+            modelo_ia: modeloIa,
+            tokens_utilizados: tokensUtilizados,
+            data_criacao: new Date().toISOString()
+          });
+
+          console.log(`✅ Diagnóstico ${diagnosticoId} gerado com sucesso!`);
+          console.log(`   Status: ${statusApi}`);
+          console.log(`   Modelo: ${modeloIa}`);
+          console.log(`   Tokens: ${tokensUtilizados}`);
+
+          return res.json({
+            success: true,
+            message: 'Diagnóstico gerado com sucesso',
+            id: diagnosticoId,
+            resumo: resumo,
+            tokens_utilizados: tokensUtilizados
+          });
+
+        } catch (error) {
+          console.error('❌ Erro ao gerar diagnóstico:', error);
+          return res.status(500).json({ 
+            success: false, 
+            error: 'Erro interno do servidor',
+            details: process.env.NODE_ENV === 'production' ? undefined : error.message
+          });
+        }
+    });
+
+    console.log('✅ Rota POST /api/diagnostics/gerar registrada (inline)');
+
+    // ========== ADMIN ==========
     try {
       console.log('🔍 Tentando carregar rotas admin...');
-      console.log('📂 Caminho: ./routes/admin.routes');
-      
       const adminRoutes = require('./routes/admin.routes');
-      
-      console.log('✅ Arquivo admin.routes carregado');
-      console.log('📊 Tipo:', typeof adminRoutes);
-      
       app.use('/api/admin', adminRoutes);
-      
       console.log('✅ Rotas admin registradas em /api/admin');
-      console.log('🔗 Endpoints disponíveis:');
-      console.log('   - GET  /api/admin/logs');
-      console.log('   - GET  /api/admin/stats');
-      console.log('   - GET  /api/admin/stats/quick');
-      console.log('   - POST /api/admin/logs');
-      
     } catch (error) {
-      console.error('❌ ERRO AO CARREGAR ROTAS ADMIN:');
-      console.error('   Mensagem:', error.message);
-      console.error('   Stack:', error.stack);
+      console.error('❌ Erro ao carregar rotas admin:', error.message);
     }
     
-    // ========== ROTAS DE DEBUG E HEALTH ==========
+    // ========== ROTAS DE DEBUG ==========
     
     app.get('/api/health', (req, res) => {
       res.json({ 
@@ -140,9 +300,7 @@ async function startServer() {
 
     app.get('/api/debug/database', async (req, res) => {
       try {
-        const { db } = require('./config/database');
         const tenants = await db('tenants').select('*').limit(5);
-        
         res.json({
           message: 'Debug do banco PostgreSQL',
           total_tenants: tenants.length,
@@ -150,26 +308,7 @@ async function startServer() {
           connection: 'PostgreSQL OK'
         });
       } catch (error) {
-        console.error('❌ Erro no debug:', error);
-        res.status(500).json({
-          error: error.message
-        });
-      }
-    });
-
-    app.get('/api/debug/connection', async (req, res) => {
-      try {
-        const Tenant = require('./models/Tenant');
-        const isConnected = await Tenant.testConnection();
-        res.json({
-          success: isConnected,
-          message: isConnected ? 'Conexão OK' : 'Conexão falhou'
-        });
-      } catch (error) {
-        res.status(500).json({
-          success: false,
-          error: error.message
-        });
+        res.status(500).json({ error: error.message });
       }
     });
 
@@ -183,10 +322,7 @@ async function startServer() {
           tenants: tenants
         });
       } catch (error) {
-        res.status(500).json({
-          success: false,
-          error: error.message
-        });
+        res.status(500).json({ success: false, error: error.message });
       }
     });
 
@@ -194,16 +330,7 @@ async function startServer() {
       res.status(404).json({ 
         error: 'Endpoint não encontrado',
         path: req.originalUrl,
-        method: req.method,
-        availableEndpoints: [
-          'GET /health',
-          'GET /api/health', 
-          'GET /api/test',
-          'GET /api/tenant/verify/:codigo',
-          'GET /api/tenant/list',
-          'GET /api/debug/database',
-          'GET /api/debug/tenants'
-        ]
+        method: req.method
       });
     });
 
@@ -215,7 +342,6 @@ async function startServer() {
       });
     });
 
-    // Só inicia o servidor se não estiver no Vercel
     if (process.env.VERCEL !== '1') {
       app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 SeeNet API rodando na porta ${PORT}`);
@@ -228,9 +354,6 @@ async function startServer() {
   }
 }
 
-// Iniciar servidor
 startServer();
 
-// Export para Vercel (serverless)
-module.exports = app; 
-
+module.exports = app;

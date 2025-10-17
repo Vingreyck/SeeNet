@@ -61,6 +61,8 @@ async function startServer() {
     
     const { initDatabase, db } = require('./config/database');
     await initDatabase();
+    const { db } = require('./config/database');
+
     
     console.log('📁 Carregando rotas...');
 

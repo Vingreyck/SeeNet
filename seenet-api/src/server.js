@@ -59,9 +59,12 @@ async function startServer() {
   try {
     console.log('🔌 Inicializando banco de dados...');
     
+    // ✅ ADICIONAR ESTA LINHA:
+    const { initDatabase } = require('./config/database');
     await initDatabase();
+    
+    // ✅ AGORA PEGAR O db
     const { db } = require('./config/database');
-
     
     console.log('📁 Carregando rotas...');
 

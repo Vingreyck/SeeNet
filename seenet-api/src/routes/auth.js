@@ -129,8 +129,12 @@ router.post('/register', [
     });
 
     // Criar usuário
-    const [userId] = await db('usuarios').insert(novoUsuario);
+    const [result] = await db('usuarios')
+      .insert(novoUsuario)
+      .returning('id');
 
+    const userId = result.id;
+    
     console.log('✅ Usuário criado com ID:', userId);
 
     // Log de auditoria

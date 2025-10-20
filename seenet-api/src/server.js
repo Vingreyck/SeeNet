@@ -106,7 +106,7 @@ async function startServer() {
 
     // ========== DIAGNÓSTICOS (INLINE) ==========
     const { body, validationResult } = require('express-validator');
-    const geminiService = require('./services/geminiService');
+    const geminiService = require('./routes/geminiService');
     const { authMiddleware } = require('./middleware/auth');
 
     app.post('/api/diagnostics/gerar', 

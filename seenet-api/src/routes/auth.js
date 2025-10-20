@@ -166,6 +166,7 @@ router.post('/register', [
   }
 });
 
+
 // ========== LOGIN ==========
 router.post('/login', loginLimiter, [
   body('email').isEmail().normalizeEmail().withMessage('Email inválido'),

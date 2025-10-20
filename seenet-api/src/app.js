@@ -6,7 +6,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
-const { initDatabase } = require('./config/database');
+const { initDatabase, db } = require('./config/database');
 const logger = require('./config/logger');
 const { authMiddleware } = require('./middleware/auth');
 
@@ -79,16 +79,191 @@ app.use('/api/checkmarks', require('./routes/checkmark'));
 // Avaliações
 app.use('/api/avaliacoes', require('./routes/avaliacoes'));
 
-// Diagnósticos
-app.use('/api/diagnostics', require('./routes/diagnostics'));
+// ========== DIAGNÓSTICOS (INLINE) ==========
+const { body, validationResult } = require('express-validator');
+const geminiService = require('./services/geminiService');
 
+app.post('/api/diagnostics/gerar', 
+  [
+    body('avaliacao_id').isInt({ min: 1 }),
+    body('categoria_id').isInt({ min: 1 }),
+    body('checkmarks_marcados').isArray({ min: 1 })
+  ], 
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        logger.warn('❌ Validação falhou:', errors.array());
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Dados inválidos', 
+          details: errors.array() 
+        });
+      }
+
+      const { avaliacao_id, categoria_id, checkmarks_marcados } = req.body;
+
+      logger.info('🚀 Gerando diagnóstico...');
+      logger.info(`   Avaliação: ${avaliacao_id}`);
+      logger.info(`   Categoria: ${categoria_id}`);
+      logger.info(`   Checkmarks: ${JSON.stringify(checkmarks_marcados)}`);
+
+      // Verificar avaliação
+      const avaliacao = await db('avaliacoes')
+        .where('id', avaliacao_id)
+        .where('tenant_id', req.tenantId)
+        .first();
+
+      if (!avaliacao) {
+        logger.warn('❌ Avaliação não encontrada');
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Avaliação não encontrada' 
+        });
+      }
+
+      // Buscar checkmarks
+      const checkmarks = await db('checkmarks')
+        .whereIn('id', checkmarks_marcados)
+        .where('tenant_id', req.tenantId)
+        .select('id', 'titulo', 'descricao', 'prompt_chatgpt');
+
+      if (checkmarks.length === 0) {
+        logger.warn('❌ Nenhum checkmark encontrado');
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Checkmarks não encontrados' 
+        });
+      }
+
+      logger.info(`✅ ${checkmarks.length} checkmarks encontrados`);
+
+      // Montar prompt
+      let prompt = "RELATÓRIO TÉCNICO DE PROBLEMAS IDENTIFICADOS:\n\n";
+      checkmarks.forEach((c, i) => {
+        prompt += `PROBLEMA ${i + 1}:\n`;
+        prompt += `• Título: ${c.titulo}\n`;
+        if (c.descricao) {
+          prompt += `• Descrição: ${c.descricao}\n`;
+        }
+        prompt += `• Contexto técnico: ${c.prompt_chatgpt}\n\n`;
+      });
+      prompt += "TAREFA:\n";
+      prompt += "Analise os problemas listados e forneça um diagnóstico técnico completo. ";
+      prompt += "Considere correlações entre os problemas. ";
+      prompt += "Forneça soluções práticas, começando pelas mais simples.";
+
+      logger.info('📝 Prompt montado. Enviando para Gemini...');
+
+      // Gerar com Gemini
+      let resposta;
+      let statusApi = 'sucesso';
+      let modeloIa = 'gemini-2.0-flash';
+      
+      try {
+        resposta = await geminiService.gerarDiagnostico(prompt);
+        
+        if (!resposta) {
+          throw new Error('Gemini retornou resposta vazia');
+        }
+        
+        logger.info('✅ Resposta recebida do Gemini');
+      } catch (geminiError) {
+        logger.warn('⚠️ Gemini falhou, usando fallback:', geminiError.message);
+        statusApi = 'erro';
+        modeloIa = 'fallback';
+        
+        // Fallback
+        const problemas = checkmarks.map(c => c.titulo).join(', ');
+        resposta = `🔧 DIAGNÓSTICO TÉCNICO (MODO FALLBACK)
+
+📊 PROBLEMAS IDENTIFICADOS: ${problemas}
+
+🛠️ AÇÕES RECOMENDADAS:
+1. Reinicie todos os equipamentos (modem, roteador, dispositivos)
+2. Verifique todas as conexões físicas e cabos
+3. Teste a conectividade em diferentes dispositivos
+4. Documente os resultados de cada teste
+
+📞 PRÓXIMOS PASSOS:
+- Execute as soluções na ordem apresentada
+- Anote o que funcionou ou não funcionou
+- Se problemas persistirem, entre em contato com suporte técnico
+
+---
+⚠️ Este diagnóstico foi gerado em modo fallback devido à indisponibilidade da IA.`;
+      }
+
+      // Extrair resumo
+      const linhas = resposta.split('\n');
+      let resumo = '';
+      for (let linha of linhas) {
+        if (linha.includes('DIAGNÓSTICO') || linha.includes('ANÁLISE') || linha.includes('PROBLEMA')) {
+          resumo = linha.replace(/[🔍📊🎯*#]/g, '').trim();
+          break;
+        }
+      }
+      if (!resumo) {
+        resumo = resposta.substring(0, 120);
+      }
+      if (resumo.length > 120) {
+        resumo = resumo.substring(0, 120) + '...';
+      }
+
+      // Contar tokens
+      const tokensUtilizados = Math.ceil((prompt + resposta).length / 4);
+
+      logger.info('💾 Salvando diagnóstico no banco...');
+
+      // Salvar no banco
+      const [diagnosticoId] = await db('diagnosticos').insert({
+        tenant_id: req.tenantId,
+        avaliacao_id,
+        categoria_id,
+        prompt_enviado: prompt,
+        resposta_chatgpt: resposta,
+        resumo_diagnostico: resumo,
+        status_api: statusApi,
+        modelo_ia: modeloIa,
+        tokens_utilizados: tokensUtilizados,
+        data_criacao: new Date().toISOString()
+      });
+
+      logger.info(`✅ Diagnóstico ${diagnosticoId} gerado com sucesso!`);
+      logger.info(`   Status: ${statusApi}`);
+      logger.info(`   Modelo: ${modeloIa}`);
+      logger.info(`   Tokens: ${tokensUtilizados}`);
+
+      return res.json({
+        success: true,
+        message: 'Diagnóstico gerado com sucesso',
+        id: diagnosticoId,
+        resumo: resumo,
+        tokens_utilizados: tokensUtilizados
+      });
+
+    } catch (error) {
+      logger.error('❌ Erro ao gerar diagnóstico:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Erro interno do servidor',
+        details: process.env.NODE_ENV === 'production' ? undefined : error.message
+      });
+    }
+});
+
+logger.info('✅ Rota POST /api/diagnostics/gerar registrada (inline)');
+// ✅ ADICIONAR ESTE LOG DE DEBUG:
+console.log('🔍 DEBUG: Rota de diagnósticos registrada com sucesso');
+app._router.stack.forEach(function(r){
+  if (r.route && r.route.path && r.route.path.includes('diagnostic')){
+    console.log('   Rota encontrada:', Object.keys(r.route.methods), r.route.path);
+  }
+});
 // Transcrições
 app.use('/api/transcriptions', require('./routes/transcriptions'));
 
-// Usuários (futuramente, endpoints de gerenciamento)
-// app.use('/api/users', require('./routes/users'));
-
-// Admin (futuramente)
+// Admin
 app.use('/api/admin', require('./routes/admin.routes'));
 
 // ========== ROTA 404 ==========
@@ -104,7 +279,6 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   logger.error('Erro não tratado:', err);
   
-  // Erro de validação
   if (err.name === 'ValidationError') {
     return res.status(400).json({
       error: 'Erro de validação',
@@ -112,7 +286,6 @@ app.use((err, req, res, next) => {
     });
   }
   
-  // Erro de autenticação
   if (err.name === 'UnauthorizedError') {
     return res.status(401).json({
       error: 'Não autorizado',
@@ -120,7 +293,6 @@ app.use((err, req, res, next) => {
     });
   }
   
-  // Erro de banco de dados
   if (err.code === 'ER_DUP_ENTRY' || err.code === '23505') {
     return res.status(409).json({
       error: 'Registro duplicado',
@@ -128,7 +300,6 @@ app.use((err, req, res, next) => {
     });
   }
   
-  // Erro genérico
   res.status(err.status || 500).json({
     error: process.env.NODE_ENV === 'production' 
       ? 'Erro interno do servidor' 
@@ -142,10 +313,8 @@ const PORT = process.env.PORT || 3000;
 
 async function startServer() {
   try {
-    // Inicializar banco de dados
     await initDatabase();
     
-    // Iniciar servidor
     app.listen(PORT, () => {
       logger.info(`
 ╔══════════════════════════════════════════════════════════╗
@@ -160,22 +329,13 @@ async function startServer() {
 ║  Rotas disponíveis:                                     ║
 ║  • GET  /health                                         ║
 ║  • POST /api/auth/login                                 ║
-║  • POST /api/auth/register                              ║
-║  • GET  /api/tenant/verify/:codigo                      ║
-║  • GET  /api/checkmark/categorias                      ║
-║  • GET  /api/checkmark/categoria/:id                   ║
-║  • POST /api/avaliacoes                                 ║
-║  • POST /api/diagnostics/gerar                          ║
+║  • POST /api/diagnostics/gerar ✅ (inline)             ║
 ║  • POST /api/transcriptions                             ║
-║                                                          ║
-║  📚 Docs: https://docs.seenet.api                       ║
-║  🔧 Status: https://status.seenet.api                   ║
 ║                                                          ║
 ╚══════════════════════════════════════════════════════════╝
       `);
       
       logger.info(`✅ Servidor rodando em http://localhost:${PORT}`);
-      logger.info(`✅ Health check: http://localhost:${PORT}/health`);
     });
     
   } catch (error) {
@@ -184,19 +344,16 @@ async function startServer() {
   }
 }
 
-
-// Graceful shutdown
 process.on('SIGTERM', () => {
-  logger.info('SIGTERM recebido. Encerrando servidor...');
+  logger.info('SIGTERM recebido. Encerrando...');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  logger.info('SIGINT recebido. Encerrando servidor...');
+  logger.info('SIGINT recebido. Encerrando...');
   process.exit(0);
 });
 
-// Iniciar servidor
 if (require.main === module) {
   startServer();
 }

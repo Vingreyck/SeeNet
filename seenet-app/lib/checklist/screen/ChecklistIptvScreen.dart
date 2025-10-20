@@ -125,32 +125,42 @@ class _ChecklistIptvScreenState extends State<ChecklistIptvScreen> {
   }
 
   void _enviarDiagnostico() async {
+    // 1. Salvar respostas
     bool salvou = await checkmarkController.salvarRespostas();
 
-    if (salvou) {
-      await checkmarkController.finalizarAvaliacao();
-
+    if (!salvou) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Respostas salvas! Gerando diagnóstico...'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        
-        Get.toNamed('/diagnostico');
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erro ao salvar respostas'),
+            content: Text('❌ Erro ao salvar respostas'),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 2),
           ),
         );
       }
+      return;
+    }
+
+    // 2. Mostrar loading
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🤖 Gerando diagnóstico com IA...'),
+          backgroundColor: Color(0xFF00FF88),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+
+    // 3. Gerar diagnóstico com Gemini
+    bool diagnosticoGerado = await checkmarkController.gerarDiagnosticoComGemini();
+
+    // 4. Finalizar avaliação
+    await checkmarkController.finalizarAvaliacao();
+
+    // 5. Navegar para tela de diagnóstico
+    if (mounted) {
+      Get.offNamed('/diagnostico');
     }
   }
 }

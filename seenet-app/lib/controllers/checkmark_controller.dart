@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../models/categoria_checkmark.dart';
 import '../models/checkmark.dart';
 import '../models/avaliacao.dart';
+import '../controllers/diagnostico_controller.dart';
 import '../services/api_service.dart';
 
 class CheckmarkController extends GetxController {
@@ -44,6 +45,51 @@ class CheckmarkController extends GetxController {
       Get.snackbar('Erro', 'Erro de conexão ao carregar categorias');
     } finally {
       isLoading.value = false;
+    }
+  }
+  
+// ========== GERAR DIAGNÓSTICO COM GEMINI ==========
+  Future<bool> gerarDiagnosticoComGemini() async {
+    try {
+      if (avaliacaoAtual.value == null) {
+        print('❌ Nenhuma avaliação ativa');
+        Get.snackbar('Erro', 'Nenhuma avaliação ativa');
+        return false;
+      }
+
+      if (categoriaAtual.value == 0) {
+        print('❌ Categoria não selecionada');
+        Get.snackbar('Erro', 'Categoria não identificada');
+        return false;
+      }
+
+      List<int> checkmarksMarcadosIds = checkmarksMarcados;
+
+      if (checkmarksMarcadosIds.isEmpty) {
+        print('⚠️ Nenhum checkmark marcado');
+        Get.snackbar('Aviso', 'Marque pelo menos um problema');
+        return false;
+      }
+
+      print('🤖 Iniciando geração de diagnóstico...');
+      print('   Avaliação ID: ${avaliacaoAtual.value!.id}');
+      print('   Categoria ID: ${categoriaAtual.value}');
+      print('   Checkmarks marcados: $checkmarksMarcadosIds');
+
+      // Usar o DiagnosticoController
+      final diagnosticoController = Get.find<DiagnosticoController>();
+      
+      final sucesso = await diagnosticoController.gerarDiagnostico(
+        avaliacaoAtual.value!.id!,
+        categoriaAtual.value,
+        checkmarksMarcadosIds,
+      );
+
+      return sucesso;
+    } catch (e) {
+      print('❌ Erro ao gerar diagnóstico: $e');
+      Get.snackbar('Erro', 'Falha na comunicação com a IA: $e');
+      return false;
     }
   }
 
@@ -254,5 +300,7 @@ Future<bool> salvarRespostas() async {
     } catch (e) {
       return null;
     }
+    
   }
+  
 }

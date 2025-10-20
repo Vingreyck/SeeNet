@@ -1,4 +1,5 @@
-// lib/controllers/diagnostico_controller.dart - VERSÃO API
+// lib/controllers/diagnostico_controller.dart - VERSÃO CORRIGIDA
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/diagnostico.dart';
 import '../services/api_service.dart';
@@ -18,51 +19,87 @@ class DiagnosticoController extends GetxController {
   ) async {
     try {
       isLoading.value = true;
-      statusMensagem.value = 'Gerando diagnóstico com IA...';
+      statusMensagem.value = '🤖 Gerando diagnóstico com IA...';
 
-      final response = await _api.post('/diagnostics/gerar', {
+      print('🚀 Gerando diagnóstico...');
+      print('   Avaliação: $avaliacaoId');
+      print('   Categoria: $categoriaId');
+      print('   Checkmarks: $checkmarksMarcados');
+
+      final response = await _api.post('/diagnostics/gerar', { // ✅ COM "s" para bater com backend
         'avaliacao_id': avaliacaoId,
         'categoria_id': categoriaId,
         'checkmarks_marcados': checkmarksMarcados,
       });
 
-      if (response['success']) {
-        statusMensagem.value = 'Diagnóstico gerado com sucesso!';
+      print('📥 Response: $response');
+
+      // ✅ Verificar se houve sucesso OU se retornou mensagem
+      if (response['success'] == true || response['message'] != null) {
+        statusMensagem.value = '✅ Diagnóstico gerado com sucesso!';
         
-        // Recarregar diagnósticos
-        await carregarDiagnosticos(avaliacaoId);
+        // Limpar diagnósticos anteriores
+        diagnosticos.clear();
+        
+        // Criar diagnóstico a partir da resposta
+        // O backend retorna: { message, id, resumo, tokens_utilizados }
+        final id = response['id'];
+        final resumo = response['resumo'] ?? response['message'] ?? 'Diagnóstico gerado';
+        final tokens = response['tokens_utilizados'];
+        
+        final novoDiagnostico = Diagnostico(
+          id: id,
+          avaliacaoId: avaliacaoId,
+          categoriaId: categoriaId,
+          promptEnviado: '',
+          respostaChatgpt: resumo,
+          resumoDiagnostico: resumo,
+          statusApi: 'sucesso',
+          tokensUtilizados: tokens,
+          dataCriacao: DateTime.now(),
+        );
+        
+        diagnosticos.add(novoDiagnostico);
         
         print('✅ Diagnóstico gerado via API');
+        print('   ID: ${novoDiagnostico.id}');
+        print('   Tokens: ${novoDiagnostico.tokensUtilizados}');
         
         Get.snackbar(
           'Sucesso',
           'Diagnóstico gerado com sucesso!',
-          duration: const Duration(seconds: 3),
+          backgroundColor: const Color(0xFF00FF88),
+          colorText: Colors.black,
+          duration: const Duration(seconds: 2),
         );
         
         return true;
       } else {
-        statusMensagem.value = 'Erro ao gerar diagnóstico';
+        statusMensagem.value = '❌ Erro ao gerar diagnóstico';
         
         print('❌ Erro ao gerar diagnóstico: ${response['error']}');
         
         Get.snackbar(
           'Erro',
           response['error'] ?? 'Falha ao gerar diagnóstico',
-          duration: const Duration(seconds: 4),
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
         );
         
         return false;
       }
     } catch (e) {
-      statusMensagem.value = 'Erro de conexão';
+      statusMensagem.value = '❌ Erro de conexão';
       
-      print('❌ Erro ao gerar diagnóstico: $e');
+      print('❌ Exceção ao gerar diagnóstico: $e');
       
       Get.snackbar(
         'Erro de Conexão',
-        'Não foi possível gerar o diagnóstico',
-        duration: const Duration(seconds: 4),
+        'Não foi possível gerar o diagnóstico: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
       );
       
       return false;
@@ -76,10 +113,10 @@ class DiagnosticoController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.get('/diagnostics/avaliacao/$avaliacaoId');
+      final response = await _api.get('/diagnostics/avaliacao/$avaliacaoId'); // ✅ COM "s"
 
-      if (response['success']) {
-        final List<dynamic> data = response['data']['diagnosticos'];
+      if (response['success'] == true || response['diagnosticos'] != null) {
+        final List<dynamic> data = response['diagnosticos'] ?? [];
         
         diagnosticos.value = data
             .map((json) => Diagnostico.fromMap(json))
@@ -101,10 +138,10 @@ class DiagnosticoController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.get('/diagnostics/$diagnosticoId');
+      final response = await _api.get('/diagnostics/$diagnosticoId'); // ✅ COM "s"
 
-      if (response['success']) {
-        final data = response['data']['diagnostico'];
+      if (response['success'] == true) {
+        final data = response['diagnostico'];
         return Diagnostico.fromMap(data);
       } else {
         print('❌ Erro ao buscar diagnóstico: ${response['error']}');

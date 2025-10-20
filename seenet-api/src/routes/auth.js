@@ -20,12 +20,11 @@ const loginLimiter = rateLimit({
 });
 
 
-// ========== REGISTRO DE USUÁRIO ==========
+// ========== REGISTRO DE USUÁRIO ========== (VERSÃO CORRIGIDA)
 router.post('/register', [
   body('nome').trim().isLength({ min: 2, max: 100 }).withMessage('Nome deve ter entre 2 e 100 caracteres'),
   body('email').isEmail().normalizeEmail().withMessage('Email inválido'),
   body('senha').isLength({ min: 6, max: 128 }).withMessage('Senha deve ter entre 6 e 128 caracteres'),
-  // ✅ MODIFICADO: Aceitar ambos os nomes de campo
   body().custom((value, { req }) => {
     const codigo = req.body.codigoEmpresa || req.body.tenantCode;
     if (!codigo || codigo.trim().length < 3 || codigo.trim().length > 20) {
@@ -35,8 +34,12 @@ router.post('/register', [
   })
 ], async (req, res) => {
   try {
+    console.log('📝 POST /api/auth/register iniciado');
+    console.log('📦 Body recebido:', JSON.stringify(req.body, null, 2));
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Erros de validação:', errors.array());
       return res.status(400).json({ 
         error: 'Dados inválidos', 
         details: errors.array() 
@@ -44,7 +47,12 @@ router.post('/register', [
     }
 
     const { nome, email, senha } = req.body;
-    const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode; // ✅ ACEITAR AMBOS
+    const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode;
+
+    console.log('✅ Validação OK');
+    console.log('👤 Nome:', nome);
+    console.log('📧 Email:', email);
+    console.log('🏢 Código Empresa:', codigoEmpresa);
 
     // Verificar se o tenant existe e está ativo
     const tenant = await db('tenants')
@@ -53,10 +61,13 @@ router.post('/register', [
       .first();
 
     if (!tenant) {
+      console.log('❌ Tenant não encontrado:', codigoEmpresa);
       return res.status(400).json({ 
         error: 'Código da empresa inválido ou empresa inativa' 
       });
     }
+
+    console.log('✅ Tenant encontrado:', tenant.nome, '- ID:', tenant.id);
 
     // Verificar se email já existe no tenant
     const existingUser = await db('usuarios')
@@ -65,10 +76,13 @@ router.post('/register', [
       .first();
 
     if (existingUser) {
+      console.log('❌ Email já existe:', email);
       return res.status(400).json({ 
         error: 'Este email já está cadastrado nesta empresa' 
       });
     }
+
+    console.log('✅ Email disponível');
 
     // Verificar limite de usuários do plano
     const userCount = await db('usuarios')
@@ -81,29 +95,43 @@ router.post('/register', [
       'basico': 5,
       'profissional': 25,
       'empresarial': 100,
-      'enterprise': -1 // ilimitado
+      'enterprise': -1
     };
 
     const maxUsers = limits[tenant.plano] || 5;
     if (maxUsers !== -1 && userCount.total >= maxUsers) {
+      console.log('❌ Limite de usuários atingido:', userCount.total, '/', maxUsers);
       return res.status(400).json({ 
         error: `Limite de usuários atingido para o plano ${tenant.plano}. Máximo: ${maxUsers}` 
       });
     }
 
+    console.log('✅ Limite de usuários OK:', userCount.total, '/', maxUsers);
+
     // Hash da senha
     const senhaHash = await bcrypt.hash(senha, 12);
+    console.log('✅ Senha hasheada');
 
-    // Criar usuário
-    const [userId] = await db('usuarios').insert({
+    // ✅ CORREÇÃO: Remover data_criacao (usar default do banco)
+    const novoUsuario = {
       nome,
       email: email.toLowerCase(),
       senha: senhaHash,
       tenant_id: tenant.id,
-      tipo_usuario: 'tecnico', // Novos usuários sempre como técnico
+      tipo_usuario: 'tecnico',
       ativo: true,
-      data_criacao: new Date().toISOString(),
+      // ❌ REMOVIDO: data_criacao (deixar o banco usar o default)
+    };
+
+    console.log('📝 Objeto para inserir:', {
+      ...novoUsuario,
+      senha: '[HASH]' // Não mostrar a senha no log
     });
+
+    // Criar usuário
+    const [userId] = await db('usuarios').insert(novoUsuario);
+
+    console.log('✅ Usuário criado com ID:', userId);
 
     // Log de auditoria
     await auditService.log({
@@ -122,8 +150,19 @@ router.post('/register', [
     });
 
   } catch (error) {
+    console.error('❌ ERRO CRÍTICO NO REGISTRO:', error);
+    console.error('Stack trace:', error.stack);
+    console.error('Detalhes do erro:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail
+    });
+    
     logger.error('Erro no registro:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

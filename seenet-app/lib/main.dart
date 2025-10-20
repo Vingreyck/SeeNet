@@ -43,7 +43,7 @@ void main() async {
   Get.put(AuthService(), permanent: true);
   Get.put(UsuarioController(), permanent: true);
   Get.put(CheckmarkController(), permanent: true);
-  Get.put(DiagnosticoController(), permanent: true);
+  Get.lazyPut<DiagnosticoController>(() => DiagnosticoController(), fenix: true);
   Get.put(TranscricaoController(), permanent: true);
 
   print('✅ App inicializado - Modo 100% API');

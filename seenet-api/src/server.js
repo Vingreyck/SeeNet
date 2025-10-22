@@ -3,22 +3,41 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
+const logger = require('./config/logger');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.set('trust proxy', 1);
-console.log('🚀 Iniciando servidor SeeNet API...');
+
+logger.info('\n=== 🚀 INICIANDO SEENET API ===');
+logger.info(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
+logger.info(`Porta: ${PORT}`);
 
 // ========== MIDDLEWARES GLOBAIS ==========
 app.use(helmet());
 app.use(compression()); 
-app.use(morgan('combined'));
+// Configurar morgan para usar o logger
+app.use(morgan('[:date[iso]] :method :url :status :response-time ms - :res[content-length]', {
+  stream: {
+    write: (message) => {
+      // Filtrar healthchecks para reduzir ruído
+      if (!message.includes('/health')) {
+        logger.info(message.trim());
+      }
+    }
+  },
+  skip: (req) => {
+    // Não logar requests de health check em produção
+    return process.env.NODE_ENV === 'production' && req.path === '/health';
+  }
+}));
 
-app.use(cors({
+// CORS settings
+const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? '*'
+    ? '*' 
     : [
         'http://localhost:3000',
         'http://localhost:8080',
@@ -30,7 +49,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Code']
-}));
+};
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -130,10 +149,13 @@ async function startServer() {
 
           const { avaliacao_id, categoria_id, checkmarks_marcados } = req.body;
 
-          console.log('🚀 Gerando diagnóstico...');
-          console.log(`   Avaliação: ${avaliacao_id}`);
-          console.log(`   Categoria: ${categoria_id}`);
-          console.log(`   Checkmarks: ${JSON.stringify(checkmarks_marcados)}`);
+          logger.info('Iniciando geração de diagnóstico', {
+            avaliacao_id,
+            categoria_id,
+            checkmarks_marcados,
+            tenant_id: req.tenantId,
+            usuario_id: req.user.id
+          });
 
           // Verificar avaliação
           const avaliacao = await db('avaliacoes')
@@ -142,7 +164,11 @@ async function startServer() {
             .first();
 
           if (!avaliacao) {
-            console.log('❌ Avaliação não encontrada');
+            logger.warn('Avaliação não encontrada', {
+              avaliacao_id,
+              tenant_id: req.tenantId,
+              usuario_id: req.user.id
+            });
             return res.status(404).json({ 
               success: false, 
               error: 'Avaliação não encontrada' 
@@ -156,7 +182,11 @@ async function startServer() {
             .select('id', 'titulo', 'descricao', 'prompt_chatgpt');
 
           if (checkmarks.length === 0) {
-            console.log('❌ Nenhum checkmark encontrado');
+            logger.warn('Checkmarks não encontrados', {
+              checkmarks_marcados,
+              tenant_id: req.tenantId,
+              usuario_id: req.user.id
+            });
             return res.status(400).json({ 
               success: false, 
               error: 'Checkmarks não encontrados' 
@@ -343,22 +373,66 @@ async function startServer() {
       });
     });
 
+    // Handler de erros global
     app.use((error, req, res, next) => {
-      console.error('❌ Erro na aplicação:', error);
-      res.status(500).json({
-        error: 'Erro interno do servidor',
-        message: process.env.NODE_ENV === 'development' ? error.message : 'Algo deu errado'
+      // Estruturar informações do erro
+      const errorInfo = {
+        type: error.constructor.name,
+        message: error.message,
+        path: req.path,
+        method: req.method,
+        userId: req.user?.id,
+        tenantId: req.tenantId,
+        timestamp: new Date().toISOString()
+      };
+
+      // Log detalhado para erros não tratados
+      logger.error('Erro não tratado na aplicação', {
+        ...errorInfo,
+        stack: error.stack,
+        body: req.body,
+        query: req.query,
+        headers: req.headers
+      });
+
+      // Determinar status HTTP apropriado
+      const status = error.status || 
+        (error.name === 'ValidationError' ? 400 : 
+         error.name === 'UnauthorizedError' ? 401 : 500);
+
+      // Resposta ao cliente
+      res.status(status).json({
+        error: status === 500 ? 'Erro interno do servidor' : error.message,
+        type: error.name,
+        path: req.path,
+        ...(process.env.NODE_ENV === 'development' && {
+          details: error.message,
+          stack: error.stack
+        })
       });
     });
 
     if (process.env.VERCEL !== '1') {
       app.listen(PORT, '0.0.0.0', () => {
-        console.log(`🚀 SeeNet API rodando na porta ${PORT}`);
+        logger.info('\n=== ✨ SERVIDOR INICIADO COM SUCESSO ===', {
+          port: PORT,
+          environment: process.env.NODE_ENV,
+          nodeVersion: process.version,
+          timestamp: new Date().toISOString()
+        });
       });
     }
 
   } catch (error) {
-    console.error('❌ Falha ao iniciar servidor:', error);
+    logger.error('Falha crítica ao iniciar servidor', {
+      error: {
+        type: error.constructor.name,
+        message: error.message,
+        stack: error.stack
+      },
+      environment: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    });
     process.exit(1);
   }
 }

@@ -83,18 +83,27 @@ app.use('/api/avaliacoes', require('./routes/avaliacoes'));
 const { body, validationResult } = require('express-validator');
 const geminiService = require('./services/geminiService');
 
-app.post('/api/diagnostics/gerar', 
-  authMiddleware,
+app.post('/api/diagnostics/gerar',
+  (req, res, next) => {
+    console.log('\n🚨 === REQUISIÇÃO RECEBIDA: /api/diagnostics/gerar ===');
+    console.log('📦 Body:', JSON.stringify(req.body, null, 2));
+    console.log('🔐 Authorization header:', req.headers.authorization ? 'PRESENTE' : 'AUSENTE');
+    console.log('🏢 X-Tenant-Code header:', req.headers['x-tenant-code'] || 'AUSENTE');
+    next();
+  },
+  authMiddleware,  // ← Vai mostrar logs agora
   [
     body('avaliacao_id').isInt({ min: 1 }),
     body('categoria_id').isInt({ min: 1 }),
     body('checkmarks_marcados').isArray({ min: 1 })
-  ], 
+  ],
   async (req, res) => {
+    console.log('✅ CHEGOU NA FUNÇÃO PRINCIPAL!');
+    
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        logger.warn('❌ Validação falhou:', errors.array());
+        console.log('❌ Validação falhou:', errors.array());
         return res.status(400).json({ 
           success: false, 
           error: 'Dados inválidos', 
@@ -104,10 +113,10 @@ app.post('/api/diagnostics/gerar',
 
       const { avaliacao_id, categoria_id, checkmarks_marcados } = req.body;
 
-      logger.info('🚀 Gerando diagnóstico...');
-      logger.info(`   Avaliação: ${avaliacao_id}`);
-      logger.info(`   Categoria: ${categoria_id}`);
-      logger.info(`   Checkmarks: ${JSON.stringify(checkmarks_marcados)}`);
+      console.log('🚀 Gerando diagnóstico...');
+      console.log(`   Avaliação: ${avaliacao_id}`);
+      console.log(`   Categoria: ${categoria_id}`);
+      console.log(`   Checkmarks: ${JSON.stringify(checkmarks_marcados)}`);
 
       // Verificar avaliação
       const avaliacao = await db('avaliacoes')

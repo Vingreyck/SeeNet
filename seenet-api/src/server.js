@@ -287,9 +287,9 @@ async function startServer() {
             modelo_ia: modeloIa,
             tokens_utilizados: tokensUtilizados,
             data_criacao: new Date().toISOString()
-          }).returning('id');
+          }).returning(['id', 'resposta_chatgpt', 'resumo_diagnostico', 'tokens_utilizados']);
           
-          const diagnosticoId = result[0].id;
+          const diagnostico = result[0];
 
           console.log(`✅ Diagnóstico ${diagnosticoId} gerado com sucesso!`);
           console.log(`   Status: ${statusApi}`);
@@ -299,9 +299,12 @@ async function startServer() {
           return res.json({
             success: true,
             message: 'Diagnóstico gerado com sucesso',
-            id: diagnosticoId,
-            resumo: resumo,
-            tokens_utilizados: tokensUtilizados
+            data: {
+              id: diagnostico.id,
+              resposta: diagnostico.resposta_chatgpt,
+              resumo: diagnostico.resumo_diagnostico,
+              tokens_utilizados: diagnostico.tokens_utilizados
+            }
           });
 
         } catch (error) {

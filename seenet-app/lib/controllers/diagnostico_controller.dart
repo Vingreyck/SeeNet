@@ -51,7 +51,7 @@ class DiagnosticoController extends GetxController {
           avaliacaoId: avaliacaoId,
           categoriaId: categoriaId,
           promptEnviado: '',
-          respostaChatgpt: data['resumo'] ?? 'Diagnóstico gerado',
+          respostaChatgpt: data['resposta'] ?? 'Diagnóstico gerado',
           resumoDiagnostico: data['resumo'] ?? 'Diagnóstico gerado',
           statusApi: 'sucesso',
           tokensUtilizados: data['tokens_utilizados'],

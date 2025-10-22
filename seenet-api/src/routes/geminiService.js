@@ -11,10 +11,16 @@ class GeminiService {
 
   
   async gerarDiagnostico(prompt) {
+    console.log('\n🤖 === INICIANDO CHAMADA GEMINI ===');
+    
     if (!this.apiKey) {
+      console.error('❌ Chave da API Gemini não configurada');
       throw new Error('Chave da API Gemini não configurada');
     }
-
+    
+    console.log('✅ API Key configurada:', this.apiKey.substring(0, 10) + '...');
+    console.log('🌐 URL da API:', this.apiUrl);
+    
     const systemPrompt = `Você é um técnico especialista em internet/IPTV. Suas respostas devem ser EXTREMAMENTE DIRETAS e PRÁTICAS.
 
 REGRAS OBRIGATÓRIAS:
@@ -55,13 +61,21 @@ IMPORTANTE: Seja direto, prático e focado na solução imediata.`;
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        logger.info(`🚀 Tentativa ${attempt}/${this.maxRetries} - Enviando para Gemini...`);
-
+        console.log(`\n🚀 Tentativa ${attempt}/${this.maxRetries} - Enviando para Gemini...`);
+        console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
+        
+        const headers = {
+          'Content-Type': 'application/json',
+          'X-goog-api-key': this.apiKey
+        };
+        
+        console.log('🔤 Headers:', {
+          ...headers,
+          'X-goog-api-key': headers['X-goog-api-key'].substring(0, 10) + '...'
+        });
+        
         const response = await axios.post(this.apiUrl, requestBody, {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-goog-api-key': this.apiKey
-          },
+          headers,
           timeout: 30000 // 30 segundos
         });
 

@@ -46,14 +46,22 @@ class DiagnosticoController extends GetxController {
         
         diagnosticos.clear();
         
+        // Log dos dados recebidos
+        print('📥 Dados do diagnóstico:');
+        print('   ID: ${data['id']}');
+        print('   Resposta: ${data['resposta']?.substring(0, 50)}...');
+        print('   Resumo: ${data['resumo']}');
+        print('   Status: ${data['status']}');
+        print('   Modelo: ${data['modelo']}');
+
         final novoDiagnostico = Diagnostico(
           id: data['id'],
           avaliacaoId: avaliacaoId,
           categoriaId: categoriaId,
           promptEnviado: '',
-          respostaChatgpt: data['resposta'] ?? 'Diagnóstico gerado',
-          resumoDiagnostico: data['resumo'] ?? 'Diagnóstico gerado',
-          statusApi: 'sucesso',
+          respostaChatgpt: data['resposta'] ?? 'Diagnóstico não disponível',
+          resumoDiagnostico: data['resumo'] ?? 'Resumo não disponível',
+          statusApi: data['status'] ?? 'sucesso',
           tokensUtilizados: data['tokens_utilizados'],
           dataCriacao: DateTime.now(),
         );

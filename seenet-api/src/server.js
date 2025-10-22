@@ -291,10 +291,18 @@ async function startServer() {
           
           const diagnostico = result[0];
 
-          console.log(`✅ Diagnóstico ${diagnosticoId} gerado com sucesso!`);
+          console.log(`✅ Diagnóstico ${diagnostico.id} gerado com sucesso!`);
           console.log(`   Status: ${statusApi}`);
           console.log(`   Modelo: ${modeloIa}`);
           console.log(`   Tokens: ${tokensUtilizados}`);
+
+          // Log dos dados antes de enviar
+          console.log('📤 Enviando resposta:', {
+            id: diagnostico.id,
+            resposta: diagnostico.resposta_chatgpt ? diagnostico.resposta_chatgpt.substring(0, 50) + '...' : 'N/A',
+            resumo: diagnostico.resumo_diagnostico,
+            tokens: diagnostico.tokens_utilizados
+          });
 
           return res.json({
             success: true,
@@ -303,7 +311,9 @@ async function startServer() {
               id: diagnostico.id,
               resposta: diagnostico.resposta_chatgpt,
               resumo: diagnostico.resumo_diagnostico,
-              tokens_utilizados: diagnostico.tokens_utilizados
+              tokens_utilizados: diagnostico.tokens_utilizados,
+              status: statusApi,
+              modelo: modeloIa
             }
           });
 

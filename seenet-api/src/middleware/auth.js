@@ -35,13 +35,12 @@ const authMiddleware = async (req, res, next) => {
 
     // Verificar token
     let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-      logger.debug('Token JWT verificado', {
-        userId: decoded.userId,
-        tenantId: decoded.tenantId,
-        exp: decoded.exp
-      });
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    logger.debug('Token JWT verificado', {
+      userId: decoded.userId,
+      tenantId: decoded.tenantId,
+      exp: decoded.exp
+    });
     
     // Buscar e validar usuário e tenant
     const user = await db('usuarios')

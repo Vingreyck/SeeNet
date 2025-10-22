@@ -84,6 +84,7 @@ const { body, validationResult } = require('express-validator');
 const geminiService = require('./services/geminiService');
 
 app.post('/api/diagnostics/gerar', 
+  authMiddleware,
   [
     body('avaliacao_id').isInt({ min: 1 }),
     body('categoria_id').isInt({ min: 1 }),

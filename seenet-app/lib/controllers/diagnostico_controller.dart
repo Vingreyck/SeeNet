@@ -26,36 +26,35 @@ class DiagnosticoController extends GetxController {
       print('   Categoria: $categoriaId');
       print('   Checkmarks: $checkmarksMarcados');
 
-      final response = await _api.post('/diagnostics/gerar', { // ✅ COM "s" para bater com backend
-        'avaliacao_id': avaliacaoId,
-        'categoria_id': categoriaId,
-        'checkmarks_marcados': checkmarksMarcados,
-      });
+      // ✅ CORRIGIDO: Garantir autenticação + endpoint correto
+      final response = await _api.post(
+        '/diagnostics/gerar',  // ← ApiService adiciona /api automaticamente
+        {
+          'avaliacao_id': avaliacaoId,
+          'categoria_id': categoriaId,
+          'checkmarks_marcados': checkmarksMarcados,
+        },
+        requireAuth: true,  // ✅ IMPORTANTE: Enviar token
+      );
 
       print('📥 Response: $response');
 
-      // ✅ Verificar se houve sucesso OU se retornou mensagem
-      if (response['success'] == true || response['message'] != null) {
+      // ✅ Verificar sucesso
+      if (response['success'] == true) {
+        final data = response['data'];
         statusMensagem.value = '✅ Diagnóstico gerado com sucesso!';
         
-        // Limpar diagnósticos anteriores
         diagnosticos.clear();
         
-        // Criar diagnóstico a partir da resposta
-        // O backend retorna: { message, id, resumo, tokens_utilizados }
-        final id = response['id'];
-        final resumo = response['resumo'] ?? response['message'] ?? 'Diagnóstico gerado';
-        final tokens = response['tokens_utilizados'];
-        
         final novoDiagnostico = Diagnostico(
-          id: id,
+          id: data['id'],
           avaliacaoId: avaliacaoId,
           categoriaId: categoriaId,
           promptEnviado: '',
-          respostaChatgpt: resumo,
-          resumoDiagnostico: resumo,
+          respostaChatgpt: data['resumo'] ?? 'Diagnóstico gerado',
+          resumoDiagnostico: data['resumo'] ?? 'Diagnóstico gerado',
           statusApi: 'sucesso',
-          tokensUtilizados: tokens,
+          tokensUtilizados: data['tokens_utilizados'],
           dataCriacao: DateTime.now(),
         );
         
@@ -96,7 +95,7 @@ class DiagnosticoController extends GetxController {
       
       Get.snackbar(
         'Erro de Conexão',
-        'Não foi possível gerar o diagnóstico: $e',
+        'Não foi possível gerar o diagnóstico',
         backgroundColor: Colors.red,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
@@ -113,10 +112,13 @@ class DiagnosticoController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.get('/diagnostics/avaliacao/$avaliacaoId'); // ✅ COM "s"
+      final response = await _api.get(
+        '/diagnostics/avaliacao/$avaliacaoId',
+        requireAuth: true,  // ✅ Autenticação necessária
+      );
 
-      if (response['success'] == true || response['diagnosticos'] != null) {
-        final List<dynamic> data = response['diagnosticos'] ?? [];
+      if (response['success'] == true) {
+        final List<dynamic> data = response['data']['diagnosticos'] ?? [];
         
         diagnosticos.value = data
             .map((json) => Diagnostico.fromMap(json))
@@ -138,10 +140,13 @@ class DiagnosticoController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.get('/diagnostics/$diagnosticoId'); // ✅ COM "s"
+      final response = await _api.get(
+        '/diagnostics/$diagnosticoId',
+        requireAuth: true,  // ✅ Autenticação necessária
+      );
 
       if (response['success'] == true) {
-        final data = response['diagnostico'];
+        final data = response['data']['diagnostico'];
         return Diagnostico.fromMap(data);
       } else {
         print('❌ Erro ao buscar diagnóstico: ${response['error']}');
@@ -162,7 +167,6 @@ class DiagnosticoController extends GetxController {
     print('✅ Diagnósticos limpos');
   }
 
-  // ========== LIMPAR STATUS ==========
   void limparStatus() {
     statusMensagem.value = '';
   }
@@ -180,8 +184,6 @@ class DiagnosticoController extends GetxController {
     return diagnosticos.where((d) => d.statusApi == status).length;
   }
 
-  // ========== INFO SOBRE SERVIÇO ==========
-  
   Map<String, String> get infoServico {
     return {
       'Nome': 'Google Gemini via API',

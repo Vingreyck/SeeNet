@@ -20,6 +20,8 @@ dependencies:
   path_provider: ^2.1.1
   permission_handler: ^11.1.0
   share_plus: ^7.2.1
+  flutter_dotenv: ^6.0.0
+
   
   # ✅ ADICIONADO: PostgreSQL
   postgres: ^2.4.6
@@ -34,11 +36,13 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  
 
 flutter:
   uses-material-design: true
 
   assets:
+    - .env
     - assets/images/background.png
     - assets/images/logo.svg
     - assets/images/snail.svg

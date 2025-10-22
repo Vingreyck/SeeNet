@@ -1,42 +1,54 @@
+// lib/config/environment.dart - VERSÃO SEGURA
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class Environment {
+  // ✅ Carregar variáveis de ambiente do arquivo .env
+  static Future<void> load() async {
+    try {
+      await dotenv.load(fileName: ".env");
+      print('✅ Variáveis de ambiente carregadas do .env');
+    } catch (e) {
+      print('⚠️ Arquivo .env não encontrado. Usando valores padrão.');
+    }
+  }
+
   // Configurações de ambiente
-  static const bool isDevelopment = bool.fromEnvironment('DEVELOPMENT', defaultValue: false);
+  static const bool isDevelopment = bool.fromEnvironment('DEVELOPMENT', defaultValue: true);
   static const bool isProduction = bool.fromEnvironment('PRODUCTION', defaultValue: false);
   
-  // ✅ SUPABASE PostgreSQL - Configurações corrigidas
+  // ✅ SUPABASE PostgreSQL
   static bool get usePostgreSQL => 
-    const String.fromEnvironment('USE_POSTGRESQL', defaultValue: 'false') == 'true';
+    dotenv.env['USE_POSTGRESQL']?.toLowerCase() == 'true' || false;
     
   static String get dbHost => 
-    const String.fromEnvironment('DB_HOST', defaultValue: 'db.tcqhyzbkkigukrqniefx.supabase.co');
+    dotenv.env['DB_HOST'] ?? 'db.tcqhyzbkkigukrqniefx.supabase.co';
     
   static int get dbPort => 
-    const int.fromEnvironment('DB_PORT', defaultValue: 5432);
+    int.tryParse(dotenv.env['DB_PORT'] ?? '5432') ?? 5432;
     
   static String get dbName => 
-    const String.fromEnvironment('DB_NAME', defaultValue: 'postgres');
+    dotenv.env['DB_NAME'] ?? 'postgres';
     
   static String get dbUsername => 
-    const String.fromEnvironment('DB_USERNAME', defaultValue: 'postgres');
+    dotenv.env['DB_USERNAME'] ?? 'postgres';
     
   static String get dbPassword => 
-    const String.fromEnvironment('DB_PASSWORD', defaultValue: '');
+    dotenv.env['DB_PASSWORD'] ?? ''; // ✅ NUNCA tem defaultValue com senha real
   
-  // ✅ URL COMPLETA para facilitar
   static String get databaseUrl => 
-    const String.fromEnvironment('DATABASE_URL', 
-      defaultValue: 'postgresql://postgres:@db.tcqhyzbkkigukrqniefx.supabase.co:5432/postgres');
+    dotenv.env['DATABASE_URL'] ?? 
+    'postgresql://postgres:@db.tcqhyzbkkigukrqniefx.supabase.co:5432/postgres';
   
-  // API Keys
+  // ✅ API Keys - SEGURAS
   static String get geminiApiKey => 
-    const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+    dotenv.env['GEMINI_API_KEY'] ?? ''; // ✅ SEM defaultValue!
   
   // URLs por ambiente
   static String get apiBaseUrl {
     if (isProduction) {
-      return const String.fromEnvironment('API_URL_PROD', defaultValue: 'https://api.seenet.com');
+      return dotenv.env['API_URL_PROD'] ?? 'https://api.seenet.com';
     }
-    return const String.fromEnvironment('API_URL_DEV', defaultValue: 'http://localhost:3000');
+    return dotenv.env['API_URL_DEV'] ?? 'http://localhost:3000';
   }
   
   // Debug/Logs
@@ -45,12 +57,14 @@ class Environment {
   
   // Configurações de segurança
   static int get sessionTimeoutMinutes => 
-    const int.fromEnvironment('SESSION_TIMEOUT', defaultValue: 480);
+    int.tryParse(dotenv.env['SESSION_TIMEOUT'] ?? '480') ?? 480;
   
   static int get maxLoginAttempts => 
-    const int.fromEnvironment('MAX_LOGIN_ATTEMPTS', defaultValue: 5);
+    int.tryParse(dotenv.env['MAX_LOGIN_ATTEMPTS'] ?? '5') ?? 5;
   
-  // Validar configuração
+  // ✅ Validar se API keys estão configuradas
+  static bool get isGeminiConfigured => geminiApiKey.isNotEmpty;
+  
   static bool get isConfigured {
     if (usePostgreSQL) {
       return dbHost.isNotEmpty && dbPassword.isNotEmpty;
@@ -65,7 +79,7 @@ class Environment {
     print('🔧 === CONFIGURAÇÃO DE AMBIENTE ===');
     print('🏗️ Modo: ${isProduction ? "PRODUÇÃO" : "DESENVOLVIMENTO"}');
     print('🐘 PostgreSQL: ${usePostgreSQL ? "ATIVO" : "INATIVO"}');
-    print('🔑 Gemini configurado: ${geminiApiKey.isNotEmpty ? "SIM" : "NÃO"}');
+    print('🔑 Gemini configurado: ${isGeminiConfigured ? "SIM ✅" : "NÃO ❌"}');
     print('📡 API URL: $apiBaseUrl');
     print('🐘 DB Host: $dbHost');
     print('🔌 DB Port: $dbPort');
@@ -78,5 +92,29 @@ class Environment {
     print('📊 Crash reporting: $enableCrashReporting');
     print('✅ Configuração válida: $isConfigured');
     print('=====================================\n');
+  }
+  
+  // ✅ NOVO: Validar se todas as keys necessárias estão presentes
+  static void validateRequiredKeys() {
+    final List<String> missing = [];
+    
+    if (!isGeminiConfigured) {
+      missing.add('GEMINI_API_KEY');
+    }
+    
+    if (usePostgreSQL && dbPassword.isEmpty) {
+      missing.add('DB_PASSWORD');
+    }
+    
+    if (missing.isNotEmpty) {
+      print('⚠️ ATENÇÃO: Variáveis de ambiente faltando:');
+      for (var key in missing) {
+        print('   ❌ $key');
+      }
+      print('');
+      print('💡 Configure-as no arquivo .env na raiz do projeto.');
+    } else {
+      print('✅ Todas as variáveis de ambiente necessárias estão configuradas!');
+    }
   }
 }

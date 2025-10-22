@@ -1,4 +1,4 @@
-// lib/login/loginview.controller.dart - VERSÃO FINAL (API)
+// lib/login/loginview.controller.dart - VERSÃO CORRIGIDA
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../controllers/usuario_controller.dart';
@@ -8,10 +8,11 @@ import '../services/test_auth_flow.dart';
 import '../services/api_service.dart';
 
 class LoginController extends GetxController {
-  TextEditingController loginInput = TextEditingController();
-  TextEditingController senhaInput = TextEditingController();
-  TextEditingController codigoEmpresaController = TextEditingController();
-  FocusNode codigoEmpresaFocusNode = FocusNode();
+  // ✅ CORREÇÃO: Usar late para inicialização lazy
+  late TextEditingController loginInput;
+  late TextEditingController senhaInput;
+  late TextEditingController codigoEmpresaController;
+  late FocusNode codigoEmpresaFocusNode;
   
   RxBool isLoading = false.obs;
   RxString email = ''.obs;
@@ -28,6 +29,12 @@ class LoginController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    
+    // ✅ CORREÇÃO: Inicializar controllers e focus nodes no onInit
+    loginInput = TextEditingController();
+    senhaInput = TextEditingController();
+    codigoEmpresaController = TextEditingController();
+    codigoEmpresaFocusNode = FocusNode();
     
     // Listeners
     loginInput.addListener(() {
@@ -121,20 +128,19 @@ class LoginController extends GetxController {
         codigoEmpresaController.text.trim().toUpperCase(),
       );
 
-    if (loginSucesso) {
-      _showSuccess('Login realizado com sucesso!');
-      
-      // ✅ ADICIONAR: Debug do fluxo
-      if (Environment.enableDebugLogs) {
-        await AuthFlowDebugger.testarFluxoCompleto();
+      if (loginSucesso) {
+        _showSuccess('Login realizado com sucesso!');
+        
+        // Debug do fluxo
+        if (Environment.enableDebugLogs) {
+          await AuthFlowDebugger.testarFluxoCompleto();
+        }
+        
+        print('✅ Usuário logado: ${usuarioController.nomeUsuario}');
+        
+        // Navegar para checklist
+        Get.offAllNamed('/checklist');
       }
-      
-      print('✅ Usuário logado: ${usuarioController.nomeUsuario}');
-      
-      // Navegar para checklist
-      Get.offAllNamed('/checklist');
-    }
-      // AuthService já mostra erros
       
     } catch (e) {
       _showError('Erro ao conectar com servidor');
@@ -324,6 +330,7 @@ class LoginController extends GetxController {
 
   @override
   void onClose() {
+    // ✅ CORREÇÃO: Garantir que dispose só seja chamado se inicializados
     loginInput.dispose();
     senhaInput.dispose();
     codigoEmpresaController.dispose();

@@ -4,7 +4,7 @@
 
 class EnvConfig {
   // 🔑 Google Gemini API Key - SUBSTITUA pela sua chave real
-  static const String geminiApiKey = 'COLE_SUA_CHAVE_GEMINI_AQUI';
+  static const String geminiApiKey = 'AIzaSyAUspHbbab-bkGnFKe7KnU9f7iuXRPoW7k';
   
   // 🗄️ Banco de dados local - CONFIGURE com sua senha real
   static const String localDbPassword = 'sua_senha_mysql_local';

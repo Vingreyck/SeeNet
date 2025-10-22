@@ -6,6 +6,7 @@ import 'package:seenet/login/widgets/login.binding.dart';
 import 'package:seenet/registro/registro.view.dart';
 import 'package:seenet/admin/usuarios_admin.view.dart'; 
 import 'package:seenet/admin/checkmarks_admin.view.dart'; 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'splash_screen/splash_screen.dart';
 import 'package:seenet/transcricao/transcricao.view.dart';
 import 'package:seenet/transcricao/historico_transcricao.view.dart';
@@ -27,9 +28,13 @@ import 'controllers/diagnostico_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await Environment.load();
 
   // ✅ Configurar ambiente
   Environment.printConfiguration();
+  Environment.validateRequiredKeys();
+
   GeminiConfig.printStatus();
   
   // ✅ Verificar configuração

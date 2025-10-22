@@ -83,6 +83,36 @@ app.use('/api/avaliacoes', require('./routes/avaliacoes'));
 const { body, validationResult } = require('express-validator');
 const geminiService = require('./services/geminiService');
 
+// Error handler específico para diagnósticos
+const handleDiagnosticError = (error, req, res) => {
+  console.error('\n❌ === ERRO NO DIAGNÓSTICO ===');
+  console.error('Tipo:', error.constructor.name);
+  console.error('Mensagem:', error.message);
+  console.error('Stack:', error.stack);
+  
+  if (error.response) {
+    console.error('Detalhes da resposta:');
+    console.error('Status:', error.response.status);
+    console.error('Data:', JSON.stringify(error.response.data, null, 2));
+  }
+
+  // Log do contexto no momento do erro
+  console.error('Contexto:');
+  console.error('User:', req.user ? `${req.user.id} - ${req.user.nome}` : 'N/A');
+  console.error('Tenant:', req.tenantId);
+  console.error('Body:', req.body);
+
+  return res.status(500).json({
+    success: false,
+    error: 'Erro interno do servidor',
+    details: process.env.NODE_ENV === 'development' ? {
+      message: error.message,
+      type: error.constructor.name,
+      stack: error.stack
+    } : undefined
+  });
+};
+
 app.post('/api/diagnostics/gerar',
   async (req, res, next) => {
     try {
@@ -116,7 +146,10 @@ app.post('/api/diagnostics/gerar',
     body('checkmarks_marcados').isArray({ min: 1 })
   ],
   async (req, res) => {
-    console.log('✅ CHEGOU NA FUNÇÃO PRINCIPAL!');
+    console.log('\n✨ === INICIANDO GERAÇÃO DE DIAGNÓSTICO ===');
+    console.log('👤 Usuário:', req.user.id, '-', req.user.nome);
+    console.log('🏢 Tenant:', req.tenantId);
+    console.log('📦 Dados:', JSON.stringify(req.body, null, 2));
     
     try {
       const errors = validationResult(req);
@@ -271,15 +304,24 @@ app.post('/api/diagnostics/gerar',
       });
 
     } catch (error) {
-      logger.error('❌ Erro ao gerar diagnóstico:', error);
+      logger.error('\n❌ === ERRO AO GERAR DIAGNÓSTICO ===');
+      logger.error('Tipo:', error.constructor.name);
+      logger.error('Mensagem:', error.message);
+      logger.error('Stack:', error.stack);
       
-      // Log mais detalhado do erro
-      console.error('Stack trace completo:', error.stack);
-      console.error('Detalhes adicionais:', {
-        message: error.message,
-        code: error.code,
-        type: error.constructor.name
-      });
+      // Log detalhado para erros do Gemini
+      if (error.response) {
+        logger.error('Resposta da API:');
+        logger.error('Status:', error.response.status);
+        logger.error('Data:', JSON.stringify(error.response.data, null, 2));
+        logger.error('Headers:', JSON.stringify(error.response.headers, null, 2));
+      }
+      
+      // Capturando detalhes do contexto
+      logger.error('Contexto da execução:');
+      logger.error('Usuário:', req.user ? `${req.user.id} - ${req.user.nome}` : 'N/A');
+      logger.error('Tenant:', req.tenantId);
+      logger.error('Body:', JSON.stringify(req.body, null, 2));
       
       return res.status(500).json({ 
         success: false, 
@@ -288,8 +330,8 @@ app.post('/api/diagnostics/gerar',
           ? undefined 
           : {
               message: error.message,
-              stack: error.stack,
-              type: error.constructor.name
+              type: error.constructor.name,
+              code: error.code || 'UNKNOWN_ERROR'
             }
       });
     }

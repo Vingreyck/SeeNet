@@ -101,11 +101,29 @@ IMPORTANTE: Seja direto, prático e focado na solução imediata.`;
         throw new Error('Resposta inválida da API');
 
       } catch (error) {
-        logger.warn(`⚠️ Tentativa ${attempt} falhou:`, error.message);
+        logger.warn('\n⚠️ === FALHA NA CHAMADA GEMINI ===');
+        logger.warn(`Tentativa ${attempt}/${this.maxRetries}`);
+        logger.warn('Tipo de erro:', error.constructor.name);
+        logger.warn('Mensagem:', error.message);
+
+        // Log detalhado da resposta de erro
+        if (error.response) {
+          logger.error('Detalhes da resposta de erro:');
+          logger.error('Status:', error.response.status);
+          logger.error('Status Text:', error.response.statusText);
+          logger.error('Data:', JSON.stringify(error.response.data, null, 2));
+          logger.error('Headers:', JSON.stringify(error.response.headers, null, 2));
+        }
 
         if (attempt === this.maxRetries) {
-          logger.error('❌ Todas as tentativas falharam');
-          throw new Error(`Falha na API Gemini após ${this.maxRetries} tentativas: ${error.message}`);
+          logger.error('\n❌ === TODAS AS TENTATIVAS FALHARAM ===');
+          logger.error('Stack trace:', error.stack);
+          
+          const finalError = new Error(`Falha na API Gemini após ${this.maxRetries} tentativas`);
+          finalError.originalError = error;
+          finalError.lastResponse = error.response;
+          finalError.attempts = this.maxRetries;
+          throw finalError;
         }
 
         // Aguardar antes da próxima tentativa

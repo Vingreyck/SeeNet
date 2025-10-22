@@ -34,7 +34,7 @@ class ApiConfig {
     'avaliacoes_create': '/avaliacoes',
     'avaliacoes_detail': '/avaliacoes',
     
-    // ✅ DIAGNÓSTICOS - ENDPOINT CORRETO
+    // ✅ DIAGNÓSTICOS - ENDPOINT CORRIGIDO
     'diagnostics_gerar': '/diagnostics/gerar',
     'diagnostics_list': '/diagnostics/avaliacao',
     'diagnostics_detail': '/diagnostics',

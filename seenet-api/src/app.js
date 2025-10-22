@@ -254,10 +254,25 @@ app.post('/api/diagnostics/gerar',
 
     } catch (error) {
       logger.error('❌ Erro ao gerar diagnóstico:', error);
+      
+      // Log mais detalhado do erro
+      console.error('Stack trace completo:', error.stack);
+      console.error('Detalhes adicionais:', {
+        message: error.message,
+        code: error.code,
+        type: error.constructor.name
+      });
+      
       return res.status(500).json({ 
         success: false, 
         error: 'Erro interno do servidor',
-        details: process.env.NODE_ENV === 'production' ? undefined : error.message
+        details: process.env.NODE_ENV === 'production' 
+          ? undefined 
+          : {
+              message: error.message,
+              stack: error.stack,
+              type: error.constructor.name
+            }
       });
     }
 });

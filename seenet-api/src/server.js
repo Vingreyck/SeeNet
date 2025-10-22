@@ -220,17 +220,22 @@ async function startServer() {
 ⚠️ Este diagnóstico foi gerado em modo fallback devido à indisponibilidade da IA.`;
           }
 
-          // Extrair resumo
-          const linhas = resposta.split('\n');
+          // Extrair resumo com validação
           let resumo = '';
-          for (let linha of linhas) {
-            if (linha.includes('DIAGNÓSTICO') || linha.includes('ANÁLISE') || linha.includes('PROBLEMA')) {
-              resumo = linha.replace(/[🔍📊🎯*#]/g, '').trim();
-              break;
+          if (typeof resposta === 'string') {
+            const linhas = resposta.split('\n');
+            for (let linha of linhas) {
+              if (linha.includes('DIAGNÓSTICO') || linha.includes('ANÁLISE') || linha.includes('PROBLEMA')) {
+                resumo = linha.replace(/[🔍📊🎯*#]/g, '').trim();
+                break;
+              }
             }
-          }
-          if (!resumo) {
-            resumo = resposta.substring(0, 120);
+            if (!resumo) {
+              resumo = resposta.substring(0, 120);
+            }
+          } else {
+            console.error('❌ Resposta não é uma string:', resposta);
+            resumo = 'Erro ao gerar diagnóstico';
           }
           if (resumo.length > 120) {
             resumo = resumo.substring(0, 120) + '...';

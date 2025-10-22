@@ -65,12 +65,22 @@ IMPORTANTE: Seja direto, prático e focado na solução imediata.`;
           timeout: 30000 // 30 segundos
         });
 
-        if (response.status === 200 && response.data.candidates) {
-          const resposta = response.data.candidates[0]?.content?.parts?.[0]?.text;
+        if (response.status === 200) {
+          logger.info('📥 Resposta Gemini:', JSON.stringify(response.data, null, 2));
           
-          if (resposta) {
-            logger.info(`✅ Diagnóstico gerado com sucesso (tentativa ${attempt})`);
-            return resposta;
+          if (response.data.candidates) {
+            const resposta = response.data.candidates[0]?.content?.parts?.[0]?.text;
+            
+            if (resposta) {
+              logger.info(`✅ Diagnóstico gerado com sucesso (tentativa ${attempt})`);
+              logger.info('📝 Conteúdo:', resposta.substring(0, 200) + '...');
+              return resposta;
+            } else {
+              logger.warn('⚠️ Resposta sem texto válido');
+              logger.warn('📦 Candidates:', JSON.stringify(response.data.candidates, null, 2));
+            }
+          } else {
+            logger.warn('⚠️ Resposta sem candidates');
           }
         }
 

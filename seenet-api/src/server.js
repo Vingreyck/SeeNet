@@ -276,7 +276,7 @@ async function startServer() {
           console.log('💾 Salvando diagnóstico no banco...');
 
           // Salvar no banco
-          const [diagnosticoId] = await db('diagnosticos').insert({
+          const result = await db('diagnosticos').insert({
             tenant_id: req.tenantId,
             avaliacao_id,
             categoria_id,
@@ -287,7 +287,9 @@ async function startServer() {
             modelo_ia: modeloIa,
             tokens_utilizados: tokensUtilizados,
             data_criacao: new Date().toISOString()
-          });
+          }).returning('id');
+          
+          const diagnosticoId = result[0].id;
 
           console.log(`✅ Diagnóstico ${diagnosticoId} gerado com sucesso!`);
           console.log(`   Status: ${statusApi}`);

@@ -34,10 +34,10 @@ class ApiConfig {
     'avaliacoes_create': '/avaliacoes',
     'avaliacoes_detail': '/avaliacoes',
     
-    // ✅ DIAGNÓSTICOS - ENDPOINT CORRIGIDO
-    'diagnostics_gerar': '/diagnostics/gerar',
-    'diagnostics_list': '/diagnostics/avaliacao',
-    'diagnostics_detail': '/diagnostics',
+    // ✅ DIAGNÓSTICOS - ENDPOINTS COM /api/
+    'diagnostics_gerar': '/api/diagnostics/gerar',
+    'diagnostics_list': '/api/diagnostics/avaliacao',
+    'diagnostics_detail': '/api/diagnostics',
     
     // Transcrições
     'transcriptions': '/transcriptions',

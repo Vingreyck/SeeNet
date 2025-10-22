@@ -84,12 +84,30 @@ const { body, validationResult } = require('express-validator');
 const geminiService = require('./services/geminiService');
 
 app.post('/api/diagnostics/gerar',
-  (req, res, next) => {
-    console.log('\n🚨 === REQUISIÇÃO RECEBIDA: /api/diagnostics/gerar ===');
-    console.log('📦 Body:', JSON.stringify(req.body, null, 2));
-    console.log('🔐 Authorization header:', req.headers.authorization ? 'PRESENTE' : 'AUSENTE');
-    console.log('🏢 X-Tenant-Code header:', req.headers['x-tenant-code'] || 'AUSENTE');
-    next();
+  async (req, res, next) => {
+    try {
+      console.log('\n🚨 === REQUISIÇÃO RECEBIDA: /api/diagnostics/gerar ===');
+      console.log('📦 Body:', JSON.stringify(req.body, null, 2));
+      console.log('🔐 Authorization header:', req.headers.authorization ? 'PRESENTE' : 'AUSENTE');
+      console.log('🏢 X-Tenant-Code header:', req.headers['x-tenant-code'] || 'AUSENTE');
+      
+      // Log do tenant e usuário
+      console.log('👤 Usuário:', req.user ? `${req.user.id} - ${req.user.nome}` : 'NÃO IDENTIFICADO');
+      console.log('🏢 Tenant:', req.tenantId ? `ID ${req.tenantId}` : 'NÃO IDENTIFICADO');
+      
+      // Verificar se os dados necessários estão presentes
+      if (!req.body.avaliacao_id || !req.body.categoria_id || !req.body.checkmarks_marcados) {
+        console.log('❌ Dados obrigatórios ausentes no body');
+        console.log('   avaliacao_id:', req.body.avaliacao_id);
+        console.log('   categoria_id:', req.body.categoria_id);
+        console.log('   checkmarks_marcados:', req.body.checkmarks_marcados);
+      }
+      
+      next();
+    } catch (error) {
+      console.error('❌ Erro no middleware de diagnóstico:', error);
+      next(error);
+    }
   },
   authMiddleware,  // ← Vai mostrar logs agora
   [

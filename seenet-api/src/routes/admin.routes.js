@@ -269,6 +269,7 @@ router.get('/logs/export', authMiddleware, requireAdmin, async (req, res) => {
       });
     }
     
+    
   } catch (error) {
     console.error('❌ Erro ao exportar logs:', error);
     res.status(500).json({

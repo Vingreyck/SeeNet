@@ -12,6 +12,7 @@ function getDb() {
   return db;
 }
 
+
 // ========== VERIFICAR CÓDIGO DA EMPRESA ==========
 router.get('/verify/:codigo', async (req, res) => {
   try {

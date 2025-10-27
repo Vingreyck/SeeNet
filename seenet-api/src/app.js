@@ -11,6 +11,7 @@ const { initDatabase } = require('./config/database');
 const logger = require('./config/logger');
 const authMiddleware = require('./middleware/auth');
 
+
 const app = express();
 
 // ========== CONFIGURAÇÕES BÁSICAS ==========

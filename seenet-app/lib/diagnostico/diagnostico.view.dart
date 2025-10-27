@@ -9,6 +9,7 @@ import '../controllers/checkmark_controller.dart';
 import '../models/diagnostico.dart';
 import '../models/checkmark.dart';
 
+
 /// Diagnóstico View com técnicas avançadas de Flutter
 /// Implementa: Micro-interactions, Shimmer effects, Pull-to-refresh,
 /// Gesture handling, Performance optimizations, Custom animations

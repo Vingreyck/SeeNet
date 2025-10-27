@@ -8,6 +8,7 @@ const { db } = require('../config/database');
 const logger = require('../config/logger');
 const auditService = require('../services/auditService');
 
+
 const router = express.Router();
 
 // Rate limiting para login (mais restritivo)

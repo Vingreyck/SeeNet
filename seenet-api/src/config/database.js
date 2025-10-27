@@ -47,6 +47,7 @@ let db = null;
 async function initDatabase() {
   logger.info('🔌 Conectando ao PostgreSQL...');
   
+  
   try {
     db = knex(dbConfig);
     

@@ -9,6 +9,7 @@ class GeminiService {
     this.maxRetries = 3;
     this.retryDelay = 2000;
     
+    
     // Validar configuração na inicialização
     this.validateConfig();
   }

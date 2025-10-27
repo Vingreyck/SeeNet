@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../config/api_config.dart';
 import '../config/environment.dart';
 
+
 class ApiService extends GetxService {
   static ApiService get instance => Get.find<ApiService>();
   

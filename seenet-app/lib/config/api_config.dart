@@ -4,6 +4,7 @@ class ApiConfig {
   // ✅ CORRIGIDO: Usar Environment.apiBaseUrl (que lê do .env)
   static String get baseUrl => Environment.apiBaseUrl;
   
+  
   static const Map<String, String> endpoints = {
     // Health
     'health': '/health',

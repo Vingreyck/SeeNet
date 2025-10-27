@@ -1,127 +1,229 @@
+// routes/diagnostics.js - ROTA CORRIGIDA E COMPLETA
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { db } = require('../config/database');
 const geminiService = require('../services/geminiService');
-const auditService = require('../services/auditService');
+const authMiddleware = require('../middleware/auth');
 const logger = require('../config/logger');
-const Tenant = require('../models/Tenant');
 
 const router = express.Router();
 
+// ========== APLICAR AUTENTICAÇÃO EM TODAS AS ROTAS ==========
+router.use(authMiddleware);
+
 // ========== GERAR DIAGNÓSTICO ==========
 router.post('/gerar', [
-  body('avaliacao_id').isInt({ min: 1 }),
-  body('categoria_id').isInt({ min: 1 }),
-  body('checkmarks_marcados').isArray({ min: 1 }).withMessage('Deve marcar pelo menos um checkmark')
+  body('avaliacao_id').isInt({ min: 1 }).withMessage('ID da avaliação inválido'),
+  body('categoria_id').isInt({ min: 1 }).withMessage('ID da categoria inválido'),
+  body('checkmarks_marcados')
+    .isArray({ min: 1 })
+    .withMessage('Deve marcar pelo menos um checkmark')
 ], async (req, res) => {
+  const requestId = `DIAG-${Date.now()}`;
+  
   try {
+    logger.info(`[${requestId}] 🚀 Iniciando geração de diagnóstico`);
+    logger.info(`[${requestId}] Tenant: ${req.tenantCode} (ID: ${req.tenantId})`);
+    logger.info(`[${requestId}] Usuário: ${req.user.nome} (ID: ${req.user.id})`);
+
+    // Validar entrada
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
+      logger.warn(`[${requestId}] ❌ Validação falhou:`, errors.array());
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Dados inválidos', 
+        details: errors.array() 
+      });
     }
 
     const { avaliacao_id, categoria_id, checkmarks_marcados } = req.body;
 
-    // Verificar limites do tenant
-    const canGenerate = await Tenant.checkLimits(req.tenantId, 'api_calls');
-    if (!canGenerate) {
-      return res.status(429).json({ 
-        error: 'Limite de diagnósticos do plano atingido' 
-      });
-    }
+    logger.info(`[${requestId}] Dados recebidos:`, {
+      avaliacao_id,
+      categoria_id,
+      checkmarks_count: checkmarks_marcados.length,
+      checkmarks_ids: checkmarks_marcados
+    });
 
-    // Verificar se avaliação pertence ao tenant
+    // Verificar avaliação
     const avaliacao = await db('avaliacoes')
       .where('id', avaliacao_id)
       .where('tenant_id', req.tenantId)
       .first();
 
     if (!avaliacao) {
-      return res.status(404).json({ error: 'Avaliação não encontrada' });
+      logger.warn(`[${requestId}] ❌ Avaliação ${avaliacao_id} não encontrada para tenant ${req.tenantId}`);
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Avaliação não encontrada' 
+      });
     }
 
-    // Buscar checkmarks selecionados
+    logger.info(`[${requestId}] ✅ Avaliação encontrada: "${avaliacao.titulo}"`);
+
+    // Buscar checkmarks
     const checkmarks = await db('checkmarks')
       .whereIn('id', checkmarks_marcados)
       .where('tenant_id', req.tenantId)
       .select('id', 'titulo', 'descricao', 'prompt_chatgpt');
 
-    if (checkmarks.length !== checkmarks_marcados.length) {
-      return res.status(400).json({ error: 'Alguns checkmarks não foram encontrados' });
+    if (checkmarks.length === 0) {
+      logger.warn(`[${requestId}] ❌ Nenhum checkmark encontrado`);
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Checkmarks não encontrados' 
+      });
     }
+
+    if (checkmarks.length !== checkmarks_marcados.length) {
+      logger.warn(`[${requestId}] ⚠️ Alguns checkmarks não foram encontrados (esperado: ${checkmarks_marcados.length}, encontrado: ${checkmarks.length})`);
+    }
+
+    logger.info(`[${requestId}] ✅ ${checkmarks.length} checkmarks carregados`);
 
     // Montar prompt
-    const prompt = montarPromptDiagnostico(checkmarks);
+    let prompt = "RELATÓRIO TÉCNICO DE PROBLEMAS IDENTIFICADOS:\n\n";
+    checkmarks.forEach((c, i) => {
+      prompt += `PROBLEMA ${i + 1}:\n`;
+      prompt += `• Título: ${c.titulo}\n`;
+      if (c.descricao) {
+        prompt += `• Descrição: ${c.descricao}\n`;
+      }
+      prompt += `• Contexto técnico: ${c.prompt_chatgpt}\n\n`;
+    });
+    prompt += "TAREFA:\n";
+    prompt += "Analise os problemas listados e forneça um diagnóstico técnico completo. ";
+    prompt += "Considere correlações entre os problemas. ";
+    prompt += "Forneça soluções práticas, começando pelas mais simples.";
 
+    logger.info(`[${requestId}] 📝 Prompt montado (${prompt.length} caracteres)`);
+
+    // Gerar com Gemini
+    let resposta;
+    let statusApi = 'sucesso';
+    let modeloIa = 'gemini-2.0-flash';
+    let erroApi = null;
+    
     try {
-      // Gerar diagnóstico com Gemini
-      const resposta = await geminiService.gerarDiagnostico(prompt);
+      logger.info(`[${requestId}] 🤖 Enviando para Gemini...`);
+      
+      // ✅ ADICIONAR TIMEOUT E LOG DETALHADO
+      const startTime = Date.now();
+      resposta = await Promise.race([
+        geminiService.gerarDiagnostico(prompt),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout Gemini (30s)')), 30000)
+        )
+      ]);
+      const duration = Date.now() - startTime;
       
       if (!resposta) {
-        throw new Error('Falha na API do Gemini');
+        throw new Error('Gemini retornou resposta vazia');
       }
-
-      // Salvar diagnóstico
-      const [diagnosticoId] = await db('diagnosticos').insert({
-        tenant_id: req.tenantId,
-        avaliacao_id,
-        categoria_id,
-        prompt_enviado: prompt,
-        resposta_chatgpt: resposta,
-        resumo_diagnostico: extrairResumo(resposta),
-        status_api: 'sucesso',
-        modelo_ia: 'gemini-2.0-flash',
-        tokens_utilizados: contarTokens(prompt + resposta),
-        data_criacao: new Date().toISOString()
+      
+      logger.info(`[${requestId}] ✅ Resposta recebida do Gemini em ${duration}ms`);
+      logger.info(`[${requestId}] Resposta: ${resposta.length} caracteres`);
+      
+    } catch (geminiError) {
+      logger.error(`[${requestId}] ❌ Erro no Gemini:`, {
+        error: geminiError.message,
+        stack: geminiError.stack
       });
+      
+      statusApi = 'erro';
+      modeloIa = 'fallback';
+      erroApi = geminiError.message;
+      
+      // Fallback
+      const problemas = checkmarks.map(c => c.titulo).join(', ');
+      resposta = `🔧 DIAGNÓSTICO TÉCNICO (MODO FALLBACK)
 
-      // Log de auditoria
-      await auditService.log({
-        action: 'DIAGNOSTIC_GENERATED',
-        usuario_id: req.user.id,
-        tenant_id: req.tenantId,
-        tabela_afetada: 'diagnosticos',
-        registro_id: diagnosticoId,
-        details: `Diagnóstico gerado para avaliação ${avaliacao_id}`,
-        ip_address: req.ip
-      });
+📊 PROBLEMAS IDENTIFICADOS: ${problemas}
 
-      logger.info(`✅ Diagnóstico gerado: ${diagnosticoId} (Tenant: ${req.tenantCode})`);
+🛠️ AÇÕES RECOMENDADAS:
+1. Reinicie todos os equipamentos (modem, roteador, dispositivos)
+2. Verifique todas as conexões físicas e cabos
+3. Teste a conectividade em diferentes dispositivos
+4. Documente os resultados de cada teste
 
-      res.json({
-        message: 'Diagnóstico gerado com sucesso',
-        id: diagnosticoId,
-        resumo: extrairResumo(resposta),
-        tokens_utilizados: contarTokens(prompt + resposta)
-      });
+📞 PRÓXIMOS PASSOS:
+- Execute as soluções na ordem apresentada
+- Anote o que funcionou ou não funcionou
+- Se problemas persistirem, entre em contato com suporte técnico
 
-    } catch (apiError) {
-      // Salvar erro no banco
-      const [diagnosticoId] = await db('diagnosticos').insert({
-        tenant_id: req.tenantId,
-        avaliacao_id,
-        categoria_id,
-        prompt_enviado: prompt,
-        resposta_chatgpt: gerarDiagnosticoFallback(checkmarks),
-        resumo_diagnostico: 'Diagnóstico gerado em modo fallback',
-        status_api: 'erro',
-        erro_api: apiError.message,
-        modelo_ia: 'fallback',
-        data_criacao: new Date().toISOString()
-      });
-
-      logger.warn(`⚠️ Fallback de diagnóstico: ${diagnosticoId} (Tenant: ${req.tenantCode})`);
-
-      res.json({
-        message: 'Diagnóstico gerado (modo fallback)',
-        id: diagnosticoId,
-        warning: 'IA indisponível, diagnóstico básico gerado'
-      });
+---
+⚠️ Este diagnóstico foi gerado em modo fallback devido à indisponibilidade da IA.
+Erro: ${geminiError.message}`;
+      
+      logger.info(`[${requestId}] 🔄 Usando fallback`);
     }
 
+    // Extrair resumo
+    const linhas = resposta.split('\n');
+    let resumo = '';
+    for (let linha of linhas) {
+      if (linha.includes('DIAGNÓSTICO') || linha.includes('ANÁLISE') || linha.includes('PROBLEMA')) {
+        resumo = linha.replace(/[🔍📊🎯*#]/g, '').trim();
+        break;
+      }
+    }
+    if (!resumo) {
+      resumo = resposta.substring(0, 120);
+    }
+    if (resumo.length > 120) {
+      resumo = resumo.substring(0, 120) + '...';
+    }
+
+    const tokensUtilizados = Math.ceil((prompt + resposta).length / 4);
+
+    logger.info(`[${requestId}] 💾 Salvando diagnóstico no banco...`);
+
+    // Salvar no banco
+    const [diagnosticoId] = await db('diagnosticos').insert({
+      tenant_id: req.tenantId,
+      avaliacao_id,
+      categoria_id,
+      prompt_enviado: prompt,
+      resposta_chatgpt: resposta,
+      resumo_diagnostico: resumo,
+      status_api: statusApi,
+      erro_api: erroApi,
+      modelo_ia: modeloIa,
+      tokens_utilizados: tokensUtilizados,
+      data_criacao: new Date().toISOString()
+    });
+
+    logger.info(`[${requestId}] ✅ Diagnóstico ${diagnosticoId} salvo com sucesso!`);
+    logger.info(`[${requestId}] Status: ${statusApi}, Modelo: ${modeloIa}, Tokens: ${tokensUtilizados}`);
+
+    return res.json({
+      success: true,
+      message: 'Diagnóstico gerado com sucesso',
+      data: {
+        id: diagnosticoId,
+        resumo: resumo,
+        resposta: resposta,
+        status: statusApi,
+        modelo: modeloIa,
+        tokens_utilizados: tokensUtilizados
+      }
+    });
+
   } catch (error) {
-    logger.error('Erro ao gerar diagnóstico:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    logger.error(`[${requestId}] ❌ ERRO CRÍTICO ao gerar diagnóstico:`, {
+      error: error.message,
+      stack: error.stack,
+      tenant: req.tenantCode,
+      user: req.user.id
+    });
+    
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Erro interno do servidor',
+      details: process.env.NODE_ENV === 'production' ? undefined : error.message,
+      requestId: requestId
+    });
   }
 });
 
@@ -130,6 +232,8 @@ router.get('/avaliacao/:avaliacaoId', async (req, res) => {
   try {
     const { avaliacaoId } = req.params;
 
+    logger.info(`Listando diagnósticos da avaliação ${avaliacaoId} - Tenant: ${req.tenantCode}`);
+
     // Verificar se avaliação pertence ao tenant
     const avaliacao = await db('avaliacoes')
       .where('id', avaliacaoId)
@@ -137,7 +241,10 @@ router.get('/avaliacao/:avaliacaoId', async (req, res) => {
       .first();
 
     if (!avaliacao) {
-      return res.status(404).json({ error: 'Avaliação não encontrada' });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Avaliação não encontrada' 
+      });
     }
 
     const diagnosticos = await db('diagnosticos')
@@ -153,10 +260,17 @@ router.get('/avaliacao/:avaliacaoId', async (req, res) => {
         'data_criacao'
       );
 
-    res.json({ diagnosticos });
+    res.json({ 
+      success: true, 
+      data: { diagnosticos } 
+    });
+    
   } catch (error) {
     logger.error('Erro ao listar diagnósticos:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Erro interno do servidor' 
+    });
   }
 });
 
@@ -171,73 +285,24 @@ router.get('/:diagnosticoId', async (req, res) => {
       .first();
 
     if (!diagnostico) {
-      return res.status(404).json({ error: 'Diagnóstico não encontrado' });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Diagnóstico não encontrado' 
+      });
     }
 
-    res.json({ diagnostico });
+    res.json({ 
+      success: true, 
+      data: { diagnostico } 
+    });
+    
   } catch (error) {
     logger.error('Erro ao buscar diagnóstico:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Erro interno do servidor' 
+    });
   }
 });
-
-// ========== FUNÇÕES AUXILIARES ==========
-function montarPromptDiagnostico(checkmarks) {
-  let prompt = "RELATÓRIO TÉCNICO DE PROBLEMAS IDENTIFICADOS:\n\n";
-  
-  checkmarks.forEach((checkmark, index) => {
-    prompt += `PROBLEMA ${index + 1}:\n`;
-    prompt += `• Título: ${checkmark.titulo}\n`;
-    if (checkmark.descricao) {
-      prompt += `• Descrição: ${checkmark.descricao}\n`;
-    }
-    prompt += `• Contexto técnico: ${checkmark.prompt_chatgpt}\n\n`;
-  });
-  
-  prompt += "TAREFA:\n";
-  prompt += "Analise os problemas listados acima e forneça um diagnóstico técnico completo. ";
-  prompt += "Considere que pode haver correlação entre os problemas. ";
-  prompt += "Forneça soluções práticas, começando pelas mais simples e eficazes.";
-  
-  return prompt;
-}
-
-function extrairResumo(resposta) {
-  const linhas = resposta.split('\n');
-  for (let linha of linhas) {
-    if (linha.includes('DIAGNÓSTICO') || linha.includes('ANÁLISE')) {
-      let resumo = linha.replace(/[🔍📊🎯*]/g, '').trim();
-      return resumo.length > 120 ? resumo.substring(0, 120) + '...' : resumo;
-    }
-  }
-  return resposta.length > 120 ? resposta.substring(0, 120) + '...' : resposta;
-}
-
-function contarTokens(texto) {
-  // Estimativa simples: ~4 caracteres por token
-  return Math.ceil(texto.length / 4);
-}
-
-function gerarDiagnosticoFallback(checkmarks) {
-  const problemas = checkmarks.map(c => c.titulo).join(', ');
-  return `🔧 **DIAGNÓSTICO TÉCNICO (MODO FALLBACK)**
-
-📊 **PROBLEMAS IDENTIFICADOS:** ${problemas}
-
-🛠️ **AÇÕES RECOMENDADAS:**
-1. Reinicie todos os equipamentos (modem, roteador, dispositivos)
-2. Verifique todas as conexões físicas e cabos
-3. Teste a conectividade em diferentes dispositivos
-4. Documente os resultados de cada teste
-
-📞 **PRÓXIMOS PASSOS:**
-• Execute as soluções na ordem apresentada
-• Anote o que funcionou ou não funcionou
-• Se problemas persistirem, entre em contato com suporte técnico
-
----
-⚠️ Este diagnóstico foi gerado em modo fallback devido à indisponibilidade da IA.
-Para diagnósticos mais detalhados, aguarde o restabelecimento do serviço.`;
-}
 
 module.exports = router;

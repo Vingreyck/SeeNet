@@ -1,17 +1,43 @@
+// routes/geminiService.js - VERSÃO CORRIGIDA COM LOGS DETALHADOS
 const axios = require('axios');
 const logger = require('../config/logger');
 
 class GeminiService {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
-    this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
     this.maxRetries = 3;
-    this.retryDelay = 2000; // 2 segundos
+    this.retryDelay = 2000;
+    
+    // Validar configuração na inicialização
+    this.validateConfig();
   }
 
-  
+  validateConfig() {
+    if (!this.apiKey) {
+      logger.error('❌ GEMINI_API_KEY não configurada no ambiente!');
+      logger.error('Configure a variável de ambiente GEMINI_API_KEY');
+      return false;
+    }
+
+    if (this.apiKey.length < 30) {
+      logger.warn('⚠️ GEMINI_API_KEY parece inválida (muito curta)');
+      return false;
+    }
+
+    if (!this.apiKey.startsWith('AIza')) {
+      logger.warn('⚠️ GEMINI_API_KEY não começa com "AIza" (formato esperado)');
+    }
+
+    logger.info('✅ Gemini Service configurado');
+    logger.info(`   API Key: ${this.apiKey.substring(0, 8)}...${this.apiKey.slice(-4)}`);
+    logger.info(`   URL: ${this.apiUrl}`);
+    
+    return true;
+  }
+
   async gerarDiagnostico(prompt) {
-    console.log('\n🤖 === INICIANDO CHAMADA GEMINI ===');
+    const startTime = Date.now();
     
     if (!this.apiKey) {
       console.error('❌ Chave da API Gemini não configurada');
@@ -56,88 +82,162 @@ IMPORTANTE: Seja direto, prático e focado na solução imediata.`;
         parts: [{
           text: `${systemPrompt}\n\n${prompt}`
         }]
-      }]
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2048,
+        topP: 0.8,
+        topK: 40
+      }
     };
+
+    logger.info('📤 Preparando requisição para Gemini:', {
+      promptLength: prompt.length,
+      systemPromptLength: systemPrompt.length,
+      totalLength: (systemPrompt + prompt).length
+    });
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        console.log(`\n🚀 Tentativa ${attempt}/${this.maxRetries} - Enviando para Gemini...`);
-        console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
+        logger.info(`🔄 Tentativa ${attempt}/${this.maxRetries} - Enviando para Gemini...`);
         
-        const headers = {
-          'Content-Type': 'application/json',
-          'X-goog-api-key': this.apiKey
-        };
-        
-        console.log('🔤 Headers:', {
-          ...headers,
-          'X-goog-api-key': headers['X-goog-api-key'].substring(0, 10) + '...'
-        });
+        const attemptStart = Date.now();
         
         const response = await axios.post(this.apiUrl, requestBody, {
-          headers,
-          timeout: 30000 // 30 segundos
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': this.apiKey  // ✅ Header correto conforme documentação Google
+          },
+          timeout: 30000,
+          validateStatus: (status) => status < 500 // Aceitar todos os status < 500 para tratar manualmente
         });
 
-        if (response.status === 200) {
-          logger.info('📥 Resposta Gemini:', JSON.stringify(response.data, null, 2));
+        const attemptDuration = Date.now() - attemptStart;
+
+        logger.info(`📥 Resposta recebida em ${attemptDuration}ms`, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: {
+            'content-type': response.headers['content-type'],
+            'content-length': response.headers['content-length']
+          }
+        });
+
+        // Verificar status HTTP
+        if (response.status !== 200) {
+          const errorData = response.data;
+          logger.error(`❌ Erro HTTP ${response.status}:`, errorData);
           
-          if (response.data.candidates) {
-            const resposta = response.data.candidates[0]?.content?.parts?.[0]?.text;
-            
-            if (resposta) {
-              logger.info(`✅ Diagnóstico gerado com sucesso (tentativa ${attempt})`);
-              logger.info('📝 Conteúdo:', resposta.substring(0, 200) + '...');
-              return resposta;
-            } else {
-              logger.warn('⚠️ Resposta sem texto válido');
-              logger.warn('📦 Candidates:', JSON.stringify(response.data.candidates, null, 2));
-            }
+          // Interpretar erros específicos
+          if (response.status === 400) {
+            throw new Error(`Erro 400: Request inválido - ${errorData.error?.message || 'Verifique formato do request'}`);
+          } else if (response.status === 403) {
+            throw new Error(`Erro 403: API não habilitada ou token inválido - ${errorData.error?.message || 'Verifique token e permissões'}`);
+          } else if (response.status === 404) {
+            throw new Error(`Erro 404: Modelo não encontrado - ${errorData.error?.message || 'Verifique URL do endpoint'}`);
+          } else if (response.status === 429) {
+            throw new Error(`Erro 429: Rate limit excedido - ${errorData.error?.message || 'Aguarde e tente novamente'}`);
           } else {
-            logger.warn('⚠️ Resposta sem candidates');
+            throw new Error(`Erro ${response.status}: ${errorData.error?.message || response.statusText}`);
           }
         }
 
-        throw new Error('Resposta inválida da API');
+        // Validar estrutura da resposta
+        if (!response.data) {
+          throw new Error('Resposta vazia da API');
+        }
+
+        logger.debug('📄 Estrutura da resposta:', {
+          hasCandidates: !!response.data.candidates,
+          candidatesLength: response.data.candidates?.length,
+          keys: Object.keys(response.data)
+        });
+
+        if (!response.data.candidates || response.data.candidates.length === 0) {
+          throw new Error('Resposta sem candidates');
+        }
+
+        const candidate = response.data.candidates[0];
+        
+        if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+          throw new Error('Candidate sem conteúdo válido');
+        }
+
+        const resposta = candidate.content.parts[0].text;
+
+        if (!resposta || resposta.trim().length === 0) {
+          throw new Error('Texto da resposta vazio');
+        }
+
+        const totalDuration = Date.now() - startTime;
+        
+        logger.info(`✅ Diagnóstico gerado com sucesso!`, {
+          tentativa: attempt,
+          duracao: `${totalDuration}ms`,
+          comprimentoResposta: resposta.length,
+          primeiraLinha: resposta.split('\n')[0].substring(0, 50)
+        });
+
+        return resposta;
 
       } catch (error) {
-        logger.warn('\n⚠️ === FALHA NA CHAMADA GEMINI ===');
-        logger.warn(`Tentativa ${attempt}/${this.maxRetries}`);
-        logger.warn('Tipo de erro:', error.constructor.name);
-        logger.warn('Mensagem:', error.message);
+        const attemptDuration = Date.now() - startTime;
+        
+        logger.warn(`⚠️ Tentativa ${attempt} falhou após ${attemptDuration}ms:`, {
+          error: error.message,
+          type: error.constructor.name,
+          code: error.code,
+          status: error.response?.status
+        });
 
-        // Log detalhado da resposta de erro
-        if (error.response) {
-          logger.error('Detalhes da resposta de erro:');
-          logger.error('Status:', error.response.status);
-          logger.error('Status Text:', error.response.statusText);
-          logger.error('Data:', JSON.stringify(error.response.data, null, 2));
-          logger.error('Headers:', JSON.stringify(error.response.headers, null, 2));
-        }
+        // Se erro de rede/timeout, vale a pena tentar novamente
+        const isRetriable = 
+          error.code === 'ECONNRESET' ||
+          error.code === 'ETIMEDOUT' ||
+          error.code === 'ENOTFOUND' ||
+          error.message.includes('timeout') ||
+          error.message.includes('network');
 
-        if (attempt === this.maxRetries) {
-          logger.error('\n❌ === TODAS AS TENTATIVAS FALHARAM ===');
-          logger.error('Stack trace:', error.stack);
+        // Se última tentativa ou erro não retriable, propagar erro
+        if (attempt === this.maxRetries || !isRetriable) {
+          const totalDuration = Date.now() - startTime;
           
-          const finalError = new Error(`Falha na API Gemini após ${this.maxRetries} tentativas`);
-          finalError.originalError = error;
-          finalError.lastResponse = error.response;
-          finalError.attempts = this.maxRetries;
-          throw finalError;
+          logger.error(`❌ Todas as tentativas falharam após ${totalDuration}ms`);
+          
+          throw new Error(
+            `Falha na API Gemini após ${this.maxRetries} tentativas: ${error.message}`
+          );
         }
 
-        // Aguardar antes da próxima tentativa
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay * attempt));
+        // Aguardar com backoff exponencial
+        const delay = this.retryDelay * Math.pow(2, attempt - 1);
+        logger.info(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
 
   async testarConexao() {
     try {
-      const resposta = await this.gerarDiagnostico('Teste simples. Responda apenas: "Gemini funcionando!"');
-      return resposta && resposta.includes('funcionando');
+      logger.info('🧪 Testando conexão com Gemini...');
+      
+      const resposta = await this.gerarDiagnostico(
+        'Teste de conectividade. Responda apenas: "Gemini funcionando!"'
+      );
+      
+      const sucesso = resposta && resposta.toLowerCase().includes('funcionando');
+      
+      if (sucesso) {
+        logger.info('✅ Teste de conexão bem-sucedido!');
+        logger.info(`Resposta: ${resposta.substring(0, 100)}`);
+      } else {
+        logger.warn('⚠️ Teste retornou resposta inesperada:', resposta);
+      }
+      
+      return sucesso;
+      
     } catch (error) {
-      logger.error('Teste de conexão Gemini falhou:', error);
+      logger.error('❌ Teste de conexão falhou:', error.message);
       return false;
     }
   }
@@ -145,11 +245,29 @@ IMPORTANTE: Seja direto, prático e focado na solução imediata.`;
   getInfo() {
     return {
       nome: 'Google Gemini 2.0 Flash',
-      configurado: !!this.apiKey,
-      modelo: 'gemini-2.0-flash',
+      configurado: !!this.apiKey && this.apiKey.length > 30,
+      modelo: 'gemini-2.0-flash-exp',
+      endpoint: this.apiUrl,
       limite: '15 req/min (gratuito)',
+      maxRetries: this.maxRetries,
+      retryDelay: `${this.retryDelay}ms`,
       status: this.apiKey ? 'Configurado' : 'Não configurado'
     };
+  }
+
+  debugConfig() {
+    logger.info('\n🔍 === DEBUG GEMINI SERVICE ===');
+    logger.info('Configurações:');
+    logger.info(`  API Key configurada: ${!!this.apiKey}`);
+    if (this.apiKey) {
+      logger.info(`  API Key: ${this.apiKey.substring(0, 8)}...${this.apiKey.slice(-4)}`);
+      logger.info(`  Tamanho: ${this.apiKey.length} caracteres`);
+      logger.info(`  Formato válido: ${this.apiKey.startsWith('AIza')}`);
+    }
+    logger.info(`  URL: ${this.apiUrl}`);
+    logger.info(`  Max Retries: ${this.maxRetries}`);
+    logger.info(`  Retry Delay: ${this.retryDelay}ms`);
+    logger.info('================================\n');
   }
 }
 

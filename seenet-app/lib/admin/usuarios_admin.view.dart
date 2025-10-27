@@ -28,7 +28,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       setState(() => isLoading = true);
 
       // ✅ Buscar usuários da API
-      final response = await _api.get('adminUsers');
+      final response = await _api.get('admin/users');
       
       if (response['success']) {
         List<dynamic> usuariosData = response['data']['usuarios'];

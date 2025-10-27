@@ -39,24 +39,38 @@ class DiagnosticoController extends GetxController {
 
       print('📥 Response: $response');
 
-      // ✅ Verificar sucesso
+        // ✅ Verificar sucesso
       if (response['success'] == true) {
-        final data = response['data'];
+        final diagnosticoData = response['data'];
         statusMensagem.value = '✅ Diagnóstico gerado com sucesso!';
         
+        print('\n📥 DADOS RECEBIDOS DA API:');
+        print(response);
+        
+        print('\n📦 DADOS DO DIAGNÓSTICO:');
+        print('ID: ${diagnosticoData['id']}');
+        print('Status: ${diagnosticoData['status']}');
+        print('Modelo: ${diagnosticoData['modelo']}');
+        print('Tokens: ${diagnosticoData['tokens_utilizados']}');        // Limpar diagnósticos anteriores
         diagnosticos.clear();
         
+        // Criar o diagnóstico com o conteúdo da API
         final novoDiagnostico = Diagnostico(
-          id: data['id'],
+          id: diagnosticoData['id'],
           avaliacaoId: avaliacaoId,
           categoriaId: categoriaId,
           promptEnviado: '',
-          respostaChatgpt: data['resumo'] ?? 'Diagnóstico gerado',
-          resumoDiagnostico: data['resumo'] ?? 'Diagnóstico gerado',
-          statusApi: 'sucesso',
-          tokensUtilizados: data['tokens_utilizados'],
+          respostaChatgpt: diagnosticoData['resposta'] ?? 'Diagnóstico não disponível',
+          resumoDiagnostico: diagnosticoData['resumo'] ?? 'Resumo não disponível',
+          statusApi: diagnosticoData['status'] ?? 'sucesso',
+          tokensUtilizados: diagnosticoData['tokens_utilizados'] ?? 0,
           dataCriacao: DateTime.now(),
         );
+
+        // Debug do diagnóstico criado
+        print('\n🔍 DIAGNÓSTICO CRIADO:');
+        print('Status: ${novoDiagnostico.statusApi}');
+        print('Resposta: ${novoDiagnostico.respostaChatgpt}');
         
         diagnosticos.add(novoDiagnostico);
         

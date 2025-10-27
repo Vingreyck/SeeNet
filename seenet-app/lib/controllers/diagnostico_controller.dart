@@ -1,4 +1,4 @@
-// lib/controllers/diagnostico_controller.dart - VERSÃO CORRIGIDA
+// lib/controllers/diagnostico_controller.dart - VERSÃO CORRIGIDA COM PARSE CORRETO
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/diagnostico.dart';
@@ -26,40 +26,75 @@ class DiagnosticoController extends GetxController {
       print('   Categoria: $categoriaId');
       print('   Checkmarks: $checkmarksMarcados');
 
-      // ✅ CORRIGIDO: Garantir autenticação + endpoint correto
       final response = await _api.post(
-        '/diagnostics/gerar',  // ← ApiService adiciona /api automaticamente
+        '/diagnostics/gerar',
         {
           'avaliacao_id': avaliacaoId,
           'categoria_id': categoriaId,
           'checkmarks_marcados': checkmarksMarcados,
         },
-        requireAuth: true,  // ✅ IMPORTANTE: Enviar token
+        requireAuth: true,
       );
 
       print('📥 Response: $response');
 
-      // ✅ Verificar sucesso
+      // ✅ CORREÇÃO CRÍTICA: Parse do nested data
       if (response['success'] == true) {
-        final data = response['data'];
+        // O backend retorna: { success: true, data: { success: true, data: {...} } }
+        // Precisamos acessar response['data']['data']
+        
+        final outerData = response['data'];
+        if (outerData == null) {
+          throw Exception('Response data is null');
+        }
+        
+        // Verificar se tem success interno
+        if (outerData['success'] != true) {
+          throw Exception(outerData['error'] ?? 'Erro desconhecido');
+        }
+        
+        // Pegar o data interno
+        final diagnosticoData = outerData['data'];
+        if (diagnosticoData == null) {
+          throw Exception('Diagnostico data is null');
+        }
+        
         statusMensagem.value = '✅ Diagnóstico gerado com sucesso!';
         
+        print('\n📥 DADOS RECEBIDOS DA API:');
+        print('ID: ${diagnosticoData['id']}');
+        print('Status: ${diagnosticoData['status']}');
+        print('Modelo: ${diagnosticoData['modelo']}');
+        print('Tokens: ${diagnosticoData['tokens_utilizados']}');
+        print('Resposta length: ${diagnosticoData['resposta']?.toString().length ?? 0}');
+        
+        // Limpar diagnósticos anteriores
         diagnosticos.clear();
         
+        // ✅ CRIAR DIAGNÓSTICO COM DADOS CORRETOS
         final novoDiagnostico = Diagnostico(
-          id: data['id'],
+          id: diagnosticoData['id'],
           avaliacaoId: avaliacaoId,
           categoriaId: categoriaId,
-          promptEnviado: '',
-          respostaChatgpt: data['resumo'] ?? 'Diagnóstico gerado',
-          resumoDiagnostico: data['resumo'] ?? 'Diagnóstico gerado',
-          statusApi: 'sucesso',
-          tokensUtilizados: data['tokens_utilizados'],
+          promptEnviado: '', // Backend não retorna isso na geração
+          respostaChatgpt: diagnosticoData['resposta'] ?? 'Diagnóstico não disponível',
+          resumoDiagnostico: diagnosticoData['resumo'] ?? 'Resumo não disponível',
+          statusApi: diagnosticoData['status'] ?? 'sucesso',
+          tokensUtilizados: diagnosticoData['tokens_utilizados'] ?? 0,
           dataCriacao: DateTime.now(),
         );
+
+        // Debug do diagnóstico criado
+        print('\n🔍 DIAGNÓSTICO CRIADO:');
+        print('ID: ${novoDiagnostico.id}');
+        print('Status: ${novoDiagnostico.statusApi}');
+        print('Tokens: ${novoDiagnostico.tokensUtilizados}');
+        print('Resposta length: ${novoDiagnostico.respostaChatgpt.length}');
+        print('Resposta preview: ${novoDiagnostico.respostaChatgpt.substring(0, novoDiagnostico.respostaChatgpt.length > 100 ? 100 : novoDiagnostico.respostaChatgpt.length)}...');
         
         diagnosticos.add(novoDiagnostico);
         
+        print('✅ Diagnóstico adicionado à lista (total: ${diagnosticos.length})');
         print('✅ Diagnóstico gerado via API');
         print('   ID: ${novoDiagnostico.id}');
         print('   Tokens: ${novoDiagnostico.tokensUtilizados}');
@@ -88,14 +123,15 @@ class DiagnosticoController extends GetxController {
         
         return false;
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       statusMensagem.value = '❌ Erro de conexão';
       
       print('❌ Exceção ao gerar diagnóstico: $e');
+      print('Stack trace: $stackTrace');
       
       Get.snackbar(
         'Erro de Conexão',
-        'Não foi possível gerar o diagnóstico',
+        'Não foi possível gerar o diagnóstico: $e',
         backgroundColor: Colors.red,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
@@ -114,7 +150,7 @@ class DiagnosticoController extends GetxController {
 
       final response = await _api.get(
         '/diagnostics/avaliacao/$avaliacaoId',
-        requireAuth: true,  // ✅ Autenticação necessária
+        requireAuth: true,
       );
 
       if (response['success'] == true) {
@@ -142,7 +178,7 @@ class DiagnosticoController extends GetxController {
 
       final response = await _api.get(
         '/diagnostics/$diagnosticoId',
-        requireAuth: true,  // ✅ Autenticação necessária
+        requireAuth: true,
       );
 
       if (response['success'] == true) {
@@ -200,6 +236,16 @@ class DiagnosticoController extends GetxController {
     print('❌ Erro: ${contarPorStatus('erro')}');
     print('📡 Carregando: $isLoading');
     print('💬 Status: $statusMensagem');
+    
+    if (diagnosticos.isNotEmpty) {
+      print('\n📋 Último diagnóstico:');
+      final ultimo = ultimoDiagnostico!;
+      print('   ID: ${ultimo.id}');
+      print('   Status: ${ultimo.statusApi}');
+      print('   Tokens: ${ultimo.tokensUtilizados}');
+      print('   Resposta: ${ultimo.respostaChatgpt.substring(0, ultimo.respostaChatgpt.length > 50 ? 50 : ultimo.respostaChatgpt.length)}...');
+    }
+    
     print('============================\n');
   }
 }

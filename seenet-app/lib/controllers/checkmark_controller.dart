@@ -1,4 +1,4 @@
-// lib/controllers/checkmark_controller.dart - VERSÃO 100% API
+// lib/controllers/checkmark_controller.dart - VERSÃO CORRIGIDA SEM DUPLA CHAMADA
 import 'package:get/get.dart';
 import '../models/categoria_checkmark.dart';
 import '../models/checkmark.dart';
@@ -15,6 +15,9 @@ class CheckmarkController extends GetxController {
   Rx<Avaliacao?> avaliacaoAtual = Rx<Avaliacao?>(null);
   RxInt categoriaAtual = 0.obs;
   RxBool isLoading = false.obs;
+  
+  // ✅ ADICIONAR FLAG PARA EVITAR CHAMADA DUPLICADA
+  bool _gerandoDiagnostico = false;
 
   @override
   void onInit() {
@@ -27,7 +30,7 @@ class CheckmarkController extends GetxController {
     try {
       isLoading.value = true;
 
-      final response = await _api.get('/checkmark/categorias'); // ✅ Endpoint correto
+      final response = await _api.get('/checkmark/categorias');
 
       if (response['success']) {
         final List<dynamic> data = response['data']['categorias'];
@@ -48,9 +51,18 @@ class CheckmarkController extends GetxController {
     }
   }
   
-// ========== GERAR DIAGNÓSTICO COM GEMINI ==========
+  // ========== GERAR DIAGNÓSTICO COM GEMINI ==========
   Future<bool> gerarDiagnosticoComGemini() async {
+    // ✅ PREVENIR CHAMADA DUPLICADA
+    if (_gerandoDiagnostico) {
+      print('⚠️ Diagnóstico já está sendo gerado, ignorando chamada duplicada');
+      return false;
+    }
+    
     try {
+      // ✅ MARCAR COMO GERANDO
+      _gerandoDiagnostico = true;
+      
       if (avaliacaoAtual.value == null) {
         print('❌ Nenhuma avaliação ativa');
         Get.snackbar('Erro', 'Nenhuma avaliação ativa');
@@ -90,6 +102,9 @@ class CheckmarkController extends GetxController {
       print('❌ Erro ao gerar diagnóstico: $e');
       Get.snackbar('Erro', 'Falha na comunicação com a IA: $e');
       return false;
+    } finally {
+      // ✅ LIBERAR FLAG
+      _gerandoDiagnostico = false;
     }
   }
 
@@ -120,14 +135,13 @@ class CheckmarkController extends GetxController {
       isLoading.value = false;
     }
   }
-  
 
   // ========== INICIAR NOVA AVALIAÇÃO NA API ==========
   Future<bool> iniciarAvaliacao(int tecnicoId, String titulo) async {
     try {
       isLoading.value = true;
 
-     final response = await _api.post('/avaliacoes', {  // ✅ Barra no início
+      final response = await _api.post('/avaliacoes', {
         'titulo': titulo,
         'descricao': 'Avaliação técnica',
       });
@@ -165,62 +179,59 @@ class CheckmarkController extends GetxController {
   }
 
   // ========== SALVAR RESPOSTAS NA API ==========
-  // lib/controllers/checkmark_controller.dart
+  Future<bool> salvarRespostas() async {
+    try {
+      if (avaliacaoAtual.value == null) {
+        print('❌ Nenhuma avaliação ativa');
+        Get.snackbar('Erro', 'Nenhuma avaliação ativa');
+        return false;
+      }
 
-Future<bool> salvarRespostas() async {
-  try {
-    if (avaliacaoAtual.value == null) {
-      print('❌ Nenhuma avaliação ativa');
-      Get.snackbar('Erro', 'Nenhuma avaliação ativa');
+      List<int> checkmarksMarcados = respostas.entries
+          .where((entry) => entry.value == true)
+          .map((entry) => entry.key)
+          .toList();
+
+      if (checkmarksMarcados.isEmpty) {
+        Get.snackbar('Aviso', 'Marque pelo menos um problema');
+        return false;
+      }
+
+      print('📤 Salvando respostas:');
+      print('   Avaliação ID: ${avaliacaoAtual.value!.id}');
+      print('   Total marcados: ${checkmarksMarcados.length}');
+      print('   IDs marcados: $checkmarksMarcados');
+
+      isLoading.value = true;
+
+      final payload = {'checkmarks_marcados': checkmarksMarcados};
+      print('   Payload: $payload');
+
+      final response = await _api.post(
+        '/avaliacoes/${avaliacaoAtual.value!.id}/respostas',
+        payload,
+      );
+
+      print('📥 Resposta:');
+      print('   Success: ${response['success']}');
+      print('   Response completo: $response');
+
+      if (response['success']) {
+        print('✅ ${checkmarksMarcados.length} respostas salvas na API');
+        return true;
+      } else {
+        print('❌ Erro ao salvar respostas: ${response['error']}');
+        Get.snackbar('Erro', 'Falha ao salvar respostas');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Erro ao salvar respostas: $e');
+      Get.snackbar('Erro', 'Erro de conexão ao salvar respostas');
       return false;
+    } finally {
+      isLoading.value = false;
     }
-
-    List<int> checkmarksMarcados = respostas.entries
-        .where((entry) => entry.value == true)
-        .map((entry) => entry.key)
-        .toList();
-
-    if (checkmarksMarcados.isEmpty) {
-      Get.snackbar('Aviso', 'Marque pelo menos um problema');
-      return false;
-    }
-
-    // ✅ LOGS DETALHADOS
-    print('📤 Salvando respostas:');
-    print('   Avaliação ID: ${avaliacaoAtual.value!.id}');
-    print('   Total marcados: ${checkmarksMarcados.length}');
-    print('   IDs marcados: $checkmarksMarcados');
-
-    isLoading.value = true;
-
-    final payload = {'checkmarks_marcados': checkmarksMarcados};
-    print('   Payload: $payload');
-
-    final response = await _api.post(
-      '/avaliacoes/${avaliacaoAtual.value!.id}/respostas',
-      payload,
-    );
-
-    print('📥 Resposta:');
-    print('   Success: ${response['success']}');
-    print('   Response completo: $response');
-
-    if (response['success']) {
-      print('✅ ${checkmarksMarcados.length} respostas salvas na API');
-      return true;
-    } else {
-      print('❌ Erro ao salvar respostas: ${response['error']}');
-      Get.snackbar('Erro', 'Falha ao salvar respostas');
-      return false;
-    }
-  } catch (e) {
-    print('❌ Erro ao salvar respostas: $e');
-    Get.snackbar('Erro', 'Erro de conexão ao salvar respostas');
-    return false;
-  } finally {
-    isLoading.value = false;
   }
-}
 
   // ========== FINALIZAR AVALIAÇÃO NA API ==========
   Future<bool> finalizarAvaliacao() async {
@@ -230,7 +241,7 @@ Future<bool> salvarRespostas() async {
       isLoading.value = true;
 
       final response = await _api.put(
-        '/avaliacoes/${avaliacaoAtual.value!.id}/finalizar',  // ✅ Barra no início
+        '/avaliacoes/${avaliacaoAtual.value!.id}/finalizar',
         {},
       );
 
@@ -255,6 +266,7 @@ Future<bool> salvarRespostas() async {
     respostas.clear();
     checkmarksAtivos.clear();
     categoriaAtual.value = 0;
+    _gerandoDiagnostico = false; // ✅ RESETAR FLAG
     print('✅ Avaliação limpa');
   }
 
@@ -300,7 +312,5 @@ Future<bool> salvarRespostas() async {
     } catch (e) {
       return null;
     }
-    
   }
-  
 }

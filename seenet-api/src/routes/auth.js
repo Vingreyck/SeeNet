@@ -8,6 +8,7 @@ const { db } = require('../config/database');
 const logger = require('../config/logger');
 const auditService = require('../services/auditService');
 
+
 const router = express.Router();
 
 // Rate limiting para login (mais restritivo)
@@ -33,19 +34,9 @@ router.post('/register', [
     return true;
   })
 ], async (req, res) => {
-  const requestContext = {
-    ip: req.ip,
-    userAgent: req.headers['user-agent'],
-    email: req.body.email,
-    tenantCode: req.body.codigoEmpresa || req.body.tenantCode,
-    timestamp: new Date().toISOString()
-  };
-
   try {
-    logger.info('Iniciando registro de usuário', {
-      ...requestContext,
-      nome: req.body.nome
-    });
+    console.log('📝 POST /api/auth/register iniciado');
+    console.log('📦 Body recebido:', JSON.stringify(req.body, null, 2));
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -144,7 +135,7 @@ router.post('/register', [
       .returning('id');
 
     const userId = result.id;
-
+    
     console.log('✅ Usuário criado com ID:', userId);
 
     // Log de auditoria
@@ -193,23 +184,10 @@ router.post('/login', loginLimiter, [
     return true;
   })
 ], async (req, res) => {
-  const requestContext = {
-    ip: req.ip,
-    userAgent: req.headers['user-agent'],
-    email: req.body.email?.toLowerCase(),
-    tenantCode: (req.body.codigoEmpresa || req.body.tenantCode)?.toUpperCase(),
-    timestamp: new Date().toISOString()
-  };
-
   try {    
-    // Log inicial da tentativa de login
-    logger.info('Iniciando tentativa de login', {
-      ...requestContext,
-      headers: {
-        ...req.headers,
-        authorization: undefined // Não logar authorization header
-      }
-    });
+    console.log('🔍 POST /api/auth/login iniciado');
+    console.log('📦 Body:', JSON.stringify(req.body));
+    console.log('📝 Headers:', JSON.stringify(req.headers));
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -243,17 +221,10 @@ router.post('/login', loginLimiter, [
       .first();
 
     if (!user) {
-      // Log de falha na autenticação
-      logger.warn('Tentativa de login falhou - usuário/tenant não encontrado', {
-        ...requestContext,
-        reason: 'USER_NOT_FOUND'
-      });
-
       await auditService.log({
         action: 'LOGIN_FAILED',
-        details: `Tentativa de login falhou: ${email} - Tenant: ${codigoEmpresa}`,
-        ip_address: req.ip,
-        reason: 'USER_NOT_FOUND'
+        details: `Tentativa de login falhada: ${email} - Tenant: ${codigoEmpresa}`,
+        ip_address: req.ip
       });
 
       return res.status(401).json({ 
@@ -264,28 +235,13 @@ router.post('/login', loginLimiter, [
     // Verificar senha
     const senhaValida = await bcrypt.compare(senha, user.senha);
     if (!senhaValida) {
-      // Log de falha na autenticação
-      logger.warn('Tentativa de login falhou - senha incorreta', {
-        ...requestContext,
-        userId: user.id,
-        tenantId: user.tenant_id,
-        reason: 'INVALID_PASSWORD',
-        loginAttempts: (user.tentativas_login || 0) + 1
-      });
-
       await auditService.log({
         action: 'LOGIN_FAILED',
         usuario_id: user.id,
         tenant_id: user.tenant_id,
         details: `Senha incorreta: ${email}`,
-        ip_address: req.ip,
-        reason: 'INVALID_PASSWORD'
+        ip_address: req.ip
       });
-
-      // Incrementar tentativas de login
-      await db('usuarios')
-        .where('id', user.id)
-        .increment('tentativas_login', 1);
 
       return res.status(401).json({ 
         error: 'Credenciais inválidas' 
@@ -325,16 +281,7 @@ router.post('/login', loginLimiter, [
       ip_address: req.ip
     });
 
-    // Log de sucesso
-    logger.info('Login bem-sucedido', {
-      ...requestContext,
-      userId: user.id,
-      userName: user.nome,
-      userType: user.tipo_usuario,
-      tenantId: user.tenant_id,
-      tenantName: user.tenant_name,
-      tenantPlan: user.tenant_plan
-    });
+    logger.info(`✅ Login bem-sucedido: ${email} - Tenant: ${user.tenant_name}`);
 
     res.json({
       token,

@@ -45,18 +45,8 @@ const dbConfig = {
 let db = null;
 
 async function initDatabase() {
-  logger.info('\n=== 🔌 INICIANDO BANCO DE DADOS ===');
+  logger.info('🔌 Conectando ao PostgreSQL...');
   
-  // Log da configuração (omitindo dados sensíveis)
-  logger.info('Configuração do banco:', {
-    host: dbConfig.connection.host,
-    port: dbConfig.connection.port,
-    database: dbConfig.connection.database,
-    ssl: !!dbConfig.connection.ssl,
-    pool: dbConfig.pool,
-    migrationsPath: dbConfig.migrations.directory,
-    seedsPath: dbConfig.seeds.directory
-  });
   
   try {
     db = knex(dbConfig);
@@ -67,71 +57,32 @@ async function initDatabase() {
     
     // Executar migrações
     try {
-      // Executar e logar migrações
-      logger.info('\n=== 🔄 VERIFICANDO MIGRAÇÕES ===');
+      logger.info('🔄 Executando migrações...');
       const [batchNo, migrationsList] = await db.migrate.latest();
-      
       if (migrationsList.length === 0) {
-        logger.info('Nenhuma migração pendente', {
-          currentBatch: batchNo,
-          timestamp: new Date().toISOString()
-        });
+        logger.info('ℹ️ Nenhuma migração pendente');
       } else {
-        logger.info('Migrações executadas com sucesso', {
-          batch: batchNo,
-          count: migrationsList.length,
-          migrations: migrationsList,
-          timestamp: new Date().toISOString()
-        });
+        logger.info(`✅ Migrações executadas - Batch ${batchNo}:`, migrationsList);
       }
     } catch (migrationError) {
-      logger.error('Erro ao executar migrações', {
-        error: {
-          message: migrationError.message,
-          code: migrationError.code,
-          stack: migrationError.stack
-        },
-        timestamp: new Date().toISOString()
-      });
+      logger.error('❌ Erro nas migrações:', migrationError.message);
       throw migrationError;
     }
     
     // Executar seeds
     try {
-      logger.info('\n=== 🌱 EXECUTANDO SEEDS ===');
-      const seedResults = await db.seed.run();
-      
-      logger.info('Seeds executados com sucesso', {
-        seedFiles: seedResults.map(r => r.file),
-        count: seedResults.length,
-        timestamp: new Date().toISOString()
-      });
+      logger.info('🌱 Executando seeds...');
+      await db.seed.run();
+      logger.info('✅ Seeds executados');
     } catch (seedError) {
-      logger.warn('Erro ao executar seeds', {
-        error: {
-          message: seedError.message,
-          code: seedError.code
-        },
-        timestamp: new Date().toISOString()
-      });
-      // Não lançar erro para seeds, pois não são críticos
+      logger.warn('⚠️ Erro nos seeds:', seedError.message);
     }
     
     return db;
   } catch (error) {
-    logger.error('\n=== ❌ ERRO CRÍTICO NO BANCO DE DADOS ===', {
-      error: {
-        type: error.constructor.name,
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      },
-      context: {
-        host: dbConfig.connection.host,
-        database: dbConfig.connection.database,
-        timestamp: new Date().toISOString()
-      }
-    });
+    logger.error('❌ Falha ao conectar com PostgreSQL:');
+    logger.error('Mensagem:', error.message);
+    logger.error('Código:', error.code);
     throw error;
   }
 }

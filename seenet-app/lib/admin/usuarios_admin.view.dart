@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 
 class UsuariosAdminView extends StatefulWidget {
   const UsuariosAdminView({super.key});
+  
 
   @override
   State<UsuariosAdminView> createState() => _UsuariosAdminViewState();
@@ -28,7 +29,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       setState(() => isLoading = true);
 
       // ✅ Buscar usuários da API
-      final response = await _api.get('admin/users');
+      final response = await _api.get('adminUsers');
       
       if (response['success']) {
         List<dynamic> usuariosData = response['data']['usuarios'];

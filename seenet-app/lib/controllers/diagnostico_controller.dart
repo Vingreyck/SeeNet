@@ -237,6 +237,7 @@ class DiagnosticoController extends GetxController {
     print('📡 Carregando: $isLoading');
     print('💬 Status: $statusMensagem');
     
+    
     if (diagnosticos.isNotEmpty) {
       print('\n📋 Último diagnóstico:');
       final ultimo = ultimoDiagnostico!;

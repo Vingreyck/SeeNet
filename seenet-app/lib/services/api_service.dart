@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../config/api_config.dart';
 import '../config/environment.dart';
 
+
 class ApiService extends GetxService {
   static ApiService get instance => Get.find<ApiService>();
   
@@ -39,34 +40,15 @@ class ApiService extends GetxService {
     print('🚪 Autenticação limpa');
   }
   
-  // ✅ HEADERS CORRIGIDOS COM LOGS
+  // Headers da requisição
   Map<String, String> _getHeaders({bool requireAuth = true}) {
-    print('\n🔍 === MONTANDO HEADERS ===');
-    print('   Requer autenticação: $requireAuth');
-    
-    if (requireAuth) {
-      print('   Token: ${_token != null ? "PRESENTE (${_token!.length} chars)" : "AUSENTE"}');
-      print('   Tenant Code: ${_tenantCode ?? "AUSENTE"}');
-      
-      if (_token == null || _tenantCode == null) {
-        print('❌ ERRO: Autenticação necessária mas token/tenant ausente!');
-        throw Exception('Autenticação necessária - Token ou código da empresa não configurado');
-      }
-      
-      final headers = ApiConfig.getAuthHeaders(_token!, _tenantCode!);
-      print('✅ Headers com autenticação montados:');
-      headers.forEach((key, value) {
-        if (key == 'Authorization') {
-          print('   $key: Bearer ${value.substring(7, 17)}...');
-        } else {
-          print('   $key: $value');
-        }
-      });
-      return headers;
-    } else {
-      print('✅ Headers sem autenticação');
-      return ApiConfig.defaultHeaders;
+    if (requireAuth && (_token == null || _tenantCode == null)) {
+      throw Exception('Autenticação necessária - Token ou código da empresa não configurado');
     }
+    
+    return requireAuth 
+        ? ApiConfig.getAuthHeaders(_token!, _tenantCode!)
+        : ApiConfig.defaultHeaders;
   }
   
   // GET
@@ -99,52 +81,30 @@ class ApiService extends GetxService {
     }
   }
   
-  // ✅ POST CORRIGIDO COM LOGS EXTENSIVOS
+  // POST
   Future<Map<String, dynamic>> post(
     String endpoint,
     Map<String, dynamic> data, {
     bool requireAuth = true,
   }) async {
     try {
-      print('\n🚀 === INICIANDO POST REQUEST ===');
-      print('📍 Endpoint recebido: $endpoint');
+      String url = ApiConfig.getUrl(ApiConfig.endpoints[endpoint] ?? endpoint);
       
-      // ✅ CORREÇÃO CRÍTICA: Garantir que o endpoint está correto
-      String fullEndpoint = ApiConfig.endpoints[endpoint] ?? endpoint;
-      print('📍 Endpoint processado: $fullEndpoint');
-      
-      String url = ApiConfig.getUrl(fullEndpoint);
-      print('🌐 URL completa: $url');
-      
-      // ✅ SEMPRE mostrar o body (não apenas em debug)
-      print('📦 Body da requisição:');
-      print(json.encode(data));
-      
-      print('🔐 Autenticação requerida: $requireAuth');
-      
-      final headers = _getHeaders(requireAuth: requireAuth);
-      
-      print('📤 Enviando requisição HTTP POST...');
+      print('🌐 POST: $url');
+      if (Environment.enableDebugLogs) {
+        print('📄 Data: ${json.encode(data)}');
+      }
       
       final response = await _client
           .post(
             Uri.parse(url),
-            headers: headers,
+            headers: _getHeaders(requireAuth: requireAuth),
             body: json.encode(data),
           )
-          .timeout(
-            ApiConfig.requestTimeout,
-            onTimeout: () {
-              print('⏱️ TIMEOUT: Servidor não respondeu em ${ApiConfig.requestTimeout.inSeconds}s');
-              throw Exception('Timeout na requisição');
-            },
-          );
-      
-      print('📥 Resposta recebida do servidor');
+          .timeout(ApiConfig.requestTimeout);
       
       return _handleResponse(response);
     } catch (e) {
-      print('❌ EXCEÇÃO no POST: $e');
       return _handleError(e);
     }
   }
@@ -174,7 +134,7 @@ class ApiService extends GetxService {
     }
   }
   
-  // DELETE
+  // DELETE (✅ AGORA COM queryParams)
   Future<Map<String, dynamic>> delete(
     String endpoint, {
     Map<String, String>? queryParams,
@@ -183,6 +143,7 @@ class ApiService extends GetxService {
     try {
       String url = ApiConfig.getUrl(ApiConfig.endpoints[endpoint] ?? endpoint);
       
+      // ✅ Adicionar query params se existirem
       if (queryParams != null && queryParams.isNotEmpty) {
         url += '?' + queryParams.entries
             .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
@@ -204,46 +165,22 @@ class ApiService extends GetxService {
     }
   }
   
-  // ✅ TRATAR RESPOSTA COM LOGS DETALHADOS
+  // Tratar resposta
   Map<String, dynamic> _handleResponse(http.Response response) {
-    print('\n📡 === PROCESSANDO RESPOSTA ===');
-    print('   Status Code: ${response.statusCode}');
-    print('   Content-Type: ${response.headers['content-type']}');
-    print('   Body length: ${response.body.length} bytes');
-    
-    // ✅ Mostrar os primeiros 500 caracteres do body
-    if (response.body.isNotEmpty) {
-      final preview = response.body.length > 500 
-          ? response.body.substring(0, 500) + '...' 
-          : response.body;
-      print('   Body preview: $preview');
-    }
+    print('📡 Status: ${response.statusCode}');
     
     if (response.body.isEmpty) {
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        print('✅ Resposta vazia mas sucesso (${response.statusCode})');
-        return {'success': true};
-      } else {
-        print('❌ Resposta vazia com erro (${response.statusCode})');
-        return {
-          'success': false,
-          'error': 'Resposta vazia com status ${response.statusCode}',
-          'statusCode': response.statusCode
-        };
-      }
+      return {'success': response.statusCode < 400};
     }
     
     try {
       Map<String, dynamic> data = json.decode(response.body);
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        print('✅ SUCESSO: ${response.statusCode}');
+        print('✅ Sucesso: ${response.statusCode}');
         return {'success': true, 'data': data};
       } else {
-        print('❌ ERRO HTTP: ${response.statusCode}');
-        print('   Mensagem: ${data['error'] ?? 'Sem mensagem de erro'}');
-        print('   Detalhes: ${data['details'] ?? 'Sem detalhes'}');
-        
+        print('❌ Erro: ${response.statusCode} - ${data['error'] ?? 'Erro desconhecido'}');
         return {
           'success': false,
           'error': data['error'] ?? 'Erro no servidor',
@@ -252,62 +189,49 @@ class ApiService extends GetxService {
         };
       }
     } catch (e) {
-      print('❌ ERRO ao decodificar JSON: $e');
-      print('📄 Body raw: ${response.body}');
-      
+      print('❌ Erro ao decodificar resposta: $e');
+      print('📄 Body: ${response.body}');
       return {
         'success': false,
         'error': 'Erro ao processar resposta do servidor',
         'statusCode': response.statusCode,
-        'rawBody': response.body,
-        'parseError': e.toString()
+        'rawBody': response.body
       };
     }
   }
   
-  // ✅ TRATAR ERRO COM LOGS DETALHADOS
+  // Tratar erro
   Map<String, dynamic> _handleError(dynamic error) {
-    print('\n❌ === ERRO NA REQUISIÇÃO ===');
-    print('   Tipo: ${error.runtimeType}');
-    print('   Mensagem: $error');
+    print('❌ Erro na requisição: $error');
     
     if (error is SocketException) {
-      print('   Categoria: Sem conexão com internet');
       return {
         'success': false,
         'error': 'Sem conexão com a internet',
-        'type': 'connection',
-        'details': error.toString()
+        'type': 'connection'
       };
     }
     
     if (error is HttpException) {
-      print('   Categoria: Erro HTTP');
       return {
         'success': false,
         'error': 'Erro de conexão com o servidor',
-        'type': 'http',
-        'details': error.toString()
+        'type': 'http'
       };
     }
     
-    if (error.toString().contains('TimeoutException') || 
-        error.toString().contains('Timeout')) {
-      print('   Categoria: Timeout');
+    if (error.toString().contains('TimeoutException')) {
       return {
         'success': false,
         'error': 'Tempo limite da requisição excedido',
-        'type': 'timeout',
-        'details': error.toString()
+        'type': 'timeout'
       };
     }
     
-    print('   Categoria: Erro desconhecido');
     return {
       'success': false,
       'error': error.toString(),
-      'type': 'unknown',
-      'details': error.toString()
+      'type': 'unknown'
     };
   }
   
@@ -321,33 +245,20 @@ class ApiService extends GetxService {
     }
   }
   
-  // ✅ DEBUG MELHORADO
+  // Debug - testar todas as URLs
   Future<void> debugEndpoints() async {
-    print('\n🧪 === TESTE DE ENDPOINTS ===');
-    print('📍 Base URL: ${ApiConfig.baseUrl}');
-    print('🔐 Token: ${_token != null ? "Configurado" : "NÃO configurado"}');
-    print('🏢 Tenant: ${_tenantCode ?? "NÃO configurado"}');
+    if (!Environment.enableDebugLogs) return;
+    
+    print('🧪 === TESTE DE ENDPOINTS ===');
     
     // Testar health check
     try {
-      print('\n🏥 Testando health check...');
       bool health = await checkConnectivity();
-      print('🏥 Health check: ${health ? "✅ OK" : "❌ FALHOU"}');
+      print('🏥 Health check: ${health ? "OK" : "FALHOU"}');
     } catch (e) {
-      print('🏥 Health check: ❌ ERRO - $e');
+      print('🏥 Health check: ERRO - $e');
     }
     
-    // Testar montagem de URL do diagnóstico
-    try {
-      print('\n🧪 Testando montagem de URL de diagnóstico...');
-      String diagnosticEndpoint = ApiConfig.endpoints['diagnostics_gerar'] ?? '/diagnostics/gerar';
-      String diagnosticUrl = ApiConfig.getUrl(diagnosticEndpoint);
-      print('   Endpoint: $diagnosticEndpoint');
-      print('   URL completa: $diagnosticUrl');
-    } catch (e) {
-      print('❌ Erro ao montar URL: $e');
-    }
-    
-    print('\n================================\n');
+    print('================================\n');
   }
 }

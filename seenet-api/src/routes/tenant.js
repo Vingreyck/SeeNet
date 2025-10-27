@@ -12,22 +12,16 @@ function getDb() {
   return db;
 }
 
-const logger = require('../config/logger');
 
 // ========== VERIFICAR CÓDIGO DA EMPRESA ==========
 router.get('/verify/:codigo', async (req, res) => {
   try {
     const { codigo } = req.params;
     const codigoUpper = codigo.toUpperCase();
-    const db = getDb();
+    
+    console.log(`🔍 Verificando código da empresa: "${codigo}" -> "${codigoUpper}"`);
 
-    // Log da tentativa de verificação
-    logger.info('Verificando código da empresa', {
-      codigo_original: codigo,
-      codigo_normalizado: codigoUpper,
-      ip: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    const db = getDb(); // Acessar db apenas quando necessário
 
     const tenant = await db('tenants')
       .where('codigo', codigoUpper)
@@ -36,40 +30,20 @@ router.get('/verify/:codigo', async (req, res) => {
       .first();
 
     if (!tenant) {
-      // Log estruturado para tentativa falha
-      logger.warn('Empresa não encontrada', {
-        codigo: codigoUpper,
-        ip: req.ip,
-        tentativa_timestamp: new Date().toISOString()
-      });
+      console.log(`❌ Empresa não encontrada: ${codigoUpper}`);
       
-      // Em desenvolvimento, incluir lista de empresas disponíveis
-      if (process.env.NODE_ENV === 'development') {
-        const allTenants = await db('tenants')
-          .select('codigo', 'ativo')
-          .orderBy('codigo');
-          
-        logger.debug('Empresas disponíveis', { tenants: allTenants });
-        
-        return res.status(404).json({ 
-          error: 'Código da empresa não encontrado ou empresa inativa',
-          codigo_procurado: codigoUpper,
-          debug: allTenants
-        });
-      }
+      // Debug: Mostrar o que existe na tabela
+      const allTenants = await db('tenants').select('codigo', 'ativo');
+      console.log('📊 Empresas disponíveis:', allTenants);
       
       return res.status(404).json({ 
         error: 'Código da empresa não encontrado ou empresa inativa',
-        codigo_procurado: codigoUpper
+        codigo_procurado: codigoUpper,
+        debug: allTenants
       });
     }
 
-    // Log de sucesso
-    logger.info('Empresa verificada com sucesso', {
-      tenant_id: tenant.id,
-      tenant_nome: tenant.nome,
-      tenant_codigo: tenant.codigo
-    });
+    console.log(`✅ Empresa encontrada: ${tenant.nome}`);
 
     // Contar usuários ativos
     let usuariosAtivos = 0;

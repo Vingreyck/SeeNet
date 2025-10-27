@@ -279,6 +279,103 @@ router.get('/logs/export', authMiddleware, requireAdmin, async (req, res) => {
   }
 });
 
+// ========== GERENCIAMENTO DE USUÁRIOS (ADMIN) ==========
+router.get('/users', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const users = await db('usuarios')
+      .where('tenant_id', req.user.tenant_id)
+      .select('id', 'nome', 'email', 'tipo_usuario', 'created_at', 'updated_at')
+      .orderBy('nome');
+    
+    res.json(users);
+  } catch (error) {
+    console.error('❌ Erro ao buscar usuários:', error);
+    res.status(500).json({
+      error: 'Erro ao buscar usuários',
+      details: error.message
+    });
+  }
+});
+
+router.post('/users', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { nome, email, senha, tipo_usuario } = req.body;
+    
+    const [id] = await db('usuarios').insert({
+      nome,
+      email,
+      senha,
+      tipo_usuario,
+      tenant_id: req.user.tenant_id,
+      created_at: db.fn.now(),
+      updated_at: db.fn.now()
+    }).returning('id');
+    
+    res.json({
+      success: true,
+      data: { id }
+    });
+  } catch (error) {
+    console.error('❌ Erro ao criar usuário:', error);
+    res.status(500).json({
+      error: 'Erro ao criar usuário',
+      details: error.message
+    });
+  }
+});
+
+router.put('/users/:id', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, email, senha, tipo_usuario } = req.body;
+    
+    const updateData = {
+      nome,
+      email,
+      tipo_usuario,
+      updated_at: db.fn.now()
+    };
+    
+    if (senha) {
+      updateData.senha = senha;
+    }
+    
+    await db('usuarios')
+      .where({ id, tenant_id: req.user.tenant_id })
+      .update(updateData);
+    
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error('❌ Erro ao atualizar usuário:', error);
+    res.status(500).json({
+      error: 'Erro ao atualizar usuário',
+      details: error.message
+    });
+  }
+});
+
+router.delete('/users/:id', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await db('usuarios')
+      .where({ id, tenant_id: req.user.tenant_id })
+      .delete();
+    
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error('❌ Erro ao excluir usuário:', error);
+    res.status(500).json({
+      error: 'Erro ao excluir usuário',
+      details: error.message
+    });
+  }
+});
+
 // ========== LIMPAR LOGS ANTIGOS (ADMIN) ==========
 router.delete('/logs/cleanup', authMiddleware, requireAdmin, async (req, res) => {
   try {

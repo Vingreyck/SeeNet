@@ -40,9 +40,13 @@ class GeminiService {
     const startTime = Date.now();
     
     if (!this.apiKey) {
+      console.error('❌ Chave da API Gemini não configurada');
       throw new Error('Chave da API Gemini não configurada');
     }
-
+    
+    console.log('✅ API Key configurada:', this.apiKey.substring(0, 10) + '...');
+    console.log('🌐 URL da API:', this.apiUrl);
+    
     const systemPrompt = `Você é um técnico especialista em internet/IPTV. Suas respostas devem ser EXTREMAMENTE DIRETAS e PRÁTICAS.
 
 REGRAS OBRIGATÓRIAS:

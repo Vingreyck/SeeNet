@@ -132,6 +132,112 @@ if (process.env.NODE_ENV !== 'production') {
             methods: Object.keys(handler.route.methods).join(', ').toUpperCase()
           });
         }
+        
+        logger.info('✅ Resposta recebida do Gemini');
+      } catch (geminiError) {
+        logger.warn('⚠️ Gemini falhou, usando fallback:', geminiError.message);
+        statusApi = 'erro';
+        modeloIa = 'fallback';
+        
+        // Fallback
+        const problemas = checkmarks.map(c => c.titulo).join(', ');
+        resposta = `🔧 DIAGNÓSTICO TÉCNICO (MODO FALLBACK)
+
+📊 PROBLEMAS IDENTIFICADOS: ${problemas}
+
+🛠️ AÇÕES RECOMENDADAS:
+1. Reinicie todos os equipamentos (modem, roteador, dispositivos)
+2. Verifique todas as conexões físicas e cabos
+3. Teste a conectividade em diferentes dispositivos
+4. Documente os resultados de cada teste
+
+📞 PRÓXIMOS PASSOS:
+- Execute as soluções na ordem apresentada
+- Anote o que funcionou ou não funcionou
+- Se problemas persistirem, entre em contato com suporte técnico
+
+---
+⚠️ Este diagnóstico foi gerado em modo fallback devido à indisponibilidade da IA.`;
+      }
+
+      // Extrair resumo
+      const linhas = resposta.split('\n');
+      let resumo = '';
+      for (let linha of linhas) {
+        if (linha.includes('DIAGNÓSTICO') || linha.includes('ANÁLISE') || linha.includes('PROBLEMA')) {
+          resumo = linha.replace(/[🔍📊🎯*#]/g, '').trim();
+          break;
+        }
+      }
+      if (!resumo) {
+        resumo = resposta.substring(0, 120);
+      }
+      if (resumo.length > 120) {
+        resumo = resumo.substring(0, 120) + '...';
+      }
+
+      // Contar tokens
+      const tokensUtilizados = Math.ceil((prompt + resposta).length / 4);
+
+      logger.info('💾 Salvando diagnóstico no banco...');
+
+      // Salvar no banco
+      const [diagnosticoId] = await db('diagnosticos').insert({
+        tenant_id: req.tenantId,
+        avaliacao_id,
+        categoria_id,
+        prompt_enviado: prompt,
+        resposta_chatgpt: resposta,
+        resumo_diagnostico: resumo,
+        status_api: statusApi,
+        modelo_ia: modeloIa,
+        tokens_utilizados: tokensUtilizados,
+        data_criacao: new Date().toISOString()
+      });
+
+      logger.info(`✅ Diagnóstico ${diagnosticoId} gerado com sucesso!`);
+      logger.info(`   Status: ${statusApi}`);
+      logger.info(`   Modelo: ${modeloIa}`);
+      logger.info(`   Tokens: ${tokensUtilizados}`);
+
+      return res.json({
+        success: true,
+        message: 'Diagnóstico gerado com sucesso',
+        id: diagnosticoId,
+        resumo: resumo,
+        tokens_utilizados: tokensUtilizados
+      });
+
+    } catch (error) {
+      logger.error('\n❌ === ERRO AO GERAR DIAGNÓSTICO ===');
+      logger.error('Tipo:', error.constructor.name);
+      logger.error('Mensagem:', error.message);
+      logger.error('Stack:', error.stack);
+      
+      // Log detalhado para erros do Gemini
+      if (error.response) {
+        logger.error('Resposta da API:');
+        logger.error('Status:', error.response.status);
+        logger.error('Data:', JSON.stringify(error.response.data, null, 2));
+        logger.error('Headers:', JSON.stringify(error.response.headers, null, 2));
+      }
+      
+      // Capturando detalhes do contexto
+      logger.error('Contexto da execução:');
+      logger.error('Usuário:', req.user ? `${req.user.id} - ${req.user.nome}` : 'N/A');
+      logger.error('Tenant:', req.tenantId);
+      logger.error('Body:', JSON.stringify(req.body, null, 2));
+      
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Erro interno do servidor',
+        details: process.env.NODE_ENV === 'production' 
+          ? undefined 
+          : {
+              message: error.message,
+              type: error.constructor.name,
+              code: error.code || 'UNKNOWN_ERROR'
+            }
       });
     }
   });

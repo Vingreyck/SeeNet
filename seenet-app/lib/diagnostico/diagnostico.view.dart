@@ -7,7 +7,6 @@ import 'dart:ui' show ImageFilter;
 import '../controllers/diagnostico_controller.dart';
 import '../controllers/checkmark_controller.dart';
 import '../models/diagnostico.dart';
-import '../models/checkmark.dart';
 
 /// Diagnóstico View com técnicas avançadas de Flutter
 /// Implementa: Micro-interactions, Shimmer effects, Pull-to-refresh,
@@ -41,9 +40,7 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
   // State variables
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
   GlobalKey<RefreshIndicatorState>();
-  bool _isInputFocused = false;
-  bool _showFloatingInput = false;
-
+  
   @override
   void initState() {
     super.initState();
@@ -246,16 +243,6 @@ Entre em contato com a operadora informando os testes realizados.
         )
     );
   }
-// ADICIONAR: Método para limpar diagnósticos manualmente (se necessário)
-  void _limparDiagnosticos() {
-    _diagnosticoController.diagnosticos.clear();
-    _showSnackbar(
-      'Limpeza',
-      'Diagnósticos anteriores foram removidos',
-      SnackbarType.info,
-    );
-  }
-
   /// Pull-to-refresh implementation
   Future<void> _handleRefresh() async {
     await HapticFeedback.mediumImpact();
@@ -715,18 +702,49 @@ Entre em contato com a operadora informando os testes realizados.
   /// Conteúdo do card
   Widget _buildCardContent(Diagnostico diagnostico) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF0A0A0A),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: SelectableText(
-        diagnostico.respostaChatgpt,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 15,
-          height: 1.6,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (diagnostico.respostaChatgpt.isNotEmpty)
+            SelectableText(
+              diagnostico.respostaChatgpt,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                height: 1.6,
+                fontFamily: 'monospace',
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Colors.red.shade300,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Erro ao carregar o diagnóstico',
+                      style: TextStyle(
+                        color: Colors.red.shade300,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -871,22 +889,6 @@ Entre em contato com a operadora informando os testes realizados.
       margin: const EdgeInsets.only(left: 20),
       child: TextField(
         controller: _perguntaController,
-        onChanged: (value) {
-          setState(() {
-            _showFloatingInput = value.isNotEmpty;
-          });
-        },
-        onTap: () async {
-          await HapticFeedback.selectionClick();
-          setState(() {
-            _isInputFocused = true;
-          });
-        },
-        onEditingComplete: () {
-          setState(() {
-            _isInputFocused = false;
-          });
-        },
         style: const TextStyle(
           color: Colors.white,
           fontSize: 16,
@@ -965,10 +967,6 @@ Entre em contato com a operadora informando os testes realizados.
             'Pergunta: "$pergunta" - Chat será implementado em breve',
             SnackbarType.success,
           );
-
-          setState(() {
-            _showFloatingInput = false;
-          });
         }
       },
       child: AnimatedBuilder(
@@ -1009,12 +1007,6 @@ Entre em contato com a operadora informando os testes realizados.
         },
       ),
     );
-  }
-
-  /// Formatar data brasileira
-  String _formatarData(DateTime? data) {
-    if (data == null) return 'Data não disponível';
-    return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year} às ${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -1147,27 +1139,10 @@ abstract class DiagnosticoObserver {
   void onErrorOccurred(String error);
 }
 
-/// Pattern: Command para ações
+/// Pattern: Command para ações (será implementado futuramente)
 abstract class DiagnosticoCommand {
   Future<void> execute();
   Future<void> undo();
-}
-
-class GenerateDiagnosticoCommand implements DiagnosticoCommand {
-  final DiagnosticoController _controller;
-  final List<Checkmark> _checkmarks;
-
-  GenerateDiagnosticoCommand(this._controller, this._checkmarks);
-
-  @override
-  Future<void> execute() async {
-    // Implementar geração de diagnóstico
-  }
-
-  @override
-  Future<void> undo() async {
-    // Implementar desfazer
-  }
 }
 
 /// Pattern: Factory para criação de widgets

@@ -1,8 +1,9 @@
-// seenet-api/src/routes/admin.routes.js - SEM MIDDLEWARE GLOBAL
+// seenet-api/src/routes/admin.routes.js - VERSÃO CORRIGIDA
 const express = require('express');
 const router = express.Router();
 const { db } = require('../config/database');
 const authMiddleware = require('../middleware/auth');
+
 // Middleware para verificar se é admin
 const requireAdmin = (req, res, next) => {
   if (!req.user || req.user.tipo_usuario !== 'administrador') {
@@ -15,7 +16,6 @@ const requireAdmin = (req, res, next) => {
 };
 
 // ========== REGISTRAR LOG DE AUDITORIA ==========
-// Qualquer usuário autenticado pode registrar log
 router.post('/logs', authMiddleware, async (req, res) => {
   try {
     const {
@@ -279,12 +279,12 @@ router.get('/logs/export', authMiddleware, requireAdmin, async (req, res) => {
   }
 });
 
-// ========== GERENCIAMENTO DE USUÁRIOS (ADMIN) ==========
+// ========== GERENCIAMENTO DE USUÁRIOS (ADMIN) ========== ✅ CORRIGIDO
 router.get('/users', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const users = await db('usuarios')
       .where('tenant_id', req.user.tenant_id)
-      .select('id', 'nome', 'email', 'tipo_usuario', 'created_at', 'updated_at')
+      .select('id', 'nome', 'email', 'tipo_usuario', 'data_criacao', 'data_atualizacao') // ✅ CORRIGIDO
       .orderBy('nome');
     
     res.json(users);
@@ -307,8 +307,7 @@ router.post('/users', authMiddleware, requireAdmin, async (req, res) => {
       senha,
       tipo_usuario,
       tenant_id: req.user.tenant_id,
-      created_at: db.fn.now(),
-      updated_at: db.fn.now()
+      // ✅ REMOVIDO: created_at e updated_at (deixar o banco usar defaults)
     }).returning('id');
     
     res.json({
@@ -333,7 +332,7 @@ router.put('/users/:id', authMiddleware, requireAdmin, async (req, res) => {
       nome,
       email,
       tipo_usuario,
-      updated_at: db.fn.now()
+      data_atualizacao: db.fn.now() // ✅ CORRIGIDO
     };
     
     if (senha) {

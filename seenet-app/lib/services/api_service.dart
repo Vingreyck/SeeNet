@@ -70,7 +70,7 @@ class ApiService extends GetxService {
   }
   
   // GET
-  Future<Map<String, dynamic>> get(
+  Future<dynamic> get(
     String endpoint, {
     Map<String, String>? queryParams,
     bool requireAuth = true,
@@ -204,66 +204,84 @@ class ApiService extends GetxService {
     }
   }
   
-  // ✅ TRATAR RESPOSTA COM LOGS DETALHADOS
-  Map<String, dynamic> _handleResponse(http.Response response) {
-    print('\n📡 === PROCESSANDO RESPOSTA ===');
-    print('   Status Code: ${response.statusCode}');
-    print('   Content-Type: ${response.headers['content-type']}');
-    print('   Body length: ${response.body.length} bytes');
-    
-    // ✅ Mostrar os primeiros 500 caracteres do body
-    if (response.body.isNotEmpty) {
-      final preview = response.body.length > 500 
-          ? response.body.substring(0, 500) + '...' 
-          : response.body;
-      print('   Body preview: $preview');
-    }
-    
-    if (response.body.isEmpty) {
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        print('✅ Resposta vazia mas sucesso (${response.statusCode})');
-        return {'success': true};
-      } else {
-        print('❌ Resposta vazia com erro (${response.statusCode})');
-        return {
-          'success': false,
-          'error': 'Resposta vazia com status ${response.statusCode}',
-          'statusCode': response.statusCode
-        };
-      }
-    }
-    
-    try {
-      Map<String, dynamic> data = json.decode(response.body);
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        print('✅ SUCESSO: ${response.statusCode}');
-        return {'success': true, 'data': data};
-      } else {
-        print('❌ ERRO HTTP: ${response.statusCode}');
-        print('   Mensagem: ${data['error'] ?? 'Sem mensagem de erro'}');
-        print('   Detalhes: ${data['details'] ?? 'Sem detalhes'}');
-        
-        return {
-          'success': false,
-          'error': data['error'] ?? 'Erro no servidor',
-          'details': data['details'],
-          'statusCode': response.statusCode
-        };
-      }
-    } catch (e) {
-      print('❌ ERRO ao decodificar JSON: $e');
-      print('📄 Body raw: ${response.body}');
-      
+// ✅ TRATAR RESPOSTA COM LOGS DETALHADOS - VERSÃO CORRIGIDA
+dynamic _handleResponse(http.Response response) {
+  print('\n📡 === PROCESSANDO RESPOSTA ===');
+  print('   Status Code: ${response.statusCode}');
+  print('   Content-Type: ${response.headers['content-type']}');
+  print('   Body length: ${response.body.length} bytes');
+  
+  if (response.body.isNotEmpty) {
+    final preview = response.body.length > 500 
+        ? response.body.substring(0, 500) + '...' 
+        : response.body;
+    print('   Body preview: $preview');
+  }
+  
+  if (response.body.isEmpty) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      print('✅ Resposta vazia mas sucesso (${response.statusCode})');
+      return {'success': true};
+    } else {
+      print('❌ Resposta vazia com erro (${response.statusCode})');
       return {
         'success': false,
-        'error': 'Erro ao processar resposta do servidor',
-        'statusCode': response.statusCode,
-        'rawBody': response.body,
-        'parseError': e.toString()
+        'error': 'Resposta vazia com status ${response.statusCode}',
+        'statusCode': response.statusCode
       };
     }
   }
+  
+  try {
+    // ✅ CORREÇÃO: Decodificar como dynamic primeiro
+    dynamic decoded = json.decode(response.body);
+    
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      print('✅ SUCESSO: ${response.statusCode}');
+      
+      // ✅ Se for uma lista, retornar diretamente
+      if (decoded is List) {
+        print('📋 Resposta é uma lista com ${decoded.length} itens');
+        return decoded;
+      }
+      
+      // ✅ Se for um Map, retornar com wrapper
+      if (decoded is Map<String, dynamic>) {
+        return {'success': true, 'data': decoded};
+      }
+      
+      // ✅ Outros tipos, retornar com wrapper
+      return {'success': true, 'data': decoded};
+    } else {
+      print('❌ ERRO HTTP: ${response.statusCode}');
+      
+      Map<String, dynamic> errorData = decoded is Map<String, dynamic> 
+          ? decoded 
+          : {'error': decoded.toString()};
+      
+      print('   Mensagem: ${errorData['error'] ?? 'Sem mensagem de erro'}');
+      print('   Detalhes: ${errorData['details'] ?? 'Sem detalhes'}');
+      
+      return {
+        'success': false,
+        'error': errorData['error'] ?? 'Erro no servidor',
+        'details': errorData['details'],
+        'statusCode': response.statusCode
+      };
+    }
+  } catch (e) {
+    print('❌ ERRO ao decodificar JSON: $e');
+    print('📄 Body raw: ${response.body}');
+    
+    return {
+      'success': false,
+      'error': 'Erro ao processar resposta do servidor',
+      'statusCode': response.statusCode,
+      'rawBody': response.body,
+      'parseError': e.toString()
+    };
+  }
+}
   
   // ✅ TRATAR ERRO COM LOGS DETALHADOS
   Map<String, dynamic> _handleError(dynamic error) {

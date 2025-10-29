@@ -23,42 +23,61 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     carregarUsuarios();
   }
 
-  Future<void> carregarUsuarios() async {
-    try {
-      setState(() => isLoading = true);
+Future<void> carregarUsuarios() async {
+  try {
+    setState(() => isLoading = true);
 
-      // ✅ Buscar usuários da API
-      final response = await _api.get('admin/users');
-      
-      if (response['success']) {
-        List<dynamic> usuariosData = response['data']['usuarios'];
-        
-        usuarios = usuariosData.map((userData) => Usuario(
-          id: userData['id'],
-          nome: userData['nome'],
-          email: userData['email'],
-          senha: '', // Não vem da API
-          tipoUsuario: userData['tipo_usuario'],
-          ativo: userData['ativo'] == 1 || userData['ativo'] == true,
-          dataCriacao: DateTime.tryParse(userData['data_criacao'] ?? '') ?? DateTime.now(),
-        )).toList();
-        
-        print('📊 ${usuarios.length} usuários carregados da API');
+    final response = await _api.get('admin/users');
+    
+    List<dynamic> usuariosData;
+    
+    // ✅ CORREÇÃO: Tratar todos os casos
+    if (response is List) {
+      usuariosData = response;
+    } else if (response is Map) {
+      if (response.containsKey('data')) {
+        var data = response['data'];
+        usuariosData = data is List ? data : [data];
       } else {
-        throw Exception(response['error'] ?? 'Erro desconhecido');
+        throw Exception('Resposta não contém dados');
       }
-    } catch (e) {
-      print('❌ Erro ao carregar usuários: $e');
-      Get.snackbar(
-        'Erro',
-        'Erro ao conectar com servidor',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      setState(() => isLoading = false);
+    } else {
+      throw Exception('Formato inválido: ${response.runtimeType}');
     }
+    
+    // ✅ ADICIONAR try-catch no map
+    usuarios = [];
+    for (var userData in usuariosData) {
+      try {
+        usuarios.add(Usuario(
+          id: userData['id'] as int?,
+          nome: userData['nome'] as String? ?? '',
+          email: userData['email'] as String? ?? '',
+          senha: '',
+          tipoUsuario: userData['tipo_usuario'] as String? ?? 'tecnico',
+          ativo: userData['ativo'] == 1 || userData['ativo'] == true,
+          dataCriacao: DateTime.tryParse(userData['data_criacao'] as String? ?? ''),
+        ));
+      } catch (e) {
+        print('⚠️ Erro ao processar usuário: $e');
+        print('   Dados: $userData');
+      }
+    }
+    
+    print('📊 ${usuarios.length} usuários carregados da API');
+    
+  } catch (e) {
+    print('❌ Erro ao carregar usuários: $e');
+    Get.snackbar(
+      'Erro',
+      'Erro ao conectar com servidor',
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
+  } finally {
+    setState(() => isLoading = false);
   }
+}
 
   @override
   Widget build(BuildContext context) {

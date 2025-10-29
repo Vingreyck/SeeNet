@@ -16,46 +16,48 @@ class UsuarioController extends GetxController {
     super.onInit();
     print('📱 UsuarioController inicializado (modo API)');
   }
-  // ========== LOGIN VIA API ==========
-  Future<bool> login(String email, String senha, String codigoEmpresa) async {
-    try {
-      isLoading.value = true;
-      
-      // Validações básicas
-      if (email.trim().isEmpty || senha.isEmpty || codigoEmpresa.trim().isEmpty) {
-        Get.snackbar(
-          'Erro',
-          'Preencha todos os campos',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return false;
-      }
-      
-      // Login via AuthService (que usa API)
-      bool sucesso = await _authService.login(email, senha, codigoEmpresa);
-      
-      if (sucesso) {
-        // AuthService já atualizou usuarioLogado
-        print('✅ Login bem-sucedido via API');
-        return true;
-      }
-      
-      
-      return false;
-    } catch (e) {
-      print('❌ Erro no login: $e');
+// ========== LOGIN VIA API ==========
+Future<bool> login(String email, String senha, String codigoEmpresa) async {
+  try {
+    isLoading.value = true;
+    
+    // Validações básicas
+    if (email.trim().isEmpty || senha.isEmpty || codigoEmpresa.trim().isEmpty) {
       Get.snackbar(
         'Erro',
-        'Erro ao fazer login',
+        'Preencha todos os campos',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
       return false;
-    } finally {
-      isLoading.value = false;
     }
+    
+    // 🔥 CORREÇÃO: Chamar clearSession() ao invés de logout()
+    _authService.clearSession();
+    
+    // Login via AuthService (que usa API)
+    bool sucesso = await _authService.login(email, senha, codigoEmpresa);
+    
+    if (sucesso) {
+      // AuthService já atualizou usuarioLogado
+      print('✅ Login bem-sucedido via API');
+      return true;
+    }
+    
+    return false;
+  } catch (e) {
+    print('❌ Erro no login: $e');
+    Get.snackbar(
+      'Erro',
+      'Erro ao fazer login',
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
+    return false;
+  } finally {
+    isLoading.value = false;
   }
+}
 
   // ========== REGISTRO VIA API ==========
   Future<bool> registrar(String nome, String email, String senha, String codigoEmpresa) async {
@@ -94,13 +96,6 @@ class UsuarioController extends GetxController {
     } finally {
       isLoading.value = false;
     }
-  }
-
-  // ========== LOGOUT ==========
-  Future<void> logout() async {
-    await _authService.logout();
-    usuarioLogado.value = null;
-    print('👋 Logout realizado');
   }
 
   // ========== ATUALIZAR PERFIL ==========

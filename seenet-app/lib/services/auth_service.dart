@@ -11,76 +11,78 @@ class AuthService extends GetxService {
   UsuarioController get _usuarioController => Get.find<UsuarioController>();
   
 
-  // Login com código da empresa
-  Future<bool> login(String email, String senha, String codigoEmpresa) async {
-    try {
-      _usuarioController.isLoading.value = true;
+Future<bool> login(String email, String senha, String codigoEmpresa) async {
+  try {
+    _usuarioController.isLoading.value = true;
 
-      final response = await _api.post('/auth/login', {
-        'email': email,
-        'senha': senha,
-        'codigoEmpresa': codigoEmpresa.toUpperCase(),
-      }, requireAuth: false);
+    clearSession();
+    
+    print('🔐 Iniciando novo login para: $email');
 
-      if (response['success']) {
-        final data = response['data'];
-        final token = data['token'];
-        final userData = data['user'];
+    final response = await _api.post('/auth/login', {
+      'email': email,
+      'senha': senha,
+      'codigoEmpresa': codigoEmpresa.toUpperCase(),
+    }, requireAuth: false);
 
-        // Configurar autenticação no ApiService
-        _api.setAuth(token, userData['tenant']['codigo']);
+    // 🔥 CORREÇÃO: Acessar data primeiro
+    if (response['success'] == true && response['data'] != null) {
+      final data = response['data'];
+      final token = data['token'];
+      final userData = data['user'];
 
-        print('🔐 Token configurado no ApiService');
-        print('📌 Tenant Code: ${userData['tenant']['codigo']}');
-        print('🎫 Token: ${token.substring(0, 20)}...');
+      _api.setAuth(token, userData['tenant']['codigo']);
 
-        // Criar objeto Usuario compatível com seu sistema
-        Usuario usuario = Usuario(
-          id: userData['id'],
-          nome: userData['nome'],
-          email: userData['email'],
-          senha: '', // Não retornamos a senha do servidor
-          tipoUsuario: userData['tipo_usuario'],
-          ativo: true,
-          dataCriacao: DateTime.now(),
-        );
+      print('🔐 Token configurado no ApiService');
+      print('📌 Tenant Code: ${userData['tenant']['codigo']}');
+      print('🎫 Token: ${token.substring(0, 20)}...');
 
-        // Atualizar controller do usuário
-        _usuarioController.usuarioLogado.value = usuario;
+      Usuario usuario = Usuario(
+        id: userData['id'],
+        nome: userData['nome'],
+        email: userData['email'],
+        senha: '',
+        tipoUsuario: userData['tipo_usuario'],
+        ativo: true,
+        dataCriacao: DateTime.now(),
+      );
 
-        print('✅ Login bem-sucedido: ${userData['nome']} - Empresa: ${userData['tenant']['nome']}');
+      _usuarioController.usuarioLogado.value = usuario;
 
-        Get.snackbar(
-          'Sucesso',
-          'Bem-vindo, ${userData['nome']}!',
-          backgroundColor: Get.theme.colorScheme.primary,
-          colorText: Get.theme.colorScheme.onPrimary,
-        );
+      print('✅ Login bem-sucedido: ${userData['nome']} - Empresa: ${userData['tenant']['nome']}');
 
-        return true;
-      } else {
-        print('❌ Login falhou: ${response['error']}');
-        Get.snackbar(
-          'Erro',
-          response['error'] ?? 'Falha no login',
-          backgroundColor: Get.theme.colorScheme.error,
-          colorText: Get.theme.colorScheme.onError,
-        );
-        return false;
-      }
-    } catch (e) {
-      print('❌ Erro no login: $e');
+      Get.snackbar(
+        'Sucesso',
+        'Bem-vindo, ${userData['nome']}!',
+        backgroundColor: Get.theme.colorScheme.primary,
+        colorText: Get.theme.colorScheme.onPrimary,
+      );
+
+      return true;
+    } else {
+      print('❌ Login falhou: Resposta inválida');
+      print('📦 Response: $response');
       Get.snackbar(
         'Erro',
-        'Erro de conexão com o servidor',
+        response['error'] ?? 'Resposta inválida do servidor',
         backgroundColor: Get.theme.colorScheme.error,
         colorText: Get.theme.colorScheme.onError,
       );
       return false;
-    } finally {
-      _usuarioController.isLoading.value = false;
     }
+  } catch (e) {
+    print('❌ Erro no login: $e');
+    Get.snackbar(
+      'Erro',
+      'Erro de conexão com o servidor',
+      backgroundColor: Get.theme.colorScheme.error,
+      colorText: Get.theme.colorScheme.onError,
+    );
+    return false;
+  } finally {
+    _usuarioController.isLoading.value = false;
   }
+}
 
   // Registro com token da empresa
   Future<bool> register(String nome, String email, String senha, String codigoEmpresa) async {
@@ -167,20 +169,31 @@ class AuthService extends GetxService {
     }
   }
 
-  // Logout
-  Future<void> logout() async {
-    try {
-      await _api.post('/auth/logout', {});
-    } catch (e) {
-      print('⚠️ Erro no logout do servidor: $e');
-    } finally {
-      _api.clearAuth();
-      _usuarioController.usuarioLogado.value = null;
-
-      print('👋 Logout realizado');
-      Get.offAllNamed('/login');
-    }
+// Logout completo (com navegação para tela de login)
+Future<void> logout() async {
+  try {
+    await _api.post('/auth/logout', {});
+  } catch (e) {
+    print('⚠️ Erro no logout do servidor: $e');
+  } finally {
+    _clearSession(); // 🔥 Chama o método interno de limpeza
+    
+    print('👋 Logout realizado');
+    Get.offAllNamed('/login');
   }
+}
+
+// Método PÚBLICO para limpar sessão (sem navegação) - usado antes de novo login
+void clearSession() {
+  _api.clearAuth();
+  _usuarioController.usuarioLogado.value = null;
+  print('🧹 Sessão limpa');
+}
+
+// Método PRIVADO mantém a mesma lógica
+void _clearSession() {
+  clearSession(); // Reutiliza o código
+}
 
   // Verificar token
   Future<bool> verifyToken() async {

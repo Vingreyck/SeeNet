@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:seenet/checklist/widgets/checklist_categoria_card.widget.dart';
 import 'package:get/get.dart';
 import '../controllers/usuario_controller.dart';
+import 'package:seenet/services/auth_service.dart';
 import '../controllers/checkmark_controller.dart';
 
 class Checklistview extends StatefulWidget {
@@ -15,6 +16,7 @@ class Checklistview extends StatefulWidget {
 class _ChecklistviewState extends State<Checklistview> {
   final UsuarioController usuarioController = Get.find<UsuarioController>();
   final CheckmarkController checkmarkController = Get.find<CheckmarkController>();
+  final AuthService authService = Get.find<AuthService>();
 
   @override
   void initState() {
@@ -335,7 +337,7 @@ class _ChecklistviewState extends State<Checklistview> {
                 subtitle: 'Fazer logout do sistema',
                 onTap: () {
                   Navigator.pop(context);
-                  usuarioController.logout();
+                  authService.logout();
                 },
                 color: Colors.red,
               ),

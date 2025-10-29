@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../controllers/usuario_controller.dart';
 import '../config/environment.dart';
 import '../services/auth_service.dart';
-import '../services/test_auth_flow.dart';
 import '../services/api_service.dart';
 
 class LoginController extends GetxController {
@@ -130,12 +129,7 @@ class LoginController extends GetxController {
 
       if (loginSucesso) {
         _showSuccess('Login realizado com sucesso!');
-        
-        // Debug do fluxo
-        if (Environment.enableDebugLogs) {
-          await AuthFlowDebugger.testarFluxoCompleto();
-        }
-        
+
         print('✅ Usuário logado: ${usuarioController.nomeUsuario}');
         
         // Navegar para checklist

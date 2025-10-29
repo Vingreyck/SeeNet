@@ -374,8 +374,8 @@ router.get('/verify', async (req, res) => {
     const user = await db('usuarios')
       .join('tenants', 'usuarios.tenant_id', 'tenants.id')
       .where('usuarios.id', decoded.userId)
-      .where('usuarios.ativo', true)
-      .where('tenants.ativo', true)
+      .whereRaw('usuarios.ativo', true)
+      .whereRaw('tenants.ativo', true)
       .select(
         'usuarios.id',
         'usuarios.nome',

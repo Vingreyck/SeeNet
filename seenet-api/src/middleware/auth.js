@@ -47,8 +47,8 @@ const authMiddleware = async (req, res, next) => {
       .join('tenants', 'usuarios.tenant_id', 'tenants.id')
       .where('usuarios.id', decoded.userId)
       .where('tenants.codigo', tenantCode)
-      .where('usuarios.ativo', true)
-      .where('tenants.ativo', true)
+      .whereRaw('usuarios.ativo', true)
+      .whereRaw('tenants.ativo', true)
       .select(
         'usuarios.*',
         'tenants.id as tenant_id',

@@ -231,8 +231,8 @@ router.post('/login', loginLimiter, [
       .join('tenants', 'usuarios.tenant_id', 'tenants.id')
       .where('usuarios.email', email.toLowerCase())
       .where('tenants.codigo', codigoEmpresa.toUpperCase())
-      .where('usuarios.ativo', true)
-      .where('tenants.ativo', true)
+      .whereRaw('usuarios.ativo', true)
+      .whereRaw('tenants.ativo', true)
       .select(
         'usuarios.*',
         'tenants.id as tenant_id',

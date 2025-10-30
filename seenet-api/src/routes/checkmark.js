@@ -27,42 +27,47 @@ router.get('/categorias', async (req, res) => {
 });
 
 // ========== LISTAR CHECKMARKS POR CATEGORIA ==========
-router.get('/categoria/:categoriaId', verifyToken, async (req, res) => {
+router.get('/categoria/:categoriaId', [
+  query('incluir_inativos').optional().isBoolean()
+], async (req, res) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Parâmetros inválidos', details: errors.array() });
+    }
+
     const { categoriaId } = req.params;
-    const tenantId = req.tenantId;
+    const incluirInativos = req.query.incluir_inativos === 'true';
 
-    const checkmarks = await knex('checkmarks')
-      .where({
-        categoria_id: categoriaId,
-        tenant_id: tenantId,
-        ativo: true
-      })
-      .orderBy('ordem', 'asc');
-
-    // ✅ ADICIONAR categoria_id explicitamente
-    const checkmarksComCategoria = checkmarks.map(c => ({
-      ...c,
-      categoria_id: parseInt(categoriaId)
-    }));
-
-    const categoria = await knex('categorias_checkmark')
+    // Verificar se categoria pertence ao tenant
+    const categoria = await db('categorias_checkmark')
       .where('id', categoriaId)
+      .where('tenant_id', req.tenantId)
       .first();
 
-    res.json({
-      success: true,
-      data: {
-        categoria: categoria?.nome || 'Sem categoria',
-        checkmarks: checkmarksComCategoria
-      }
+    if (!categoria) {
+      return res.status(404).json({ error: 'Categoria não encontrada' });
+    }
+
+    let query = db('checkmarks')
+      .where('tenant_id', req.tenantId)
+      .where('categoria_id', categoriaId);
+
+    if (!incluirInativos) {
+      query = query.where('ativo', true);
+    }
+
+    const checkmarks = await query
+      .orderBy('ordem')
+      .select('id', 'titulo', 'descricao', 'prompt_chatgpt', 'ativo', 'ordem');
+
+    res.json({ 
+      categoria: categoria.nome,
+      checkmarks 
     });
   } catch (error) {
-    console.error('Erro ao buscar checkmarks:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    logger.error('Erro ao listar checkmarks:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 

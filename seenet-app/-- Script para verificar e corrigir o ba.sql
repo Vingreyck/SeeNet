@@ -41,7 +41,7 @@ INSERT IGNORE INTO categorias_checkmark (nome, descricao, ordem) VALUES
 -- Limpar checkmarks existentes (se houver)
 
 -- Inserir checkmarks para LENTIDÃO (categoria_id = 1)
-INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) VALUES 
+INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_gemini, ordem) VALUES 
 (1, 'Velocidade abaixo do contratado', 'Cliente relata velocidade de internet abaixo do contratado', 'Analise um problema de lentidão onde o cliente relata velocidade abaixo do contratado. Forneça um diagnóstico técnico e soluções práticas.', 1),
 (1, 'Lentidão alta ping > 100ms', 'Ping alto acima de 100ms causando travamentos', 'Cliente apresenta ping alto acima de 100ms. Analise as possíveis causas e forneça soluções para reduzir a latência.', 2),
 (1, 'Perda de pacotes', 'Perda de pacotes na conexão', 'Diagnóstico para problema de perda de pacotes na conexão de internet. Identifique causas e soluções.', 3),
@@ -52,7 +52,7 @@ INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) 
 (1, 'Interferência eletromagnética', 'Interferência afetando o sinal', 'Interferência de outros equipamentos afetando a qualidade da conexão.', 8);
 
 -- Inserir checkmarks para IPTV (categoria_id = 2)  
-INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) VALUES 
+INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_gemini, ordem) VALUES 
 (2, 'Canais travando/congelando', 'Canais de TV travando ou congelando', 'Problemas de travamento nos canais de IPTV. Analise e forneça soluções técnicas.', 1),
 (2, 'Buffering constante', 'Buffering constante nos canais', 'IPTV apresenta buffering constante. Diagnóstico e soluções para melhorar a qualidade.', 2),
 (2, 'Canal fora do ar', 'Canais específicos fora do ar', 'Canais de IPTV fora do ar. Analise possíveis causas e soluções.', 3),
@@ -63,7 +63,7 @@ INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) 
 (2, 'Demora para carregar', 'Lentidão para iniciar canais', 'Canais demoram muito para carregar ou inicializar.', 8);
 
 -- Inserir checkmarks para APLICATIVOS (categoria_id = 3)
-INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) VALUES 
+INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_gemini, ordem) VALUES 
 (3, 'Aplicativo não abre', 'Apps não conseguem abrir', 'Aplicativos não abrem. Diagnóstico e soluções.', 1),
 (3, 'Erro de conexão', 'Apps apresentam erro de conexão', 'Aplicativos com erro de conexão. Analise e solucione.', 2),
 (3, 'Buffering constante', 'Apps com buffering constante', 'Aplicativos apresentam buffering constante. Diagnóstico e soluções.', 3),
@@ -74,7 +74,7 @@ INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) 
 (3, 'Conteúdo não carrega', 'Conteúdo dos apps não carrega', 'Aplicativos abrem mas o conteúdo não carrega.', 8);
 
 -- Inserir checkmarks para ACESSO REMOTO (categoria_id = 4)
-INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) VALUES 
+INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_gemini, ordem) VALUES 
 (4, 'TP-link WR940N', 'Configuração de acesso remoto TP-link WR940N', 'Configure acesso remoto para roteador TP-link WR940N. Forneça passo a passo técnico.', 1),
 (4, 'MULTILASER 1200AC', 'Configuração MULTILASER 1200AC', 'Configure acesso remoto para roteador MULTILASER 1200AC. Guia técnico completo.', 2),
 (4, 'Intelbras Action RF1200', 'Configuração Intelbras RF1200', 'Setup de acesso remoto para Intelbras Action RF1200. Procedimentos técnicos.', 3),

@@ -56,7 +56,7 @@ CREATE TABLE checkmarks (
     categoria_id INTEGER NOT NULL,
     titulo VARCHAR(200) NOT NULL,
     descricao TEXT,
-    prompt_chatgpt TEXT NOT NULL,
+    prompt_gemini TEXT NOT NULL,
     ativo BOOLEAN DEFAULT TRUE,
     ordem INTEGER DEFAULT 0,
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -115,7 +115,7 @@ CREATE TABLE diagnosticos (
     avaliacao_id INTEGER NOT NULL,
     categoria_id INTEGER NOT NULL,
     prompt_enviado TEXT NOT NULL,
-    resposta_chatgpt TEXT NOT NULL,
+    resposta_gemini TEXT NOT NULL,
     resumo_diagnostico TEXT,
     status_api VARCHAR(20) DEFAULT 'pendente' CHECK (status_api IN ('pendente', 'sucesso', 'erro')),
     erro_api TEXT,
@@ -217,7 +217,7 @@ INSERT INTO categorias_checkmark (nome, descricao, ordem) VALUES
 ('Acesso Remoto', 'Ativação de acessos remotos dos roteadores', 4);
 
 -- Checkmarks para categoria Lentidão (id=1)
-INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) VALUES
+INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_gemini, ordem) VALUES
 (1, 'Velocidade abaixo do contratado', 'Cliente relata velocidade de internet abaixo do contratado', 'Analise problema de velocidade abaixo do contratado. Forneça diagnóstico e soluções.', 1),
 (1, 'Latência alta (ping > 100ms)', 'Ping alto causando travamentos', 'Cliente com ping alto acima de 100ms. Analise causas e soluções.', 2),
 (1, 'Perda de pacotes', 'Perda de pacotes na conexão', 'Problema de perda de pacotes. Identifique causas e soluções.', 3),
@@ -225,7 +225,7 @@ INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) 
 (1, 'Problemas no cabo', 'Problemas físicos no cabeamento', 'Problemas de cabeamento. Orientações para resolução.', 5);
 
 -- Checkmarks para categoria IPTV (id=2)
-INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) VALUES
+INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_gemini, ordem) VALUES
 (2, 'Canais travando/congelando', 'Canais de TV travando', 'Travamento nos canais IPTV. Soluções técnicas.', 1),
 (2, 'Buffering constante', 'Buffering constante nos canais', 'IPTV com buffering constante. Diagnóstico e melhorias.', 2),
 (2, 'Canal fora do ar', 'Canais específicos fora do ar', 'Canais IPTV fora do ar. Causas e soluções.', 3),
@@ -233,7 +233,7 @@ INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) 
 (2, 'IPTV não abre', 'Aplicativo IPTV não abre', 'IPTV não inicializa. Diagnóstico e soluções.', 5);
 
 -- Checkmarks para categoria Aplicativos (id=3)
-INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_chatgpt, ordem) VALUES
+INSERT INTO checkmarks (categoria_id, titulo, descricao, prompt_gemini, ordem) VALUES
 (3, 'Aplicativo não abre', 'Apps não conseguem abrir', 'Aplicativos não abrem. Diagnóstico e soluções.', 1),
 (3, 'Erro de conexão', 'Apps com erro de conexão', 'Aplicativos com erro de conexão. Analise e solucione.', 2),
 (3, 'Buffering constante', 'Apps com buffering constante', 'Aplicativos com buffering. Diagnóstico e soluções.', 3),

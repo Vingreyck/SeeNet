@@ -59,7 +59,7 @@ router.get('/categoria/:categoriaId', [
 
     const checkmarks = await query
       .orderBy('ordem')
-      .select('id', 'titulo', 'descricao', 'prompt_chatgpt', 'ativo', 'ordem');
+      .select('id', 'titulo', 'descricao', 'prompt_gemini', 'ativo', 'ordem');
 
     res.json({ 
       categoria: categoria.nome,
@@ -132,7 +132,7 @@ router.post('/checkmarks', adminMiddleware, [
   body('categoria_id').isInt({ min: 1 }),
   body('titulo').trim().isLength({ min: 2, max: 255 }),
   body('descricao').optional().trim().isLength({ max: 1000 }),
-  body('prompt_chatgpt').trim().isLength({ min: 10, max: 5000 }),
+  body('prompt_gemini').trim().isLength({ min: 10, max: 5000 }),
   body('ordem').optional().isInt({ min: 0 })
 ], async (req, res) => {
   console.log('🔵 === INICIANDO CRIAÇÃO DE CHECKMARK ===');
@@ -149,12 +149,12 @@ router.post('/checkmarks', adminMiddleware, [
 
     // 2. Extrair dados
     console.log('🔍 Etapa 2: Extraindo dados do body...');
-    const { categoria_id, titulo, descricao, prompt_chatgpt, ordem = 0 } = req.body;
+    const { categoria_id, titulo, descricao, prompt_gemini, ordem = 0 } = req.body;
     console.log('📦 Dados extraídos:', {
       categoria_id,
       titulo,
       descricao,
-      prompt_chatgpt_length: prompt_chatgpt?.length,
+      prompt_gemini_length: prompt_gemini?.length,
       ordem,
       tenant_id: req.tenantId,
       user_id: req.user?.id
@@ -180,7 +180,7 @@ router.post('/checkmarks', adminMiddleware, [
       categoria_id,
       titulo,
       descricao,
-      prompt_chatgpt,
+      prompt_gemini,
       ordem,
       ativo: true,
       data_criacao: new Date().toISOString()
@@ -209,7 +209,7 @@ router.post('/checkmarks', adminMiddleware, [
         tenant_id: req.tenantId,
         tabela_afetada: 'checkmarks',
         registro_id: checkmarkId,
-        dados_novos: { titulo, categoria_id, prompt_chatgpt },
+        dados_novos: { titulo, categoria_id, prompt_gemini },
         ip_address: req.ip
       });
       console.log('✅ Auditoria registrada');
@@ -247,7 +247,7 @@ router.post('/checkmarks', adminMiddleware, [
 router.put('/checkmarks/:id', adminMiddleware, [
   body('titulo').optional().trim().isLength({ min: 2, max: 255 }),
   body('descricao').optional().trim().isLength({ max: 1000 }),
-  body('prompt_chatgpt').optional().trim().isLength({ min: 10, max: 5000 }),
+  body('prompt_gemini').optional().trim().isLength({ min: 10, max: 5000 }),
   body('ativo').optional().isBoolean(),
   body('ordem').optional().isInt({ min: 0 })
 ], async (req, res) => {
@@ -261,7 +261,7 @@ router.put('/checkmarks/:id', adminMiddleware, [
     }
 
     const { id } = req.params;
-    const { titulo, descricao, prompt_chatgpt, ativo, ordem } = req.body;
+    const { titulo, descricao, prompt_gemini, ativo, ordem } = req.body;
 
     console.log('📥 Dados recebidos:');
     console.log('   ID:', id);
@@ -285,7 +285,7 @@ router.put('/checkmarks/:id', adminMiddleware, [
     const updateData = {};
     if (titulo !== undefined) updateData.titulo = titulo;
     if (descricao !== undefined) updateData.descricao = descricao;
-    if (prompt_chatgpt !== undefined) updateData.prompt_chatgpt = prompt_chatgpt;
+    if (prompt_gemini !== undefined) updateData.prompt_gemini = prompt_gemini;
     
     // ✅ CRÍTICO: Garantir que boolean seja tratado corretamente
     if (ativo !== undefined) {

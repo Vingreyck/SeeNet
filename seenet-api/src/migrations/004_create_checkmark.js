@@ -5,7 +5,7 @@ exports.up = function(knex) {
     table.integer('categoria_id').unsigned().notNullable();
     table.string('titulo', 255).notNullable();
     table.text('descricao');
-    table.text('prompt_chatgpt').notNullable();
+    table.text('prompt_gemini').notNullable();
     table.boolean('ativo').defaultTo(true);
     table.integer('ordem').defaultTo(0);
     table.boolean('global').defaultTo(false); // Checkmarks globais vs específicos do tenant

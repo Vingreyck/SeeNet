@@ -44,7 +44,7 @@ router.post('/gerar', [
     const checkmarks = await db('checkmarks')
       .whereIn('id', checkmarks_marcados)
       .where('tenant_id', req.tenantId)
-      .select('id', 'titulo', 'descricao', 'prompt_chatgpt');
+      .select('id', 'titulo', 'descricao', 'prompt_gemini');
 
     if (checkmarks.length !== checkmarks_marcados.length) {
       return res.status(400).json({ error: 'Alguns checkmarks não foram encontrados' });
@@ -67,7 +67,7 @@ router.post('/gerar', [
         avaliacao_id,
         categoria_id,
         prompt_enviado: prompt,
-        resposta_chatgpt: resposta,
+        resposta_gemini: resposta,
         resumo_diagnostico: extrairResumo(resposta),
         status_api: 'sucesso',
         modelo_ia: 'gemini-2.0-flash',
@@ -102,7 +102,7 @@ router.post('/gerar', [
         avaliacao_id,
         categoria_id,
         prompt_enviado: prompt,
-        resposta_chatgpt: gerarDiagnosticoFallback(checkmarks),
+        resposta_gemini: gerarDiagnosticoFallback(checkmarks),
         resumo_diagnostico: 'Diagnóstico gerado em modo fallback',
         status_api: 'erro',
         erro_api: apiError.message,
@@ -191,7 +191,7 @@ function montarPromptDiagnostico(checkmarks) {
     if (checkmark.descricao) {
       prompt += `• Descrição: ${checkmark.descricao}\n`;
     }
-    prompt += `• Contexto técnico: ${checkmark.prompt_chatgpt}\n\n`;
+    prompt += `• Contexto técnico: ${checkmark.prompt_gemini}\n\n`;
   });
   
   prompt += "TAREFA:\n";

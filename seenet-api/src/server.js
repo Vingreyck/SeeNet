@@ -181,7 +181,7 @@ async function startServer() {
           const checkmarks = await db('checkmarks')
             .whereIn('id', checkmarks_marcados)
             .where('tenant_id', req.tenantId)
-            .select('id', 'titulo', 'descricao', 'prompt_chatgpt');
+            .select('id', 'titulo', 'descricao', 'prompt_gemini');
 
           if (checkmarks.length === 0) {
             logger.warn('Checkmarks não encontrados', {
@@ -205,7 +205,7 @@ async function startServer() {
             if (c.descricao) {
               prompt += `• Descrição: ${c.descricao}\n`;
             }
-            prompt += `• Contexto técnico: ${c.prompt_chatgpt}\n\n`;
+            prompt += `• Contexto técnico: ${c.prompt_gemini}\n\n`;
           });
           prompt += "TAREFA:\n";
           prompt += "Analise os problemas listados e forneça um diagnóstico técnico completo. ";
@@ -283,13 +283,13 @@ async function startServer() {
             avaliacao_id,
             categoria_id,
             prompt_enviado: prompt,
-            resposta_chatgpt: resposta,
+            resposta_gemini: resposta,
             resumo_diagnostico: resumo,
             status_api: statusApi,
             modelo_ia: modeloIa,
             tokens_utilizados: tokensUtilizados,
             data_criacao: new Date().toISOString()
-          }).returning(['id', 'resposta_chatgpt', 'resumo_diagnostico', 'tokens_utilizados']);
+          }).returning(['id', 'resposta_gemini', 'resumo_diagnostico', 'tokens_utilizados']);
           
           const diagnostico = result[0];
 
@@ -301,7 +301,7 @@ async function startServer() {
           // Log dos dados antes de enviar
           console.log('📤 Enviando resposta:', {
             id: diagnostico.id,
-            resposta: diagnostico.resposta_chatgpt ? diagnostico.resposta_chatgpt.substring(0, 50) + '...' : 'N/A',
+            resposta: diagnostico.resposta_gemini ? diagnostico.resposta_gemini.substring(0, 50) + '...' : 'N/A',
             resumo: diagnostico.resumo_diagnostico,
             tokens: diagnostico.tokens_utilizados
           });
@@ -311,7 +311,7 @@ async function startServer() {
             message: 'Diagnóstico gerado com sucesso',
             data: {
               id: diagnostico.id,
-              resposta: diagnostico.resposta_chatgpt,
+              resposta: diagnostico.resposta_gemini,
               resumo: diagnostico.resumo_diagnostico,
               tokens_utilizados: diagnostico.tokens_utilizados,
               status: statusApi,

@@ -208,7 +208,7 @@ Entre em contato com a operadora informando os testes realizados.
 • Evite sobrecarga simultânea
 
 ---
-📋 Diagnóstico de demonstração - Configure sua chave do ChatGPT para diagnósticos reais""";
+📋 Diagnóstico de demonstração - Configure sua chave do Gemini para diagnósticos reais""";
 
     _diagnosticoController.diagnosticos.add(
       Diagnostico(
@@ -216,8 +216,8 @@ Entre em contato com a operadora informando os testes realizados.
         avaliacaoId: 1,
         categoriaId: 1,
         promptEnviado: "Diagnóstico de demonstração",
-        respostaChatgpt: diagnosticoExemplo,
-        resumoDiagnostico: "Diagnóstico de demonstração - Configure ChatGPT para funcionalidade completa",
+        respostaGemini: diagnosticoExemplo,
+        resumoDiagnostico: "Diagnóstico de demonstração - Configure Gemini para funcionalidade completa",
         statusApi: 'sucesso',
         dataCriacao: DateTime.now(),
       ),
@@ -638,7 +638,7 @@ Entre em contato com a operadora informando os testes realizados.
         borderRadius: BorderRadius.circular(12),
       ),
       child: SelectableText(
-        diagnostico.respostaChatgpt,
+        diagnostico.respostaGemini,
         style: const TextStyle(
           color: Colors.white,
           fontSize: 15,

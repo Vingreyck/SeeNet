@@ -70,7 +70,7 @@ exports.seed = async function(knex) {
         categoria_id: cat.id,
         titulo: item.titulo,
         descricao: item.descricao,
-        prompt_chatgpt: item.prompt,
+        prompt_gemini: item.prompt,
         ativo: true,
         ordem: index + 1,
         global: false,

@@ -5,12 +5,12 @@ exports.up = function(knex) {
     table.integer('avaliacao_id').unsigned().notNullable();
     table.integer('categoria_id').unsigned().notNullable();
     table.text('prompt_enviado').notNullable();
-    table.text('resposta_chatgpt').notNullable();
+    table.text('resposta_gemini').notNullable();
     table.text('resumo_diagnostico');
     table.enum('status_api', ['pendente', 'sucesso', 'erro']).defaultTo('pendente');
     table.text('erro_api');
     table.integer('tokens_utilizados');
-    table.string('modelo_ia', 50); // Gemini, ChatGPT, etc.
+    table.string('modelo_ia', 50); // Gemini, etc.
     table.decimal('custo_api', 10, 6); // Custo da requisição
     table.timestamp('data_criacao').defaultTo(knex.fn.now());
     

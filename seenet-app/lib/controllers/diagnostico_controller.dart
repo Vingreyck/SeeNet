@@ -88,7 +88,7 @@ Future<bool> gerarDiagnostico(
         avaliacaoId: avaliacaoId,
         categoriaId: categoriaId,
         promptEnviado: 'Checkmarks: $checkmarksMarcadosIds',
-        respostaChatgpt: data['resposta'] ?? data['respostaChatgpt'] ?? '',
+        respostaGemini: data['resposta'] ?? data['respostaGemini'] ?? '',
         resumoDiagnostico: data['resumo'] ?? data['resumoDiagnostico'],
         statusApi: data['status'] ?? 'sucesso',
         tokensUtilizados: data['tokens_utilizados'],
@@ -96,7 +96,7 @@ Future<bool> gerarDiagnostico(
       );
 
       // Verificar se resposta não está vazia
-      if (diagnostico.respostaChatgpt.isEmpty) {
+      if (diagnostico.respostaGemini.isEmpty) {
         print('❌ Diagnóstico sem conteúdo');
         statusMensagem.value = 'Erro: diagnóstico vazio';
         return false;
@@ -233,7 +233,7 @@ Future<bool> gerarDiagnostico(
       print('   ID: ${ultimo.id}');
       print('   Status: ${ultimo.statusApi}');
       print('   Tokens: ${ultimo.tokensUtilizados}');
-      print('   Resposta: ${ultimo.respostaChatgpt.substring(0, ultimo.respostaChatgpt.length > 50 ? 50 : ultimo.respostaChatgpt.length)}...');
+      print('   Resposta: ${ultimo.respostaGemini.substring(0, ultimo.respostaGemini.length > 50 ? 50 : ultimo.respostaGemini.length)}...');
     }
     
     print('============================\n');

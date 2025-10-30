@@ -6,7 +6,7 @@ class Diagnostico {
   final int avaliacaoId;
   final int categoriaId;
   final String promptEnviado;
-  final String respostaChatgpt;
+  final String respostaGemini;
   final String? resumoDiagnostico;
   final String statusApi;
   final String? erroApi;
@@ -18,7 +18,7 @@ class Diagnostico {
     required this.avaliacaoId,
     required this.categoriaId,
     required this.promptEnviado,
-    required this.respostaChatgpt,
+    required this.respostaGemini,
     this.resumoDiagnostico,
     this.statusApi = 'pendente',
     this.erroApi,
@@ -32,7 +32,7 @@ class Diagnostico {
       'avaliacao_id': avaliacaoId,
       'categoria_id': categoriaId,
       'prompt_enviado': promptEnviado,
-      'resposta_chatgpt': respostaChatgpt,
+      'resposta_gemini': respostaGemini,
       'resumo_diagnostico': resumoDiagnostico,
       'status_api': statusApi,
       'erro_api': erroApi,
@@ -46,7 +46,7 @@ class Diagnostico {
     ModelValidator.requirePositive(map['avaliacao_id'], 'avaliacao_id');
     ModelValidator.requirePositive(map['categoria_id'], 'categoria_id');
     ModelValidator.requireNotEmpty(map['prompt_enviado'], 'prompt_enviado');
-    ModelValidator.requireNotEmpty(map['resposta_chatgpt'], 'resposta_chatgpt');
+    ModelValidator.requireNotEmpty(map['resposta_gemini'], 'resposta_gemini');
     ModelValidator.requireValidStatus(
       map['status_api'], 
       ['pendente', 'sucesso', 'erro'], 
@@ -58,7 +58,7 @@ class Diagnostico {
       avaliacaoId: map['avaliacao_id'],
       categoriaId: map['categoria_id'],
       promptEnviado: map['prompt_enviado'].toString().trim(),
-      respostaChatgpt: map['resposta_chatgpt'].toString().trim(),
+      respostaGemini: map['resposta_gemini'].toString().trim(),
       resumoDiagnostico: map['resumo_diagnostico']?.toString().trim(),
       statusApi: map['status_api'] ?? 'pendente',
       erroApi: map['erro_api']?.toString(),

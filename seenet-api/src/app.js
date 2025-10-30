@@ -187,7 +187,7 @@ app.post('/api/diagnostics/gerar',
       const checkmarks = await db('checkmarks')
         .whereIn('id', checkmarks_marcados)
         .where('tenant_id', req.tenantId)
-        .select('id', 'titulo', 'descricao', 'prompt_chatgpt');
+        .select('id', 'titulo', 'descricao', 'prompt_gemini');
 
       if (checkmarks.length === 0) {
         logger.warn('❌ Nenhum checkmark encontrado');
@@ -207,7 +207,7 @@ app.post('/api/diagnostics/gerar',
         if (c.descricao) {
           prompt += `• Descrição: ${c.descricao}\n`;
         }
-        prompt += `• Contexto técnico: ${c.prompt_chatgpt}\n\n`;
+        prompt += `• Contexto técnico: ${c.prompt_gemini}\n\n`;
       });
       prompt += "TAREFA:\n";
       prompt += "Analise os problemas listados e forneça um diagnóstico técnico completo. ";
@@ -282,7 +282,7 @@ app.post('/api/diagnostics/gerar',
         avaliacao_id,
         categoria_id,
         prompt_enviado: prompt,
-        resposta_chatgpt: resposta,
+        resposta_gemini: resposta,
         resumo_diagnostico: resumo,
         status_api: statusApi,
         modelo_ia: modeloIa,

@@ -1,13 +1,13 @@
 require('dotenv').config();
 const knex = require('knex');
-const config = require('../knexfile.js');
+const config = require('../../knexfile.js');
 
 async function verify() {
   const env = process.env.NODE_ENV || 'production';
   const db = knex(config[env]);
 
   try {
-    console.log(`\nVerificando banco (${env})...\n`);
+    console.log(`\n🔍 Verificando banco (${env})...\n`);
 
     await db.raw('SELECT 1');
     console.log('✅ Conectado ao Neon\n');

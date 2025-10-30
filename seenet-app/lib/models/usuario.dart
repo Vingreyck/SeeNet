@@ -1,4 +1,6 @@
-// lib/models/usuario.dart
+import '../utils/date_parser.dart';
+import '../utils/model_validator.dart';
+
 class Usuario {
   final int? id;
   final String nome;
@@ -38,6 +40,10 @@ class Usuario {
   // ↓ ESTE MÉTODO ESTAVA FALTANDO NO SEU CÓDIGO ↓
   // Converter do Map (para ler do banco)
   factory Usuario.fromMap(Map<String, dynamic> map) {
+    ModelValidator.requireNotEmpty(map['nome'], 'nome');
+    ModelValidator.requireValidEmail(map['email']);
+    ModelValidator.requireNotEmpty(map['tipo_usuario'], 'tipo_usuario');
+    
     return Usuario(
       id: map['id'],
       nome: map['nome'] ?? '',
@@ -45,12 +51,8 @@ class Usuario {
       senha: map['senha'] ?? '',
       tipoUsuario: map['tipo_usuario'] ?? 'tecnico',
       ativo: map['ativo'] == 1,
-      dataCriacao: map['data_criacao'] != null 
-          ? DateTime.parse(map['data_criacao']) 
-          : null,
-      dataAtualizacao: map['data_atualizacao'] != null 
-          ? DateTime.parse(map['data_atualizacao']) 
-          : null,
+      dataCriacao: DateParser.parseDateTime(map['data_criacao']),
+      dataAtualizacao: DateParser.parseDateTime(map['data_atualizacao']),
     );
   }
 

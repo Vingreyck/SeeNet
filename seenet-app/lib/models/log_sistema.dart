@@ -1,3 +1,5 @@
+import '../utils/date_parser.dart';
+
 class LogSistema {
   final int? id;
   final int? usuarioId;
@@ -49,9 +51,7 @@ class LogSistema {
       dadosNovos: map['dados_novos'],
       ipAddress: map['ip_address'],
       userAgent: map['user_agent'],
-      dataAcao: map['data_acao'] != null 
-          ? DateTime.parse(map['data_acao']) 
-          : null,
+      dataAcao: DateParser.parseDateTime(map['data_acao']),
     );
   }
 }

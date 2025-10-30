@@ -206,24 +206,14 @@ class ApiService extends GetxService {
   
 // ✅ TRATAR RESPOSTA COM LOGS DETALHADOS - VERSÃO CORRIGIDA
 dynamic _handleResponse(http.Response response) {
-  print('\n📡 === PROCESSANDO RESPOSTA ===');
-  print('   Status Code: ${response.statusCode}');
-  print('   Content-Type: ${response.headers['content-type']}');
-  print('   Body length: ${response.body.length} bytes');
-  
-  if (response.body.isNotEmpty) {
-    final preview = response.body.length > 500 
-        ? response.body.substring(0, 500) + '...' 
-        : response.body;
-    print('   Body preview: $preview');
-  }
+  print('\n=== PROCESSANDO RESPOSTA ===');
+  print('Status Code: ${response.statusCode}');
+  print('Body length: ${response.body.length} bytes');
   
   if (response.body.isEmpty) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      print('✅ Resposta vazia mas sucesso (${response.statusCode})');
       return {'success': true};
     } else {
-      print('❌ Resposta vazia com erro (${response.statusCode})');
       return {
         'success': false,
         'error': 'Resposta vazia com status ${response.statusCode}',
@@ -233,34 +223,38 @@ dynamic _handleResponse(http.Response response) {
   }
   
   try {
-    // ✅ CORREÇÃO: Decodificar como dynamic primeiro
     dynamic decoded = json.decode(response.body);
     
+    // Normalizar estrutura de resposta
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      print('✅ SUCESSO: ${response.statusCode}');
+      print('SUCESSO: ${response.statusCode}');
       
-      // ✅ Se for uma lista, retornar diretamente
-      if (decoded is List) {
-        print('📋 Resposta é uma lista com ${decoded.length} itens');
+      // Se já está no formato correto
+      if (decoded is Map && decoded.containsKey('success')) {
+        // Se tem data aninhada desnecessariamente, desaninh
+        if (decoded['data'] is Map && 
+            decoded['data'].containsKey('success') && 
+            decoded['data'].containsKey('data')) {
+          print('Estrutura dupla detectada, corrigindo...');
+          return {
+            'success': true,
+            'data': decoded['data']['data']
+          };
+        }
         return decoded;
       }
       
-      // ✅ Se for um Map, retornar com wrapper
-      if (decoded is Map<String, dynamic>) {
-        return {'success': true, 'data': decoded};
-      }
-      
-      // ✅ Outros tipos, retornar com wrapper
-      return {'success': true, 'data': decoded};
+      // Se é lista ou dados diretos, encapsular
+      return {
+        'success': true,
+        'data': decoded
+      };
     } else {
-      print('❌ ERRO HTTP: ${response.statusCode}');
+      print('ERRO HTTP: ${response.statusCode}');
       
       Map<String, dynamic> errorData = decoded is Map<String, dynamic> 
           ? decoded 
           : {'error': decoded.toString()};
-      
-      print('   Mensagem: ${errorData['error'] ?? 'Sem mensagem de erro'}');
-      print('   Detalhes: ${errorData['details'] ?? 'Sem detalhes'}');
       
       return {
         'success': false,
@@ -270,8 +264,7 @@ dynamic _handleResponse(http.Response response) {
       };
     }
   } catch (e) {
-    print('❌ ERRO ao decodificar JSON: $e');
-    print('📄 Body raw: ${response.body}');
+    print('ERRO ao decodificar JSON: $e');
     
     return {
       'success': false,

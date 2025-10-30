@@ -1,3 +1,5 @@
+import '../utils/date_parser.dart';
+
 class Diagnostico {
   final int? id;
   final int avaliacaoId;
@@ -49,9 +51,7 @@ class Diagnostico {
       statusApi: map['status_api'] ?? 'pendente',
       erroApi: map['erro_api'],
       tokensUtilizados: map['tokens_utilizados'],
-      dataCriacao: map['data_criacao'] != null 
-          ? DateTime.parse(map['data_criacao']) 
-          : null,
+      dataCriacao: DateParser.parseDateTime(map['data_criacao']),
     );
   }
 

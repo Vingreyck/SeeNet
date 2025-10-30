@@ -1,3 +1,5 @@
+import '../utils/date_parser.dart';
+
 class RespostaCheckmark {
   final int? id;
   final int avaliacaoId;
@@ -33,9 +35,7 @@ class RespostaCheckmark {
       checkmarkId: map['checkmark_id'] ?? 0,
       marcado: map['marcado'] == 1,
       observacoes: map['observacoes'],
-      dataResposta: map['data_resposta'] != null 
-          ? DateTime.parse(map['data_resposta']) 
-          : null,
+      dataResposta: DateParser.parseDateTime(map['data_resposta']),
     );
   }
 }

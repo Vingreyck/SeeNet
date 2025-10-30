@@ -6,13 +6,11 @@ import 'package:seenet/login/widgets/login.binding.dart';
 import 'package:seenet/registro/registro.view.dart';
 import 'package:seenet/admin/usuarios_admin.view.dart'; 
 import 'package:seenet/admin/checkmarks_admin.view.dart'; 
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'splash_screen/splash_screen.dart';
 import 'package:seenet/transcricao/transcricao.view.dart';
 import 'package:seenet/transcricao/historico_transcricao.view.dart';
 import 'controllers/transcricao_controller.dart';
 import 'package:get/get.dart';
-import 'package:seenet/config/gemini_config.dart'; 
 import 'package:seenet/login/login.view.dart';
 import 'package:seenet/checklist/checklist.view.dart';
 import 'services/avaliacao_service.dart';
@@ -34,8 +32,6 @@ void main() async {
   // ✅ Configurar ambiente
   Environment.printConfiguration();
   Environment.validateRequiredKeys();
-
-  GeminiConfig.printStatus();
   
   // ✅ Verificar configuração
   if (Environment.isProduction && !Environment.isConfigured) {
@@ -60,37 +56,55 @@ void main() async {
 class AuthMiddleware extends GetMiddleware {
   @override
   RouteSettings? redirect(String? route) {
-    // Verificar se a rota requer autenticação
-    List<String> protectedRoutes = ['/admin'];
+    if (route == null) return null;
     
-    bool isProtected = protectedRoutes.any((r) => route?.startsWith(r) ?? false);
+    // Rotas públicas - permitir acesso
+    List<String> publicRoutes = ['/login', '/registro', '/splash'];
+    if (publicRoutes.contains(route)) {
+      return null;
+    }
     
-    if (isProtected) {
-      // Verificar se tem usuário logado
-      try {
-        final usuarioController = Get.find<UsuarioController>();
-        
-        if (!usuarioController.isLoggedIn) {
-          print('❌ Sem autenticação - redirecionando para login');
+    // Verificar autenticação
+    try {
+      final usuarioController = Get.find<UsuarioController>();
+      
+      // Verificar se está logado
+      if (!usuarioController.isLoggedIn) {
+        print('Acesso negado: usuário não autenticado');
+        Get.snackbar(
+          'Acesso Negado',
+          'Faça login para acessar esta área',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 3),
+        );
+        return const RouteSettings(name: '/login');
+      }
+      
+      // Verificar acesso admin
+      if (route.startsWith('/admin')) {
+        if (!usuarioController.isAdmin) {
+          print('Acesso negado: usuário não é administrador');
           Get.snackbar(
-            '🔒 Acesso Negado',
-            'Faça login para acessar esta área',
-            backgroundColor: Colors.orange,
+            'Acesso Negado',
+            'Apenas administradores podem acessar esta área',
+            backgroundColor: Colors.red,
             colorText: Colors.white,
             snackPosition: SnackPosition.TOP,
             duration: const Duration(seconds: 3),
           );
-          return const RouteSettings(name: '/login');
+          return const RouteSettings(name: '/checklist');
         }
-        
-        print('✅ Usuário autenticado - permitindo acesso a $route');
-      } catch (e) {
-        print('❌ Erro ao verificar autenticação: $e');
-        return const RouteSettings(name: '/login');
       }
+      
+      print('Acesso permitido a: $route');
+      return null;
+      
+    } catch (e) {
+      print('Erro ao verificar autenticação: $e');
+      return const RouteSettings(name: '/login');
     }
-    
-    return null; // Permitir navegação
   }
 }
 

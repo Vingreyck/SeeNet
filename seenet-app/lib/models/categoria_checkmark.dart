@@ -1,3 +1,5 @@
+import '../utils/date_parser.dart';
+
 class CategoriaCheckmark {
   final int? id;
   final String nome;
@@ -33,9 +35,7 @@ class CategoriaCheckmark {
       descricao: map['descricao'],
       ativo: map['ativo'] == 1,
       ordem: map['ordem'] ?? 0,
-      dataCriacao: map['data_criacao'] != null 
-          ? DateTime.parse(map['data_criacao']) 
-          : null,
+      dataCriacao: DateParser.parseDateTime(map['data_criacao']),
     );
   }
 }

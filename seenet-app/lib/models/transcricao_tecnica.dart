@@ -1,3 +1,5 @@
+import '../utils/date_parser.dart';
+
 // lib/models/transcricao_tecnica.dart
 class TranscricaoTecnica {
   final int? id;
@@ -60,15 +62,10 @@ class TranscricaoTecnica {
       duracaoSegundos: map['duracao_segundos'],
       categoriaProblema: map['categoria_problema'],
       clienteInfo: map['cliente_info'],
-      dataInicio: map['data_inicio'] != null 
-          ? DateTime.parse(map['data_inicio']) 
-          : null,
-      dataConclusao: map['data_conclusao'] != null 
-          ? DateTime.parse(map['data_conclusao']) 
-          : null,
-      dataCriacao: map['data_criacao'] != null 
-          ? DateTime.parse(map['data_criacao']) 
-          : null,
+      dataInicio: DateParser.parseDateTime(map['data_inicio']),
+      dataConclusao: DateParser.parseDateTime(map['data_conclusao']) ,
+      dataCriacao: DateParser.parseDateTime(map['data_criacao']),
+
     );
   }
 

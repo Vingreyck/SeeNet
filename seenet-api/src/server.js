@@ -1,4 +1,5 @@
 const express = require('express');
+const { formatResponse, formatError } = require('./middleware/responseFormatter')
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -52,6 +53,7 @@ const corsOptions = {
 };
 
 app.use(express.json({ limit: '10mb' }));
+app.use(formatResponse);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ========== ROTAS BÁSICAS ==========
@@ -91,7 +93,7 @@ async function startServer() {
     
     try {
       const tenantRoutes = require('./routes/tenant');
-      app.use('/api/tenant', tenantRoutes);
+      app.use('/api/tenant', require('./routes/tenant'));
       console.log('✅ Rotas tenant carregadas');
     } catch (error) {
       console.error('❌ Erro ao carregar rotas tenant:', error.message);
@@ -99,7 +101,7 @@ async function startServer() {
     
     try {
       const authRoutes = require('./routes/auth');
-      app.use('/api/auth', authRoutes);
+      app.use('/api/auth', require('./routes/auth'));
       console.log('✅ Rotas auth carregadas');
     } catch (error) {
       console.error('⚠️ Rotas auth não encontradas');
@@ -109,7 +111,7 @@ async function startServer() {
     
     try {
       const checkmarksRoutes = require('./routes/checkmark');
-      app.use('/api/checkmark', checkmarksRoutes);
+      app.use('/api/checkmark', require('./routes/checkmark'));
       console.log('✅ Rotas checkmarks carregadas');
     } catch (error) {
       console.error('❌ Erro ao carregar rotas checkmarks:', error.message);
@@ -117,7 +119,7 @@ async function startServer() {
     
     try {
       const avaliacoesRoutes = require('./routes/avaliacoes');
-      app.use('/api/avaliacoes', avaliacoesRoutes);
+      app.use('/api/avaliacoes', require('./routes/avaliacoes'));
       console.log('✅ Rotas avaliacoes carregadas');
     } catch (error) {
       console.error('❌ Erro ao carregar rotas avaliacoes:', error.message);
@@ -333,7 +335,7 @@ async function startServer() {
     try {
       console.log('🔍 Tentando carregar rotas admin...');
       const adminRoutes = require('./routes/admin.routes');
-      app.use('/api/admin', adminRoutes);
+      app.use('/api/admin', require('./routes/admin.routes'));
       console.log('✅ Rotas admin registradas em /api/admin');
     } catch (error) {
       console.error('❌ Erro ao carregar rotas admin:', error.message);

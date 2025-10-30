@@ -22,4 +22,10 @@ class ModelValidator {
       throw ArgumentError('Email inválido');
     }
   }
+
+  static void requireValidStatus(String? value, List<String> validStatuses, String fieldName) {
+    if (value == null || !validStatuses.contains(value)) {
+      throw ArgumentError('Campo "$fieldName" deve ser um dos valores válidos: ${validStatuses.join(", ")}');
+    }
+  }
 }

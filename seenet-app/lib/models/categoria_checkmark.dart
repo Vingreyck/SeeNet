@@ -1,4 +1,5 @@
 import '../utils/date_parser.dart';
+import '../utils/model_validator.dart';
 
 class CategoriaCheckmark {
   final int? id;
@@ -29,11 +30,14 @@ class CategoriaCheckmark {
   }
 
   factory CategoriaCheckmark.fromMap(Map<String, dynamic> map) {
+    // Validações
+    ModelValidator.requireNotEmpty(map['nome'], 'nome');
+
     return CategoriaCheckmark(
       id: map['id'],
-      nome: map['nome'] ?? '',
-      descricao: map['descricao'],
-      ativo: map['ativo'] == 1,
+      nome: map['nome'].toString().trim(),
+      descricao: map['descricao']?.toString().trim(),
+      ativo: map['ativo'] == 1 || map['ativo'] == true,
       ordem: map['ordem'] ?? 0,
       dataCriacao: DateParser.parseDateTime(map['data_criacao']),
     );

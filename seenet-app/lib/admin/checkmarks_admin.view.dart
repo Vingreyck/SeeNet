@@ -342,7 +342,7 @@ void _mostrarDetalhesCheckmark(Checkmark checkmark) {
             // ✅ REMOVER linha de Status
             const SizedBox(height: 16),
             const Text(
-              'Prompt ChatGPT:', 
+              'Prompt Gemini:', 
               style: TextStyle(
                 color: Colors.white, 
                 fontWeight: FontWeight.bold,
@@ -358,7 +358,7 @@ void _mostrarDetalhesCheckmark(Checkmark checkmark) {
                 border: Border.all(color: Colors.white24),
               ),
               child: Text(
-                checkmark.promptChatgpt, 
+                checkmark.promptGemini, 
                 style: const TextStyle(
                   color: Colors.white70, 
                   fontSize: 12,
@@ -397,7 +397,7 @@ void _mostrarDetalhesCheckmark(Checkmark checkmark) {
 void _editarCheckmark(Checkmark checkmark) {
   final tituloCtrl = TextEditingController(text: checkmark.titulo);
   final descCtrl = TextEditingController(text: checkmark.descricao ?? '');
-  final promptCtrl = TextEditingController(text: checkmark.promptChatgpt);
+  final promptCtrl = TextEditingController(text: checkmark.promptGemini);
 
   showDialog(
     context: context,
@@ -436,7 +436,7 @@ void _editarCheckmark(Checkmark checkmark) {
               style: const TextStyle(color: Colors.white), 
               maxLines: 5,
               decoration: const InputDecoration(
-                labelText: 'Prompt ChatGPT *',
+                labelText: 'Prompt Gemini *',
                 labelStyle: TextStyle(color: Colors.white70),
                 enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
                 focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
@@ -484,7 +484,7 @@ Future<void> _salvarEdicaoCheckmark(int id, String titulo, String desc, String p
     final res = await _api.put('/checkmark/checkmarks/$id', {
       'titulo': titulo, 
       'descricao': desc.isEmpty ? null : desc,
-      'prompt_chatgpt': prompt,
+      'prompt_gemini': prompt,
       // ✅ Não enviar mais 'ativo'
     });
     
@@ -586,7 +586,7 @@ Future<void> _confirmarRemocao(int id) async {
                     focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))))),
                 const SizedBox(height: 16),
                 TextField(controller: promptCtrl, style: const TextStyle(color: Colors.white), maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Prompt ChatGPT *',
+                  decoration: const InputDecoration(labelText: 'Prompt Gemini *',
                     labelStyle: TextStyle(color: Colors.white70),
                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
                     focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))))),
@@ -623,7 +623,7 @@ Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) a
       'categoria_id': catId, 
       'titulo': titulo,
       'descricao': desc.isEmpty ? null : desc,
-      'prompt_chatgpt': prompt, 
+      'prompt_gemini': prompt, 
       'ativo': true,
     };
     

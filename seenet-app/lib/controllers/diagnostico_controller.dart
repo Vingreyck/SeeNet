@@ -12,136 +12,108 @@ class DiagnosticoController extends GetxController {
   RxString statusMensagem = ''.obs;
 
   // ========== GERAR DIAGNÓSTICO VIA API ==========
-  Future<bool> gerarDiagnostico(
-    int avaliacaoId,
-    int categoriaId,
-    List<int> checkmarksMarcados,
-  ) async {
-    try {
-      isLoading.value = true;
-      statusMensagem.value = '🤖 Gerando diagnóstico com IA...';
+Future<bool> gerarDiagnostico(
+  int avaliacaoId,
+  int categoriaId,
+  List<int> checkmarksMarcadosIds,
+) async {
+  try {
+    isLoading.value = true;
+    statusMensagem.value = 'Gerando diagnóstico com IA...';
 
-      print('🚀 Gerando diagnóstico...');
-      print('   Avaliação: $avaliacaoId');
-      print('   Categoria: $categoriaId');
-      print('   Checkmarks: $checkmarksMarcados');
+    print('🚀 Gerando diagnóstico...');
+    print('   Avaliação: $avaliacaoId');
+    print('   Categoria: $categoriaId');
+    print('   Checkmarks: $checkmarksMarcadosIds');
 
-      final response = await _api.post(
-        '/diagnostics/gerar',
-        {
-          'avaliacao_id': avaliacaoId,
-          'categoria_id': categoriaId,
-          'checkmarks_marcados': checkmarksMarcados,
-        },
-        requireAuth: true,
-      );
+    if (checkmarksMarcadosIds.isEmpty) {
+      statusMensagem.value = 'Nenhum problema selecionado';
+      Get.snackbar('Aviso', 'Selecione pelo menos um problema');
+      return false;
+    }
 
-      print('📥 Response: $response');
+    final response = await _api.post(
+      '/diagnostics/gerar',
+      {
+        'avaliacao_id': avaliacaoId,
+        'categoria_id': categoriaId,
+        'checkmarks_marcados': checkmarksMarcadosIds,
+      },
+    );
 
-      // ✅ CORREÇÃO CRÍTICA: Parse do nested data
-      if (response['success'] == true) {
-        // O backend retorna: { success: true, data: { success: true, data: {...} } }
-        // Precisamos acessar response['data']['data']
-        
-        final outerData = response['data'];
-        if (outerData == null) {
-          throw Exception('Response data is null');
-        }
-        
-        // Verificar se tem success interno
-        if (outerData['success'] != true) {
-          throw Exception(outerData['error'] ?? 'Erro desconhecido');
-        }
-        
-        // Pegar o data interno
-        final diagnosticoData = outerData['data'];
-        if (diagnosticoData == null) {
-          throw Exception('Diagnostico data is null');
-        }
-        
-        statusMensagem.value = '✅ Diagnóstico gerado com sucesso!';
-        
-        print('\n📥 DADOS RECEBIDOS DA API:');
-        print('ID: ${diagnosticoData['id']}');
-        print('Status: ${diagnosticoData['status']}');
-        print('Modelo: ${diagnosticoData['modelo']}');
-        print('Tokens: ${diagnosticoData['tokens_utilizados']}');
-        print('Resposta length: ${diagnosticoData['resposta']?.toString().length ?? 0}');
-        
-        // Limpar diagnósticos anteriores
-        diagnosticos.clear();
-        
-        // ✅ CRIAR DIAGNÓSTICO COM DADOS CORRETOS
-        final novoDiagnostico = Diagnostico(
-          id: diagnosticoData['id'],
-          avaliacaoId: avaliacaoId,
-          categoriaId: categoriaId,
-          promptEnviado: '', // Backend não retorna isso na geração
-          respostaChatgpt: diagnosticoData['resposta'] ?? 'Diagnóstico não disponível',
-          resumoDiagnostico: diagnosticoData['resumo'] ?? 'Resumo não disponível',
-          statusApi: diagnosticoData['status'] ?? 'sucesso',
-          tokensUtilizados: diagnosticoData['tokens_utilizados'] ?? 0,
-          dataCriacao: DateTime.now(),
-        );
+    print('📥 Response: $response');
 
-        // Debug do diagnóstico criado
-        print('\n🔍 DIAGNÓSTICO CRIADO:');
-        print('ID: ${novoDiagnostico.id}');
-        print('Status: ${novoDiagnostico.statusApi}');
-        print('Tokens: ${novoDiagnostico.tokensUtilizados}');
-        print('Resposta length: ${novoDiagnostico.respostaChatgpt.length}');
-        print('Resposta preview: ${novoDiagnostico.respostaChatgpt.substring(0, novoDiagnostico.respostaChatgpt.length > 100 ? 100 : novoDiagnostico.respostaChatgpt.length)}...');
-        
-        diagnosticos.add(novoDiagnostico);
-        
-        print('✅ Diagnóstico adicionado à lista (total: ${diagnosticos.length})');
-        print('✅ Diagnóstico gerado via API');
-        print('   ID: ${novoDiagnostico.id}');
-        print('   Tokens: ${novoDiagnostico.tokensUtilizados}');
-        
-        Get.snackbar(
-          'Sucesso',
-          'Diagnóstico gerado com sucesso!',
-          backgroundColor: const Color(0xFF00FF88),
-          colorText: Colors.black,
-          duration: const Duration(seconds: 2),
-        );
-        
-        return true;
-      } else {
-        statusMensagem.value = '❌ Erro ao gerar diagnóstico';
-        
-        print('❌ Erro ao gerar diagnóstico: ${response['error']}');
-        
-        Get.snackbar(
-          'Erro',
-          response['error'] ?? 'Falha ao gerar diagnóstico',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 3),
-        );
-        
+    if (response['success'] == true) {
+      // Verificar estrutura da resposta
+      final data = response['data'];
+      
+      if (data == null) {
+        print('❌ Resposta sem data');
+        statusMensagem.value = 'Erro: resposta inválida';
         return false;
       }
-    } catch (e, stackTrace) {
-      statusMensagem.value = '❌ Erro de conexão';
+
+      // Criar objeto Diagnostico
+      final diagnostico = Diagnostico(
+        id: data['id'],
+        avaliacaoId: avaliacaoId,
+        categoriaId: categoriaId,
+        promptEnviado: 'Checkmarks: $checkmarksMarcadosIds',
+        respostaChatgpt: data['resposta'] ?? data['respostaChatgpt'] ?? '',
+        resumoDiagnostico: data['resumo'] ?? data['resumoDiagnostico'],
+        statusApi: data['status'] ?? 'sucesso',
+        tokensUtilizados: data['tokens_utilizados'],
+        dataCriacao: DateTime.now(),
+      );
+
+      // Verificar se resposta não está vazia
+      if (diagnostico.respostaChatgpt.isEmpty) {
+        print('❌ Diagnóstico sem conteúdo');
+        statusMensagem.value = 'Erro: diagnóstico vazio';
+        return false;
+      }
+
+      // Adicionar à lista
+      diagnosticos.add(diagnostico);
       
-      print('❌ Exceção ao gerar diagnóstico: $e');
-      print('Stack trace: $stackTrace');
+      statusMensagem.value = 'Diagnóstico gerado com sucesso!';
+      print('✅ Diagnóstico adicionado à lista');
+      print('   Total de diagnósticos: ${diagnosticos.length}');
+      
+      return true;
+    } else {
+      final errorMsg = response['error'] ?? 'Erro desconhecido';
+      print('❌ Erro na API: $errorMsg');
+      statusMensagem.value = 'Erro: $errorMsg';
       
       Get.snackbar(
-        'Erro de Conexão',
-        'Não foi possível gerar o diagnóstico: $e',
+        'Erro ao Gerar Diagnóstico',
+        errorMsg,
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        duration: const Duration(seconds: 3),
       );
       
       return false;
-    } finally {
-      isLoading.value = false;
     }
+  } catch (e, stackTrace) {
+    print('❌ Exceção ao gerar diagnóstico: $e');
+    print('Stack trace: $stackTrace');
+    
+    statusMensagem.value = 'Erro ao conectar com servidor';
+    
+    Get.snackbar(
+      'Erro',
+      'Não foi possível gerar o diagnóstico: ${e.toString()}',
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 5),
+    );
+    
+    return false;
+  } finally {
+    isLoading.value = false;
   }
+}
 
   // ========== CARREGAR DIAGNÓSTICOS DA API ==========
   Future<void> carregarDiagnosticos(int avaliacaoId) async {

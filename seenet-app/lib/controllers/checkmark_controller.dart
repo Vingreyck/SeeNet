@@ -109,32 +109,50 @@ class CheckmarkController extends GetxController {
   }
 
   // ========== CARREGAR CHECKMARKS DE UMA CATEGORIA ==========
-  Future<void> carregarCheckmarks(int categoriaId) async {
-    try {
-      isLoading.value = true;
-      categoriaAtual.value = categoriaId;
+Future<void> carregarCheckmarks(int categoriaId) async {
+  try {
+    isLoading.value = true;
+    categoriaAtual.value = categoriaId;
 
-      final response = await _api.get('/checkmark/categoria/$categoriaId');
+    print('📥 Carregando checkmarks da categoria: $categoriaId');
 
-      if (response['success']) {
-        final List<dynamic> data = response['data']['checkmarks'];
-        checkmarksAtivos.value = data
-            .map((json) => Checkmark.fromMap(json))
-            .toList();
+    final response = await _api.get('/checkmark/categoria/$categoriaId');
 
-        respostas.clear();
-        print('✅ ${checkmarksAtivos.length} checkmarks carregados da API');
-      } else {
-        print('❌ Erro ao carregar checkmarks: ${response['error']}');
-        Get.snackbar('Erro', 'Falha ao carregar checkmarks');
+    print('📦 Response completo: $response');
+
+    if (response['success']) {
+      final List<dynamic> data = response['data']['checkmarks'];
+      
+      print('📋 Total de checkmarks recebidos: ${data.length}');
+      
+      // Debug: mostrar primeiro item
+      if (data.isNotEmpty) {
+        print('🔍 Primeiro checkmark: ${data.first}');
       }
-    } catch (e) {
-      print('❌ Erro ao carregar checkmarks: $e');
-      Get.snackbar('Erro', 'Erro de conexão ao carregar checkmarks');
-    } finally {
-      isLoading.value = false;
+      
+      checkmarksAtivos.value = data.map((json) {
+        try {
+          return Checkmark.fromMap(json);
+        } catch (e) {
+          print('❌ Erro ao converter checkmark: $json');
+          print('❌ Erro: $e');
+          rethrow;
+        }
+      }).toList();
+
+      respostas.clear();
+      print('✅ ${checkmarksAtivos.length} checkmarks carregados');
+    } else {
+      print('❌ Erro ao carregar checkmarks: ${response['error']}');
+      Get.snackbar('Erro', 'Falha ao carregar checkmarks');
     }
+  } catch (e) {
+    print('❌ Erro ao carregar checkmarks: $e');
+    Get.snackbar('Erro', 'Erro de conexão ao carregar checkmarks');
+  } finally {
+    isLoading.value = false;
   }
+}
 
   // ========== INICIAR NOVA AVALIAÇÃO NA API ==========
   Future<bool> iniciarAvaliacao(int tecnicoId, String titulo) async {

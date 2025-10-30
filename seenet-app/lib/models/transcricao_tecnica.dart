@@ -1,17 +1,17 @@
 import '../utils/date_parser.dart';
+import '../utils/model_validator.dart';
 
-// lib/models/transcricao_tecnica.dart
 class TranscricaoTecnica {
   final int? id;
   final int tecnicoId;
   final String titulo;
   final String? descricao;
-  final String transcricaoOriginal; // Texto capturado da fala
-  final String pontosDaAcao; // Texto processado pela IA em pontos
-  final String status; // 'gravando', 'processando', 'concluida', 'erro'
+  final String transcricaoOriginal;
+  final String pontosDaAcao;
+  final String status;
   final int? duracaoSegundos;
-  final String? categoriaProblema; // Para organizar os tipos de problema
-  final String? clienteInfo; // Informações do cliente se necessário
+  final String? categoriaProblema;
+  final String? clienteInfo;
   final DateTime? dataInicio;
   final DateTime? dataConclusao;
   final DateTime? dataCriacao;
@@ -51,31 +51,39 @@ class TranscricaoTecnica {
   }
 
   factory TranscricaoTecnica.fromMap(Map<String, dynamic> map) {
+    // Validações
+    ModelValidator.requirePositive(map['tecnico_id'], 'tecnico_id');
+    ModelValidator.requireNotEmpty(map['titulo'], 'titulo');
+    ModelValidator.requireNotEmpty(map['transcricao_original'], 'transcricao_original');
+    ModelValidator.requireNotEmpty(map['pontos_da_acao'], 'pontos_da_acao');
+    ModelValidator.requireValidStatus(
+      map['status'], 
+      ['gravando', 'processando', 'concluida', 'erro'], 
+      'status'
+    );
+
     return TranscricaoTecnica(
       id: map['id'],
-      tecnicoId: map['tecnico_id'] ?? 0,
-      titulo: map['titulo'] ?? '',
-      descricao: map['descricao'],
-      transcricaoOriginal: map['transcricao_original'] ?? '',
-      pontosDaAcao: map['pontos_da_acao'] ?? '',
+      tecnicoId: map['tecnico_id'],
+      titulo: map['titulo'].toString().trim(),
+      descricao: map['descricao']?.toString().trim(),
+      transcricaoOriginal: map['transcricao_original'].toString().trim(),
+      pontosDaAcao: map['pontos_da_acao'].toString().trim(),
       status: map['status'] ?? 'gravando',
       duracaoSegundos: map['duracao_segundos'],
-      categoriaProblema: map['categoria_problema'],
-      clienteInfo: map['cliente_info'],
+      categoriaProblema: map['categoria_problema']?.toString().trim(),
+      clienteInfo: map['cliente_info']?.toString().trim(),
       dataInicio: DateParser.parseDateTime(map['data_inicio']),
-      dataConclusao: DateParser.parseDateTime(map['data_conclusao']) ,
+      dataConclusao: DateParser.parseDateTime(map['data_conclusao']),
       dataCriacao: DateParser.parseDateTime(map['data_criacao']),
-
     );
   }
 
-  // Verificações de status
   bool get isGravando => status == 'gravando';
   bool get isProcessando => status == 'processando';
   bool get isConcluida => status == 'concluida';
   bool get isErro => status == 'erro';
 
-  // Tempo formatado
   String get duracaoFormatada {
     if (duracaoSegundos == null) return 'N/A';
     int minutos = duracaoSegundos! ~/ 60;
@@ -83,7 +91,6 @@ class TranscricaoTecnica {
     return '${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
   }
 
-  // Cópia com novos valores
   TranscricaoTecnica copyWith({
     int? id,
     int? tecnicoId,

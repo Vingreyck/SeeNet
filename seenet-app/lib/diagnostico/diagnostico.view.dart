@@ -271,7 +271,7 @@ Entre em contato com a operadora informando os testes realizados.
       appBar: _buildAdvancedAppBar(),
       backgroundColor: const Color(0xFF0A0A0A),
       body: _buildBody(),
-      floatingActionButton: _buildAdvancedFAB(),
+      bottomNavigationBar: _buildBottomInputBar(), // ✅ Correção
     );
   }
 
@@ -846,42 +846,32 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
-  /// FAB avançado com micro-interactions
-  Widget _buildAdvancedFAB() {
-    return Positioned(
-      bottom: 30,
-      right: 20,
-      left: 20,
-      child: Container(
-        height: 70,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.circular(35),
-          border: Border.all(
-            color: Colors.white12,
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
+Widget _buildBottomInputBar() {
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1E1E1E),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.3),
+          blurRadius: 20,
+          offset: const Offset(0, -10),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: _buildInputField(),
-            ),
-            _buildMicButton(),
-            const SizedBox(width: 8),
-            _buildSendButton(),
-          ],
-        ),
+      ],
+    ),
+    child: SafeArea(
+      child: Row(
+        children: [
+          Expanded(child: _buildInputField()),
+          const SizedBox(width: 8),
+          _buildMicButton(),
+          const SizedBox(width: 8),
+          _buildSendButton(),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// Campo de input avançado
   Widget _buildInputField() {

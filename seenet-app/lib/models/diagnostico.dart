@@ -1,4 +1,5 @@
 import '../utils/date_parser.dart';
+import '../utils/model_validator.dart';
 
 class Diagnostico {
   final int? id;
@@ -7,7 +8,7 @@ class Diagnostico {
   final String promptEnviado;
   final String respostaChatgpt;
   final String? resumoDiagnostico;
-  final String statusApi; // 'pendente', 'sucesso', 'erro'
+  final String statusApi;
   final String? erroApi;
   final int? tokensUtilizados;
   final DateTime? dataCriacao;
@@ -41,26 +42,32 @@ class Diagnostico {
   }
 
   factory Diagnostico.fromMap(Map<String, dynamic> map) {
+    // Validações
+    ModelValidator.requirePositive(map['avaliacao_id'], 'avaliacao_id');
+    ModelValidator.requirePositive(map['categoria_id'], 'categoria_id');
+    ModelValidator.requireNotEmpty(map['prompt_enviado'], 'prompt_enviado');
+    ModelValidator.requireNotEmpty(map['resposta_chatgpt'], 'resposta_chatgpt');
+    ModelValidator.requireValidStatus(
+      map['status_api'], 
+      ['pendente', 'sucesso', 'erro'], 
+      'status_api'
+    );
+
     return Diagnostico(
       id: map['id'],
-      avaliacaoId: map['avaliacao_id'] ?? 0,
-      categoriaId: map['categoria_id'] ?? 0,
-      promptEnviado: map['prompt_enviado'] ?? '',
-      respostaChatgpt: map['resposta_chatgpt'] ?? '',
-      resumoDiagnostico: map['resumo_diagnostico'],
+      avaliacaoId: map['avaliacao_id'],
+      categoriaId: map['categoria_id'],
+      promptEnviado: map['prompt_enviado'].toString().trim(),
+      respostaChatgpt: map['resposta_chatgpt'].toString().trim(),
+      resumoDiagnostico: map['resumo_diagnostico']?.toString().trim(),
       statusApi: map['status_api'] ?? 'pendente',
-      erroApi: map['erro_api'],
+      erroApi: map['erro_api']?.toString(),
       tokensUtilizados: map['tokens_utilizados'],
       dataCriacao: DateParser.parseDateTime(map['data_criacao']),
     );
   }
 
-  // Verificar se foi bem-sucedido
   bool get isSucesso => statusApi == 'sucesso';
-  
-  // Verificar se houve erro
   bool get isErro => statusApi == 'erro';
-  
-  // Verificar se está pendente
   bool get isPendente => statusApi == 'pendente';
 }

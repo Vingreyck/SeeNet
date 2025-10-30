@@ -1,4 +1,5 @@
 import '../utils/date_parser.dart';
+import '../utils/model_validator.dart';
 
 class LogSistema {
   final int? id;
@@ -41,16 +42,19 @@ class LogSistema {
   }
 
   factory LogSistema.fromMap(Map<String, dynamic> map) {
+    // Validações
+    ModelValidator.requireNotEmpty(map['acao'], 'acao');
+
     return LogSistema(
       id: map['id'],
       usuarioId: map['usuario_id'],
-      acao: map['acao'] ?? '',
-      tabelaAfetada: map['tabela_afetada'],
+      acao: map['acao'].toString().trim(),
+      tabelaAfetada: map['tabela_afetada']?.toString().trim(),
       registroId: map['registro_id'],
-      dadosAnteriores: map['dados_anteriores'],
-      dadosNovos: map['dados_novos'],
-      ipAddress: map['ip_address'],
-      userAgent: map['user_agent'],
+      dadosAnteriores: map['dados_anteriores']?.toString(),
+      dadosNovos: map['dados_novos']?.toString(),
+      ipAddress: map['ip_address']?.toString(),
+      userAgent: map['user_agent']?.toString(),
       dataAcao: DateParser.parseDateTime(map['data_acao']),
     );
   }

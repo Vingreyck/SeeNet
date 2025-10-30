@@ -1,4 +1,5 @@
 import '../utils/date_parser.dart';
+import '../utils/model_validator.dart';
 
 class RespostaCheckmark {
   final int? id;
@@ -29,12 +30,16 @@ class RespostaCheckmark {
   }
 
   factory RespostaCheckmark.fromMap(Map<String, dynamic> map) {
+    // Validações
+    ModelValidator.requirePositive(map['avaliacao_id'], 'avaliacao_id');
+    ModelValidator.requirePositive(map['checkmark_id'], 'checkmark_id');
+
     return RespostaCheckmark(
       id: map['id'],
-      avaliacaoId: map['avaliacao_id'] ?? 0,
-      checkmarkId: map['checkmark_id'] ?? 0,
-      marcado: map['marcado'] == 1,
-      observacoes: map['observacoes'],
+      avaliacaoId: map['avaliacao_id'],
+      checkmarkId: map['checkmark_id'],
+      marcado: map['marcado'] == 1 || map['marcado'] == true,
+      observacoes: map['observacoes']?.toString().trim(),
       dataResposta: DateParser.parseDateTime(map['data_resposta']),
     );
   }

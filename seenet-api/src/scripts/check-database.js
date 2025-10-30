@@ -1,14 +1,29 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 const { Client } = require('pg');
 
 async function check() {
   console.log('\n🔍 Verificando banco de dados...\n');
   
-  // Connection string completa (forma que funciona com Neon)
-  const connectionString = `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}?sslmode=require`;
+  // Debug: verificar se variáveis foram carregadas
+  console.log('🔧 Configuração:');
+  console.log(`  Host: ${process.env.DB_HOST || 'NÃO DEFINIDO'}`);
+  console.log(`  Database: ${process.env.DB_NAME || 'NÃO DEFINIDO'}`);
+  console.log(`  User: ${process.env.DB_USER || 'NÃO DEFINIDO'}`);
+  console.log('');
+  
+  if (!process.env.DB_HOST || !process.env.DB_USER) {
+    console.error('❌ Variáveis de ambiente não carregadas!');
+    console.error('Verifique se o arquivo .env existe na raiz do projeto.');
+    return;
+  }
   
   const client = new Client({
-    connectionString: connectionString,
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT) || 5432,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     ssl: {
       rejectUnauthorized: false
     }

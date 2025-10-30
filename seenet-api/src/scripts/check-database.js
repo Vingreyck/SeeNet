@@ -4,13 +4,14 @@ const { Client } = require('pg');
 async function check() {
   console.log('\n🔍 Verificando banco de dados...\n');
   
+  // Connection string completa (forma que funciona com Neon)
+  const connectionString = `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}?sslmode=require`;
+  
   const client = new Client({
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT || 5432,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    ssl: { rejectUnauthorized: false }
+    connectionString: connectionString,
+    ssl: {
+      rejectUnauthorized: false
+    }
   });
 
   try {
@@ -44,14 +45,14 @@ async function check() {
       'SELECT id, titulo, data_criacao FROM checkmarks ORDER BY id DESC LIMIT 5'
     );
     lastCheckmarks.rows.forEach(c => {
-      console.log(`  - ID ${c.id}: ${c.titulo}`);
+      const data = c.data_criacao ? new Date(c.data_criacao).toLocaleDateString() : 'N/A';
+      console.log(`  - ID ${c.id}: ${c.titulo} (${data})`);
     });
 
     console.log('\n✅ Verificação completa\n');
 
   } catch (error) {
     console.error('❌ Erro:', error.message);
-    console.error('Stack:', error.stack);
   } finally {
     await client.end();
   }

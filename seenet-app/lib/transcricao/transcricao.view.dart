@@ -5,6 +5,8 @@ import 'package:get/get.dart';
 import 'dart:async';
 import '../controllers/transcricao_controller.dart';
 import 'historico_transcricao.view.dart';
+import '../widgets/skeleton_loader.dart';
+
 
 class TranscricaoView extends StatefulWidget {
   const TranscricaoView({super.key});
@@ -426,20 +428,44 @@ class _TranscricaoViewState extends State<TranscricaoView>
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.orange.withOpacity(0.3)),
         ),
-        child: const Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.orange,
-              ),
+            const Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.orange,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text(
+                  'Processando com IA...',
+                  style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500),
+                ),
+              ],
             ),
-            SizedBox(width: 12),
-            Text(
-              'Processando com IA...',
-              style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500),
+            const SizedBox(height: 16),
+            // ✅ SKELETON para preview do que está sendo processado
+            SkeletonLoader(
+              width: double.infinity,
+              height: 14,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            const SizedBox(height: 8),
+            SkeletonLoader(
+              width: MediaQuery.of(context).size.width * 0.9,
+              height: 14,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            const SizedBox(height: 8),
+            SkeletonLoader(
+              width: MediaQuery.of(context).size.width * 0.7,
+              height: 14,
+              borderRadius: BorderRadius.circular(4),
             ),
           ],
         ),
@@ -551,8 +577,51 @@ class _TranscricaoViewState extends State<TranscricaoView>
       ],
     );
   }
+  Widget _buildWaitingToRecord() {
+  return Container(
+    padding: const EdgeInsets.all(40),
+    decoration: BoxDecoration(
+      color: const Color(0xFF2A2A2A).withOpacity(0.5),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: const Color(0xFF00FF88).withOpacity(0.2),
+        width: 2,
+      ),
+    ),
+    child: Column(
+      children: [
+        Icon(
+          Icons.mic_none,
+          size: 80,
+          color: Colors.white.withOpacity(0.3),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Pronto para gravar',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Toque no microfone e comece a falar',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.3),
+            fontSize: 14,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildTranscriptionArea() {
+      if (controller.textoTranscrito.isEmpty && !controller.isGravando.value) {
+    return _buildWaitingToRecord();
+  }
     if (controller.textoTranscrito.isEmpty) return const SizedBox.shrink();
     
     return Container(

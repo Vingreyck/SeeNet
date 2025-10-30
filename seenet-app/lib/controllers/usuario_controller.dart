@@ -2,6 +2,7 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../models/usuario.dart';
+import '../utils/error_handler.dart';
 import '../services/auth_service.dart';
 
 class UsuarioController extends GetxController {
@@ -10,12 +11,27 @@ class UsuarioController extends GetxController {
   
   Rx<Usuario?> usuarioLogado = Rx<Usuario?>(null);
   RxBool isLoading = false.obs;
+  Worker? _usuarioWorker; 
 
   @override
   void onInit() {
     super.onInit();
+    _setupWorkers();
     print('📱 UsuarioController inicializado (modo API)');
   }
+
+  void _setupWorkers() {
+  // Worker: Monitorar mudanças no usuário logado
+  _usuarioWorker = ever(usuarioLogado, (usuario) {
+    if (usuario != null) {
+      print('👤 Usuário logado: ${usuario.nome} (${usuario.email})');
+      print('🔑 Tipo: ${usuario.tipoUsuario}');
+    } else {
+      print('👤 Usuário deslogado');
+    }
+  });
+}
+
 // ========== LOGIN VIA API ==========
 Future<bool> login(String email, String senha, String codigoEmpresa) async {
   try {
@@ -23,12 +39,7 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
     
     // Validações básicas
     if (email.trim().isEmpty || senha.isEmpty || codigoEmpresa.trim().isEmpty) {
-      Get.snackbar(
-        'Erro',
-        'Preencha todos os campos',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      ErrorHandler.handleValidationError('Preencha todos os campos');
       return false;
     }
     
@@ -47,12 +58,7 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
     return false;
   } catch (e) {
     print('❌ Erro no login: $e');
-    Get.snackbar(
-      'Erro',
-      'Erro ao fazer login',
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
+    ErrorHandler.handle(e, context: 'login');
     return false;
   } finally {
     isLoading.value = false;
@@ -66,17 +72,17 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       
       // Validações
       if (nome.trim().length < 2) {
-        Get.snackbar('Erro', 'Nome muito curto');
+        ErrorHandler.handleValidationError('Nome muito curto');
         return false;
       }
       
       if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
-        Get.snackbar('Erro', 'Email inválido');
+        ErrorHandler.handleValidationError('Email inválido');
         return false;
       }
 
       if (senha.length < 6) {
-        Get.snackbar('Erro', 'Senha muito curta (mínimo 6 caracteres)');
+        ErrorHandler.handleValidationError('Senha muito curta (mínimo 6 caracteres)');
         return false;
       }
 
@@ -91,12 +97,68 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       return false;
     } catch (e) {
       print('❌ Erro no registro: $e');
-      Get.snackbar('Erro', 'Erro ao registrar usuário');
+      ErrorHandler.handle(e, context: 'registrar');
       return false;
     } finally {
       isLoading.value = false;
     }
   }
+
+
+  Future<bool> registrarComAutoLogin(
+  String nome,
+  String email,
+  String senha,
+  String codigoEmpresa,
+) async {
+  try {
+    isLoading.value = true;
+
+    print('📝 Tentando registrar: $email');
+
+    // 1. Registrar usuário
+    bool registroSucesso = await _authService.register(
+      nome,
+      email,
+      senha,
+      codigoEmpresa,
+    );
+
+    if (!registroSucesso) {
+      print('❌ Falha no registro');
+      return false;
+    }
+
+    print('✅ Registro bem-sucedido, iniciando auto-login...');
+
+    // 2. Aguardar um pouco antes do login
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // 3. Fazer login automaticamente
+    bool loginSucesso = await login(email, senha, codigoEmpresa);
+
+    if (loginSucesso) {
+      print('✅ Auto-login bem-sucedido');
+      return true;
+    } else {
+      print('❌ Auto-login falhou');
+      
+      // Mesmo que o login falhe, o registro foi feito
+      ErrorHandler.showSuccess('Sua conta foi criada. Por favor, faça login.');
+      
+      return false;
+    }
+  } catch (e, stackTrace) {
+    print('❌ Erro em registrarComAutoLogin: $e');
+    print('Stack trace: $stackTrace');
+    
+    ErrorHandler.handle(e, context: 'registrarComAutoLogin');
+    
+    return false;
+  } finally {
+    isLoading.value = false;
+  }
+}
 
   // ========== ATUALIZAR PERFIL ==========
   Future<bool> atualizarPerfil({
@@ -124,12 +186,7 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       
       usuarioLogado.value = usuarioAtualizado;
       
-      Get.snackbar(
-        'Sucesso',
-        'Perfil atualizado com sucesso',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      ErrorHandler.showSuccess('Perfil atualizado com sucesso');
       
       return true;
     } catch (e) {
@@ -172,4 +229,10 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       print('❌ Nenhum usuário logado');
     }
   }
+  @override
+void onClose() {
+  // ✅ LIMPAR WORKERS
+  _usuarioWorker?.dispose();
+  super.onClose();
+}
 }

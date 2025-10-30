@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../controllers/usuario_controller.dart';
 import 'package:seenet/services/auth_service.dart';
 import '../controllers/checkmark_controller.dart';
+import '../widgets/skeleton_loader.dart';
 
 class Checklistview extends StatefulWidget {
   const Checklistview({super.key});
@@ -115,16 +116,32 @@ class _ChecklistviewState extends State<Checklistview> {
             top: 270, left: 0, right: 0, bottom: 0,
             child: Obx(() {
               if (checkmarkController.isLoading.value) {
-                return const Center(child: CircularProgressIndicator(color: Color(0xFF00FF88)));
+                return const CategoriasSkeleton(itemCount: 4);
               }
 
               if (checkmarkController.categorias.isEmpty) {
+                // ✅ Mostrar categorias hardcoded quando API estiver vazia
                 return SingleChildScrollView(
                   child: Column(
                     children: [
-                      ChecklistCategoriaCardWidget(title: 'Lentidão', description: 'Problemas de velocidade', assetIcon: 'assets/images/snail.svg', onTap: () => Get.toNamed('/checklist/lentidao')),
-                      ChecklistCategoriaCardWidget(title: 'IPTV', description: 'Travamento, buffering', assetIcon: 'assets/images/iptv.svg', onTap: () => Get.toNamed('/checklist/iptv')),
-                      ChecklistCategoriaCardWidget(title: 'Aplicativos', description: 'Apps não funcionam', assetIcon: 'assets/images/app.svg', onTap: () => Get.toNamed('/checklist/apps')),
+                      ChecklistCategoriaCardWidget(
+                        title: 'Lentidão', 
+                        description: 'Problemas de velocidade', 
+                        assetIcon: 'assets/images/snail.svg', 
+                        onTap: () => Get.toNamed('/checklist/lentidao'),
+                      ),
+                      ChecklistCategoriaCardWidget(
+                        title: 'IPTV', 
+                        description: 'Travamento, buffering', 
+                        assetIcon: 'assets/images/iptv.svg', 
+                        onTap: () => Get.toNamed('/checklist/iptv'),
+                      ),
+                      ChecklistCategoriaCardWidget(
+                        title: 'Aplicativos', 
+                        description: 'Apps não funcionam', 
+                        assetIcon: 'assets/images/app.svg', 
+                        onTap: () => Get.toNamed('/checklist/apps'),
+                      ),
                       const SizedBox(height: 20),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -132,7 +149,11 @@ class _ChecklistviewState extends State<Checklistview> {
                           onPressed: _carregarCategorias,
                           icon: const Icon(Icons.refresh),
                           label: const Text('Recarregar'),
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF88), foregroundColor: Colors.black, minimumSize: const Size(double.infinity, 50)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00FF88), 
+                            foregroundColor: Colors.black, 
+                            minimumSize: const Size(double.infinity, 50),
+                          ),
                         ),
                       ),
                     ],

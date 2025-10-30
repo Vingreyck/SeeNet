@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../controllers/transcricao_controller.dart';
 import '../models/transcricao_tecnica.dart';
+import '../widgets/skeleton_loader.dart';
 
 class HistoricoTranscricaoView extends StatefulWidget {
   const HistoricoTranscricaoView({super.key});
@@ -209,6 +210,11 @@ class _HistoricoTranscricaoViewState extends State<HistoricoTranscricaoView> {
   }
 
   Widget _buildLista() {
+    // ✅ SKELETON DURANTE LOADING
+    if (controller.isLoading.value) {
+      return const HistoricoTranscricaoSkeleton(itemCount: 5);
+    }
+    
     if (controller.historico.isEmpty) {
       return _buildEstadoVazio();
     }

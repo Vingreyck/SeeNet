@@ -5,6 +5,7 @@ import '../controllers/usuario_controller.dart';
 import '../config/environment.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
+import '../utils/error_handler.dart';
 
 class LoginController extends GetxController {
   // ✅ CORREÇÃO: Usar late para inicialização lazy
@@ -281,46 +282,16 @@ class LoginController extends GetxController {
   // ========== SNACKBARS ==========
   
   void _showError(String message) {
-    Get.snackbar(
-      'Erro',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 3),
-      margin: const EdgeInsets.all(20),
-      borderRadius: 12,
-      icon: const Icon(Icons.error, color: Colors.white),
-    );
-  }
+  ErrorHandler.handleValidationError(message);
+}
 
   void _showSuccess(String message) {
-    Get.snackbar(
-      'Sucesso',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: const Color(0xFF00FF99),
-      colorText: Colors.black,
-      duration: const Duration(seconds: 2),
-      margin: const EdgeInsets.all(20),
-      borderRadius: 12,
-      icon: const Icon(Icons.check_circle, color: Colors.black),
-    );
-  }
+  ErrorHandler.showSuccess(message);
+}
 
   void _showInfo(String title, String message) {
-    Get.snackbar(
-      title,
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.blue,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 4),
-      margin: const EdgeInsets.all(20),
-      borderRadius: 12,
-      icon: const Icon(Icons.info, color: Colors.white),
-    );
-  }
+  ErrorHandler.showInfo(message, title: title);
+}
 
   @override
   void onClose() {

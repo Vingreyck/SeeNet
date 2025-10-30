@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/diagnostico.dart';
+import '../utils/error_handler.dart';
 import '../services/api_service.dart';
 
 class DiagnosticoController extends GetxController {
@@ -10,6 +11,34 @@ class DiagnosticoController extends GetxController {
   RxList<Diagnostico> diagnosticos = <Diagnostico>[].obs;
   RxBool isLoading = false.obs;
   RxString statusMensagem = ''.obs;
+
+Worker? _diagnosticosWorker;
+Worker? _loadingWorker;
+
+@override
+void onInit() {
+  super.onInit();
+  _setupWorkers();
+}
+
+void _setupWorkers() {
+  // Worker 1: Notificar quando novos diagnósticos forem adicionados
+  _diagnosticosWorker = ever(diagnosticos, (callback) {
+    if (diagnosticos.isNotEmpty) {
+      print('🤖 Total de diagnósticos: ${diagnosticos.length}');
+    }
+  });
+
+  // Worker 2: Monitorar mudanças de loading
+  _loadingWorker = ever(isLoading, (loading) {
+    if (loading) {
+      print('⏳ Diagnóstico: Carregando...');
+    } else {
+      print('✅ Diagnóstico: Carregamento concluído');
+    }
+  });
+}
+
 
   // ========== GERAR DIAGNÓSTICO VIA API ==========
 Future<bool> gerarDiagnostico(
@@ -28,7 +57,7 @@ Future<bool> gerarDiagnostico(
 
     if (checkmarksMarcadosIds.isEmpty) {
       statusMensagem.value = 'Nenhum problema selecionado';
-      Get.snackbar('Aviso', 'Selecione pelo menos um problema');
+      ErrorHandler.showWarning('Selecione pelo menos um problema');
       return false;
     }
 
@@ -86,12 +115,7 @@ Future<bool> gerarDiagnostico(
       print('❌ Erro na API: $errorMsg');
       statusMensagem.value = 'Erro: $errorMsg';
       
-      Get.snackbar(
-        'Erro ao Gerar Diagnóstico',
-        errorMsg,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      ErrorHandler.handle(errorMsg, context: 'gerarDiagnostico');
       
       return false;
     }
@@ -101,13 +125,7 @@ Future<bool> gerarDiagnostico(
     
     statusMensagem.value = 'Erro ao conectar com servidor';
     
-    Get.snackbar(
-      'Erro',
-      'Não foi possível gerar o diagnóstico: ${e.toString()}',
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 5),
-    );
+    ErrorHandler.handle(e, context: 'gerarDiagnostico');
     
     return false;
   } finally {
@@ -219,5 +237,12 @@ Future<bool> gerarDiagnostico(
     }
     
     print('============================\n');
+  }
+
+    @override
+  void onClose() {
+    _diagnosticosWorker?.dispose();
+    _loadingWorker?.dispose();
+    super.onClose();
   }
 }

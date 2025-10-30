@@ -2,6 +2,7 @@
 import 'package:get/get.dart';
 import '../models/transcricao_tecnica.dart';
 import '../services/transcricao_service.dart';
+import '../utils/error_handler.dart';
 import '../services/api_service.dart';
 import '../controllers/usuario_controller.dart';
 
@@ -22,18 +23,36 @@ class TranscricaoController extends GetxController {
   DateTime? _inicioGravacao;
   String _textoCompleto = '';
 
+  Worker? _gravacaoWorker;
+  Worker? _historicoWorker;
+
   @override
   void onInit() {
     super.onInit();
+    _setupWorkers();
     _configurarCallbacks();
     carregarHistorico();
   }
 
-  @override
-  void onClose() {
-    _transcricaoService.clearCallbacks();
-    super.onClose();
-  }
+  void _setupWorkers() {
+  // Worker 1: Monitorar estado de gravação
+  _gravacaoWorker = ever(isGravando, (gravando) {
+    if (gravando) {
+      print('🎤 Gravação INICIADA');
+    } else {
+      print('🎤 Gravação PARADA');
+    }
+  });
+
+  // Worker 2: Debounce para histórico (evitar múltiplos rebuilds)
+  debounce(
+    historico,
+    (_) {
+      print('📚 Histórico atualizado: ${historico.length} transcrições');
+    },
+    time: const Duration(milliseconds: 500),
+  );
+}
 
   void _configurarCallbacks() {
     _transcricaoService.onTranscriptionUpdate = (texto) {
@@ -54,7 +73,7 @@ class TranscricaoController extends GetxController {
 
     _transcricaoService.onError = (erro) {
       statusMensagem.value = 'Erro: $erro';
-      Get.snackbar('Erro na Gravação', erro);
+      ErrorHandler.handle(erro, context: 'gravacao');
       isGravando.value = false;
       isProcessando.value = false;
     };
@@ -140,12 +159,12 @@ Ao salvar esta documentação, nossa IA irá:
   Future<bool> salvarTranscricao(String titulo) async {
     try {
       if (_usuarioController.idUsuario == null) {
-        Get.snackbar('Erro', 'Usuário não identificado');
+        ErrorHandler.handleValidationError('Usuário não identificado');
         return false;
       }
 
       if (textoTranscrito.isEmpty) {
-        Get.snackbar('Erro', 'Não há texto para salvar');
+        ErrorHandler.handleValidationError('Não há texto para salvar');
         return false;
       }
 
@@ -172,23 +191,19 @@ Ao salvar esta documentação, nossa IA irá:
         
         print('✅ Transcrição salva e processada pela API');
         
-        Get.snackbar(
-          'Sucesso',
-          'Documentação salva e processada com IA!',
-          duration: const Duration(seconds: 3),
-        );
+        ErrorHandler.showSuccess('Documentação salva e processada com IA!');
         
         statusMensagem.value = 'Documentação salva com sucesso!';
         return true;
       } else {
         print('❌ Erro ao salvar: ${response['error']}');
-        Get.snackbar('Erro', 'Falha ao salvar documentação');
+        ErrorHandler.handle(response['error'] ?? 'Falha ao salvar', context: 'salvarTranscricao');
         statusMensagem.value = 'Erro ao salvar';
         return false;
       }
     } catch (e) {
       print('❌ Erro ao salvar: $e');
-      Get.snackbar('Erro', 'Erro de conexão ao salvar');
+      ErrorHandler.handle(e, context: 'salvarTranscricao');
       statusMensagem.value = 'Erro de conexão';
       return false;
     } finally {
@@ -245,7 +260,7 @@ Ao salvar esta documentação, nossa IA irá:
       
       if (response['success']) {
         historico.removeWhere((t) => t.id == transcricaoId);
-        Get.snackbar('Removido', 'Documentação removida');
+        ErrorHandler.showSuccess('Documentação removida');
         return true;
       }
       return false;
@@ -372,4 +387,12 @@ Ao salvar esta documentação, nossa IA irá:
     print('🌐 Modo: 100% API (Backend processa IA)');
     print('==================================\n');
   }
+  @override
+void onClose() {
+  // ✅ ADICIONAR ANTES DO _transcricaoService.clearCallbacks():
+  _gravacaoWorker?.dispose();
+  _historicoWorker?.dispose();
+  _transcricaoService.clearCallbacks();
+  super.onClose();
+}
 }

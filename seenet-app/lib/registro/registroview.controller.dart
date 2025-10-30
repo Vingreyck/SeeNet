@@ -1,8 +1,9 @@
-// lib/registro/registroview.controller.dart - VERSÃO HARDCORE FINAL
+// lib/registro/registroview.controller.dart - VERSÃO COM AUTO-LOGIN
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ✅ ADICIONAR ESTE IMPORT
+import 'package:flutter/services.dart';
 import '../controllers/usuario_controller.dart';
+import '../utils/error_handler.dart';
 import '../services/auth_service.dart';
 
 class RegistroController extends GetxController {
@@ -94,7 +95,7 @@ class RegistroController extends GetxController {
     }
   }
 
-  // ========== REGISTRO VIA API ========== (✅ SOLUÇÃO COM WORKAROUND)
+  // ========== REGISTRO COM AUTO-LOGIN ==========
   Future<void> tryToRegister() async {
     // Validações
     if (!_validarCampos()) return;
@@ -102,8 +103,12 @@ class RegistroController extends GetxController {
     try {
       isLoading.value = true;
       
-      // Registro via UsuarioController (que usa AuthService internamente)
-      bool sucesso = await usuarioController.registrar(
+      print('📝 Iniciando registro + auto-login');
+      print('   Email: ${emailInput.text.trim()}');
+      print('   Empresa: ${tokenEmpresaController.text.trim()}');
+      
+      // Usar o método registrarComAutoLogin do UsuarioController
+      bool sucesso = await usuarioController.registrarComAutoLogin(
         nomeInput.text.trim(),
         emailInput.text.trim(),
         senhaInput.text,
@@ -111,171 +116,48 @@ class RegistroController extends GetxController {
       );
       
       if (sucesso) {
+        print('✅ Registro + Auto-login bem-sucedido');
         registroSucesso.value = true;
+        limparCampos();
         
-        // ✅ WORKAROUND: Mostrar dialog customizado em vez de navegar
-        await _mostrarDialogSucesso();
+        // Aguardar frame antes de navegar
+        await Future.delayed(const Duration(milliseconds: 150));
+        
+        // Navegar para checklist
+        Get.offAllNamed('/checklist');
+        
+        // Mostrar snackbar de boas-vindas DEPOIS da navegação
+        Future.delayed(const Duration(milliseconds: 400), () {
+          if (Get.context != null) {
+            Get.snackbar(
+              '🎉 Bem-vindo!',
+              'Conta criada e login realizado com sucesso',
+              snackPosition: SnackPosition.TOP,
+              backgroundColor: const Color(0xFF00FF99),
+              colorText: Colors.black,
+              duration: const Duration(seconds: 3),
+              margin: const EdgeInsets.all(16),
+              borderRadius: 12,
+              icon: const Icon(Icons.check_circle, color: Colors.black),
+            );
+          }
+        });
+      } else {
+        print('❌ Registro ou auto-login falhou');
+        _showError('Não foi possível criar a conta. Tente novamente.');
       }
       
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ Erro no registro: $e');
-      _showError('Erro ao conectar com servidor');
+      print('Stack trace: $stackTrace');
+      
+      // Aguardar antes de mostrar erro
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      _showError('Erro ao conectar com servidor: ${e.toString()}');
     } finally {
       isLoading.value = false;
     }
-  }
-
-  // ✅ HARDCORE: Dialog que pede para fechar o app
-  Future<void> _mostrarDialogSucesso() async {
-    await Get.dialog(
-      WillPopScope(
-        onWillPop: () async => false, // Impedir fechar com back
-        child: AlertDialog(
-          backgroundColor: const Color(0xFF1F2937),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: Color(0xFF00FF99), width: 2),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.check_circle, color: Color(0xFF00FF99), size: 40),
-              SizedBox(width: 12),
-              Text(
-                '🎉 Conta Criada!',
-                style: TextStyle(
-                  color: Color(0xFF00FF99),
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Seu cadastro foi concluído com sucesso!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.business, color: Color(0xFF00FF99), size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Empresa: ${empresaInfo.value?['nome'] ?? 'N/A'}',
-                        style: const TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              
-              // ✅ INSTRUÇÃO PARA FECHAR O APP
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange, width: 1),
-                ),
-                child: const Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.orange, size: 24),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Para fazer login:',
-                            style: TextStyle(
-                              color: Colors.orange,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      '1. Feche este aplicativo completamente\n'
-                      '2. Abra o app novamente\n'
-                      '3. Faça login com suas credenciais',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // ✅ FECHAR O APP
-                  Get.back(); // Fechar dialog primeiro
-                  
-                  // Mostrar snackbar final
-                  Get.snackbar(
-                    '✅ Tudo Certo!',
-                    'Feche o app e abra novamente para fazer login',
-                    backgroundColor: const Color(0xFF00FF99),
-                    colorText: Colors.black,
-                    duration: const Duration(seconds: 8),
-                    margin: const EdgeInsets.all(20),
-                    borderRadius: 12,
-                    icon: const Icon(Icons.info, color: Colors.black),
-                    isDismissible: false,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00FF99),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'ENTENDI',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      barrierDismissible: false,
-    );
   }
 
   // ========== VALIDAÇÕES ==========
@@ -367,46 +249,16 @@ class RegistroController extends GetxController {
   // ========== SNACKBARS ==========
   
   void _showError(String message) {
-    Get.snackbar(
-      'Erro',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 3),
-      margin: const EdgeInsets.all(20),
-      borderRadius: 12,
-      icon: const Icon(Icons.error, color: Colors.white),
-    );
-  }
+  ErrorHandler.handleValidationError(message);
+}
 
   void _showSuccess(String message) {
-    Get.snackbar(
-      'Sucesso',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: const Color(0xFF00FF99),
-      colorText: Colors.black,
-      duration: const Duration(seconds: 3),
-      margin: const EdgeInsets.all(20),
-      borderRadius: 12,
-      icon: const Icon(Icons.check_circle, color: Colors.black),
-    );
-  }
+  ErrorHandler.showSuccess(message);
+}
 
   void _showInfo(String title, String message) {
-    Get.snackbar(
-      title,
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.blue,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 4),
-      margin: const EdgeInsets.all(20),
-      borderRadius: 12,
-      icon: const Icon(Icons.info, color: Colors.white),
-    );
-  }
+  ErrorHandler.showInfo(message, title: title);
+}
 
   @override
   void onClose() {

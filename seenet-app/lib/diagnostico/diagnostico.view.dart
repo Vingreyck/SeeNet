@@ -1,16 +1,15 @@
-// lib/diagnostico/diagnostico_view.dart - VERSÃO PROFISSIONAL AVANÇADA
+// lib/diagnostico/diagnostico_view.dart - VERSÃO OTIMIZADA (ROUND 7)
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-import 'dart:ui' show ImageFilter;
 import '../controllers/diagnostico_controller.dart';
 import '../controllers/checkmark_controller.dart';
 import '../models/diagnostico.dart';
+import '../widgets/skeleton_loader.dart';
 
-/// Diagnóstico View com técnicas avançadas de Flutter
-/// Implementa: Micro-interactions, Shimmer effects, Pull-to-refresh,
-/// Gesture handling, Performance optimizations, Custom animations
+/// Diagnóstico View OTIMIZADO - Memory Leak Prevention
+/// Round 7: Consolidação de AnimationControllers (4 → 1)
 class DiagnosticoView extends StatefulWidget {
   const DiagnosticoView({super.key});
 
@@ -19,27 +18,24 @@ class DiagnosticoView extends StatefulWidget {
 }
 
 class _DiagnosticoViewState extends State<DiagnosticoView>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin { // ✅ Single em vez de Ticker
+  
   // Controllers
   late DiagnosticoController _diagnosticoController;
   late CheckmarkController _checkmarkController;
   late TextEditingController _perguntaController;
 
-  // Animation Controllers
-  late AnimationController _shimmerController;
-  late AnimationController _fabController;
-  late AnimationController _logoController;
-  late AnimationController _slideController;
-
-  // Animations
+  // ✅ UM ÚNICO AnimationController MASTER
+  late AnimationController _masterController;
+  
+  // ✅ Múltiplas animações derivadas do mesmo controller
   late Animation<double> _shimmerAnimation;
   late Animation<double> _fabScaleAnimation;
   late Animation<double> _logoRotateAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // State variables
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
-  GlobalKey<RefreshIndicatorState>();
+      GlobalKey<RefreshIndicatorState>();
   
   @override
   void initState() {
@@ -49,11 +45,9 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
     _initializeDiagnostico();
   }
 
-  /// Inicializa os controllers usando padrão Singleton e Dependency Injection
   void _initializeControllers() {
     _perguntaController = TextEditingController();
 
-    // Pattern: Dependency Injection com GetX
     if (Get.isRegistered<DiagnosticoController>()) {
       _diagnosticoController = Get.find<DiagnosticoController>();
     } else {
@@ -67,78 +61,64 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
     }
   }
 
-  /// Configura animações avançadas com physics customizadas
+  /// ✅ ANIMAÇÕES CONSOLIDADAS - 1 Controller, Múltiplas Animações
   void _setupAnimations() {
-    // Shimmer animation para loading states
-    _shimmerController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-
-    _shimmerAnimation = Tween<double>(
-      begin: -1.0,
-      end: 2.0,
-    ).animate(CurvedAnimation(
-      parent: _shimmerController,
-      curve: Curves.easeInOutSine,
-    ));
-
-    // FAB scale animation para micro-interactions
-    _fabController = AnimationController(
-      duration: const Duration(milliseconds: 150),
-      vsync: this,
-    );
-
-    _fabScaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.95,
-    ).animate(CurvedAnimation(
-      parent: _fabController,
-      curve: Curves.easeInOut,
-    ));
-
-    // Logo rotation para feedback visual
-    _logoController = AnimationController(
+    // MASTER CONTROLLER - 2 segundos de duração
+    _masterController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
 
+    // Shimmer (0-50% do tempo total)
+    _shimmerAnimation = Tween<double>(
+      begin: -1.0,
+      end: 2.0,
+    ).animate(CurvedAnimation(
+      parent: _masterController,
+      curve: const Interval(0.0, 0.5, curve: Curves.easeInOutSine),
+    ));
+
+    // FAB Scale (0-15% do tempo total - rápido)
+    _fabScaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(
+      parent: _masterController,
+      curve: const Interval(0.0, 0.15, curve: Curves.easeInOut),
+    ));
+
+    // Logo Rotate (0-100% do tempo total)
     _logoRotateAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _logoController,
-      curve: Curves.elasticOut,
+      parent: _masterController,
+      curve: const Interval(0.0, 1.0, curve: Curves.elasticOut),
     ));
 
-    // Slide animation para transições suaves
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
+    // Slide (0-80% do tempo total)
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
     ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
+      parent: _masterController,
+      curve: const Interval(0.0, 0.8, curve: Curves.easeOutCubic),
     ));
 
-    // Iniciar animações
-    _slideController.forward();
+    // Iniciar animação
+    _masterController.forward();
   }
 
-  /// Inicializa o diagnóstico com feedback visual
   void _initializeDiagnostico() {
-    _logoController.forward().then((_) {
-      _gerarDiagnostico();
-    });
+    _gerarDiagnostico();
   }
 
-// Modificar o método _gerarDiagnostico() para limpar diagnósticos anteriores
   Future<void> _gerarDiagnostico() async {
-    _shimmerController.repeat();
+    // Animar shimmer durante loading
+    if (!_masterController.isAnimating) {
+      _masterController.repeat();
+    }
+
     _diagnosticoController.diagnosticos.clear();
 
     try {
@@ -164,7 +144,7 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
       bool sucesso = await _diagnosticoController.gerarDiagnostico(
         _checkmarkController.avaliacaoAtual.value!.id!,
         _checkmarkController.categoriaAtual.value,
-        checkmarksMarcadosIds, // ← Direto da propriedade do controller
+        checkmarksMarcadosIds,
       );
 
       if (!sucesso) {
@@ -178,10 +158,13 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
         await HapticFeedback.heavyImpact();
       }
     } finally {
-      _shimmerController.stop();
+      // Parar animação de loading
+      _masterController.stop();
+      _masterController.reset();
+      _masterController.forward(); // Voltar ao estado inicial
     }
   }
-// Modificar o método _criarDiagnosticoDemo() para remover a limpeza duplicada
+
   Future<void> _criarDiagnosticoDemo() async {
     await Future.delayed(const Duration(seconds: 2));
 
@@ -227,41 +210,39 @@ Entre em contato com a operadora informando os testes realizados.
 ---
 📋 Diagnóstico de demonstração - Configure sua chave do ChatGPT para diagnósticos reais""";
 
-    // REMOVER: A limpeza da lista (já foi feita em _gerarDiagnostico)
-    // _diagnosticoController.diagnosticos.clear(); // <- REMOVER ESTA LINHA
-
     _diagnosticoController.diagnosticos.add(
-        Diagnostico(
-          id: DateTime.now().millisecondsSinceEpoch,
-          avaliacaoId: 1,
-          categoriaId: 1,
-          promptEnviado: "Diagnóstico de demonstração",
-          respostaChatgpt: diagnosticoExemplo,
-          resumoDiagnostico: "Diagnóstico de demonstração - Configure ChatGPT para funcionalidade completa",
-          statusApi: 'sucesso',
-          dataCriacao: DateTime.now(),
-        )
+      Diagnostico(
+        id: DateTime.now().millisecondsSinceEpoch,
+        avaliacaoId: 1,
+        categoriaId: 1,
+        promptEnviado: "Diagnóstico de demonstração",
+        respostaChatgpt: diagnosticoExemplo,
+        resumoDiagnostico: "Diagnóstico de demonstração - Configure ChatGPT para funcionalidade completa",
+        statusApi: 'sucesso',
+        dataCriacao: DateTime.now(),
+      ),
     );
   }
-  /// Pull-to-refresh implementation
+
   Future<void> _handleRefresh() async {
     await HapticFeedback.mediumImpact();
     await _gerarDiagnostico();
   }
 
-  /// Sistema de Snackbar tipado
   void _showSnackbar(String title, String message, SnackbarType type) {
-    Get.snackbar(
-      title,
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: type.color,
-      colorText: Colors.white,
-      borderRadius: 12,
-      margin: const EdgeInsets.all(16),
-      icon: Icon(type.icon, color: Colors.white),
-      duration: const Duration(seconds: 3),
-    );
+    if (Get.context != null) {
+      Get.snackbar(
+        title,
+        message,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: type.color,
+        colorText: Colors.white,
+        borderRadius: 12,
+        margin: const EdgeInsets.all(16),
+        icon: Icon(type.icon, color: Colors.white),
+        duration: const Duration(seconds: 3),
+      );
+    }
   }
 
   @override
@@ -271,11 +252,10 @@ Entre em contato com a operadora informando os testes realizados.
       appBar: _buildAdvancedAppBar(),
       backgroundColor: const Color(0xFF0A0A0A),
       body: _buildBody(),
-      bottomNavigationBar: _buildBottomInputBar(), // ✅ Correção
+      bottomNavigationBar: _buildBottomInputBar(),
     );
   }
 
-  /// AppBar avançada com blur effect
   PreferredSizeWidget _buildAdvancedAppBar() {
     return AppBar(
       centerTitle: true,
@@ -292,13 +272,6 @@ Entre em contato com a operadora informando os testes realizados.
             ],
           ),
         ),
-        // Removido o BackdropFilter (blur)
-        // child: BackdropFilter(
-        //   filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-        //   child: Container(
-        //     color: Colors.white.withOpacity(0.05),
-        //   ),
-        // ),
       ),
       leading: _buildBackButton(),
       title: ShaderMask(
@@ -317,12 +290,18 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
-  /// Botão de voltar com animação
   Widget _buildBackButton() {
     return GestureDetector(
-      onTapDown: (_) => _fabController.forward(),
-      onTapUp: (_) => _fabController.reverse(),
-      onTapCancel: () => _fabController.reverse(),
+      onTapDown: (_) {
+        _masterController.reset();
+        _masterController.animateTo(0.15); // Animar FAB scale
+      },
+      onTapUp: (_) {
+        _masterController.forward();
+      },
+      onTapCancel: () {
+        _masterController.forward();
+      },
       onTap: () async {
         await HapticFeedback.selectionClick();
         Get.offAllNamed('/checklist');
@@ -335,10 +314,10 @@ Entre em contato com a operadora informando os testes realizados.
             child: Container(
               margin: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
+                color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: Colors.white.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -354,10 +333,21 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
-  /// Body principal com RefreshIndicator customizado
   Widget _buildBody() {
     return Container(
-      decoration: _buildGradientDecoration(),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF1A1A1A),
+            Color(0xFF2D2D2D),
+            Color(0xFF1F1F1F),
+            Color(0xFF0A0A0A),
+          ],
+          stops: [0.0, 0.3, 0.7, 1.0],
+        ),
+      ),
       child: RefreshIndicator(
         key: _refreshIndicatorKey,
         onRefresh: _handleRefresh,
@@ -379,7 +369,7 @@ Entre em contato com a operadora informando os testes realizados.
                   _buildStatusCard(),
                   const SizedBox(height: 20),
                   _buildDiagnosticContent(),
-                  const SizedBox(height: 100), // Space for FAB
+                  const SizedBox(height: 100),
                 ]),
               ),
             ),
@@ -389,24 +379,6 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
-  /// Decoração de gradiente avançada
-  BoxDecoration _buildGradientDecoration() {
-    return const BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFF1A1A1A),
-          Color(0xFF2D2D2D),
-          Color(0xFF1F1F1F),
-          Color(0xFF0A0A0A),
-        ],
-        stops: [0.0, 0.3, 0.7, 1.0],
-      ),
-    );
-  }
-
-  /// Logo animada com micro-interactions
   Widget _buildAnimatedLogo() {
     return AnimatedBuilder(
       animation: _logoRotateAnimation,
@@ -416,8 +388,8 @@ Entre em contato com a operadora informando os testes realizados.
           child: GestureDetector(
             onTap: () async {
               await HapticFeedback.lightImpact();
-              _logoController.reset();
-              _logoController.forward();
+              _masterController.reset();
+              _masterController.forward();
             },
             child: Container(
               width: 120,
@@ -426,13 +398,13 @@ Entre em contato com a operadora informando os testes realizados.
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF00FF88).withValues(alpha: 0.3),
+                    const Color(0xFF00FF88).withOpacity(0.3),
                     Colors.transparent,
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF00FF88).withValues(alpha: 0.3),
+                    color: const Color(0xFF00FF88).withOpacity(0.3),
                     blurRadius: 20,
                     spreadRadius: 5,
                   ),
@@ -453,7 +425,6 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
-  /// Card de status com animações
   Widget _buildStatusCard() {
     return SlideTransition(
       position: _slideAnimation,
@@ -464,12 +435,12 @@ Entre em contato com a operadora informando os testes realizados.
           color: const Color(0xFF1E1E1E),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFF00FF88).withValues(alpha: 0.3),
+            color: const Color(0xFF00FF88).withOpacity(0.3),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
+              color: Colors.black.withOpacity(0.5),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -510,7 +481,6 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
-  /// Shimmer indicator customizado
   Widget _buildShimmerIndicator() {
     return AnimatedBuilder(
       animation: _shimmerAnimation,
@@ -525,7 +495,7 @@ Entre em contato com a operadora informando os testes realizados.
               end: Alignment(1.0 - _shimmerAnimation.value, 0.0),
               colors: [
                 Colors.transparent,
-                const Color(0xFF00FF88).withValues(alpha: 0.5),
+                const Color(0xFF00FF88).withOpacity(0.5),
                 Colors.transparent,
               ],
               stops: const [0.0, 0.5, 1.0],
@@ -536,7 +506,6 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
-  /// Conteúdo do diagnóstico com loading states
   Widget _buildDiagnosticContent() {
     return Obx(() {
       if (_diagnosticoController.isLoading.value) {
@@ -551,52 +520,17 @@ Entre em contato com a operadora informando os testes realizados.
     });
   }
 
-  /// Loading shimmer avançado
   Widget _buildLoadingShimmer() {
-    return AnimatedBuilder(
-      animation: _shimmerAnimation,
-      builder: (context, child) {
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: List.generate(3, (index) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(20),
-                height: 200,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment(-1.0 - _shimmerAnimation.value, 0.0),
-                    end: Alignment(1.0 - _shimmerAnimation.value, 0.0),
-                    colors: const [
-                      Color(0xFF2A2A2A),
-                      Color(0xFF3A3A3A),
-                      Color(0xFF2A2A2A),
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
-                ),
-              );
-            }),
-          ),
-        );
-      },
-    );
+    // ✅ SKELETON SCREEN MELHORADO
+    return const DiagnosticoSkeleton();
   }
 
-  /// Lista de diagnósticos com animações
   Widget _buildDiagnosticsList() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
-        children: _diagnosticoController.diagnosticos.asMap().entries.map((entry) {
-          int index = entry.key;
-          Diagnostico diagnostico = entry.value;
-
-          return AnimatedContainer(
-            duration: Duration(milliseconds: 300 + (index * 100)),
-            curve: Curves.easeOutBack,
+        children: _diagnosticoController.diagnosticos.map((diagnostico) {
+          return Container(
             margin: const EdgeInsets.only(bottom: 20),
             child: _buildDiagnosticCard(diagnostico),
           );
@@ -605,8 +539,9 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
-  /// Card individual de diagnóstico
   Widget _buildDiagnosticCard(Diagnostico diagnostico) {
+    bool isDemo = diagnostico.promptEnviado.contains('demonstração');
+    
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -614,15 +549,15 @@ Entre em contato com a operadora informando os testes realizados.
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: diagnostico.isSucesso
-              ? const Color(0xFF00FF88).withValues(alpha: 0.5)
-              : Colors.red.withValues(alpha: 0.5),
+              ? const Color(0xFF00FF88).withOpacity(0.5)
+              : Colors.red.withOpacity(0.5),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
             color: diagnostico.isSucesso
-                ? const Color(0xFF00FF88).withValues(alpha: 0.1)
-                : Colors.red.withValues(alpha: 0.1),
+                ? const Color(0xFF00FF88).withOpacity(0.1)
+                : Colors.red.withOpacity(0.1),
             blurRadius: 20,
             spreadRadius: 1,
           ),
@@ -631,26 +566,23 @@ Entre em contato com a operadora informando os testes realizados.
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildCardHeader(diagnostico),
+          _buildCardHeader(diagnostico, isDemo),
           const SizedBox(height: 20),
           _buildCardContent(diagnostico),
-          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  /// Header do card com status
-  Widget _buildCardHeader(Diagnostico diagnostico) {
+  Widget _buildCardHeader(Diagnostico diagnostico, bool isDemo) {
     return Row(
       children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 500),
+        Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: diagnostico.isSucesso
-                ? const Color(0xFF00FF88).withValues(alpha: 0.2)
-                : Colors.red.withValues(alpha: 0.2),
+                ? const Color(0xFF00FF88).withOpacity(0.2)
+                : Colors.red.withOpacity(0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
@@ -670,18 +602,16 @@ Entre em contato com a operadora informando os testes realizados.
             ),
           ),
         ),
-        _buildTypeChip(diagnostico),
+        _buildTypeChip(isDemo),
       ],
     );
   }
 
-  /// Chip indicador de tipo
-  Widget _buildTypeChip(Diagnostico diagnostico) {
-    bool isDemo = diagnostico.promptEnviado.contains('demonstração');
+  Widget _buildTypeChip(bool isDemo) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isDemo ? Colors.orange.withValues(alpha: 0.2) : Colors.blue.withValues(alpha: 0.2),
+        color: isDemo ? Colors.orange.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDemo ? Colors.orange : Colors.blue,
@@ -699,7 +629,6 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
-  /// Conteúdo do card
   Widget _buildCardContent(Diagnostico diagnostico) {
     return Container(
       width: double.infinity,
@@ -708,48 +637,18 @@ Entre em contato com a operadora informando os testes realizados.
         color: const Color(0xFF0A0A0A),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (diagnostico.respostaChatgpt.isNotEmpty)
-            SelectableText(
-              diagnostico.respostaChatgpt,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                height: 1.6,
-                fontFamily: 'monospace',
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      color: Colors.red.shade300,
-                      size: 48,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Erro ao carregar o diagnóstico',
-                      style: TextStyle(
-                        color: Colors.red.shade300,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
+      child: SelectableText(
+        diagnostico.respostaChatgpt,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          height: 1.6,
+          fontFamily: 'monospace',
+        ),
       ),
     );
   }
 
-  /// Estado vazio com CTA
   Widget _buildEmptyState() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -757,10 +656,7 @@ Entre em contato com a operadora informando os testes realizados.
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white12,
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white12, width: 1),
       ),
       child: Column(
         children: [
@@ -781,10 +677,7 @@ Entre em contato com a operadora informando os testes realizados.
           const SizedBox(height: 12),
           const Text(
             'Volte para o checklist e selecione problemas para gerar um diagnóstico',
-            style: TextStyle(
-              color: Colors.white60,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: Colors.white60, fontSize: 14),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 30),
@@ -794,99 +687,83 @@ Entre em contato com a operadora informando os testes realizados.
     );
   }
 
-  /// Botão CTA animado
   Widget _buildCTAButton() {
     return GestureDetector(
-      onTapDown: (_) => _fabController.forward(),
-      onTapUp: (_) => _fabController.reverse(),
-      onTapCancel: () => _fabController.reverse(),
       onTap: () async {
         await HapticFeedback.mediumImpact();
         Get.offAllNamed('/checklist');
       },
-      child: AnimatedBuilder(
-        animation: _fabScaleAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _fabScaleAnimation.value,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00FF88), Color(0xFF00CC6A)],
-                ),
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF00FF88).withValues(alpha: 0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.arrow_back, color: Colors.black),
-                  SizedBox(width: 8),
-                  Text(
-                    'Voltar ao Checklist',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF00FF88), Color(0xFF00CC6A)],
+          ),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00FF88).withOpacity(0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.arrow_back, color: Colors.black),
+            SizedBox(width: 8),
+            Text(
+              'Voltar ao Checklist',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
 
-Widget _buildBottomInputBar() {
-  return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: const Color(0xFF1E1E1E),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.3),
-          blurRadius: 20,
-          offset: const Offset(0, -10),
-        ),
-      ],
-    ),
-    child: SafeArea(
-      child: Row(
-        children: [
-          Expanded(child: _buildInputField()),
-          const SizedBox(width: 8),
-          _buildMicButton(),
-          const SizedBox(width: 8),
-          _buildSendButton(),
+  Widget _buildBottomInputBar() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, -10),
+          ),
         ],
       ),
-    ),
-  );
-}
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(child: _buildInputField()),
+            const SizedBox(width: 8),
+            _buildMicButton(),
+            const SizedBox(width: 8),
+            _buildSendButton(),
+          ],
+        ),
+      ),
+    );
+  }
 
-  /// Campo de input avançado
   Widget _buildInputField() {
     return Container(
       margin: const EdgeInsets.only(left: 20),
       child: TextField(
         controller: _perguntaController,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-        ),
+        style: const TextStyle(color: Colors.white, fontSize: 16),
         decoration: InputDecoration(
           hintText: 'Pergunte sobre o diagnóstico...',
           hintStyle: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
+            color: Colors.white.withOpacity(0.5),
             fontSize: 16,
           ),
           border: InputBorder.none,
@@ -896,12 +773,8 @@ Widget _buildBottomInputBar() {
     );
   }
 
-  /// Botão do microfone com animação
   Widget _buildMicButton() {
     return GestureDetector(
-      onTapDown: (_) => _fabController.forward(),
-      onTapUp: (_) => _fabController.reverse(),
-      onTapCancel: () => _fabController.reverse(),
       onTap: () async {
         await HapticFeedback.mediumImpact();
         _showSnackbar(
@@ -910,45 +783,24 @@ Widget _buildBottomInputBar() {
           SnackbarType.info,
         );
       },
-      child: AnimatedBuilder(
-        animation: _fabScaleAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _fabScaleAnimation.value,
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A2A2A),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white12,
-                  width: 1,
-                ),
-              ),
-              child: const Icon(
-                Icons.mic,
-                color: Colors.white70,
-                size: 24,
-              ),
-            ),
-          );
-        },
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A2A),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white12, width: 1),
+        ),
+        child: const Icon(Icons.mic, color: Colors.white70, size: 24),
       ),
     );
   }
 
-  /// Botão de envio com gradiente
   Widget _buildSendButton() {
     return GestureDetector(
-      onTapDown: (_) => _fabController.forward(),
-      onTapUp: (_) => _fabController.reverse(),
-      onTapCancel: () => _fabController.reverse(),
       onTap: () async {
         if (_perguntaController.text.isNotEmpty) {
           await HapticFeedback.mediumImpact();
-
-          // Simular envio de mensagem
           String pergunta = _perguntaController.text;
           _perguntaController.clear();
 
@@ -959,42 +811,25 @@ Widget _buildBottomInputBar() {
           );
         }
       },
-      child: AnimatedBuilder(
-        animation: _fabScaleAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _fabScaleAnimation.value,
-            child: Container(
-              width: 50,
-              height: 50,
-              margin: const EdgeInsets.only(right: 10),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: _perguntaController.text.isNotEmpty
-                      ? [const Color(0xFF00FF88), const Color(0xFF00CC6A)]
-                      : [const Color(0xFF2A2A2A), const Color(0xFF2A2A2A)],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: _perguntaController.text.isNotEmpty
-                    ? [
-                  BoxShadow(
-                    color: const Color(0xFF00FF88).withValues(alpha: 0.4),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
-                  ),
-                ]
-                    : [],
-              ),
-              child: Icon(
-                Icons.send,
-                color: _perguntaController.text.isNotEmpty
-                    ? Colors.black
-                    : Colors.white54,
-                size: 24,
-              ),
-            ),
-          );
-        },
+      child: Container(
+        width: 50,
+        height: 50,
+        margin: const EdgeInsets.only(right: 10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: _perguntaController.text.isNotEmpty
+                ? [const Color(0xFF00FF88), const Color(0xFF00CC6A)]
+                : [const Color(0xFF2A2A2A), const Color(0xFF2A2A2A)],
+          ),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.send,
+          color: _perguntaController.text.isNotEmpty
+              ? Colors.black
+              : Colors.white54,
+          size: 24,
+        ),
       ),
     );
   }
@@ -1002,15 +837,11 @@ Widget _buildBottomInputBar() {
   @override
   void dispose() {
     _perguntaController.dispose();
-    _shimmerController.dispose();
-    _fabController.dispose();
-    _logoController.dispose();
-    _slideController.dispose();
+    _masterController.dispose(); // ✅ Apenas 1 dispose
     super.dispose();
   }
 }
 
-/// Enum para tipos de Snackbar
 enum SnackbarType {
   success(Color(0xFF4CAF50), Icons.check_circle),
   error(Color(0xFFF44336), Icons.error),
@@ -1021,155 +852,3 @@ enum SnackbarType {
   final Color color;
   final IconData icon;
 }
-
-/// Extension para facilitar uso de filtros
-extension ImageFilterImport on ImageFilter {
-  // Import necessário no topo do arquivo:
-  // import 'dart:ui' show ImageFilter;
-}
-
-/// Classe para shimmer customizado (opcional - para casos mais avançados)
-class CustomShimmer extends StatefulWidget {
-  final Widget child;
-  final Color baseColor;
-  final Color highlightColor;
-  final Duration duration;
-
-  const CustomShimmer({
-    super.key,
-    required this.child,
-    this.baseColor = const Color(0xFF2A2A2A),
-    this.highlightColor = const Color(0xFF3A3A3A),
-    this.duration = const Duration(milliseconds: 1500),
-  });
-
-  @override
-  State<CustomShimmer> createState() => _CustomShimmerState();
-}
-
-class _CustomShimmerState extends State<CustomShimmer>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: widget.duration,
-      vsync: this,
-    );
-    _animation = Tween<double>(
-      begin: -1.0,
-      end: 2.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutSine,
-    ));
-    _controller.repeat();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return ShaderMask(
-          shaderCallback: (bounds) {
-            return LinearGradient(
-              begin: Alignment(-1.0 - _animation.value, 0.0),
-              end: Alignment(1.0 - _animation.value, 0.0),
-              colors: [
-                widget.baseColor,
-                widget.highlightColor,
-                widget.baseColor,
-              ],
-              stops: const [0.0, 0.5, 1.0],
-            ).createShader(bounds);
-          },
-          child: widget.child,
-        );
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-}
-
-/// Mixin para performance optimization
-mixin PerformanceOptimization<T extends StatefulWidget> on State<T> {
-  /// Cache para widgets pesados
-  final Map<String, Widget> _widgetCache = {};
-
-  /// Método para cachear widgets
-  Widget cacheWidget(String key, Widget Function() builder) {
-    return _widgetCache.putIfAbsent(key, builder);
-  }
-
-  /// Limpar cache quando necessário
-  void clearCache() {
-    _widgetCache.clear();
-  }
-
-  @override
-  void dispose() {
-    clearCache();
-    super.dispose();
-  }
-}
-
-/// Pattern: Observer para mudanças de estado
-abstract class DiagnosticoObserver {
-  void onDiagnosticoUpdated(List<Diagnostico> diagnosticos);
-  void onLoadingStateChanged(bool isLoading);
-  void onErrorOccurred(String error);
-}
-
-/// Pattern: Command para ações (será implementado futuramente)
-abstract class DiagnosticoCommand {
-  Future<void> execute();
-  Future<void> undo();
-}
-
-/// Pattern: Factory para criação de widgets
-class DiagnosticoWidgetFactory {
-  static Widget createLoadingIndicator({
-    Color? color,
-    double? size,
-  }) {
-    return CircularProgressIndicator(
-      color: color ?? const Color(0xFF00FF88),
-      strokeWidth: 3,
-    );
-  }
-
-  static Widget createErrorWidget(String message) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error, color: Colors.red),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Adicionar import necessário no topo:
-// import 'dart:ui' show ImageFilter; (já adicionado acima)

@@ -1,10 +1,11 @@
-// lib/controllers/checkmark_controller.dart - VERSÃO CORRIGIDA SEM DUPLA CHAMADA
+// lib/controllers/checkmark_controller.dart - COM ERROR HANDLER (ROUND 9)
 import 'package:get/get.dart';
 import '../models/categoria_checkmark.dart';
 import '../models/checkmark.dart';
 import '../models/avaliacao.dart';
 import '../controllers/diagnostico_controller.dart';
 import '../services/api_service.dart';
+import '../utils/error_handler.dart'; // ✅ IMPORTAR
 
 class CheckmarkController extends GetxController {
   final ApiService _api = ApiService.instance;
@@ -16,8 +17,10 @@ class CheckmarkController extends GetxController {
   RxInt categoriaAtual = 0.obs;
   RxBool isLoading = false.obs;
   
-  // ✅ ADICIONAR FLAG PARA EVITAR CHAMADA DUPLICADA
   bool _gerandoDiagnostico = false;
+
+Worker? _categoriasWorker;
+Worker? _checkmarksWorker;
 
   @override
   void onInit() {
@@ -40,38 +43,65 @@ class CheckmarkController extends GetxController {
 
         print('✅ ${categorias.length} categorias carregadas da API');
       } else {
-        print('❌ Erro ao carregar categorias: ${response['error']}');
-        Get.snackbar('Erro', 'Falha ao carregar categorias');
+        // ✅ USAR ERROR HANDLER
+        ErrorHandler.handle(
+          response['error'] ?? 'Erro ao carregar categorias',
+          context: 'carregarCategorias',
+        );
       }
     } catch (e) {
-      print('❌ Erro ao carregar categorias: $e');
-      Get.snackbar('Erro', 'Erro de conexão ao carregar categorias');
+      // ✅ USAR ERROR HANDLER
+      ErrorHandler.handle(e, context: 'carregarCategorias');
     } finally {
       isLoading.value = false;
     }
   }
+
+  // ========== SETUP WORKERS ==========
+  void _setupWorkers() {
+  // Worker 1: Só reagir quando categorias realmente mudarem
+  _categoriasWorker = ever(categorias, (callback) {
+    print('🔄 Categorias atualizadas: ${categorias.length} itens');
+  });
+
+  // Worker 2: Reagir quando categoria atual mudar
+  _checkmarksWorker = ever(categoriaAtual, (categoriaId) {
+    if (categoriaId > 0) {
+      print('🔄 Categoria selecionada: $categoriaId');
+    }
+  });
+
+  // Worker 3: Debounce para respostas (evitar múltiplos rebuilds)
+  debounce(
+    respostas,
+    (_) {
+      print('📊 Total de checkmarks marcados: $totalCheckmarksMarcados');
+    },
+    time: const Duration(milliseconds: 300),
+  );
+}
   
   // ========== GERAR DIAGNÓSTICO COM GEMINI ==========
   Future<bool> gerarDiagnosticoComGemini() async {
-    // ✅ PREVENIR CHAMADA DUPLICADA
     if (_gerandoDiagnostico) {
       print('⚠️ Diagnóstico já está sendo gerado, ignorando chamada duplicada');
       return false;
     }
     
     try {
-      // ✅ MARCAR COMO GERANDO
       _gerandoDiagnostico = true;
       
       if (avaliacaoAtual.value == null) {
         print('❌ Nenhuma avaliação ativa');
-        Get.snackbar('Erro', 'Nenhuma avaliação ativa');
+        // ✅ USAR ERROR HANDLER
+        ErrorHandler.handleValidationError('Nenhuma avaliação ativa');
         return false;
       }
 
       if (categoriaAtual.value == 0) {
         print('❌ Categoria não selecionada');
-        Get.snackbar('Erro', 'Categoria não identificada');
+        // ✅ USAR ERROR HANDLER
+        ErrorHandler.handleValidationError('Categoria não identificada');
         return false;
       }
 
@@ -79,7 +109,8 @@ class CheckmarkController extends GetxController {
 
       if (checkmarksMarcadosIds.isEmpty) {
         print('⚠️ Nenhum checkmark marcado');
-        Get.snackbar('Aviso', 'Marque pelo menos um problema');
+        // ✅ USAR ERROR HANDLER
+        ErrorHandler.showWarning('Marque pelo menos um problema');
         return false;
       }
 
@@ -88,7 +119,6 @@ class CheckmarkController extends GetxController {
       print('   Categoria ID: ${categoriaAtual.value}');
       print('   Checkmarks marcados: $checkmarksMarcadosIds');
 
-      // Usar o DiagnosticoController
       final diagnosticoController = Get.find<DiagnosticoController>();
       
       final sucesso = await diagnosticoController.gerarDiagnostico(
@@ -100,59 +130,61 @@ class CheckmarkController extends GetxController {
       return sucesso;
     } catch (e) {
       print('❌ Erro ao gerar diagnóstico: $e');
-      Get.snackbar('Erro', 'Falha na comunicação com a IA: $e');
+      // ✅ USAR ERROR HANDLER
+      ErrorHandler.handle(e, context: 'gerarDiagnosticoComGemini');
       return false;
     } finally {
-      // ✅ LIBERAR FLAG
       _gerandoDiagnostico = false;
     }
   }
 
   // ========== CARREGAR CHECKMARKS DE UMA CATEGORIA ==========
-Future<void> carregarCheckmarks(int categoriaId) async {
-  try {
-    isLoading.value = true;
-    categoriaAtual.value = categoriaId;
+  Future<void> carregarCheckmarks(int categoriaId) async {
+    try {
+      isLoading.value = true;
+      categoriaAtual.value = categoriaId;
 
-    print('📥 Carregando checkmarks da categoria: $categoriaId');
+      print('📥 Carregando checkmarks da categoria: $categoriaId');
 
-    final response = await _api.get('/checkmark/categoria/$categoriaId');
+      final response = await _api.get('/checkmark/categoria/$categoriaId');
 
-    print('📦 Response completo: $response');
+      print('📦 Response completo: $response');
 
-    if (response['success']) {
-      final List<dynamic> data = response['data']['checkmarks'];
-      
-      print('📋 Total de checkmarks recebidos: ${data.length}');
-      
-      // Debug: mostrar primeiro item
-      if (data.isNotEmpty) {
-        print('🔍 Primeiro checkmark: ${data.first}');
-      }
-      
-      checkmarksAtivos.value = data.map((json) {
-        try {
-          return Checkmark.fromMap(json);
-        } catch (e) {
-          print('❌ Erro ao converter checkmark: $json');
-          print('❌ Erro: $e');
-          rethrow;
+      if (response['success']) {
+        final List<dynamic> data = response['data']['checkmarks'];
+        
+        print('📋 Total de checkmarks recebidos: ${data.length}');
+        
+        if (data.isNotEmpty) {
+          print('🔍 Primeiro checkmark: ${data.first}');
         }
-      }).toList();
+        
+        checkmarksAtivos.value = data.map((json) {
+          try {
+            return Checkmark.fromMap(json);
+          } catch (e) {
+            print('❌ Erro ao converter checkmark: $json');
+            print('❌ Erro: $e');
+            rethrow;
+          }
+        }).toList();
 
-      respostas.clear();
-      print('✅ ${checkmarksAtivos.length} checkmarks carregados');
-    } else {
-      print('❌ Erro ao carregar checkmarks: ${response['error']}');
-      Get.snackbar('Erro', 'Falha ao carregar checkmarks');
+        respostas.clear();
+        print('✅ ${checkmarksAtivos.length} checkmarks carregados');
+      } else {
+        // ✅ USAR ERROR HANDLER
+        ErrorHandler.handle(
+          response['error'] ?? 'Erro ao carregar checkmarks',
+          context: 'carregarCheckmarks',
+        );
+      }
+    } catch (e) {
+      // ✅ USAR ERROR HANDLER
+      ErrorHandler.handle(e, context: 'carregarCheckmarks');
+    } finally {
+      isLoading.value = false;
     }
-  } catch (e) {
-    print('❌ Erro ao carregar checkmarks: $e');
-    Get.snackbar('Erro', 'Erro de conexão ao carregar checkmarks');
-  } finally {
-    isLoading.value = false;
   }
-}
 
   // ========== INICIAR NOVA AVALIAÇÃO NA API ==========
   Future<bool> iniciarAvaliacao(int tecnicoId, String titulo) async {
@@ -177,13 +209,16 @@ Future<void> carregarCheckmarks(int categoriaId) async {
         print('✅ Avaliação iniciada na API: $avaliacaoId');
         return true;
       } else {
-        print('❌ Erro ao iniciar avaliação: ${response['error']}');
-        Get.snackbar('Erro', 'Falha ao iniciar avaliação');
+        // ✅ USAR ERROR HANDLER
+        ErrorHandler.handle(
+          response['error'] ?? 'Erro ao iniciar avaliação',
+          context: 'iniciarAvaliacao',
+        );
         return false;
       }
     } catch (e) {
-      print('❌ Erro ao iniciar avaliação: $e');
-      Get.snackbar('Erro', 'Erro de conexão ao iniciar avaliação');
+      // ✅ USAR ERROR HANDLER
+      ErrorHandler.handle(e, context: 'iniciarAvaliacao');
       return false;
     } finally {
       isLoading.value = false;
@@ -201,7 +236,8 @@ Future<void> carregarCheckmarks(int categoriaId) async {
     try {
       if (avaliacaoAtual.value == null) {
         print('❌ Nenhuma avaliação ativa');
-        Get.snackbar('Erro', 'Nenhuma avaliação ativa');
+        // ✅ USAR ERROR HANDLER
+        ErrorHandler.handleValidationError('Nenhuma avaliação ativa');
         return false;
       }
 
@@ -211,7 +247,8 @@ Future<void> carregarCheckmarks(int categoriaId) async {
           .toList();
 
       if (checkmarksMarcados.isEmpty) {
-        Get.snackbar('Aviso', 'Marque pelo menos um problema');
+        // ✅ USAR ERROR HANDLER
+        ErrorHandler.showWarning('Marque pelo menos um problema');
         return false;
       }
 
@@ -238,13 +275,16 @@ Future<void> carregarCheckmarks(int categoriaId) async {
         print('✅ ${checkmarksMarcados.length} respostas salvas na API');
         return true;
       } else {
-        print('❌ Erro ao salvar respostas: ${response['error']}');
-        Get.snackbar('Erro', 'Falha ao salvar respostas');
+        // ✅ USAR ERROR HANDLER
+        ErrorHandler.handle(
+          response['error'] ?? 'Erro ao salvar respostas',
+          context: 'salvarRespostas',
+        );
         return false;
       }
     } catch (e) {
-      print('❌ Erro ao salvar respostas: $e');
-      Get.snackbar('Erro', 'Erro de conexão ao salvar respostas');
+      // ✅ USAR ERROR HANDLER
+      ErrorHandler.handle(e, context: 'salvarRespostas');
       return false;
     } finally {
       isLoading.value = false;
@@ -265,13 +305,20 @@ Future<void> carregarCheckmarks(int categoriaId) async {
 
       if (response['success']) {
         print('✅ Avaliação finalizada na API');
+        // ✅ USAR ERROR HANDLER PARA SUCESSO
+        ErrorHandler.showSuccess('Avaliação finalizada com sucesso');
         return true;
       } else {
-        print('❌ Erro ao finalizar: ${response['error']}');
+        // ✅ USAR ERROR HANDLER
+        ErrorHandler.handle(
+          response['error'] ?? 'Erro ao finalizar avaliação',
+          context: 'finalizarAvaliacao',
+        );
         return false;
       }
     } catch (e) {
-      print('❌ Erro ao finalizar avaliação: $e');
+      // ✅ USAR ERROR HANDLER
+      ErrorHandler.handle(e, context: 'finalizarAvaliacao');
       return false;
     } finally {
       isLoading.value = false;
@@ -284,7 +331,7 @@ Future<void> carregarCheckmarks(int categoriaId) async {
     respostas.clear();
     checkmarksAtivos.clear();
     categoriaAtual.value = 0;
-    _gerandoDiagnostico = false; // ✅ RESETAR FLAG
+    _gerandoDiagnostico = false;
     print('✅ Avaliação limpa');
   }
 
@@ -330,5 +377,12 @@ Future<void> carregarCheckmarks(int categoriaId) async {
     } catch (e) {
       return null;
     }
+    
+  }
+    @override
+  void onClose() {
+    _categoriasWorker?.dispose();
+    _checkmarksWorker?.dispose();
+    super.onClose();
   }
 }

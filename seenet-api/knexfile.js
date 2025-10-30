@@ -37,6 +37,9 @@ module.exports = {
     migrations: {
       directory: path.join(__dirname, 'src', 'migrations')
     },
+    seeds: {
+      directory: path.join(__dirname, 'src', 'seeds')
+    },
     pool: {
       min: 2,
       max: 10

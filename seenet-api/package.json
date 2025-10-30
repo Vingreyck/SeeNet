@@ -4,11 +4,14 @@
   "description": "SeeNet Multi-tenant API",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "start": "NODE_ENV=production node src/server.js",
+    "dev": "NODE_ENV=development nodemon src/server.js",
     "test": "jest",
     "migrate": "knex migrate:latest",
-    "seed": "knex seed:run"
+    "migrate:prod": "NODE_ENV=production knex migrate:latest",
+    "migrate:status": "knex migrate:status",
+    "seed": "knex seed:run",
+    "seed:prod": "NODE_ENV=production knex seed:run"
   },
   "dependencies": {
     "cors": "^2.8.5",

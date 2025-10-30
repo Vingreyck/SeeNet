@@ -1,6 +1,14 @@
 exports.seed = async function(knex) {
-  await knex('checkmarks').del();
+  // Verificar se já existem checkmarks
+  const existingCheckmarks = await knex('checkmarks')
+    .select('id')
+    .limit(1);
   
+  if (existingCheckmarks.length > 0) {
+    console.log('✅ Checkmarks já existem, pulando seed...');
+    return;
+  }
+
   const tenant = await knex('tenants').where('codigo', 'DEMO2024').first();
   if (!tenant) {
     console.log('⚠️ Tenant DEMO2024 não encontrado');
@@ -50,7 +58,6 @@ exports.seed = async function(knex) {
         { titulo: 'Conteúdo não carrega', descricao: 'Conteúdo dos apps não carrega', prompt: 'Apps abrem mas conteúdo não carrega.' }
       ];
     } else {
-      // Checkmarks genéricos para outras categorias
       items = [
         { titulo: 'Problema geral 1', descricao: `Problema relacionado a ${cat.nome}`, prompt: `Analise problema em ${cat.nome} e forneça soluções.` },
         { titulo: 'Problema geral 2', descricao: `Outro problema em ${cat.nome}`, prompt: `Diagnóstico de problema em ${cat.nome}.` }

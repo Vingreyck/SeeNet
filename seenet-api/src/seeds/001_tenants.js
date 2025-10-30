@@ -1,19 +1,17 @@
 exports.seed = async function(knex) {
-  // Limpar dados existentes
-  await knex('logs_sistema').del();
-  await knex('transcricoes_tecnicas').del();
-  await knex('diagnosticos').del();
-  await knex('respostas_checkmark').del();
-  await knex('avaliacoes').del();
-  await knex('checkmarks').del();
-  await knex('categorias_checkmark').del();
-  await knex('usuarios').del();
-  await knex('tenants').del();
+  // Verificar se já existem tenants
+  const existingTenants = await knex('tenants')
+    .select('id')
+    .limit(1);
+  
+  if (existingTenants.length > 0) {
+    console.log('✅ Tenants já existem, pulando seed...');
+    return;
+  }
 
   // Inserir tenants de teste
   const tenants = await knex('tenants').insert([
     {
-      id: 1,
       nome: 'SeeNet Demo',
       codigo: 'DEMO2024',
       descricao: 'Empresa de demonstração do sistema SeeNet',
@@ -33,7 +31,6 @@ exports.seed = async function(knex) {
       contato_telefone: '(11) 99999-9999'
     },
     {
-      id: 2,
       nome: 'TechCorp Ltda',
       codigo: 'TECH2024',
       descricao: 'Empresa de tecnologia especializada em redes',
@@ -55,5 +52,5 @@ exports.seed = async function(knex) {
     }
   ]).returning('id');
 
-  console.log('✅ Tenants criados:', tenants);
+  console.log('✅ Tenants criados:', tenants.map(t => t.id || t));
 };

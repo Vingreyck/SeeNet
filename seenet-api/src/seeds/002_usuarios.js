@@ -4,7 +4,7 @@ exports.seed = async function(knex) {
   // Verificar se já existem dados
   const existingUsers = await knex('usuarios').select('id').limit(1);
   if (existingUsers.length > 0) {
-    console.log('📊 Seeds já executados, pulando...');
+    console.log('📊 Usuários já existem, pulando...');
     return;
   }
 

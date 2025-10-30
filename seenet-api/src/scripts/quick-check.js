@@ -7,7 +7,7 @@ async function check() {
     host: 'ep-fragrant-hall-ac21xf1e-pooler.sa-east-1.aws.neon.tech',
     port: 5432,
     user: 'neondb_owner',
-    password: 'npg_YJN0yymM1J4h',
+    password: 'npg_YJW0ycmUdj4h',
     database: 'neondb',
     ssl: {
       rejectUnauthorized: false
@@ -39,19 +39,38 @@ async function check() {
     console.log(`  Logs: ${logs.rows[0].count}`);
 
     // Últimos checkmarks
-    console.log('\n📝 Últimos 5 checkmarks criados:');
+    console.log('\n📝 Últimos 10 checkmarks criados:');
     const last = await client.query(
-      `SELECT id, titulo, TO_CHAR(data_criacao, 'DD/MM/YYYY') as data 
+      `SELECT id, titulo, tenant_id, 
+              TO_CHAR(data_criacao, 'DD/MM/YYYY HH24:MI') as data 
        FROM checkmarks 
-       ORDER BY id DESC 
-       LIMIT 5`
+       ORDER BY data_criacao DESC 
+       LIMIT 10`
     );
     
     last.rows.forEach(c => {
-      console.log(`  - ID ${c.id}: ${c.titulo} (${c.data})`);
+      console.log(`  - ID ${c.id} (tenant ${c.tenant_id}): ${c.titulo} - ${c.data}`);
     });
 
-    console.log('\n✅ Verificação completa\n');
+    // Diagnósticos recentes
+    console.log('\n🔬 Últimos 5 diagnósticos:');
+    const diags = await client.query(
+      `SELECT id, tenant_id, 
+              TO_CHAR(created_at, 'DD/MM/YYYY HH24:MI') as data 
+       FROM diagnosticos 
+       ORDER BY created_at DESC 
+       LIMIT 5`
+    );
+    
+    if (diags.rows.length > 0) {
+      diags.rows.forEach(d => {
+        console.log(`  - ID ${d.id} (tenant ${d.tenant_id}) - ${d.data}`);
+      });
+    } else {
+      console.log('  (Nenhum diagnóstico gerado ainda)');
+    }
+
+    console.log('\n✅ Verificação completa!\n');
 
   } catch (error) {
     console.error('❌ Erro:', error.message);

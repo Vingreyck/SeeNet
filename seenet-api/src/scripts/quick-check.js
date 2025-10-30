@@ -56,9 +56,9 @@ async function check() {
     console.log('\n🔬 Últimos 5 diagnósticos:');
     const diags = await client.query(
       `SELECT id, tenant_id, 
-              TO_CHAR(created_at, 'DD/MM/YYYY HH24:MI') as data 
+              TO_CHAR(data_criacao, 'DD/MM/YYYY HH24:MI') as data 
        FROM diagnosticos 
-       ORDER BY created_at DESC 
+       ORDER BY data_criacao DESC 
        LIMIT 5`
     );
     

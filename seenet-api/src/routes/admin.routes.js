@@ -307,7 +307,6 @@ router.post('/users', authMiddleware, requireAdmin, async (req, res) => {
       senha,
       tipo_usuario,
       tenant_id: req.user.tenant_id,
-      // ✅ REMOVIDO: created_at e updated_at (deixar o banco usar defaults)
     }).returning('id');
     
     res.json({

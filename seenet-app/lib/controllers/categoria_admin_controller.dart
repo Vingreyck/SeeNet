@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'checkmark_controller.dart';
 import '../services/categoria_service.dart';
 
 class CategoriaAdminController extends GetxController {
@@ -112,52 +113,78 @@ class CategoriaAdminController extends GetxController {
     }
   }
 
-  Future<void> deletarCategoria(int id, String nome) async {
-    try {
-      final confirmacao = await Get.dialog<bool>(
-        AlertDialog(
-          title: const Text('Confirmar exclusão'),
+Future<void> deletarCategoria(int id, String nome) async {
+  try {
+    bool? confirmacao = await showDialog<bool>(
+      context: Get.context!,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2A2A2A),
+          title: const Text(
+            'Confirmar exclusão',
+            style: TextStyle(color: Colors.white),
+          ),
           content: Text(
             'Tem certeza que deseja deletar a categoria "$nome"?\n\n'
             'Esta ação não pode ser desfeita.',
+            style: const TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
-              onPressed: () => Get.back(result: false),
-              child: const Text('Cancelar'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.white54),
+              ),
             ),
             ElevatedButton(
-              onPressed: () => Get.back(result: true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Deletar'),
             ),
           ],
-        ),
-      );
+        );
+      },
+    );
 
-      if (confirmacao != true) return;
+    if (confirmacao != true) return;
 
-      isLoading.value = true;
+    isLoading.value = true;
 
-      await _categoriaService.deletarCategoria(id);
+    await _categoriaService.deletarCategoria(id);
 
-      Get.snackbar(
-        'Sucesso',
-        'Categoria deletada com sucesso',
-        backgroundColor: const Color(0xFF00FF88),
-        colorText: Colors.black,
-      );
+    // ✅ REMOVER da lista local IMEDIATAMENTE
+    categorias.removeWhere((cat) => cat['id'] == id);
 
-      await carregarCategorias();
-    } catch (e) {
-      Get.snackbar(
-        'Erro',
-        'Não foi possível deletar a categoria: $e',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      isLoading.value = false;
+    // ✅ ATUALIZAR CheckmarkController se estiver registrado
+    if (Get.isRegistered<CheckmarkController>()) {
+      final checkmarkController = Get.find<CheckmarkController>();
+      // Recarregar categorias no CheckmarkController
+      await checkmarkController.carregarCategorias();
     }
+
+    Get.snackbar(
+      'Sucesso',
+      'Categoria deletada com sucesso',
+      backgroundColor: const Color(0xFF00FF88),
+      colorText: Colors.black,
+    );
+
+    // ✅ Recarregar para garantir sincronização
+    await carregarCategorias();
+  } catch (e) {
+    print('❌ Erro ao deletar categoria: $e');
+    Get.snackbar(
+      'Erro',
+      'Não foi possível deletar a categoria: $e',
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
+  } finally {
+    isLoading.value = false;
   }
+}
 }

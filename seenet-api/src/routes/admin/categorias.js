@@ -182,7 +182,6 @@ router.put('/:id', async (req, res) => {
     console.log('   Tenant ID:', tenant_id);
     console.log('   Usuario ID:', usuario_id);
 
-    // Buscar categoria existente
     const existente = await db('categorias_checkmark')
       .where({ id, tenant_id })
       .first();
@@ -196,7 +195,6 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    // Verificar duplicação de nome
     if (nome && nome !== existente.nome) {
       const duplicado = await db('categorias_checkmark')
         .where({ tenant_id, nome })
@@ -217,9 +215,7 @@ router.put('/:id', async (req, res) => {
     if (descricao !== undefined) updateData.descricao = descricao;
     if (ordem !== undefined && ordem !== null) updateData.ordem = parseInt(ordem);
     
-    // ⚠️ CORREÇÃO IMPORTANTE: converter ativo para boolean
     if (ativo !== undefined && ativo !== null) {
-      // Aceitar: true, false, 1, 0, "true", "false"
       if (typeof ativo === 'boolean') {
         updateData.ativo = ativo;
       } else if (typeof ativo === 'number') {
@@ -229,11 +225,11 @@ router.put('/:id', async (req, res) => {
       }
     }
     
-    updateData.data_atualizacao = new Date();
+    // ❌ REMOVER ESTA LINHA:
+    // updateData.data_atualizacao = new Date();
 
     console.log('   Dados para update:', JSON.stringify(updateData));
 
-    // Atualizar no banco
     const result = await db('categorias_checkmark')
       .where({ id: parseInt(id), tenant_id })
       .update(updateData)

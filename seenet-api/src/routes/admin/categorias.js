@@ -1,24 +1,43 @@
-// backend/routes/admin/categorias.js
 const express = require('express');
 const router = express.Router();
+
+console.log('\n🔥 === ARQUIVO routes/admin/categorias.js CARREGADO ===');
+console.log('📍 Este log confirma que o arquivo foi lido pelo Node.js');
+
 const { db } = require('../../config/database');
-const authMiddleware = require('../../middleware/auth'); // ← Import padrão
-const { adminMiddleware } = authMiddleware; // ← Extrair adminMiddleware
+
+console.log('✅ Database importado:', typeof db);
+
+const authMiddleware = require('../../middleware/auth');
+const { adminMiddleware } = authMiddleware;
+
+console.log('✅ Middlewares importados');
+
 const { body, validationResult } = require('express-validator');
 
-console.log('📋 Carregando routes/admin/categorias.js');
+console.log('✅ express-validator importado');
 
 // Aplicar middlewares
-router.use(authMiddleware); // ← Usar authMiddleware diretamente (não chamar como função)
-router.use(adminMiddleware); // ← Adicionar verificação de admin
+router.use((req, res, next) => {
+  console.log('🔵 Middleware categorias atingido:', req.method, req.path);
+  next();
+});
 
-// Resto do código permanece igual...
+router.use(authMiddleware);
+router.use(adminMiddleware);
+
+console.log('✅ Middlewares aplicados ao router');
+
+// GET - Listar categorias
 router.get('/', async (req, res) => {
-  console.log('📥 GET /admin/categorias');
+  console.log('📥 === GET /admin/categorias EXECUTANDO ===');
+  console.log('   User:', req.user?.email);
   console.log('   Tenant ID:', req.user?.tenant_id);
   
   try {
     const { tenant_id } = req.user;
+
+    console.log('   🔍 Buscando categorias para tenant:', tenant_id);
 
     const categorias = await db('categorias_checkmark')
       .where({ tenant_id })
@@ -41,12 +60,15 @@ router.get('/', async (req, res) => {
       })
     );
 
+    console.log('   📤 Enviando resposta com', categoriasComContagem.length, 'categorias');
+
     res.json({
       success: true,
       data: categoriasComContagem
     });
   } catch (error) {
-    console.error('❌ Erro ao listar categorias:', error);
+    console.error('   ❌ ERRO ao listar categorias:', error);
+    console.error('   Stack:', error.stack);
     res.status(500).json({
       success: false,
       error: 'Erro ao listar categorias',
@@ -55,6 +77,7 @@ router.get('/', async (req, res) => {
   }
 });
 
+// POST - Criar categoria
 router.post(
   '/',
   [
@@ -63,7 +86,7 @@ router.post(
     body('ordem').optional()
   ],
   async (req, res) => {
-    console.log('📥 POST /admin/categorias');
+    console.log('📥 === POST /admin/categorias EXECUTANDO ===');
     console.log('   Body:', req.body);
     
     try {
@@ -145,8 +168,9 @@ router.post(
   }
 );
 
+// PUT - Atualizar categoria
 router.put('/:id', async (req, res) => {
-  console.log('📥 PUT /admin/categorias/:id');
+  console.log('📥 === PUT /admin/categorias/:id EXECUTANDO ===');
   console.log('   ID:', req.params.id);
   
   try {
@@ -224,8 +248,9 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// DELETE - Deletar categoria
 router.delete('/:id', async (req, res) => {
-  console.log('📥 DELETE /admin/categorias/:id');
+  console.log('📥 === DELETE /admin/categorias/:id EXECUTANDO ===');
   
   try {
     const { id } = req.params;
@@ -290,6 +315,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-console.log('✅ Routes admin/categorias carregadas');
+console.log('✅ Rotas GET, POST, PUT, DELETE definidas');
+console.log('🔥 === FIM routes/admin/categorias.js ===\n');
 
 module.exports = router;

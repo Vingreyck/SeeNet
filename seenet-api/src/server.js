@@ -331,15 +331,53 @@ async function startServer() {
 
     console.log('✅ Rota POST /api/diagnostics/gerar registrada (inline)');
 
+    app.get('/api/admin/categorias/test', (req, res) => {
+  console.log('🧪 Rota de teste /api/admin/categorias/test chamada');
+  res.json({ 
+    message: 'Rota de teste funcionando!',
+    timestamp: new Date().toISOString()
+  });
+});
+
     // ========== ADMIN ==========
-    try {
-      console.log('🔍 Tentando carregar rotas admin...');
-      const adminRoutes = require('./routes/admin.routes');
-      app.use('/api/admin', require('./routes/admin.routes'));
-      console.log('✅ Rotas admin registradas em /api/admin');
-    } catch (error) {
-      console.error('❌ Erro ao carregar rotas admin:', error.message);
-    }
+try {
+  console.log('\n=== CARREGANDO ROTAS ADMIN ===');
+  console.log('📂 Tentando carregar: ./routes/admin.routes');
+  const adminRoutes = require('./routes/admin.routes');
+  console.log('✅ admin.routes carregado com sucesso');
+  
+  app.use('/api/admin', adminRoutes);
+  console.log('✅ Rotas /api/admin registradas');
+  console.log('=== FIM ROTAS ADMIN ===\n');
+} catch (error) {
+  console.error('❌ ERRO AO CARREGAR admin.routes:', error.message);
+  console.error('Stack:', error.stack);
+}
+
+// ========== ADMIN CATEGORIAS ==========
+try {
+  console.log('\n=== CARREGANDO ROTAS ADMIN/CATEGORIAS ===');
+  console.log('📂 Tentando carregar: ./routes/admin/categorias');
+  
+  // Verificar se arquivo existe
+  const fs = require('fs');
+  const path = require('path');
+  const categoriaPath = path.join(__dirname, 'routes', 'admin', 'categorias.js');
+  console.log('📍 Caminho completo:', categoriaPath);
+  console.log('📄 Arquivo existe?', fs.existsSync(categoriaPath));
+  
+  const categoriasAdminRoutes = require('./routes/admin/categorias');
+  console.log('✅ admin/categorias carregado com sucesso');
+  console.log('   Tipo:', typeof categoriasAdminRoutes);
+  console.log('   É router?', categoriasAdminRoutes.stack ? 'SIM' : 'NÃO');
+  
+  app.use('/api/admin/categorias', categoriasAdminRoutes);
+  console.log('✅ Rotas /api/admin/categorias registradas');
+  console.log('=== FIM ROTAS ADMIN/CATEGORIAS ===\n');
+} catch (error) {
+  console.error('❌ ERRO AO CARREGAR admin/categorias:', error.message);
+  console.error('Stack:', error.stack);
+}
     
     // ========== ROTAS DE DEBUG ==========
     
@@ -428,6 +466,26 @@ async function startServer() {
         })
       });
     });
+
+    // Listar todas as rotas registradas
+console.log('\n=== ROTAS REGISTRADAS ===');
+app._router.stack.forEach((middleware) => {
+  if (middleware.route) {
+    // Rotas diretas
+    console.log(`${Object.keys(middleware.route.methods)[0].toUpperCase()} ${middleware.route.path}`);
+  } else if (middleware.name === 'router') {
+    // Routers montados
+    middleware.handle.stack.forEach((handler) => {
+      if (handler.route) {
+        const path = middleware.regexp.source
+          .replace('\\/?', '')
+          .replace('(?=\\/|$)', '')
+          .replace(/\\/g, '');
+        console.log(`${Object.keys(handler.route.methods)[0].toUpperCase()} ${path}${handler.route.path}`);
+      }
+    });
+  }
+});
 
     if (process.env.VERCEL !== '1') {
       app.listen(PORT, '0.0.0.0', () => {

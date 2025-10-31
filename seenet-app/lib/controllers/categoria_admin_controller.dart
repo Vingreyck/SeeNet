@@ -77,6 +77,14 @@ class CategoriaAdminController extends GetxController {
     try {
       isLoading.value = true;
 
+    // Construir body com apenas os campos que foram alterados
+    final Map<String, dynamic> body = {};
+    if (nome != null) body['nome'] = nome;
+    if (descricao != null) body['descricao'] = descricao;
+    if (ativo != null) body['ativo'] = ativo; // ← Enviar como boolean
+
+    print('📤 Atualizando categoria $id com body: $body');
+
       await _categoriaService.atualizarCategoria(
         id: id,
         nome: nome,

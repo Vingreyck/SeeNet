@@ -172,15 +172,22 @@ router.post(
 router.put('/:id', async (req, res) => {
   console.log('📥 === PUT /admin/categorias/:id EXECUTANDO ===');
   console.log('   ID:', req.params.id);
+  console.log('   Body recebido:', JSON.stringify(req.body));
   
   try {
     const { id } = req.params;
     const { tenant_id, id: usuario_id } = req.user;
     const { nome, descricao, ordem, ativo } = req.body;
 
+    console.log('   Tenant ID:', tenant_id);
+    console.log('   Usuario ID:', usuario_id);
+
+    // Buscar categoria existente
     const existente = await db('categorias_checkmark')
       .where({ id, tenant_id })
       .first();
+
+    console.log('   Categoria existente:', existente ? 'SIM' : 'NÃO');
 
     if (!existente) {
       return res.status(404).json({
@@ -189,6 +196,7 @@ router.put('/:id', async (req, res) => {
       });
     }
 
+    // Verificar duplicação de nome
     if (nome && nome !== existente.nome) {
       const duplicado = await db('categorias_checkmark')
         .where({ tenant_id, nome })
@@ -203,34 +211,57 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    // Montar dados para atualização
     const updateData = {};
-    if (nome !== undefined) updateData.nome = nome;
+    if (nome !== undefined && nome !== null) updateData.nome = nome;
     if (descricao !== undefined) updateData.descricao = descricao;
-    if (ordem !== undefined) updateData.ordem = ordem;
-    if (ativo !== undefined) updateData.ativo = ativo;
+    if (ordem !== undefined && ordem !== null) updateData.ordem = parseInt(ordem);
+    
+    // ⚠️ CORREÇÃO IMPORTANTE: converter ativo para boolean
+    if (ativo !== undefined && ativo !== null) {
+      // Aceitar: true, false, 1, 0, "true", "false"
+      if (typeof ativo === 'boolean') {
+        updateData.ativo = ativo;
+      } else if (typeof ativo === 'number') {
+        updateData.ativo = ativo === 1;
+      } else if (typeof ativo === 'string') {
+        updateData.ativo = ativo.toLowerCase() === 'true' || ativo === '1';
+      }
+    }
+    
     updateData.data_atualizacao = new Date();
 
-    const [atualizada] = await db('categorias_checkmark')
-      .where({ id, tenant_id })
+    console.log('   Dados para update:', JSON.stringify(updateData));
+
+    // Atualizar no banco
+    const result = await db('categorias_checkmark')
+      .where({ id: parseInt(id), tenant_id })
       .update(updateData)
       .returning('*');
 
-    console.log('   ✅ Categoria atualizada');
+    if (!result || result.length === 0) {
+      throw new Error('Nenhum registro foi atualizado');
+    }
 
+    const atualizada = result[0];
+
+    console.log('   ✅ Categoria atualizada:', atualizada.id);
+
+    // Log de auditoria
     try {
       await db('logs_sistema').insert({
         tenant_id,
         usuario_id,
         acao: 'ATUALIZAR_CATEGORIA',
         tabela_afetada: 'categorias_checkmark',
-        registro_id: id,
+        registro_id: parseInt(id),
         dados_anteriores: JSON.stringify(existente),
         dados_novos: JSON.stringify(atualizada),
         nivel: 'info',
         data_acao: new Date()
       });
     } catch (logError) {
-      console.warn('⚠️ Erro ao criar log:', logError.message);
+      console.warn('⚠️ Erro ao criar log de auditoria:', logError.message);
     }
 
     res.json({
@@ -239,11 +270,15 @@ router.put('/:id', async (req, res) => {
       message: 'Categoria atualizada com sucesso'
     });
   } catch (error) {
-    console.error('❌ Erro ao atualizar categoria:', error);
+    console.error('❌ ERRO ao atualizar categoria:', error);
+    console.error('   Tipo do erro:', error.constructor.name);
+    console.error('   Mensagem:', error.message);
+    console.error('   Stack:', error.stack);
+    
     res.status(500).json({
       success: false,
       error: 'Erro ao atualizar categoria',
-      details: error.message
+      details: process.env.NODE_ENV === 'production' ? undefined : error.message
     });
   }
 });

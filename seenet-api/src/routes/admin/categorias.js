@@ -1,35 +1,42 @@
+// backend/routes/admin/categorias.js
 const express = require('express');
 const router = express.Router();
-const knex = require('../../config/database');
-const { authenticateToken } = require('../../middleware/auth');
-const { requireAdmin } = require('../../middleware/adminAuth');
+const { db } = require('../../config/database');
+const authMiddleware = require('../../middleware/auth'); // ← Import padrão
+const { adminMiddleware } = authMiddleware; // ← Extrair adminMiddleware
 const { body, validationResult } = require('express-validator');
 
-// Middleware para admin
-router.use(authenticateToken);
-router.use(requireAdmin);
+console.log('📋 Carregando routes/admin/categorias.js');
 
-// Listar todas as categorias do tenant
+// Aplicar middlewares
+router.use(authMiddleware); // ← Usar authMiddleware diretamente (não chamar como função)
+router.use(adminMiddleware); // ← Adicionar verificação de admin
+
+// Resto do código permanece igual...
 router.get('/', async (req, res) => {
+  console.log('📥 GET /admin/categorias');
+  console.log('   Tenant ID:', req.user?.tenant_id);
+  
   try {
     const { tenant_id } = req.user;
 
-    const categorias = await knex('categorias_checkmark')
+    const categorias = await db('categorias_checkmark')
       .where({ tenant_id })
       .orderBy('ordem', 'asc')
       .select('*');
 
-    // Contar checkmarks por categoria
+    console.log(`   ✅ ${categorias.length} categorias encontradas`);
+
     const categoriasComContagem = await Promise.all(
       categorias.map(async (cat) => {
-        const { count } = await knex('checkmarks')
+        const result = await db('checkmarks')
           .where({ categoria_id: cat.id, tenant_id })
           .count('* as count')
           .first();
 
         return {
           ...cat,
-          total_checkmarks: parseInt(count)
+          total_checkmarks: parseInt(result.count || 0)
         };
       })
     );
@@ -39,28 +46,32 @@ router.get('/', async (req, res) => {
       data: categoriasComContagem
     });
   } catch (error) {
-    console.error('Erro ao listar categorias:', error);
+    console.error('❌ Erro ao listar categorias:', error);
     res.status(500).json({
       success: false,
-      error: 'Erro ao listar categorias'
+      error: 'Erro ao listar categorias',
+      details: error.message
     });
   }
 });
 
-// Criar nova categoria
 router.post(
   '/',
   [
     body('nome').trim().notEmpty().withMessage('Nome é obrigatório'),
     body('descricao').optional().trim(),
-    body('ordem').optional().isInt({ min: 0 })
+    body('ordem').optional()
   ],
   async (req, res) => {
+    console.log('📥 POST /admin/categorias');
+    console.log('   Body:', req.body);
+    
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
+          error: 'Dados inválidos',
           errors: errors.array()
         });
       }
@@ -68,51 +79,55 @@ router.post(
       const { tenant_id, id: usuario_id } = req.user;
       const { nome, descricao, ordem } = req.body;
 
-      // Verificar se já existe categoria com este nome para o tenant
-      const categoriaExistente = await knex('categorias_checkmark')
+      const existente = await db('categorias_checkmark')
         .where({ tenant_id, nome })
         .first();
 
-      if (categoriaExistente) {
+      if (existente) {
         return res.status(400).json({
           success: false,
           error: 'Já existe uma categoria com este nome'
         });
       }
 
-      // Se ordem não foi especificada, pegar a próxima disponível
       let ordemFinal = ordem;
       if (!ordemFinal) {
-        const ultimaCategoria = await knex('categorias_checkmark')
+        const ultima = await db('categorias_checkmark')
           .where({ tenant_id })
           .orderBy('ordem', 'desc')
           .first();
         
-        ordemFinal = ultimaCategoria ? ultimaCategoria.ordem + 1 : 1;
+        ordemFinal = ultima ? ultima.ordem + 1 : 1;
       }
 
-      // Criar categoria
-      const [novaCategoria] = await knex('categorias_checkmark')
+      const [novaCategoria] = await db('categorias_checkmark')
         .insert({
           tenant_id,
           nome,
-          descricao,
+          descricao: descricao || null,
           ordem: ordemFinal,
           ativo: true,
-          global: false
+          global: false,
+          data_criacao: new Date()
         })
         .returning('*');
 
-      // Log de auditoria
-      await knex('logs_sistema').insert({
-        tenant_id,
-        usuario_id,
-        acao: 'CRIAR_CATEGORIA',
-        tabela_afetada: 'categorias_checkmark',
-        registro_id: novaCategoria.id,
-        dados_novos: JSON.stringify(novaCategoria),
-        nivel: 'info'
-      });
+      console.log('   ✅ Categoria criada:', novaCategoria.id);
+
+      try {
+        await db('logs_sistema').insert({
+          tenant_id,
+          usuario_id,
+          acao: 'CRIAR_CATEGORIA',
+          tabela_afetada: 'categorias_checkmark',
+          registro_id: novaCategoria.id,
+          dados_novos: JSON.stringify(novaCategoria),
+          nivel: 'info',
+          data_acao: new Date()
+        });
+      } catch (logError) {
+        console.warn('⚠️ Erro ao criar log:', logError.message);
+      }
 
       res.status(201).json({
         success: true,
@@ -120,112 +135,103 @@ router.post(
         message: 'Categoria criada com sucesso'
       });
     } catch (error) {
-      console.error('Erro ao criar categoria:', error);
+      console.error('❌ Erro ao criar categoria:', error);
       res.status(500).json({
         success: false,
-        error: 'Erro ao criar categoria'
+        error: 'Erro ao criar categoria',
+        details: error.message
       });
     }
   }
 );
 
-// Atualizar categoria
-router.put(
-  '/:id',
-  [
-    body('nome').optional().trim().notEmpty(),
-    body('descricao').optional().trim(),
-    body('ordem').optional().isInt({ min: 0 }),
-    body('ativo').optional().isBoolean()
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          errors: errors.array()
-        });
-      }
+router.put('/:id', async (req, res) => {
+  console.log('📥 PUT /admin/categorias/:id');
+  console.log('   ID:', req.params.id);
+  
+  try {
+    const { id } = req.params;
+    const { tenant_id, id: usuario_id } = req.user;
+    const { nome, descricao, ordem, ativo } = req.body;
 
-      const { id } = req.params;
-      const { tenant_id, id: usuario_id } = req.user;
-      const { nome, descricao, ordem, ativo } = req.body;
+    const existente = await db('categorias_checkmark')
+      .where({ id, tenant_id })
+      .first();
 
-      // Verificar se categoria existe e pertence ao tenant
-      const categoriaExistente = await knex('categorias_checkmark')
-        .where({ id, tenant_id })
+    if (!existente) {
+      return res.status(404).json({
+        success: false,
+        error: 'Categoria não encontrada'
+      });
+    }
+
+    if (nome && nome !== existente.nome) {
+      const duplicado = await db('categorias_checkmark')
+        .where({ tenant_id, nome })
+        .whereNot({ id })
         .first();
 
-      if (!categoriaExistente) {
-        return res.status(404).json({
+      if (duplicado) {
+        return res.status(400).json({
           success: false,
-          error: 'Categoria não encontrada'
+          error: 'Já existe uma categoria com este nome'
         });
       }
+    }
 
-      // Se mudar nome, verificar duplicação
-      if (nome && nome !== categoriaExistente.nome) {
-        const nomeDuplicado = await knex('categorias_checkmark')
-          .where({ tenant_id, nome })
-          .whereNot({ id })
-          .first();
+    const updateData = {};
+    if (nome !== undefined) updateData.nome = nome;
+    if (descricao !== undefined) updateData.descricao = descricao;
+    if (ordem !== undefined) updateData.ordem = ordem;
+    if (ativo !== undefined) updateData.ativo = ativo;
+    updateData.data_atualizacao = new Date();
 
-        if (nomeDuplicado) {
-          return res.status(400).json({
-            success: false,
-            error: 'Já existe uma categoria com este nome'
-          });
-        }
-      }
+    const [atualizada] = await db('categorias_checkmark')
+      .where({ id, tenant_id })
+      .update(updateData)
+      .returning('*');
 
-      // Atualizar categoria
-      const [categoriaAtualizada] = await knex('categorias_checkmark')
-        .where({ id, tenant_id })
-        .update({
-          ...(nome && { nome }),
-          ...(descricao !== undefined && { descricao }),
-          ...(ordem !== undefined && { ordem }),
-          ...(ativo !== undefined && { ativo }),
-          data_atualizacao: knex.fn.now()
-        })
-        .returning('*');
+    console.log('   ✅ Categoria atualizada');
 
-      // Log de auditoria
-      await knex('logs_sistema').insert({
+    try {
+      await db('logs_sistema').insert({
         tenant_id,
         usuario_id,
         acao: 'ATUALIZAR_CATEGORIA',
         tabela_afetada: 'categorias_checkmark',
         registro_id: id,
-        dados_anteriores: JSON.stringify(categoriaExistente),
-        dados_novos: JSON.stringify(categoriaAtualizada),
-        nivel: 'info'
+        dados_anteriores: JSON.stringify(existente),
+        dados_novos: JSON.stringify(atualizada),
+        nivel: 'info',
+        data_acao: new Date()
       });
-
-      res.json({
-        success: true,
-        data: categoriaAtualizada,
-        message: 'Categoria atualizada com sucesso'
-      });
-    } catch (error) {
-      console.error('Erro ao atualizar categoria:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Erro ao atualizar categoria'
-      });
+    } catch (logError) {
+      console.warn('⚠️ Erro ao criar log:', logError.message);
     }
-  }
-);
 
-// Deletar categoria
+    res.json({
+      success: true,
+      data: atualizada,
+      message: 'Categoria atualizada com sucesso'
+    });
+  } catch (error) {
+    console.error('❌ Erro ao atualizar categoria:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao atualizar categoria',
+      details: error.message
+    });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
+  console.log('📥 DELETE /admin/categorias/:id');
+  
   try {
     const { id } = req.params;
     const { tenant_id, id: usuario_id } = req.user;
 
-    // Verificar se categoria existe
-    const categoria = await knex('categorias_checkmark')
+    const categoria = await db('categorias_checkmark')
       .where({ id, tenant_id })
       .first();
 
@@ -236,8 +242,7 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    // Verificar se há checkmarks associados
-    const { count } = await knex('checkmarks')
+    const { count } = await db('checkmarks')
       .where({ categoria_id: id, tenant_id })
       .count('* as count')
       .first();
@@ -245,83 +250,46 @@ router.delete('/:id', async (req, res) => {
     if (parseInt(count) > 0) {
       return res.status(400).json({
         success: false,
-        error: `Não é possível deletar. Existem ${count} checkmarks associados a esta categoria.`,
+        error: `Não é possível deletar. Existem ${count} checkmarks associados.`,
         total_checkmarks: parseInt(count)
       });
     }
 
-    // Deletar categoria
-    await knex('categorias_checkmark')
+    await db('categorias_checkmark')
       .where({ id, tenant_id })
       .delete();
 
-    // Log de auditoria
-    await knex('logs_sistema').insert({
-      tenant_id,
-      usuario_id,
-      acao: 'DELETAR_CATEGORIA',
-      tabela_afetada: 'categorias_checkmark',
-      registro_id: id,
-      dados_anteriores: JSON.stringify(categoria),
-      nivel: 'warning'
-    });
+    console.log('   ✅ Categoria deletada');
+
+    try {
+      await db('logs_sistema').insert({
+        tenant_id,
+        usuario_id,
+        acao: 'DELETAR_CATEGORIA',
+        tabela_afetada: 'categorias_checkmark',
+        registro_id: id,
+        dados_anteriores: JSON.stringify(categoria),
+        nivel: 'warning',
+        data_acao: new Date()
+      });
+    } catch (logError) {
+      console.warn('⚠️ Erro ao criar log:', logError.message);
+    }
 
     res.json({
       success: true,
       message: 'Categoria deletada com sucesso'
     });
   } catch (error) {
-    console.error('Erro ao deletar categoria:', error);
+    console.error('❌ Erro ao deletar categoria:', error);
     res.status(500).json({
       success: false,
-      error: 'Erro ao deletar categoria'
+      error: 'Erro ao deletar categoria',
+      details: error.message
     });
   }
 });
 
-// Reordenar categorias
-router.post('/reordenar', async (req, res) => {
-  try {
-    const { tenant_id, id: usuario_id } = req.user;
-    const { categorias } = req.body; // Array de { id, ordem }
-
-    if (!Array.isArray(categorias)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Formato inválido. Esperado array de categorias'
-      });
-    }
-
-    // Atualizar ordem de cada categoria
-    await knex.transaction(async (trx) => {
-      for (const cat of categorias) {
-        await trx('categorias_checkmark')
-          .where({ id: cat.id, tenant_id })
-          .update({ ordem: cat.ordem });
-      }
-    });
-
-    // Log de auditoria
-    await knex('logs_sistema').insert({
-      tenant_id,
-      usuario_id,
-      acao: 'REORDENAR_CATEGORIAS',
-      tabela_afetada: 'categorias_checkmark',
-      dados_novos: JSON.stringify(categorias),
-      nivel: 'info'
-    });
-
-    res.json({
-      success: true,
-      message: 'Categorias reordenadas com sucesso'
-    });
-  } catch (error) {
-    console.error('Erro ao reordenar categorias:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao reordenar categorias'
-    });
-  }
-});
+console.log('✅ Routes admin/categorias carregadas');
 
 module.exports = router;

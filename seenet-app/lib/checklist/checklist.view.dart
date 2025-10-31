@@ -325,6 +325,16 @@ class _ChecklistviewState extends State<Checklistview> {
                   },
                   color: Colors.blue,
                 ),
+                _buildMenuOption(
+                  icon: Icons.category,
+                  title: 'Gerenciar Categorias',
+                  subtitle: 'Adicionar ou remover categorias de checklist',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Get.toNamed('/admin/categorias');
+                  },
+                  color: Colors.green,
+                ),
                 const SizedBox(height: 12),
                 // ← LOGS APENAS PARA ADMIN
                 _buildMenuOption(

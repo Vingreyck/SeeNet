@@ -5,6 +5,10 @@ const { authenticateToken } = require('../../middleware/auth');
 const { requireAdmin } = require('../../middleware/adminAuth');
 const { body, validationResult } = require('express-validator');
 
+// Middleware para admin
+router.use(authenticateToken);
+router.use(requireAdmin);
+
 // Listar todas as categorias do tenant
 router.get('/', async (req, res) => {
   try {

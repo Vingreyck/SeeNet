@@ -311,7 +311,7 @@ async function startServer() {
             message: 'Diagnóstico gerado com sucesso',
             data: {
               id: diagnostico.id,
-              resposta: diagnostico.resposta_gemini,
+              resposta: diagnostico.resposta_chatgpt,
               resumo: diagnostico.resumo_diagnostico,
               tokens_utilizados: diagnostico.tokens_utilizados,
               status: statusApi,

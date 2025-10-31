@@ -1,10 +1,10 @@
-// backend/src/routes/admin.routes.js
+// seenet-api/src/routes/admin.routes.js - VERSÃO CORRIGIDA
 const express = require('express');
 const router = express.Router();
 const { db } = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 
-// ========== MIDDLEWARE ADMIN ==========
+// Middleware para verificar se é admin
 const requireAdmin = (req, res, next) => {
   if (!req.user || req.user.tipo_usuario !== 'administrador') {
     return res.status(403).json({
@@ -15,25 +15,8 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// Aplicar middlewares globalmente para todas rotas admin
-router.use(authMiddleware);
-router.use(requireAdmin);
-
-// ========== SUB-ROTAS MODULARES ==========
-// Importar rotas específicas
-const categoriasRoutes = require('.categorias');
-const checkmarksRoutes = require('.checkmarks'); // Se existir
-const usuariosRoutes = require('.usuarios'); // Podemos modularizar depois
-
-// Registrar sub-rotas
-router.use('/categorias', categoriasRoutes);
-// router.use('/checkmarks', checkmarksRoutes); // Descomentar quando criar
-// router.use('/usuarios', usuariosRoutes); // Descomentar quando modularizar
-
-// ========== LOGS DE AUDITORIA ==========
-
-// Registrar log
-router.post('/logs', async (req, res) => {
+// ========== REGISTRAR LOG DE AUDITORIA ==========
+router.post('/logs', authMiddleware, async (req, res) => {
   try {
     const {
       usuario_id,
@@ -69,7 +52,7 @@ router.post('/logs', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Erro ao registrar log:', error);
+    console.error('❌ Erro ao registrar log:', error);
     res.status(500).json({
       success: false,
       error: 'Erro ao registrar log de auditoria'
@@ -77,8 +60,8 @@ router.post('/logs', async (req, res) => {
   }
 });
 
-// Buscar logs com filtros
-router.get('/logs', async (req, res) => {
+// ========== BUSCAR LOGS COM FILTROS (ADMIN) ==========
+router.get('/logs', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const {
       usuario_id,
@@ -121,7 +104,7 @@ router.get('/logs', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Erro ao buscar logs:', error);
+    console.error('❌ Erro ao buscar logs:', error);
     res.status(500).json({
       success: false,
       error: 'Erro ao buscar logs',
@@ -130,8 +113,8 @@ router.get('/logs', async (req, res) => {
   }
 });
 
-// Estatísticas gerais
-router.get('/stats', async (req, res) => {
+// ========== ESTATÍSTICAS GERAIS (ADMIN) ==========
+router.get('/stats', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { data_inicio, data_fim } = req.query;
     
@@ -210,7 +193,7 @@ router.get('/stats', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Erro ao gerar estatísticas:', error);
+    console.error('❌ Erro ao gerar estatísticas:', error);
     res.status(500).json({
       success: false,
       error: 'Erro ao gerar estatísticas',
@@ -219,8 +202,8 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-// Estatísticas rápidas
-router.get('/stats/quick', async (req, res) => {
+// ========== ESTATÍSTICAS RÁPIDAS (ADMIN) ==========
+router.get('/stats/quick', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const logs24h = await db('logs_sistema')
       .where('tenant_id', req.user.tenant_id)
@@ -244,7 +227,7 @@ router.get('/stats/quick', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Erro ao obter estatísticas rápidas:', error);
+    console.error('❌ Erro ao obter estatísticas rápidas:', error);
     res.status(500).json({
       success: false,
       error: 'Erro ao obter estatísticas',
@@ -253,8 +236,8 @@ router.get('/stats/quick', async (req, res) => {
   }
 });
 
-// Exportar logs
-router.get('/logs/export', async (req, res) => {
+// ========== EXPORTAR LOGS (ADMIN) ==========
+router.get('/logs/export', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { data_inicio, data_fim, formato = 'json' } = req.query;
     
@@ -287,7 +270,7 @@ router.get('/logs/export', async (req, res) => {
     }
     
   } catch (error) {
-    console.error('Erro ao exportar logs:', error);
+    console.error('❌ Erro ao exportar logs:', error);
     res.status(500).json({
       success: false,
       error: 'Erro ao exportar logs',
@@ -296,8 +279,103 @@ router.get('/logs/export', async (req, res) => {
   }
 });
 
-// Limpar logs antigos
-router.delete('/logs/cleanup', async (req, res) => {
+// ========== GERENCIAMENTO DE USUÁRIOS (ADMIN) ========== ✅ CORRIGIDO
+router.get('/users', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const users = await db('usuarios')
+      .where('tenant_id', req.user.tenant_id)
+      .select('id', 'nome', 'email', 'tipo_usuario', 'ativo', 'data_criacao', 'data_atualizacao') // ✅ ADICIONADO 'ativo'
+      .orderBy('nome');
+    
+    res.json(users);
+  } catch (error) {
+    console.error('❌ Erro ao buscar usuários:', error);
+    res.status(500).json({
+      error: 'Erro ao buscar usuários',
+      details: error.message
+    });
+  }
+});
+
+router.post('/users', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { nome, email, senha, tipo_usuario } = req.body;
+    
+    const [id] = await db('usuarios').insert({
+      nome,
+      email,
+      senha,
+      tipo_usuario,
+      tenant_id: req.user.tenant_id,
+    }).returning('id');
+    
+    res.json({
+      success: true,
+      data: { id }
+    });
+  } catch (error) {
+    console.error('❌ Erro ao criar usuário:', error);
+    res.status(500).json({
+      error: 'Erro ao criar usuário',
+      details: error.message
+    });
+  }
+});
+
+router.put('/users/:id', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, email, senha, tipo_usuario } = req.body;
+    
+    const updateData = {
+      nome,
+      email,
+      tipo_usuario,
+      data_atualizacao: db.fn.now() // ✅ CORRIGIDO
+    };
+    
+    if (senha) {
+      updateData.senha = senha;
+    }
+    
+    await db('usuarios')
+      .where({ id, tenant_id: req.user.tenant_id })
+      .update(updateData);
+    
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error('❌ Erro ao atualizar usuário:', error);
+    res.status(500).json({
+      error: 'Erro ao atualizar usuário',
+      details: error.message
+    });
+  }
+});
+
+router.delete('/users/:id', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await db('usuarios')
+      .where({ id, tenant_id: req.user.tenant_id })
+      .delete();
+    
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error('❌ Erro ao excluir usuário:', error);
+    res.status(500).json({
+      error: 'Erro ao excluir usuário',
+      details: error.message
+    });
+  }
+});
+
+// ========== LIMPAR LOGS ANTIGOS (ADMIN) ==========
+router.delete('/logs/cleanup', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { dias = 90 } = req.query;
     
@@ -324,125 +402,10 @@ router.delete('/logs/cleanup', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Erro ao limpar logs:', error);
+    console.error('❌ Erro ao limpar logs:', error);
     res.status(500).json({
       success: false,
       error: 'Erro ao limpar logs',
-      details: error.message
-    });
-  }
-});
-
-// ========== GERENCIAMENTO DE USUÁRIOS ==========
-
-// Listar usuários
-router.get('/users', async (req, res) => {
-  try {
-    const users = await db('usuarios')
-      .where('tenant_id', req.user.tenant_id)
-      .select('id', 'nome', 'email', 'tipo_usuario', 'ativo', 'data_criacao', 'data_atualizacao')
-      .orderBy('nome');
-    
-    res.json({
-      success: true,
-      data: users
-    });
-  } catch (error) {
-    console.error('Erro ao buscar usuários:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao buscar usuários',
-      details: error.message
-    });
-  }
-});
-
-// Criar usuário
-router.post('/users', async (req, res) => {
-  try {
-    const { nome, email, senha, tipo_usuario } = req.body;
-    
-    const [id] = await db('usuarios').insert({
-      nome,
-      email,
-      senha,
-      tipo_usuario,
-      tenant_id: req.user.tenant_id,
-    }).returning('id');
-    
-    res.json({
-      success: true,
-      data: { id }
-    });
-  } catch (error) {
-    console.error('Erro ao criar usuário:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao criar usuário',
-      details: error.message
-    });
-  }
-});
-
-// Atualizar usuário
-router.put('/users/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { nome, email, senha, tipo_usuario } = req.body;
-    
-    const updateData = {
-      nome,
-      email,
-      tipo_usuario,
-      data_atualizacao: db.fn.now()
-    };
-    
-    if (senha) {
-      updateData.senha = senha;
-    }
-    
-    await db('usuarios')
-      .where({ id, tenant_id: req.user.tenant_id })
-      .update(updateData);
-    
-    res.json({
-      success: true
-    });
-  } catch (error) {
-    console.error('Erro ao atualizar usuário:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao atualizar usuário',
-      details: error.message
-    });
-  }
-});
-
-// Deletar usuário
-router.delete('/users/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Não permitir deletar o próprio usuário
-    if (parseInt(id) === req.user.id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Você não pode deletar sua própria conta'
-      });
-    }
-    
-    await db('usuarios')
-      .where({ id, tenant_id: req.user.tenant_id })
-      .delete();
-    
-    res.json({
-      success: true
-    });
-  } catch (error) {
-    console.error('Erro ao excluir usuário:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao excluir usuário',
       details: error.message
     });
   }

@@ -14,6 +14,7 @@ import 'package:get/get.dart';
 import 'package:seenet/login/login.view.dart';
 import 'package:seenet/checklist/checklist.view.dart';
 import 'services/avaliacao_service.dart';
+import 'services/categoria_service.dart';
 import 'package:seenet/admin/logs_admin.view.dart';
 import 'package:seenet/diagnostico/diagnostico.view.dart';
 import 'package:seenet/registro/widgets/registro.bindings.dart';
@@ -21,8 +22,10 @@ import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'package:seenet/config/environment.dart';
 import 'controllers/usuario_controller.dart';
+import 'admin/categorias_admin.view.dart';
 import 'controllers/checkmark_controller.dart';
 import 'controllers/diagnostico_controller.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +44,7 @@ void main() async {
   // ✅ Inicializar SOMENTE controllers de API
   Get.put(ApiService(), permanent: true);
   Get.put(AvaliacaoService(), permanent: true);
+  Get.put(CategoriaService(), permanent: true);
   Get.put(AuthService(), permanent: true);
   Get.put(UsuarioController(), permanent: true);
   Get.put(CheckmarkController(), permanent: true);
@@ -156,7 +160,7 @@ class MyApp extends StatelessWidget {
           name: '/diagnostico',
           page: () => const DiagnosticoView(),
         ),
-        // ✅ ROTAS ADMIN PROTEGIDAS
+
         GetPage(
           name: '/admin/usuarios',
           page: () => const UsuariosAdminView(),
@@ -165,6 +169,11 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/admin/checkmarks',
           page: () => const CheckmarksAdminView(),
+          middlewares: [AuthMiddleware()],
+        ),
+        GetPage(
+          name: '/admin/categorias',
+          page: () => const CategoriasAdminView(),
           middlewares: [AuthMiddleware()],
         ),
         GetPage(

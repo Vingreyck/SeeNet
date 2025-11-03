@@ -29,9 +29,13 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
     print('📋 Checkmarks já carregados: ${checkmarkController.checkmarksAtivos.length}');
 
     if (usuarioController.usuarioLogado.value != null) {
+      final categoriaNome = checkmarkController.nomeCategoriaAtual.isNotEmpty 
+          ? checkmarkController.nomeCategoriaAtual 
+          : 'Aplicativos';
+      
       await checkmarkController.iniciarAvaliacao(
         usuarioController.usuarioLogado.value!.id!,
-        'Diagnóstico - Aplicativos'
+        'Diagnóstico - $categoriaNome',
       );
     }
   }
@@ -68,28 +72,39 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
                   },
                 ),
                 const SizedBox(width: 16),
-                const Text(
-                  'Problemas de Aplicativos',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Obx(() {
+                  final categoriaNome = checkmarkController.nomeCategoriaAtual.isNotEmpty
+                      ? checkmarkController.nomeCategoriaAtual
+                      : 'Aplicativos';
+                  
+                  return Text(
+                    'Problemas de $categoriaNome',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                }),
               ],
             ),
           ),
+          
           Expanded(
             child: Column(
               children: [
                 Expanded(
                   child: Obx(() {
-                    if (checkmarkController.checkmarksAtivos.isEmpty) {
+                    if (checkmarkController.isLoading.value) {
                       return const Center(
                         child: CircularProgressIndicator(
                           color: Color(0xFF00FF88),
                         ),
                       );
+                    }
+
+                    if (checkmarkController.checkmarksAtivos.isEmpty) {
+                      return _buildEmptyState();
                     }
 
                     return ListView.builder(
@@ -123,8 +138,73 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
     );
   }
 
+  Widget _buildEmptyState() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(40),
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: const Color(0xFF232323),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.playlist_add_check_outlined,
+              size: 80,
+              color: Colors.white24,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Nenhum checkmark disponível',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Esta categoria ainda não possui checkmarks cadastrados.\n\n'
+              'Acesse o painel administrativo para adicionar.',
+              style: TextStyle(color: Colors.white60, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 30),
+            
+            if (usuarioController.isAdmin) ...[
+              ElevatedButton.icon(
+                onPressed: () => Get.toNamed('/admin/checkmarks'),
+                icon: const Icon(Icons.add, color: Colors.black),
+                label: const Text(
+                  'Adicionar Checkmarks',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00FF88),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 15,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   void _enviarDiagnostico() async {
-    // 1. Salvar respostas
     bool salvou = await checkmarkController.salvarRespostas();
 
     if (!salvou) {
@@ -140,7 +220,6 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
       return;
     }
 
-    // 2. Mostrar loading
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -151,13 +230,9 @@ class _ChecklistAppsScreenState extends State<ChecklistAppsScreen> {
       );
     }
 
-    // 3. Gerar diagnóstico com Gemini
-    bool diagnosticoGerado = await checkmarkController.gerarDiagnosticoComGemini();
-
-    // 4. Finalizar avaliação
+    await checkmarkController.gerarDiagnosticoComGemini();
     await checkmarkController.finalizarAvaliacao();
 
-    // 5. Navegar para tela de diagnóstico
     if (mounted) {
       Get.offNamed('/diagnostico');
     }

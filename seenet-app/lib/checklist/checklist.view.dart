@@ -120,44 +120,51 @@ class _ChecklistviewState extends State<Checklistview> {
               }
 
               if (checkmarkController.categorias.isEmpty) {
-                // ✅ Mostrar categorias hardcoded quando API estiver vazia
-                return SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      ChecklistCategoriaCardWidget(
-                        title: 'Lentidão', 
-                        description: 'Problemas de velocidade', 
-                        assetIcon: 'assets/images/snail.svg', 
-                        onTap: () => Get.toNamed('/checklist/lentidao'),
-                      ),
-                      ChecklistCategoriaCardWidget(
-                        title: 'IPTV', 
-                        description: 'Travamento, buffering', 
-                        assetIcon: 'assets/images/iptv.svg', 
-                        onTap: () => Get.toNamed('/checklist/iptv'),
-                      ),
-                      ChecklistCategoriaCardWidget(
-                        title: 'Aplicativos', 
-                        description: 'Apps não funcionam', 
-                        assetIcon: 'assets/images/app.svg', 
-                        onTap: () => Get.toNamed('/checklist/apps'),
-                      ),
-                      const SizedBox(height: 20),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: ElevatedButton.icon(
-                          onPressed: _carregarCategorias,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Recarregar'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00FF88), 
-                            foregroundColor: Colors.black, 
-                            minimumSize: const Size(double.infinity, 50),
-                          ),
+                Positioned(
+                  top: 270, left: 0, right: 0, bottom: 0,
+                  child: Obx(() {
+                    if (checkmarkController.isLoading.value) {
+                      return const CategoriasSkeleton(itemCount: 3);
+                    }
+
+                    if (checkmarkController.categorias.isEmpty) {
+                      // ✅ EMPTY STATE - Nenhuma categoria criada ainda
+                      return _buildEmptyStateNoCategorias();
+                    }
+
+                    // Categorias da API
+                    return RefreshIndicator(
+                      onRefresh: _carregarCategorias,
+                      color: const Color(0xFF00FF88),
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          children: [
+                            ...checkmarkController.categorias.map((categoria) {
+                              String icone = _getIconeParaCategoria(categoria.nome);
+                              return ChecklistCategoriaCardWidget(
+                                title: categoria.nome,
+                                description: categoria.descricao ?? 'Categoria de diagnóstico',
+                                assetIcon: icone,
+                                onTap: () async {
+                                  if (categoria.id != null) {
+                                    print('🎯 Categoria: ${categoria.nome} (ID: ${categoria.id})');
+                                    
+                                    checkmarkController.categoriaAtual.value = categoria.id!;
+                                    await checkmarkController.carregarCheckmarks(categoria.id!);
+                                    
+                                    // Navegar para tela genérica
+                                    Get.toNamed('/checklist/lentidao');
+                                  }
+                                },
+                              );
+                            }).toList(),
+                            const SizedBox(height: 20),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  }),
                 );
               }
 
@@ -176,27 +183,29 @@ class _ChecklistviewState extends State<Checklistview> {
                           title: categoria.nome,
                           description: categoria.descricao ?? 'Categoria de diagnóstico',
                           assetIcon: icone,
-                          onTap: () {
+                          onTap: () async {
                             if (categoria.id != null) {
-                              print('🎯 Categoria: ${categoria.nome} (ID: ${categoria.id})');
+                              print('🎯 Categoria selecionada: ${categoria.nome} (ID: ${categoria.id})');
                               
-                              // ✅ EXECUTAR DEPOIS DO BUILD
-                              Future.microtask(() async {
-                                // Carregar checkmarks
-                                await checkmarkController.carregarCheckmarks(categoria.id!);
-                                
-                                // Navegar
-                                final nomeLower = categoria.nome.toLowerCase();
-                                if (nomeLower.contains('lentidão') || nomeLower.contains('lentidao')) {
-                                  Get.toNamed('/checklist/lentidao');
-                                } else if (nomeLower.contains('iptv') || nomeLower.contains('tv')) {
-                                  Get.toNamed('/checklist/iptv');
-                                } else if (nomeLower.contains('app') || nomeLower.contains('aplicativo')) {
-                                  Get.toNamed('/checklist/apps');
-                                } else {
-                                  Get.snackbar('Em desenvolvimento', 'Tela para "${categoria.nome}" em breve!', backgroundColor: Colors.orange);
-                                }
-                              });
+                              // Setar categoria atual
+                              checkmarkController.categoriaAtual.value = categoria.id!;
+                              
+                              // Carregar checkmarks
+                              await checkmarkController.carregarCheckmarks(categoria.id!);
+                              
+                              // Navegar para tela genérica baseado no nome
+                              final nomeLower = categoria.nome.toLowerCase();
+                              
+                              if (nomeLower.contains('lentidão') || nomeLower.contains('lentidao')) {
+                                Get.toNamed('/checklist/lentidao');
+                              } else if (nomeLower.contains('iptv') || nomeLower.contains('tv')) {
+                                Get.toNamed('/checklist/iptv');
+                              } else if (nomeLower.contains('app') || nomeLower.contains('aplicativo')) {
+                                Get.toNamed('/checklist/apps');
+                              } else {
+                                // ✅ PARA CATEGORIAS NOVAS: Navegar para tela genérica
+                                Get.toNamed('/checklist/lentidao'); // ← Usar a mesma tela base
+                              }
                             }
                           },
                         );
@@ -380,6 +389,87 @@ class _ChecklistviewState extends State<Checklistview> {
       ),
     );
   }
+  Widget _buildEmptyStateNoCategorias() {
+  return Center(
+    child: Container(
+      margin: const EdgeInsets.all(40),
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: const Color(0xFF232323),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.category_outlined,
+            size: 80,
+            color: Colors.white24,
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Nenhuma categoria criada',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Esta empresa ainda não possui categorias de diagnóstico.\n\n'
+            'Acesse o painel administrativo para criar as primeiras categorias.',
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 30),
+          
+          // Botão para admin
+          if (usuarioController.isAdmin) ...[
+            ElevatedButton.icon(
+              onPressed: () => Get.toNamed('/admin/categorias'),
+              icon: const Icon(Icons.add, color: Colors.black),
+              label: const Text(
+                'Criar Primeira Categoria',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF88),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 18,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+            ),
+          ] else ...[
+            // Para técnicos não-admin
+            const Text(
+              'Entre em contato com um administrador.',
+              style: TextStyle(
+                color: Colors.orange,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildMenuOption({
     required IconData icon,

@@ -167,7 +167,7 @@ router.post('/checkmarks', adminMiddleware, [
   body('categoria_id').isInt({ min: 1 }),
   body('titulo').trim().isLength({ min: 2, max: 255 }),
   body('descricao').optional().trim().isLength({ max: 1000 }),
-  body('prompt_gemini').trim().isLength({ min: 10, max: 5000 }),
+  body('prompt_gemini').trim().isLength({ min: 10, max: 5000 }).withMessage('O prompt deve ter entre 10 e 5000 caracteres'),
   body('ordem').optional().isInt({ min: 0 })
 ], async (req, res) => {
   console.log('🔵 === INICIANDO CRIAÇÃO DE CHECKMARK ===');
@@ -178,7 +178,26 @@ router.post('/checkmarks', adminMiddleware, [
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       console.log('❌ Validação falhou:', JSON.stringify(errors.array(), null, 2));
-      return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
+      
+      // ✅ VERIFICAR SE É ERRO DE PROMPT
+      const promptError = errors.array().find(err => err.path === 'prompt_gemini');
+      
+      if (promptError) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Prompt inválido', 
+          details: 'O prompt do Gemini deve conter no mínimo 10 caracteres para garantir uma análise adequada.',
+          field: 'prompt_gemini',
+          currentLength: req.body.prompt_gemini?.length || 0,
+          minimumRequired: 10
+        });
+      }
+      
+      return res.status(400).json({ 
+        success: false,
+        error: 'Dados inválidos', 
+        details: errors.array() 
+      });
     }
     console.log('✅ Validação OK');
 
@@ -291,8 +310,27 @@ router.put('/checkmarks/:id', adminMiddleware, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ Validação falhou:', errors.array());
-      return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
+      console.log('❌ Validação falhou:', JSON.stringify(errors.array(), null, 2));
+      
+      // ✅ VERIFICAR SE É ERRO DE PROMPT
+      const promptError = errors.array().find(err => err.path === 'prompt_gemini');
+      
+      if (promptError) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Prompt inválido', 
+          details: 'O prompt do Gemini deve conter no mínimo 10 caracteres para garantir uma análise adequada.',
+          field: 'prompt_gemini',
+          currentLength: req.body.prompt_gemini?.length || 0,
+          minimumRequired: 10
+        });
+      }
+      
+      return res.status(400).json({ 
+        success: false,
+        error: 'Dados inválidos', 
+        details: errors.array() 
+      });
     }
 
     const { id } = req.params;

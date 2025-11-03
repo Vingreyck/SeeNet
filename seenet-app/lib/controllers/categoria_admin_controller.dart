@@ -37,37 +37,130 @@ class CategoriaAdminController extends GetxController {
     }
   }
 
-  Future<void> criarCategoria({
-    required String nome,
-    String? descricao,
-  }) async {
-    try {
-      isLoading.value = true;
+Future<void> criarCategoria({
+  required String nome,
+  String? descricao,
+}) async {
+  try {
+    isLoading.value = true;
 
-      await _categoriaService.criarCategoria(
-        nome: nome,
-        descricao: descricao,
-      );
+    await _categoriaService.criarCategoria(
+      nome: nome,
+      descricao: descricao,
+    );
 
-      Get.snackbar(
-        'Sucesso',
-        'Categoria criada com sucesso',
-        backgroundColor: const Color(0xFF00FF88),
-        colorText: Colors.black,
-      );
+    // ✅ POPUP DE SUCESSO COM AVISO DE REINÍCIO
+    await Get.dialog(
+      AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        title: Row(
+          children: const [
+            Icon(Icons.check_circle, color: Color(0xFF00FF88), size: 28),
+            SizedBox(width: 12),
+            Text(
+              'Categoria Criada!',
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'A categoria "$nome" foi criada com sucesso!',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                border: Border.all(color: Colors.orange, width: 2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'IMPORTANTE',
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Para ver a nova categoria na tela principal, você precisa fechar e reabrir o aplicativo.',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Passos para ver a categoria:',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildStep('1', 'Feche completamente o aplicativo'),
+            _buildStep('2', 'Abra o aplicativo novamente'),
+            _buildStep('3', 'A categoria estará visível na tela principal'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text(
+              'Entendi',
+              style: TextStyle(
+                color: Color(0xFF00FF88),
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+      barrierDismissible: false, // Força o usuário a clicar em "Entendi"
+    );
 
-      await carregarCategorias();
-    } catch (e) {
-      Get.snackbar(
-        'Erro',
-        'Não foi possível criar a categoria: $e',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      isLoading.value = false;
+    // Recarregar CheckmarkController também
+    if (Get.isRegistered<CheckmarkController>()) {
+      await Get.find<CheckmarkController>().carregarCategorias();
     }
+
+    await carregarCategorias();
+  } catch (e) {
+    Get.snackbar(
+      'Erro',
+      'Não foi possível criar a categoria: $e',
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
+  } finally {
+    isLoading.value = false;
   }
+}
     // ✅ HELPER: Widget para os passos
   static Widget _buildStep(String numero, String texto) {
     return Padding(

@@ -611,10 +611,89 @@ Future<void> _confirmarRemocao(int id) async {
   }
 
 Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) async {
-  if (titulo.isEmpty || prompt.isEmpty) {
-    Get.snackbar('Erro', 'Título e Prompt obrigatórios', 
+  // ✅ VALIDAÇÃO: Título obrigatório
+  if (titulo.isEmpty) {
+    Get.snackbar('Erro', 'Título é obrigatório', 
       backgroundColor: Colors.red, colorText: Colors.white);
     return;
+  }
+  
+  // ✅ VALIDAÇÃO: Prompt obrigatório
+  if (prompt.isEmpty) {
+    Get.snackbar('Erro', 'Prompt é obrigatório', 
+      backgroundColor: Colors.red, colorText: Colors.white);
+    return;
+  }
+  
+  // ✅ VALIDAÇÃO: Prompt mínimo 10 caracteres
+  if (prompt.length < 10) {
+    await Get.dialog(
+      AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        title: Row(
+          children: const [
+            Icon(Icons.error_outline, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Text('Prompt inválido', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'O prompt do Gemini deve conter no mínimo 10 caracteres para garantir uma análise adequada.',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                border: Border.all(color: Colors.red, width: 1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.red, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Caracteres atuais: ${prompt.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Mínimo necessário: 10 caracteres',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text(
+              'Entendi',
+              style: TextStyle(
+                color: Color(0xFF00FF88),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return; // NÃO enviar para o servidor
   }
   
   try {

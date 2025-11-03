@@ -334,6 +334,7 @@ class _ChecklistviewState extends State<Checklistview> {
                   },
                   color: Colors.blue,
                 ),
+                const SizedBox(height: 12),
                 _buildMenuOption(
                   icon: Icons.category,
                   title: 'Gerenciar Categorias',

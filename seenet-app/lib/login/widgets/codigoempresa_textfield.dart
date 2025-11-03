@@ -50,7 +50,6 @@ class CodigoEmpresaTextField extends GetView<LoginController> {
               fontWeight: FontWeight.w500,
             ),
             decoration: InputDecoration(
-              hintText: 'Ex: DEMO2024, TECH2024',
               hintStyle: TextStyle(
                 color: Colors.white.withOpacity(0.6),
                 fontSize: 16,

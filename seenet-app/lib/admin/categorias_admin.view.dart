@@ -235,94 +235,105 @@ class CategoriasAdminView extends StatelessWidget {
     );
   }
 
+  // ✅ ADICIONAR controller COMO PARÂMETRO
   void _mostrarDialogNovaCategoria(
     BuildContext context,
-    CategoriaAdminController controller,
+    CategoriaAdminController controller, // ← ADICIONADO
   ) {
     final nomeController = TextEditingController();
     final descricaoController = TextEditingController();
 
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text(
-          'Nova Categoria',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nomeController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Nome da Categoria',
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white30),
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2A2A2A),
+          title: const Text(
+            'Nova Categoria',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nomeController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Nome da Categoria',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white30),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF00FF88)),
+                  ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF00FF88)),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descricaoController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Descrição',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white30),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF00FF88)),
+                  ),
                 ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.white54),
               ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descricaoController,
-              style: const TextStyle(color: Colors.white),
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Descrição (opcional)',
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white30),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF00FF88)),
-                ),
+            ElevatedButton(
+              onPressed: () async {
+                final nome = nomeController.text.trim();
+                final descricao = descricaoController.text.trim();
+
+                if (nome.isEmpty) {
+                  Get.snackbar(
+                    'Erro',
+                    'Nome da categoria é obrigatório',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                  return;
+                }
+
+                // ✅ FECHAR DIALOG ANTES
+                Navigator.of(dialogContext).pop();
+
+                // ✅ AGORA controller EXISTE
+                await controller.criarCategoria(
+                  nome: nome,
+                  descricao: descricao.isEmpty ? null : descricao,
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF88),
+                foregroundColor: Colors.black,
               ),
+              child: const Text('Criar'),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: Colors.white54),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nomeController.text.trim().isEmpty) {
-                Get.snackbar(
-                  'Erro',
-                  'Nome da categoria é obrigatório',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-                return;
-              }
-
-              Get.back();
-              controller.criarCategoria(
-                nome: nomeController.text.trim(),
-                descricao: descricaoController.text.trim().isEmpty
-                    ? null
-                    : descricaoController.text.trim(),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF88),
-              foregroundColor: Colors.black,
-            ),
-            child: const Text('Criar'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
+  // ✅ CORRIGIR TAMBÉM O DIALOG DE EDITAR
   void _mostrarDialogEditarCategoria(
     BuildContext context,
     CategoriaAdminController controller,
@@ -332,85 +343,89 @@ class CategoriasAdminView extends StatelessWidget {
     final descricaoController =
         TextEditingController(text: categoria['descricao'] ?? '');
 
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text(
-          'Editar Categoria',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nomeController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Nome da Categoria',
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white30),
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2A2A2A),
+          title: const Text(
+            'Editar Categoria',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nomeController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Nome da Categoria',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white30),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF00FF88)),
+                  ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF00FF88)),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descricaoController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Descrição',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white30),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF00FF88)),
+                  ),
                 ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(), // ✅ CORRIGIDO
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.white54),
               ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descricaoController,
-              style: const TextStyle(color: Colors.white),
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Descrição',
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white30),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF00FF88)),
-                ),
+            ElevatedButton(
+              onPressed: () {
+                if (nomeController.text.trim().isEmpty) {
+                  Get.snackbar(
+                    'Erro',
+                    'Nome da categoria é obrigatório',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                  return;
+                }
+
+                Navigator.of(dialogContext).pop(); // ✅ CORRIGIDO
+                
+                controller.atualizarCategoria(
+                  id: categoria['id'],
+                  nome: nomeController.text.trim(),
+                  descricao: descricaoController.text.trim().isEmpty
+                      ? null
+                      : descricaoController.text.trim(),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF88),
+                foregroundColor: Colors.black,
               ),
+              child: const Text('Salvar'),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: Colors.white54),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nomeController.text.trim().isEmpty) {
-                Get.snackbar(
-                  'Erro',
-                  'Nome da categoria é obrigatório',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-                return;
-              }
-
-              Get.back();
-              controller.atualizarCategoria(
-                id: categoria['id'],
-                nome: nomeController.text.trim(),
-                descricao: descricaoController.text.trim().isEmpty
-                    ? null
-                    : descricaoController.text.trim(),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF88),
-              foregroundColor: Colors.black,
-            ),
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

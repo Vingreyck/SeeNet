@@ -107,6 +107,15 @@ async function startServer() {
       console.error('⚠️ Rotas auth não encontradas');
     }
 
+    // ========== PLAY INTEGRITY API ==========
+    try {
+      const integrityRoutes = require('./routes/integrity');
+      app.use('/api', integrityRoutes);
+      console.log('✅ Rotas Play Integrity carregadas');
+    } catch (error) {
+      console.error('⚠️ Rotas Play Integrity não encontradas:', error.message);
+    }
+
     // ========== ROTAS PROTEGIDAS (COM AUTENTICAÇÃO) ==========
     
     try {
@@ -464,7 +473,7 @@ try {
           stack: error.stack
         })
       });
-    });
+    })
 
     // Listar todas as rotas registradas
 console.log('\n=== ROTAS REGISTRADAS ===');

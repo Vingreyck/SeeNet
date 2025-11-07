@@ -37,8 +37,8 @@ android {
         applicationId = "com.seenet.app"
         minSdk = 21
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.0.0"
+        versionCode = 7
+        versionName = "1.0.2"
         multiDexEnabled = true
     }
 
@@ -79,4 +79,6 @@ flutter {
 
 dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
+    implementation("com.google.android.play:integrity:1.5.0")
+
 }

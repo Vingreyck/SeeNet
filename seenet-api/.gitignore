@@ -4,3 +4,8 @@ node_modules/
 .DS_Store
 *.sqlite
 *.db
+
+service-account.json
+*.json
+!package.json
+!package-lock.json

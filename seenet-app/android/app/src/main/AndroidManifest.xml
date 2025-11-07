@@ -9,8 +9,6 @@
                      android:maxSdkVersion="32" />
     
     <!-- ✅ Para Android 13+ (API 33+) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <application

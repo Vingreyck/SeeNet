@@ -74,3 +74,9 @@ ios/Runner/GoogleService-Info.plist
 android/app/google-services.json
 *.jks
 *.keystore
+
+# Google Cloud Service Account
+service-account.json
+*.json
+!package.json
+!package-lock.json

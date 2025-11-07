@@ -72,3 +72,5 @@ logs/
 android/key.properties
 ios/Runner/GoogleService-Info.plist
 android/app/google-services.json
+*.jks
+*.keystore

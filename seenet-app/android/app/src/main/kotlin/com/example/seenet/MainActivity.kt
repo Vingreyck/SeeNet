@@ -1,4 +1,4 @@
-package com.example.seenet
+package com.seenet.app
 
 import io.flutter.embedding.android.FlutterActivity
 

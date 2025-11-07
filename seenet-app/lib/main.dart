@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:seenet/checklist/screen/ChecklistAppsScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistIptvScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistLentidaoScreen.dart';
+import 'package:flutter/services.dart';
 import 'package:seenet/login/widgets/login.binding.dart';
 import 'package:seenet/registro/registro.view.dart';
 import 'package:seenet/admin/usuarios_admin.view.dart'; 
@@ -28,7 +29,20 @@ import 'controllers/diagnostico_controller.dart';
 
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // ✅ CONFIGURAR TELA CHEIA (Edge-to-edge)
+  SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.edgeToEdge,
+  );
+  
+  // ✅ CONFIGURAR COR DA STATUS BAR
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent, // Transparente
+      statusBarIconBrightness: Brightness.light, // Ícones brancos (para fundo escuro)
+      systemNavigationBarColor: Color(0xFF000000), // Barra de navegação preta
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
   
   await Environment.load();
 

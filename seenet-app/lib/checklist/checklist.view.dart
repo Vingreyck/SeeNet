@@ -29,198 +29,193 @@ class _ChecklistviewState extends State<Checklistview> {
     await checkmarkController.carregarCategorias();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        backgroundColor: const Color.fromARGB(0, 255, 255, 255),
-        elevation: 0,
-      ),
-      backgroundColor: const Color(0xFF1A1A1A),
-      body: Stack(
-        children: [
-          // Header verde (mantém igual)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 150,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  stops: [0.32, 1.0],
-                  colors: [
-                    Color.fromARGB(255, 0, 232, 124),
-                    Color.fromARGB(255, 0, 176, 91),
-                  ],
-                ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    // ✅ REMOVER AppBar
+    backgroundColor: const Color(0xFF1A1A1A),
+    body: Stack(
+      children: [
+        // ✅ HEADER VERDE - VAI ATÉ O TOPO
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 125, // ✅ AUMENTADO para cobrir a status bar
+          child: Container(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 40, // ✅ Espaço da status bar
+              bottom: 20,
+              left: 24,
+              right: 24,
+            ),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                stops: [0.32, 1.0],
+                colors: [
+                  Color.fromARGB(255, 0, 232, 124),
+                  Color.fromARGB(255, 0, 176, 91),
+                ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(30),
+                bottomRight: Radius.circular(30),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        SvgPicture.asset('assets/images/logo.svg', width: 48, height: 48),
-                        const SizedBox(width: 3),
-                        const Text('SeeNet', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ],
+                    SvgPicture.asset(
+                      'assets/images/logo.svg',
+                      width: 48,
+                      height: 48,
                     ),
-                    GestureDetector(
-                      onTap: () => _mostrarMenuUsuario(context, usuarioController),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.2),
-                          border: usuarioController.isAdmin ? Border.all(color: Colors.orange, width: 2) : null,
-                        ),
-                        child: CircleAvatar(
-                          radius: 20,
-                          backgroundColor: usuarioController.isAdmin ? Colors.orange.withOpacity(0.3) : Colors.white.withOpacity(0.2),
-                          child: Icon(usuarioController.isAdmin ? Icons.admin_panel_settings : Icons.person_outline, color: Colors.white, size: 24),
-                        ),
+                    const SizedBox(width: 3),
+                    const Text(
+                      'SeeNet',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
-          
-          // Título
-          Positioned(
-            top: 180, left: 24, right: 24,
-            child: ShaderMask(
-              shaderCallback: (Rect bounds) => const LinearGradient(colors: [Color(0xFF00FF88), Color(0xFFFFFFFF)]).createShader(Rect.fromLTWH(0.0, 0.0, bounds.width, bounds.height)),
-              child: const Text('Checklist Técnico', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w500), textAlign: TextAlign.left),
-            ),
-          ),
-          
-          // Subtítulo
-          const Positioned(
-            top: 220, left: 24, right: 24,
-            child: Text('Selecione a categoria para diagnóstico', style: TextStyle(color: Color(0XFF888888), fontSize: 16)),
-          ),
-          
-          // ✅ LISTA DINÂMICA DA API
-          Positioned(
-            top: 270, left: 0, right: 0, bottom: 0,
-            child: Obx(() {
-              if (checkmarkController.isLoading.value) {
-                return const CategoriasSkeleton(itemCount: 4);
-              }
-
-              if (checkmarkController.categorias.isEmpty) {
-                Positioned(
-                  top: 270, left: 0, right: 0, bottom: 0,
-                  child: Obx(() {
-                    if (checkmarkController.isLoading.value) {
-                      return const CategoriasSkeleton(itemCount: 3);
-                    }
-
-                    if (checkmarkController.categorias.isEmpty) {
-                      // ✅ EMPTY STATE - Nenhuma categoria criada ainda
-                      return _buildEmptyStateNoCategorias();
-                    }
-
-                    // Categorias da API
-                    return RefreshIndicator(
-                      onRefresh: _carregarCategorias,
-                      color: const Color(0xFF00FF88),
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: Column(
-                          children: [
-                            ...checkmarkController.categorias.map((categoria) {
-                              String icone = _getIconeParaCategoria(categoria.nome);
-                              return ChecklistCategoriaCardWidget(
-                                title: categoria.nome,
-                                description: categoria.descricao ?? 'Categoria de diagnóstico',
-                                assetIcon: icone,
-                                onTap: () async {
-                                  if (categoria.id != null) {
-                                    print('🎯 Categoria: ${categoria.nome} (ID: ${categoria.id})');
-                                    
-                                    checkmarkController.categoriaAtual.value = categoria.id!;
-                                    await checkmarkController.carregarCheckmarks(categoria.id!);
-                                    
-                                    // Navegar para tela genérica
-                                    Get.toNamed('/checklist/lentidao');
-                                  }
-                                },
-                              );
-                            }).toList(),
-                            const SizedBox(height: 20),
-                          ],
-                        ),
+                GestureDetector(
+                  onTap: () => _mostrarMenuUsuario(context, usuarioController),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.2),
+                      border: usuarioController.isAdmin
+                          ? Border.all(color: Colors.orange, width: 2)
+                          : null,
+                    ),
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: usuarioController.isAdmin
+                          ? Colors.orange.withOpacity(0.3)
+                          : Colors.white.withOpacity(0.2),
+                      child: Icon(
+                        usuarioController.isAdmin
+                            ? Icons.admin_panel_settings
+                            : Icons.person_outline,
+                        color: Colors.white,
+                        size: 24,
                       ),
-                    );
-                  }),
-                );
-              }
-
-
-              // ✅ Categorias da API
-              return RefreshIndicator(
-                onRefresh: _carregarCategorias,
-                color: const Color(0xFF00FF88),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Column(
-                    children: [
-                      ...checkmarkController.categorias.map((categoria) {
-                        String icone = _getIconeParaCategoria(categoria.nome);
-                        return ChecklistCategoriaCardWidget(
-                          title: categoria.nome,
-                          description: categoria.descricao ?? 'Categoria de diagnóstico',
-                          assetIcon: icone,
-                          onTap: () async {
-                            if (categoria.id != null) {
-                              print('🎯 Categoria selecionada: ${categoria.nome} (ID: ${categoria.id})');
-                              
-                              // Setar categoria atual
-                              checkmarkController.categoriaAtual.value = categoria.id!;
-                              
-                              // Carregar checkmarks
-                              await checkmarkController.carregarCheckmarks(categoria.id!);
-                              
-                              // Navegar para tela genérica baseado no nome
-                              final nomeLower = categoria.nome.toLowerCase();
-                              
-                              if (nomeLower.contains('lentidão') || nomeLower.contains('lentidao')) {
-                                Get.toNamed('/checklist/lentidao');
-                              } else if (nomeLower.contains('iptv') || nomeLower.contains('tv')) {
-                                Get.toNamed('/checklist/iptv');
-                              } else if (nomeLower.contains('app') || nomeLower.contains('aplicativo')) {
-                                Get.toNamed('/checklist/apps');
-                              } else {
-                                // ✅ PARA CATEGORIAS NOVAS: Navegar para tela genérica
-                                Get.toNamed('/checklist/lentidao'); // ← Usar a mesma tela base
-                              }
-                            }
-                          },
-                        );
-                      }).toList(),
-                      const SizedBox(height: 20),
-                    ],
+                    ),
                   ),
                 ),
-              );
-            }),
+              ],
+            ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+
+        // ✅ TÍTULO
+        Positioned(
+          top: 220,
+          left: 24,
+          right: 24,
+          child: ShaderMask(
+            shaderCallback: (Rect bounds) => const LinearGradient(
+              colors: [Color(0xFF00FF88), Color(0xFFFFFFFF)],
+            ).createShader(
+              Rect.fromLTWH(0.0, 0.0, bounds.width, bounds.height),
+            ),
+            child: const Text(
+              'Checklist Técnico',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.left,
+            ),
+          ),
+        ),
+
+        // ✅ SUBTÍTULO
+        const Positioned(
+          top: 260,
+          left: 24,
+          right: 24,
+          child: Text(
+            'Selecione a categoria para diagnóstico',
+            style: TextStyle(
+              color: Color(0XFF888888),
+              fontSize: 16,
+            ),
+          ),
+        ),
+
+        // ✅ LISTA DE CATEGORIAS
+        Positioned(
+          top: 310,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: Obx(() {
+            if (checkmarkController.isLoading.value) {
+              return const CategoriasSkeleton(itemCount: 4);
+            }
+
+            if (checkmarkController.categorias.isEmpty) {
+              return _buildEmptyStateNoCategorias();
+            }
+
+            // ✅ Categorias da API
+            return RefreshIndicator(
+              onRefresh: _carregarCategorias,
+              color: const Color(0xFF00FF88),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    ...checkmarkController.categorias.map((categoria) {
+                      String icone = _getIconeParaCategoria(categoria.nome);
+                      return ChecklistCategoriaCardWidget(
+                        title: categoria.nome,
+                        description: categoria.descricao ?? 'Categoria de diagnóstico',
+                        assetIcon: icone,
+                        onTap: () async {
+                          if (categoria.id != null) {
+                            print('🎯 Categoria selecionada: ${categoria.nome} (ID: ${categoria.id})');
+
+                            checkmarkController.categoriaAtual.value = categoria.id!;
+                            await checkmarkController.carregarCheckmarks(categoria.id!);
+
+                            final nomeLower = categoria.nome.toLowerCase();
+
+                            if (nomeLower.contains('lentidão') || nomeLower.contains('lentidao')) {
+                              Get.toNamed('/checklist/lentidao');
+                            } else if (nomeLower.contains('iptv') || nomeLower.contains('tv')) {
+                              Get.toNamed('/checklist/iptv');
+                            } else if (nomeLower.contains('app') || nomeLower.contains('aplicativo')) {
+                              Get.toNamed('/checklist/apps');
+                            } else {
+                              Get.toNamed('/checklist/lentidao');
+                            }
+                          }
+                        },
+                      );
+                    }).toList(),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    ),
+  );
+}
 
   String _getIconeParaCategoria(String nomeCategoria) {
     final nome = nomeCategoria.toLowerCase();

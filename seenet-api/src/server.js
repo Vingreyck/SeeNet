@@ -293,7 +293,6 @@ async function startServer() {
           
           const diagnostico = result[0];
 
-          console.log(`✅ Diagnóstico ${diagnostico.id} gerado com sucesso!`);
           console.log(`   Status: ${statusApi}`);
           console.log(`   Modelo: ${modeloIa}`);
           console.log(`   Tokens: ${tokensUtilizados}`);

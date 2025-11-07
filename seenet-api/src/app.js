@@ -290,7 +290,6 @@ app.post('/api/diagnostics/gerar',
         data_criacao: new Date().toISOString()
       });
 
-      logger.info(`✅ Diagnóstico ${diagnosticoId} gerado com sucesso!`);
       logger.info(`   Status: ${statusApi}`);
       logger.info(`   Modelo: ${modeloIa}`);
       logger.info(`   Tokens: ${tokensUtilizados}`);

@@ -3,32 +3,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'widgets/loginbutton.widget.dart';
+import 'package:flutter/services.dart'; // ✅ ADICIONAR
 import 'registroview.controller.dart';
 
 class RegistrarView extends GetView<RegistroController> {
   RegistrarView({super.key}) {
     _obscurePassword = true.obs;
   }
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Criar Conta',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Get.back(),
-        ),
-      ),
+@override
+Widget build(BuildContext context) {
+  return AnnotatedRegion<SystemUiOverlayStyle>(
+    value: const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+    ),
+    child: Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -46,124 +36,151 @@ class RegistrarView extends GetView<RegistroController> {
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                // Logo e título
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
+            children: [
+              // Header com botão voltar e título
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
                   children: [
-                    SvgPicture.asset(
-                      'assets/images/logo.svg',
-                      width: 60,
-                      height: 60,
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Get.back(),
                     ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'SeeNet',
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF00FF99),
+                    const Expanded(
+                      child: Text(
+                        'Criar Conta',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 48), // Espaço para balancear
                   ],
                 ),
-
-                const SizedBox(height: 30),
-
-                // Formulário principal
-                Container(
+              ),
+              // Conteúdo existente
+              Expanded(
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFF00FF99).withOpacity(0.2),
-                      width: 1,
-                    ),
-                  ),
                   child: Column(
                     children: [
-                      const Text(
-                        '📝 Dados do Novo Usuário',
-                        style: TextStyle(
-                          color: Color(0xFF00FF99),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                      // Logo e título
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SvgPicture.asset(
+                            'assets/images/logo.svg',
+                            width: 60,
+                            height: 60,
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'SeeNet',
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF00FF99),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 30),
+
+                      // Formulário principal (SEU CÓDIGO EXISTENTE)
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFF00FF99).withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              '📝 Dados do Novo Usuário',
+                              style: TextStyle(
+                                color: Color(0xFF00FF99),
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+
+                            const SizedBox(height: 30),
+
+                            // SEU CÓDIGO DOS CAMPOS (NÃO MEXER)
+                            _buildTextField(
+                              controller: controller.nomeInput,
+                              label: 'Nome Completo',
+                              hint: 'Digite seu nome completo',
+                              icon: Icons.person,
+                              textCapitalization: TextCapitalization.words,
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            _buildTextField(
+                              controller: controller.emailInput,
+                              label: 'Email',
+                              hint: 'Digite seu email',
+                              icon: Icons.email,
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            _buildPasswordField(),
+
+                            const SizedBox(height: 20),
+
+                            _buildTokenField(),
+
+                            const SizedBox(height: 20),
+
+                            _buildTokenStatus(),
+
+                            const SizedBox(height: 30),
+
+                            _buildRegisterButton(),
+                          ],
                         ),
                       ),
 
                       const SizedBox(height: 30),
 
-                      // Campo Nome
-                      _buildTextField(
-                        controller: controller.nomeInput,
-                        label: 'Nome Completo',
-                        hint: 'Digite seu nome completo',
-                        icon: Icons.person,
-                        textCapitalization: TextCapitalization.words,
+                      // Link para login
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Já tem uma conta?',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          LoginButton(),
+                        ],
                       ),
-
-                      const SizedBox(height: 20),
-
-                      // Campo Email
-                      _buildTextField(
-                        controller: controller.emailInput,
-                        label: 'Email',
-                        hint: 'Digite seu email',
-                        icon: Icons.email,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Campo Senha
-                      _buildPasswordField(),
-
-                      const SizedBox(height: 20),
-
-                      // Campo Token da Empresa
-                      _buildTokenField(),
-
-                      const SizedBox(height: 20),
-
-                      // Status do Token
-                      _buildTokenStatus(),
-
-                      const SizedBox(height: 30),
-
-                      // Botão Registrar
-                      _buildRegisterButton(),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 30),
-
-                // Link para login
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Já tem uma conta?',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 16,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    LoginButton(),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // Widget para campos de texto padrão
   Widget _buildTextField({
@@ -380,7 +397,6 @@ class RegistrarView extends GetView<RegistroController> {
             letterSpacing: 1.2,
           ),
           decoration: InputDecoration(
-            hintText: 'Ex: DEMO2024, TECH2024',
             hintStyle: TextStyle(
               color: Colors.white.withOpacity(0.5),
               fontSize: 16,

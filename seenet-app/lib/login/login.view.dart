@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'widgets/logarbutton.widget.dart';
 import 'widgets/logintextfield.widget.dart';
 import 'widgets/senhatextfield.dart';
+import 'package:flutter/services.dart'; // ✅ ADICIONAR
 import 'widgets/registrarbutton.widget.dart';
 import 'widgets/codigoempresa_textfield.dart';
 import 'loginview.controller.dart';
@@ -15,55 +16,59 @@ class LoginView extends GetView<LoginController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        backgroundColor: const Color.fromARGB(0, 0, 0, 0),
-        elevation: 0,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF6B7280), // Cinza médio no topo
-              Color(0xFF4B5563), // Cinza médio-escuro
-              Color(0xFF374151), // Cinza escuro
-              Color(0xFF1F2937), // Cinza muito escuro
-              Color(0xFF111827), // Quase preto
-              Color(0xFF0F0F0F), // Preto profundo
-            ],
-            stops: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
-          ),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SvgPicture.asset(
-                    'assets/images/logo.svg',
-                    width: 100,
-                    height: 100,
-                  ),
-                  const SizedBox(width: 16),
-                  const Text(
-                    'SeeNet',
-                    style: TextStyle(
-                      fontSize: 64,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF00FF99),
-                    ),
-                  ),
-                ],
-              ),
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF6B7280),
+                Color(0xFF4B5563),
+                Color(0xFF374151),
+                Color(0xFF1F2937),
+                Color(0xFF111827),
+                Color(0xFF0F0F0F),
+              ],
+              stops: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
             ),
-            const SizedBox(height: 30),
-            Expanded(child: _body()),
-          ],
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SvgPicture.asset(
+                        'assets/images/logo.svg',
+                        width: 100,
+                        height: 100,
+                      ),
+                      const SizedBox(width: 16),
+                      const Text(
+                        'SeeNet',
+                        style: TextStyle(
+                          fontSize: 64,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF00FF99),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+                Expanded(child: _body()),
+              ],
+            ),
+          ),
         ),
       ),
     );

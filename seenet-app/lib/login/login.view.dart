@@ -8,6 +8,7 @@ import 'package:flutter/services.dart'; // ✅ ADICIONAR
 import 'widgets/registrarbutton.widget.dart';
 import 'widgets/codigoempresa_textfield.dart';
 import 'loginview.controller.dart';
+import '../services/play_integrity_service.dart'; // ← NOVO IMPORT
 import '../services/api_service.dart';
 import '../services/auth_service.dart'; // ← NOVO IMPORT
 
@@ -74,63 +75,72 @@ class LoginView extends GetView<LoginController> {
     );
   }
 
-  Widget _body() {
-    return Center(
-      child: ListView(
-        padding: const EdgeInsets.all(40),
-        children: [
-          const LoginTextField(),
-          const SizedBox(height: 30),
-          const SenhaTextField(),
-          const SizedBox(height: 30),
-          const CodigoEmpresaTextField(),
-          const SizedBox(height: 60),
-          const LogarButton(),
-          const SizedBox(height: 30),
-          const Row(
-            children: [
-              Expanded(
-                child: Divider(
-                  color: Colors.white,
-                  thickness: 1,
-                  endIndent: 10,
-                ),
+Widget _body() {
+  return Center(
+    child: ListView(
+      padding: const EdgeInsets.all(40),
+      children: [
+        const LoginTextField(),
+        const SizedBox(height: 30),
+        const SenhaTextField(),
+        const SizedBox(height: 30),
+        const CodigoEmpresaTextField(),
+        const SizedBox(height: 60),
+        const LogarButton(),
+        
+        // ✅ ADICIONAR: Botão de teste de integridade
+        const SizedBox(height: 20),
+        _buildTestButton(
+          '🔐 Testar Integridade',
+          Icons.verified_user,
+          _testIntegrity,
+        ),
+        
+        const SizedBox(height: 30),
+        const Row(
+          children: [
+            Expanded(
+              child: Divider(
+                color: Colors.white,
+                thickness: 1,
+                endIndent: 10,
               ),
-              Text(
-                'ou',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            Text(
+              'ou',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
-              Expanded(
-                child: Divider(
-                  color: Colors.white,
-                  thickness: 1,
-                  indent: 10,
-                ),
+            ),
+            Expanded(
+              child: Divider(
+                color: Colors.white,
+                thickness: 1,
+                indent: 10,
               ),
-            ],
-          ),
-          const SizedBox(height: 30),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Ainda não tem uma conta?',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 30),
+        const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Ainda não tem uma conta?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
               ),
-              SizedBox(width: 5),
-              RegistrarButton(),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            ),
+            SizedBox(width: 5),
+            RegistrarButton(),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildTestButton(String title, IconData icon, VoidCallback onPressed) {
     return SizedBox(
@@ -175,134 +185,41 @@ class LoginView extends GetView<LoginController> {
     );
   }
 
-  // ========== TESTE DE CONECTIVIDADE ==========
-  void _testBackend() async {
-    try {
-      _showLoading();
-
-      final apiService = Get.find<ApiService>();
-      bool conectado = await apiService.checkConnectivity();
-
-      Get.back(); // Fechar loading
-
+Future<void> _testIntegrity() async {
+  try {
+    _showLoading();
+    
+    print('🔐 Testando integridade do dispositivo...');
+    
+    final result = await PlayIntegrityService.verifyIntegrity();
+    
+    _closeLoadingIfOpen();
+    
+    if (result['isValid'] == true) {
       _showSnackbar(
-        conectado ? 'Backend Online' : 'Backend Offline',
-        conectado
-            ? '✅ Servidor conectado via hotspot!'
-            : '❌ Não foi possível conectar ao servidor',
-        conectado,
+        '✅ Integridade OK',
+        'Dispositivo e app são confiáveis!\n\n'
+        'Device: ${result['deviceIntegrity']}\n'
+        'App: ${result['appIntegrity']}\n'
+        'Licença: ${result['isLicensed']}',
+        true,
       );
-
-    } catch (e) {
-      _closeLoadingIfOpen();
-      _showSnackbar('Erro no Teste', '❌ Erro: $e', false);
-    }
-  }
-
-  // ========== TESTE DE LOGIN ADMIN ==========
-  void _testLoginAdmin() async {
-    try {
-      _showLoading();
-
-      final authService = Get.find<AuthService>();
-      bool success = await authService.login(
-          'admin@seenet.com',
-          'admin123',
-          'DEMO2024'
-      );
-
-      Get.back(); // Fechar loading
-
+    } else {
       _showSnackbar(
-        success ? '✅ Login Admin OK' : '❌ Login Admin Falhou',
-        success
-            ? 'Logado como admin@seenet.com!\nEmpresa:SeeNet'
-            : 'Erro ao fazer login com credenciais do admin',
-        success,
+        '❌ Integridade Falhou',
+        'Erro: ${result['error'] ?? 'Dispositivo não confiável'}',
+        false,
       );
-
-      if (success) {
-        print('🎉 Login admin bem-sucedido!');
-        // Aqui você pode navegar para a tela principal se quiser
-        // Get.offAllNamed('/home');
-      }
-
-    } catch (e) {
-      _closeLoadingIfOpen();
-      _showSnackbar('Erro no Login Admin', '❌ Erro: $e', false);
     }
+  } catch (e) {
+    _closeLoadingIfOpen();
+    _showSnackbar(
+      '❌ Erro',
+      'Erro ao testar integridade: $e',
+      false,
+    );
   }
-
-  // ========== TESTE DE LOGIN TÉCNICO ==========
-  void _testLoginTecnico() async {
-    try {
-      _showLoading();
-
-      final authService = Get.find<AuthService>();
-      bool success = await authService.login(
-          'tecnico@seenet.com',
-          '123456',
-          'DEMO2024'
-      );
-
-      Get.back(); // Fechar loading
-
-      _showSnackbar(
-        success ? '✅ Login Técnico OK' : '❌ Login Técnico Falhou',
-        success
-            ? 'Logado como tecnico@demo.seenet.com!\nEmpresa: SeeNet Demo'
-            : 'Erro ao fazer login com credenciais do técnico',
-        success,
-      );
-
-      if (success) {
-        print('🎉 Login técnico bem-sucedido!');
-      }
-
-    } catch (e) {
-      _closeLoadingIfOpen();
-      _showSnackbar('Erro no Login Técnico', '❌ Erro: $e', false);
-    }
-  }
-
-  // ========== TESTE DE VERIFICAÇÃO DE EMPRESAS ==========
-  void _testCompanies() async {
-    try {
-      _showLoading();
-
-      final authService = Get.find<AuthService>();
-
-      var demo = await authService.verificarCodigoEmpresa('DEMO2024');
-      var tech = await authService.verificarCodigoEmpresa('TECH2024');
-      var invalid = await authService.verificarCodigoEmpresa('INVALID');
-
-      Get.back(); // Fechar loading
-
-      String message = '';
-      if (demo != null) {
-        message += '✅ DEMO2024: ${demo['nome']}\n';
-      }
-      if (tech != null) {
-        message += '✅ TECH2024: ${tech['nome']}\n';
-      }
-      message += '❌ INVALID: Não encontrada';
-
-      _showSnackbar(
-        '🏢 Verificação de Empresas',
-        message,
-        demo != null || tech != null,
-      );
-
-      // Debug
-      print('📊 DEMO2024: $demo');
-      print('📊 TECH2024: $tech');
-      print('📊 INVALID: $invalid');
-
-    } catch (e) {
-      _closeLoadingIfOpen();
-      _showSnackbar('Erro na Verificação', '❌ Erro: $e', false);
-    }
-  }
+}
 
   // ========== MÉTODOS AUXILIARES ==========
   void _showLoading() {

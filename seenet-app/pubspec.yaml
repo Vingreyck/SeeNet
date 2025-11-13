@@ -42,6 +42,7 @@ flutter:
     - assets/images/iptv.svg
     - assets/images/app.svg
     - assets/images/icon.png
+  
 
 # ✅ CONFIGURAÇÃO DO FLUTTER_LAUNCHER_ICONS (FORA DA SEÇÃO FLUTTER)
 flutter_launcher_icons:

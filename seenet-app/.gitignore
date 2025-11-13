@@ -74,7 +74,8 @@ ios/Runner/GoogleService-Info.plist
 android/app/google-services.json
 *.jks
 *.keystore
-
+# Google Service Account (Play Integrity)
+GOOGLE_SERVICE_ACCOUNT_KEY=./service-account.json
 # Google Cloud Service Account
 service-account.json
 *.json

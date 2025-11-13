@@ -70,7 +70,7 @@ router.post('/gerar', [
         resposta_gemini: resposta,
         resumo_diagnostico: extrairResumo(resposta),
         status_api: 'sucesso',
-        modelo_ia: 'gemini-2.0-flash',
+        modelo_ia: 'gemini-1.5-flash',
         tokens_utilizados: contarTokens(prompt + resposta),
         data_criacao: new Date().toISOString()
       });

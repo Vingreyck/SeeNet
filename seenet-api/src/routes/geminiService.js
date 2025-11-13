@@ -146,7 +146,7 @@ IMPORTANTE: Seja direto, prático e focado na solução imediata.`;
     return {
       nome: 'Google Gemini 2.0 Flash',
       configurado: !!this.apiKey,
-      modelo: 'gemini-2.0-flash',
+      modelo: 'gemini-1.5-flash',
       limite: '15 req/min (gratuito)',
       status: this.apiKey ? 'Configurado' : 'Não configurado'
     };

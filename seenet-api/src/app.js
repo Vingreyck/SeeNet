@@ -219,7 +219,7 @@ app.post('/api/diagnostics/gerar',
       // Gerar com Gemini
       let resposta;
       let statusApi = 'sucesso';
-      let modeloIa = 'gemini-2.0-flash';
+      let modeloIa = 'gemini-1.5-flash';
       
       try {
         resposta = await geminiService.gerarDiagnostico(prompt);

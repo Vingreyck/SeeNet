@@ -59,35 +59,54 @@ class PlayIntegrityService {
     return '$timestamp-$random';
   }
   
-  /// Valida token no backend
-  static Future<Map<String, dynamic>> _validateTokenOnBackend(String token) async {
-    try {
-      final apiUrl = dotenv.env['API_URL'];
+/// Valida token no backend
+static Future<Map<String, dynamic>> _validateTokenOnBackend(String token) async {
+  try {
+    final apiUrl = dotenv.env['API_URL'];
+    
+    if (apiUrl == null || apiUrl.isEmpty) {
+      throw Exception('API_URL não configurado');
+    }
+    
+    final response = await http.post(
+      Uri.parse('$apiUrl/api/verify-integrity'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'integrityToken': token}),
+    ).timeout(Duration(seconds: 10));
+    
+    if (response.statusCode == 200) {
+      final result = jsonDecode(response.body);
       
-      if (apiUrl == null || apiUrl.isEmpty) {
-        throw Exception('API_URL não configurado');
+      // ✅ ADICIONAR: Log detalhado dos vereditos
+      print('📊 Vereditos recebidos:');
+      print('   Device: ${result['verdict']?['device']}');
+      print('   App: ${result['verdict']?['app']}');
+      print('   License: ${result['verdict']?['license']}');
+      print('   isValid: ${result['isValid']}');
+      
+      // ✅ ADICIONAR: Para testes, aceitar MEETS_BASIC_INTEGRITY
+      if (result['verdict']?['device'] != null) {
+        final deviceVerdict = result['verdict']['device'].toString();
+        if (deviceVerdict.contains('MEETS_BASIC_INTEGRITY') || 
+            deviceVerdict.contains('MEETS_DEVICE_INTEGRITY')) {
+          print('⚠️ MODO TESTE: Dispositivo tem integridade básica');
+          // Não força isValid = true, apenas informa
+        }
       }
       
-      final response = await http.post(
-        Uri.parse('$apiUrl/api/verify-integrity'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'integrityToken': token}),
-      ).timeout(Duration(seconds: 10));
-      
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        return {
-          'isValid': false,
-          'error': 'Backend retornou status ${response.statusCode}',
-        };
-      }
-    } catch (e) {
-      print('❌ Erro ao validar no backend: $e');
+      return result;
+    } else {
       return {
         'isValid': false,
-        'error': 'Erro de conexão com backend',
+        'error': 'Backend retornou status ${response.statusCode}',
       };
     }
+  } catch (e) {
+    print('❌ Erro ao validar no backend: $e');
+    return {
+      'isValid': false,
+      'error': 'Erro de conexão com backend',
+    };
   }
+}
 }

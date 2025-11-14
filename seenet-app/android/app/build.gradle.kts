@@ -28,6 +28,12 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
 
     sourceSets {
         getByName("main").java.srcDirs("src/main/kotlin")
@@ -37,9 +43,13 @@ android {
         applicationId = "com.seenet.diagnostico"
         minSdk = 23
         targetSdk = 35
-        versionCode = 8
+        versionCode = 10
         versionName = "1.0.2"
         multiDexEnabled = true
+        
+        ndk {
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+        }
     }
 
     // ✅ CONFIGURAÇÃO DE ASSINATURA

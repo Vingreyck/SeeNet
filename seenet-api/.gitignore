@@ -1,13 +1,4 @@
-node_modules/
-.env
-*.log
-.DS_Store
-*.sqlite
-*.db
-
-service-account.json
-*.json
-# Google Service Account (Play Integrity)
-GOOGLE_SERVICE_ACCOUNT_KEY=./service-account.json
-!package.json
-!package-lock.json
+node_modules/ 
+.env 
+service-account.json 
+*.log 

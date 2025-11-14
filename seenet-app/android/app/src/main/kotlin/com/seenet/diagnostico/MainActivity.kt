@@ -1,4 +1,4 @@
-package com.seenet.app
+package com.seenet.diagnostico
 
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
@@ -9,7 +9,7 @@ import com.google.android.play.core.integrity.IntegrityTokenRequest
 import com.google.android.gms.tasks.Task
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.seenet.app/integrity"
+    private val CHANNEL = "com.seenet.diagnostico/integrity"
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

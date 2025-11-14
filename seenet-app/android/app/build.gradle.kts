@@ -16,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.seenet.app"
+    namespace = "com.seenet.diagnostico"
     compileSdk = 35
     ndkVersion = "26.3.11579264"
 
@@ -34,10 +34,10 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.seenet.app"
+        applicationId = "com.seenet.diagnostico"
         minSdk = 23
         targetSdk = 35
-        versionCode = 7
+        versionCode = 6
         versionName = "1.0.2"
         multiDexEnabled = true
     }

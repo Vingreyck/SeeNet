@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class PlayIntegrityService {
-  static const platform = MethodChannel('com.seenet.app/integrity');
+  static const platform = MethodChannel('com.seenet.diagnostico/integrity');
   
   /// Solicita token de integridade e valida no backend
   static Future<Map<String, dynamic>> verifyIntegrity() async {

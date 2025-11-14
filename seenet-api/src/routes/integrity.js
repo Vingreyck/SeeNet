@@ -26,7 +26,7 @@ router.post('/verify-integrity', async (req, res) => {
   try {
     // Descriptografar e validar token com Google Play
     const response = await playintegrity.v1.decodeIntegrityToken({
-      packageName: 'com.seenet.app',
+      packageName: 'com.seenet.diagnostico',
       requestBody: {
         integrityToken: integrityToken,
       },

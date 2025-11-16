@@ -17,8 +17,8 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.seenet.diagnostico"
-    compileSdk = 35
-    ndkVersion = "26.3.11579264"
+    compileSdk = 36
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -41,9 +41,9 @@ android {
 
     defaultConfig {
         applicationId = "com.seenet.diagnostico"
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 35
-        versionCode = 10
+        versionCode = 11
         versionName = "1.0.2"
         multiDexEnabled = true
         

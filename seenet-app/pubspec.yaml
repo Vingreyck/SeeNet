@@ -14,21 +14,21 @@ dependencies:
   cupertino_icons: ^1.0.2
   flutter_svg: ^2.0.10
   get: ^4.7.2
-  intl: ^0.18.1
+  intl: ^0.20.2
   encrypt: ^5.0.1
   speech_to_text: ^7.0.0
   path_provider: ^2.1.1
-  permission_handler: ^11.1.0
-  share_plus: ^7.2.1
+  permission_handler: ^12.0.1
+  share_plus: ^12.0.1
   flutter_dotenv: ^6.0.0
-  postgres: ^2.4.6
+  postgres: ^3.5.9
   http: ^1.1.0
   crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
 
 flutter:

@@ -8,7 +8,6 @@ import 'package:flutter/services.dart'; // ✅ ADICIONAR
 import 'widgets/registrarbutton.widget.dart';
 import 'widgets/codigoempresa_textfield.dart';
 import 'loginview.controller.dart';
-import '../services/play_integrity_service.dart'; // ← NOVO IMPORT
 import '../services/api_service.dart';
 import '../services/auth_service.dart'; // ← NOVO IMPORT
 
@@ -185,41 +184,6 @@ Widget _body() {
     );
   }
 
-Future<void> _testIntegrity() async {
-  try {
-    _showLoading();
-    
-    print('🔐 Testando integridade do dispositivo...');
-    
-    final result = await PlayIntegrityService.verifyIntegrity();
-    
-    _closeLoadingIfOpen();
-    
-    if (result['isValid'] == true) {
-      _showSnackbar(
-        '✅ Integridade OK',
-        'Dispositivo e app são confiáveis!\n\n'
-        'Device: ${result['deviceIntegrity']}\n'
-        'App: ${result['appIntegrity']}\n'
-        'Licença: ${result['isLicensed']}',
-        true,
-      );
-    } else {
-      _showSnackbar(
-        '❌ Integridade Falhou',
-        'Erro: ${result['error'] ?? 'Dispositivo não confiável'}',
-        false,
-      );
-    }
-  } catch (e) {
-    _closeLoadingIfOpen();
-    _showSnackbar(
-      '❌ Erro',
-      'Erro ao testar integridade: $e',
-      false,
-    );
-  }
-}
 
   // ========== MÉTODOS AUXILIARES ==========
   void _showLoading() {

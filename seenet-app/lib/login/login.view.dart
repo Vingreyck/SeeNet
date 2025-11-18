@@ -87,14 +87,6 @@ Widget _body() {
         const SizedBox(height: 60),
         const LogarButton(),
         
-        // ✅ ADICIONAR: Botão de teste de integridade
-        const SizedBox(height: 20),
-        _buildTestButton(
-          '🔐 Testar Integridade',
-          Icons.verified_user,
-          _testIntegrity,
-        ),
-        
         const SizedBox(height: 30),
         const Row(
           children: [

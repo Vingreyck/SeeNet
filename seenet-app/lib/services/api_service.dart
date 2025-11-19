@@ -259,6 +259,7 @@ dynamic _handleResponse(http.Response response) {
       return {
         'success': false,
         'error': errorData['error'] ?? 'Erro no servidor',
+        'type': errorData['type'],
         'details': errorData['details'],
         'statusCode': response.statusCode
       };

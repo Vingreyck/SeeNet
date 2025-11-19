@@ -25,6 +25,15 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       'codigoEmpresa': codigoEmpresa.toUpperCase(),
     }, requireAuth: false);
 
+    print('\n📦 === RESPOSTA COMPLETA ===');
+    print('Success: ${response['success']}');
+    print('Status Code: ${response['statusCode']}');
+    print('Error: ${response['error']}');
+    print('Type: ${response['type']}');
+    print('Data: ${response['data']}');
+    print('Response completo: $response');
+    print('===========================\n');
+
     // 🔥 CORREÇÃO: Acessar data primeiro
     if (response['success'] == true && response['data'] != null) {
       final data = response['data'];
@@ -60,74 +69,83 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
 
       return true;
       } else {
-        print('❌ Login falhou: ${response['error']}');
-        print('📦 Response completo: $response');
-        print('🔍 Status Code: ${response['statusCode']}');
-        print('🔍 Error Type: ${response['type']}');
+         // ✅ ADICIONAR PRINT AQUI TAMBÉM
+      print('❌ === ENTRANDO NO BLOCO DE ERRO ===');
+      print('📍 Vai exibir snackbar agora...');
+      
+      String errorType = response['type']?.toString() ?? '';
+      String errorText = response['error']?.toString() ?? '';
+      int statusCode = response['statusCode'] ?? 0;
+      
+      print('🔍 ErrorType extraído: "$errorType"');
+      print('🔍 ErrorText extraído: "$errorText"');
+      print('🔍 StatusCode extraído: $statusCode');
+      
+      String errorMessage;
+      String errorTitle;
+      
+      // Verificar primeiro o statusCode
+      if (statusCode == 401) {
+        print('✅ Status 401 detectado');
         
-        // ✅ MENSAGENS ESPECÍFICAS
-        String errorMessage;
-        String errorTitle;
-        IconData errorIcon;
-        
-        // Verificar tipo de erro retornado pelo backend
-        String errorType = response['type']?.toString() ?? '';
-        String errorText = response['error']?.toString() ?? '';
-        
-        if (response['statusCode'] == 401) {
-          // Diferenciar entre senha errada e usuário errado
-          if (errorType == 'INVALID_PASSWORD' || errorText.contains('Senha incorreta')) {
-            errorTitle = '🔒 Senha Incorreta';
-            errorMessage = 'A senha digitada está incorreta.\n\nVerifique e tente novamente.';
-            errorIcon = Icons.lock_outline;
-          } else if (errorType == 'USER_NOT_FOUND' || errorText.contains('Usuário não encontrado')) {
-            errorTitle = '👤 Usuário Não Encontrado';
-            errorMessage = 'Email não cadastrado ou código da empresa inválido.\n\nVerifique seus dados.';
-            errorIcon = Icons.person_outline;
-          } else {
-            // Fallback genérico para 401
-            errorTitle = '❌ Credenciais Inválidas';
-            errorMessage = 'Email, senha ou código da empresa incorretos.\n\nVerifique seus dados.';
-            errorIcon = Icons.error_outline;
-          }
-        } else if (errorText.contains('empresa') || errorText.contains('tenant')) {
-          errorTitle = '🏢 Empresa Não Encontrada';
-          errorMessage = 'Código da empresa incorreto ou inativo.\n\nVerifique o código.';
-          errorIcon = Icons.business_outlined;
-        } else if (errorText.contains('inativ')) {
-          errorTitle = '⚠️ Conta Inativa';
-          errorMessage = 'Sua conta está desativada.\n\nContacte o administrador.';
-          errorIcon = Icons.person_off_outlined;
-        } else {
-          errorTitle = '❌ Erro no Login';
-          errorMessage = errorText.isNotEmpty ? errorText : 'Não foi possível realizar o login.';
-          errorIcon = Icons.error_outline;
+        // Senha incorreta
+        if (errorType == 'INVALID_PASSWORD' || errorText.toLowerCase().contains('senha')) {
+          print('🔒 Detectado: Senha Incorreta');
+          errorTitle = 'Senha Incorreta';
+          errorMessage = 'A senha digitada está incorreta.\n\nVerifique e tente novamente.';
+        } 
+        // Usuário não encontrado
+        else if (errorType == 'USER_NOT_FOUND' || errorText.toLowerCase().contains('usuário')) {
+          print('👤 Detectado: Usuário Não Encontrado');
+          errorTitle = 'Usuário Não Encontrado';
+          errorMessage = 'Email não cadastrado ou código da empresa inválido.\n\nVerifique seus dados.';
         }
-        
-        Get.snackbar(
-          errorTitle,
-          errorMessage,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 5),
-          snackPosition: SnackPosition.BOTTOM,
-          margin: const EdgeInsets.all(20),
-          borderRadius: 12,
-          icon: Icon(errorIcon, color: Colors.white, size: 28),
-          shouldIconPulse: true,
-          isDismissible: true,
-        );
-        
-        return false;
+        // Fallback genérico
+        else {
+          print('⚠️ Detectado: Erro genérico 401');
+          errorTitle = 'Credenciais Inválidas';
+          errorMessage = 'Email, senha ou código da empresa incorretos.\n\nVerifique seus dados.';
+        }
+      } else {
+        print('⚠️ Status diferente de 401: $statusCode');
+        errorTitle = 'Erro no Login';
+        errorMessage = errorText.isNotEmpty ? errorText : 'Não foi possível realizar o login.';
       }
-  } catch (e) {
-    print('❌ Erro no login: $e');
+      
+      print('📢 Título: $errorTitle');
+      print('📢 Mensagem: $errorMessage');
+      print('🎯 Chamando Get.snackbar...');
+      
+      // ✅ TENTAR COM SNACKBAR MAIS SIMPLES PRIMEIRO
+      Get.snackbar(
+        errorTitle,
+        errorMessage,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(20),
+        borderRadius: 12,
+      );
+      
+      print('✅ Get.snackbar executado');
+      
+      return false;
+    }
+  } catch (e, stackTrace) {
+    print('❌ === EXCEÇÃO CAPTURADA ===');
+    print('Erro: $e');
+    print('Stack: $stackTrace');
+    
     Get.snackbar(
-      'Erro',
-      'Erro de conexão com o servidor',
-      backgroundColor: Get.theme.colorScheme.error,
-      colorText: Get.theme.colorScheme.onError,
+      'Erro de Conexão',
+      'Não foi possível conectar ao servidor.',
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 5),
+      snackPosition: SnackPosition.BOTTOM,
     );
+    
     return false;
   } finally {
     _usuarioController.isLoading.value = false;

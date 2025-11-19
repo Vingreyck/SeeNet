@@ -86,6 +86,23 @@ Widget _body() {
         const CodigoEmpresaTextField(),
         const SizedBox(height: 60),
         const LogarButton(),
+
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: () => controller.testarSnackbar(),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 15),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Text(
+            '🧪 Testar Snackbar',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
         
         const SizedBox(height: 30),
         const Row(

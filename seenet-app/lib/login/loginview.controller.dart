@@ -146,96 +146,22 @@ class LoginController extends GetxController {
   }
 
   // ========== MÉTODOS DE TESTE ==========
+void testarSnackbar() {
+  print('🧪 Testando snackbar...');
   
-  Future<void> testarBackend() async {
-    try {
-      isLoading.value = true;
-      
-      bool conectado = await apiService.checkConnectivity();
-      
-      if (conectado) {
-        _showSuccess('✅ Backend conectado!\n\nAPI respondendo corretamente.');
-        await apiService.debugEndpoints();
-      } else {
-        _showError('❌ Backend offline\n\nVerifique se a API está rodando.');
-      }
-    } catch (e) {
-      _showError('Erro ao testar: $e');
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  Future<void> testarLoginAdmin() async {
-    preencherTeste(
-      email: 'admin@seenet.com',
-      senha: 'admin123',
-      codigo: 'DEMO2024',
-    );
-
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    if (empresaValida.value) {
-      await tryToLogin();
-    } else {
-      _showError('Aguarde verificação da empresa...');
-    }
-  }
-
-  Future<void> testarLoginTecnico() async {
-    preencherTeste(
-      email: 'tecnico@seenet.com',
-      senha: '123456',
-      codigo: 'DEMO2024',
-    );
-
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    if (empresaValida.value) {
-      await tryToLogin();
-    } else {
-      _showError('Aguarde verificação da empresa...');
-    }
-  }
-
-  Future<void> testarEmpresas() async {
-    try {
-      isLoading.value = true;
-      
-      var demo = await authService.verificarCodigoEmpresa('DEMO2024');
-      var tech = await authService.verificarCodigoEmpresa('TECH2024');
-      var invalid = await authService.verificarCodigoEmpresa('INVALID');
-
-      String message = '';
-      if (demo != null) {
-        message += '✅ DEMO2024: ${demo['nome']}\n';
-        message += '   Plano: ${demo['plano']}\n\n';
-      } else {
-        message += '❌ DEMO2024: Não encontrada\n\n';
-      }
-      
-      if (tech != null) {
-        message += '✅ TECH2024: ${tech['nome']}\n';
-        message += '   Plano: ${tech['plano']}\n\n';
-      } else {
-        message += '❌ TECH2024: Não encontrada\n\n';
-      }
-      
-      message += '❌ INVALID: Não encontrada (esperado)';
-
-      _showInfo('🏢 Teste de Empresas', message);
-
-      print('📊 Resultados dos testes:');
-      print('DEMO2024: $demo');
-      print('TECH2024: $tech');
-      print('INVALID: $invalid');
-
-    } catch (e) {
-      _showError('Erro na verificação: $e');
-    } finally {
-      isLoading.value = false;
-    }
-  }
+  Get.snackbar(
+    'Teste',
+    'Se você está vendo isso, o snackbar funciona!',
+    backgroundColor: Colors.green,
+    colorText: Colors.white,
+    duration: const Duration(seconds: 3),
+    snackPosition: SnackPosition.BOTTOM,
+    margin: const EdgeInsets.all(20),
+    borderRadius: 12,
+  );
+  
+  print('✅ Snackbar chamado');
+}
 
   // ========== MÉTODOS AUXILIARES ==========
   

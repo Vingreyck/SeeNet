@@ -59,17 +59,67 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       );
 
       return true;
-    } else {
-      print('❌ Login falhou: Resposta inválida');
-      print('📦 Response: $response');
-      Get.snackbar(
-        'Erro',
-        response['error'] ?? 'Resposta inválida do servidor',
-        backgroundColor: Get.theme.colorScheme.error,
-        colorText: Get.theme.colorScheme.onError,
-      );
-      return false;
-    }
+      } else {
+        print('❌ Login falhou: ${response['error']}');
+        print('📦 Response completo: $response');
+        print('🔍 Status Code: ${response['statusCode']}');
+        print('🔍 Error Type: ${response['type']}');
+        
+        // ✅ MENSAGENS ESPECÍFICAS
+        String errorMessage;
+        String errorTitle;
+        IconData errorIcon;
+        
+        // Verificar tipo de erro retornado pelo backend
+        String errorType = response['type']?.toString() ?? '';
+        String errorText = response['error']?.toString() ?? '';
+        
+        if (response['statusCode'] == 401) {
+          // Diferenciar entre senha errada e usuário errado
+          if (errorType == 'INVALID_PASSWORD' || errorText.contains('Senha incorreta')) {
+            errorTitle = '🔒 Senha Incorreta';
+            errorMessage = 'A senha digitada está incorreta.\n\nVerifique e tente novamente.';
+            errorIcon = Icons.lock_outline;
+          } else if (errorType == 'USER_NOT_FOUND' || errorText.contains('Usuário não encontrado')) {
+            errorTitle = '👤 Usuário Não Encontrado';
+            errorMessage = 'Email não cadastrado ou código da empresa inválido.\n\nVerifique seus dados.';
+            errorIcon = Icons.person_outline;
+          } else {
+            // Fallback genérico para 401
+            errorTitle = '❌ Credenciais Inválidas';
+            errorMessage = 'Email, senha ou código da empresa incorretos.\n\nVerifique seus dados.';
+            errorIcon = Icons.error_outline;
+          }
+        } else if (errorText.contains('empresa') || errorText.contains('tenant')) {
+          errorTitle = '🏢 Empresa Não Encontrada';
+          errorMessage = 'Código da empresa incorreto ou inativo.\n\nVerifique o código.';
+          errorIcon = Icons.business_outlined;
+        } else if (errorText.contains('inativ')) {
+          errorTitle = '⚠️ Conta Inativa';
+          errorMessage = 'Sua conta está desativada.\n\nContacte o administrador.';
+          errorIcon = Icons.person_off_outlined;
+        } else {
+          errorTitle = '❌ Erro no Login';
+          errorMessage = errorText.isNotEmpty ? errorText : 'Não foi possível realizar o login.';
+          errorIcon = Icons.error_outline;
+        }
+        
+        Get.snackbar(
+          errorTitle,
+          errorMessage,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5),
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(20),
+          borderRadius: 12,
+          icon: Icon(errorIcon, color: Colors.white, size: 28),
+          shouldIconPulse: true,
+          isDismissible: true,
+        );
+        
+        return false;
+      }
   } catch (e) {
     print('❌ Erro no login: $e');
     Get.snackbar(

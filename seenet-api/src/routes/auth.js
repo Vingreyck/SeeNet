@@ -257,7 +257,8 @@ router.post('/login', loginLimiter, [
       });
 
       return res.status(401).json({ 
-        error: 'Credenciais inválidas ou empresa não encontrada' 
+        error: 'Usuário não encontrado ou empresa inválida',
+        type: 'USER_NOT_FOUND'
       });
     }
 
@@ -288,7 +289,8 @@ router.post('/login', loginLimiter, [
         .increment('tentativas_login', 1);
 
       return res.status(401).json({ 
-        error: 'Credenciais inválidas' 
+        error: 'Senha incorreta',
+        type: 'INVALID_PASSWORD'
       });
     }
 

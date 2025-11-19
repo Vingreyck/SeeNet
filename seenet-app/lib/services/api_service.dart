@@ -250,20 +250,25 @@ dynamic _handleResponse(http.Response response) {
         'data': decoded
       };
     } else {
-      print('ERRO HTTP: ${response.statusCode}');
-      
-      Map<String, dynamic> errorData = decoded is Map<String, dynamic> 
-          ? decoded 
-          : {'error': decoded.toString()};
-      
-      return {
-        'success': false,
-        'error': errorData['error'] ?? 'Erro no servidor',
-        'type': errorData['type'],
-        'details': errorData['details'],
-        'statusCode': response.statusCode
-      };
-    }
+  print('❌ Resposta de erro detectada');
+  
+  Map<String, dynamic> errorData = decoded is Map<String, dynamic> 
+      ? decoded 
+      : {'error': decoded.toString()};
+  
+  // ✅ ADICIONAR LOG DO QUE O BACKEND ENVIOU
+  print('📦 ErrorData recebido do backend: $errorData');
+  print('🔍 Type no errorData: ${errorData['type']}');
+  print('🔍 Error no errorData: ${errorData['error']}');
+  
+  return {
+    'success': false,
+    'error': errorData['error'] ?? 'Erro no servidor',
+    'type': errorData['type'],  // ← ADICIONAR ESTA LINHA!
+    'details': errorData['details'],
+    'statusCode': response.statusCode
+  };
+}
   } catch (e) {
     print('ERRO ao decodificar JSON: $e');
     

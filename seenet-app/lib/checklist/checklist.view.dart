@@ -37,85 +37,87 @@ Widget build(BuildContext context) {
     body: Stack(
       children: [
         // ✅ HEADER VERDE - VAI ATÉ O TOPO
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 125, // ✅ AUMENTADO para cobrir a status bar
+// ✅ HEADER VERDE - RESPONSIVO
+Positioned(
+  top: 0,
+  left: 0,
+  right: 0,
+  height: MediaQuery.of(context).padding.top + 100, // ✅ Altura dinâmica
+  child: Container(
+    padding: EdgeInsets.only(
+      top: MediaQuery.of(context).padding.top + 10, // ✅ Pequeno espaço após status bar
+      bottom: 15,
+      left: 24,
+      right: 24,
+    ),
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        stops: [0.32, 1.0],
+        colors: [
+          Color.fromARGB(255, 0, 232, 124),
+          Color.fromARGB(255, 0, 176, 91),
+        ],
+      ),
+      borderRadius: BorderRadius.only(
+        bottomLeft: Radius.circular(30),
+        bottomRight: Radius.circular(30),
+      ),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center, // ✅ Centralizado verticalmente
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center, // ✅ Centralizado
+          children: [
+            SvgPicture.asset(
+              'assets/images/logo.svg',
+              width: 48,
+              height: 48,
+            ),
+            const SizedBox(width: 3),
+            const Text(
+              'SeeNet',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        GestureDetector(
+          onTap: () => _mostrarMenuUsuario(context, usuarioController),
           child: Container(
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 40, // ✅ Espaço da status bar
-              bottom: 20,
-              left: 24,
-              right: 24,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.2),
+              border: usuarioController.isAdmin
+                  ? Border.all(color: Colors.orange, width: 2)
+                  : null,
             ),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                stops: [0.32, 1.0],
-                colors: [
-                  Color.fromARGB(255, 0, 232, 124),
-                  Color.fromARGB(255, 0, 176, 91),
-                ],
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: usuarioController.isAdmin
+                  ? Colors.orange.withOpacity(0.3)
+                  : Colors.white.withOpacity(0.2),
+              child: Icon(
+                usuarioController.isAdmin
+                    ? Icons.admin_panel_settings
+                    : Icons.person_outline,
+                color: Colors.white,
+                size: 24,
               ),
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(30),
-                bottomRight: Radius.circular(30),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    SvgPicture.asset(
-                      'assets/images/logo.svg',
-                      width: 48,
-                      height: 48,
-                    ),
-                    const SizedBox(width: 3),
-                    const Text(
-                      'SeeNet',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-                GestureDetector(
-                  onTap: () => _mostrarMenuUsuario(context, usuarioController),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.2),
-                      border: usuarioController.isAdmin
-                          ? Border.all(color: Colors.orange, width: 2)
-                          : null,
-                    ),
-                    child: CircleAvatar(
-                      radius: 20,
-                      backgroundColor: usuarioController.isAdmin
-                          ? Colors.orange.withOpacity(0.3)
-                          : Colors.white.withOpacity(0.2),
-                      child: Icon(
-                        usuarioController.isAdmin
-                            ? Icons.admin_panel_settings
-                            : Icons.person_outline,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ),
           ),
         ),
+      ],
+    ),
+  ),
+),
 
         // ✅ TÍTULO
         Positioned(

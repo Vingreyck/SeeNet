@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
 const IXCService = require('../../services/IXCService');
-const authMiddleware = require('../../middlewares/auth');
+const authMiddleware = require('../../middleware/auth');
 const crypto = require('crypto');
 
 const pool = new Pool({

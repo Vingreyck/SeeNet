@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const OrdensServicoController = require('../controllers/OrdensServicoController');
-const authMiddleware = require('../middlewares/auth');
+const authMiddleware = require('../middleware/auth');
 
 // ✅ Todas as rotas requerem autenticação
 router.use(authMiddleware);

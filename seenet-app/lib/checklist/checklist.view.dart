@@ -23,7 +23,12 @@ class _ChecklistviewState extends State<Checklistview> {
   void initState() {
     super.initState();
     _carregarCategorias();
+    print('🔑 Token disponível: ${authService.token != null}');
+    if (authService.token != null) {
+      print('🔑 Token: ${authService.token!.substring(0, 20)}...');
+    }
   }
+  
 
   Future<void> _carregarCategorias() async {
     await checkmarkController.carregarCategorias();
@@ -356,6 +361,17 @@ Positioned(
                 ),
                 const SizedBox(height: 12),
               ],
+              _buildMenuOption(
+                icon: Icons.assignment,
+                title: 'Ordens de Serviço',
+                subtitle: 'Ver e executar suas OSs do IXC',
+                onTap: () {
+                  Navigator.pop(context);
+                  Get.toNamed('/ordens-servico');
+                },
+                color: const Color(0xFF00FF88), // Verde do SeeNet
+              ),
+              const SizedBox(height: 12),
               // Opção de transcrição técnica (para todos os usuários)
               _buildMenuOption(
                 icon: Icons.description,

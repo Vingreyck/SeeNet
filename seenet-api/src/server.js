@@ -89,6 +89,18 @@ async function startServer() {
     
     console.log('📁 Carregando rotas...');
 
+    // ✅ INICIALIZAR SINCRONIZADOR IXC
+try {
+  console.log('🔄 Inicializando sincronizador IXC...');
+  const SincronizadorIXC = require('./services/SincronizadorIXC');
+  const sincronizador = new SincronizadorIXC();
+  sincronizador.iniciar();
+  console.log('✅ Sincronizador IXC ativo');
+} catch (error) {
+  console.error('⚠️ Erro ao iniciar sincronizador IXC:', error.message);
+  console.error('   O sistema funcionará normalmente, mas a sincronização automática não estará ativa.');
+}
+
     // ========== ROTAS PÚBLICAS (SEM AUTENTICAÇÃO) ==========
     
     try {
@@ -385,6 +397,26 @@ try {
 } catch (error) {
   console.error('❌ ERRO AO CARREGAR admin/categorias:', error.message);
   console.error('Stack:', error.stack);
+}
+
+// ========== ORDENS DE SERVIÇO ==========
+try {
+  console.log('\n=== CARREGANDO ROTAS ORDENS DE SERVIÇO ===');
+  const ordensServicoRoutes = require('./routes/ordens-servico.routes');
+  app.use('/api/ordens-servico', ordensServicoRoutes);
+  console.log('✅ Rotas /api/ordens-servico registradas');
+} catch (error) {
+  console.error('❌ Erro ao carregar rotas ordens-servico:', error.message);
+}
+
+// ========== INTEGRAÇÕES (ADMIN) ==========
+try {
+  console.log('=== CARREGANDO ROTAS INTEGRAÇÕES ===');
+  const integracoesRoutes = require('./routes/admin/integracoes.routes');
+  app.use('/api/integracoes', integracoesRoutes);
+  console.log('✅ Rotas /api/integracoes registradas');
+} catch (error) {
+  console.error('❌ Erro ao carregar rotas integracoes:', error.message);
 }
     
     // ========== ROTAS DE DEBUG ==========

@@ -18,6 +18,9 @@ class ApiService extends GetxService {
     _client = http.Client();
     ApiConfig.printConfig();
   }
+
+  String? get token => _token;
+  String? get tenantCode => _tenantCode;
   
   @override
   void onClose() {

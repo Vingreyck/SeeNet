@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:seenet/login/widgets/login.binding.dart';
 import 'package:seenet/registro/registro.view.dart';
 import 'package:seenet/admin/usuarios_admin.view.dart'; 
+import 'ordem_de_servico/screens/ordens_servico_screen.dart';
+import 'ordem_de_servico/screens/executar_os_screen.dart';
 import 'package:seenet/admin/checkmarks_admin.view.dart'; 
 import 'splash_screen/splash_screen.dart';
 import 'package:seenet/transcricao/transcricao.view.dart';
@@ -201,6 +203,14 @@ class MyApp extends StatelessWidget {
           binding: BindingsBuilder(() {
             Get.lazyPut(() => TranscricaoController());
           }),
+        ),
+        GetPage(
+          name: '/ordens-servico',
+          page: () => const OrdensServicoScreen(),
+        ),
+        GetPage(
+          name: '/ordens-servico/executar',
+          page: () => const ExecutarOSScreen(),
         ),
         GetPage(
           name: '/transcricao/historico',

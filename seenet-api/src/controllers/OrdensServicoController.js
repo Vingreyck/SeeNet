@@ -11,52 +11,53 @@ class OrdensServicoController {
    * Buscar OSs do técnico logado
    * GET /api/ordens-servico/minhas
    */
-  async buscarMinhasOSs(req, res) {
+    async buscarMinhasOSs(req, res) {
     try {
-      const { userId, tenantId } = req.user; // Vem do middleware de auth
+        const userId = req.user.id; // ✅ CORRIGIDO
+        const tenantId = req.tenantId;
 
-      console.log(`📋 Buscando OSs do técnico ${userId} (tenant: ${tenantId})`);
+        console.log(`📋 Buscando OSs do técnico ${userId} (tenant: ${tenantId})`);
 
-      const { rows } = await pool.query(`
+        const { rows } = await pool.query(`
         SELECT 
-          os.*,
-          u.nome as tecnico_nome,
-          (
+            os.*,
+            u.nome as tecnico_nome,
+            (
             SELECT json_agg(json_build_object(
-              'id', a.id,
-              'tipo', a.tipo,
-              'url_arquivo', a.url_arquivo,
-              'created_at', a.created_at
+                'id', a.id,
+                'tipo', a.tipo,
+                'url_arquivo', a.url_arquivo,
+                'created_at', a.created_at
             ))
             FROM os_anexos a
             WHERE a.os_id = os.id
-          ) as anexos
+            ) as anexos
         FROM ordem_servico os
         JOIN usuarios u ON u.id = os.tecnico_id
         WHERE os.tecnico_id = $1 
-          AND os.empresa_id = $2
-          AND os.status != 'cancelada'
+            AND os.tenant_id = $2
+            AND os.status != 'cancelada'
         ORDER BY 
-          CASE os.prioridade
+            CASE os.prioridade
             WHEN 'urgente' THEN 1
             WHEN 'alta' THEN 2
             WHEN 'media' THEN 3
             WHEN 'baixa' THEN 4
-          END,
-          os.created_at DESC
-      `, [userId, tenantId]);
+            END,
+            os.created_at DESC
+        `, [userId, tenantId]); // ✅ CORRIGIDO
 
-      console.log(`✅ ${rows.length} OS(s) encontrada(s)`);
+        console.log(`✅ ${rows.length} OS(s) encontrada(s)`);
 
-      return res.json(rows);
+        return res.json(rows);
     } catch (error) {
-      console.error('❌ Erro ao buscar OSs:', error);
-      return res.status(500).json({
+        console.error('❌ Erro ao buscar OSs:', error);
+        return res.status(500).json({
         success: false,
         error: 'Erro ao buscar ordens de serviço'
-      });
+        });
     }
-  }
+    }
 
   /**
    * Buscar detalhes de uma OS específica

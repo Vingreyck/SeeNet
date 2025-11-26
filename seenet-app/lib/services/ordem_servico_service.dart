@@ -12,15 +12,34 @@ class OrdemServicoService {
   Future<List<OrdemServico>> buscarMinhasOSs() async {
     try {
       final token = _authService.token;
+      final tenantCode = _authService.tenantCode; // ✅ ADICIONAR
+      
+      // ✅ DEBUG
+      print('🔑 === DEBUG TOKEN ===');
+      print('Token existe? ${token != null}');
+      print('TenantCode existe? ${tenantCode != null}');
+      if (token != null) {
+        print('Token (primeiros 20 chars): ${token.substring(0, 20)}...');
+      }
+      if (tenantCode != null) {
+        print('TenantCode: $tenantCode');
+      }
+      print('URL completa: $baseUrl/ordens-servico/minhas');
+      
       if (token == null) throw Exception('Token não encontrado');
+      if (tenantCode == null) throw Exception('Código da empresa não encontrado'); // ✅ ADICIONAR
 
       final response = await http.get(
         Uri.parse('$baseUrl/ordens-servico/minhas'),
         headers: {
           'Authorization': 'Bearer $token',
+          'X-Tenant-Code': tenantCode, // ✅ ADICIONAR
           'Content-Type': 'application/json',
         },
       );
+
+      print('📥 Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -38,12 +57,16 @@ class OrdemServicoService {
   Future<OrdemServico> buscarDetalhesOS(String osId) async {
     try {
       final token = _authService.token;
+      final tenantCode = _authService.tenantCode; // ✅ ADICIONAR
+      
       if (token == null) throw Exception('Token não encontrado');
+      if (tenantCode == null) throw Exception('Código da empresa não encontrado'); // ✅ ADICIONAR
 
       final response = await http.get(
         Uri.parse('$baseUrl/ordens-servico/$osId/detalhes'),
         headers: {
           'Authorization': 'Bearer $token',
+          'X-Tenant-Code': tenantCode, // ✅ ADICIONAR
           'Content-Type': 'application/json',
         },
       );
@@ -63,12 +86,16 @@ class OrdemServicoService {
   Future<bool> iniciarOS(String osId, double latitude, double longitude) async {
     try {
       final token = _authService.token;
+      final tenantCode = _authService.tenantCode; // ✅ ADICIONAR
+      
       if (token == null) throw Exception('Token não encontrado');
+      if (tenantCode == null) throw Exception('Código da empresa não encontrado'); // ✅ ADICIONAR
 
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/iniciar'),
         headers: {
           'Authorization': 'Bearer $token',
+          'X-Tenant-Code': tenantCode, // ✅ ADICIONAR
           'Content-Type': 'application/json',
         },
         body: json.encode({
@@ -88,12 +115,16 @@ class OrdemServicoService {
   Future<bool> finalizarOS(String osId, Map<String, dynamic> dados) async {
     try {
       final token = _authService.token;
+      final tenantCode = _authService.tenantCode; // ✅ ADICIONAR
+      
       if (token == null) throw Exception('Token não encontrado');
+      if (tenantCode == null) throw Exception('Código da empresa não encontrado'); // ✅ ADICIONAR
 
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/finalizar'),
         headers: {
           'Authorization': 'Bearer $token',
+          'X-Tenant-Code': tenantCode, // ✅ ADICIONAR
           'Content-Type': 'application/json',
         },
         body: json.encode(dados),

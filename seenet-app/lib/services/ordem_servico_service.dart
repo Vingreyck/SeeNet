@@ -41,10 +41,16 @@ class OrdemServicoService {
       print('📥 Status Code: ${response.statusCode}');
       print('📥 Response Body: ${response.body}');
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => OrdemServico.fromJson(json)).toList();
-      } else {
+if (response.statusCode == 200) {
+  final responseData = json.decode(response.body);
+  
+  // ✅ VERIFICAR SE É UM MAP COM 'data' OU UM ARRAY DIRETO
+  final List<dynamic> data = responseData is Map && responseData.containsKey('data')
+      ? responseData['data']
+      : responseData;
+  
+  return data.map((json) => OrdemServico.fromJson(json)).toList();
+} else {
         throw Exception('Erro ao buscar OSs: ${response.statusCode}');
       }
     } catch (e) {

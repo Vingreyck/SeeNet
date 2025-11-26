@@ -73,51 +73,51 @@ class OrdemServico {
     this.anexos,
   });
 
-  factory OrdemServico.fromJson(Map<String, dynamic> json) {
-    return OrdemServico(
-      id: json['id'] ?? '',
-      numeroOs: json['numero_os'] ?? '',
-      origem: json['origem'] ?? 'SEENET',
-      idExterno: json['id_externo'],
-      empresaId: json['empresa_id'] ?? '',
-      tecnicoId: json['tecnico_id'] ?? '',
-      clienteNome: json['cliente_nome'] ?? 'Cliente não identificado',
-      clienteEndereco: json['cliente_endereco'],
-      clienteTelefone: json['cliente_telefone'],
-      tipoServico: json['tipo_servico'] ?? 'Manutenção',
-      prioridade: json['prioridade'] ?? 'media',
-      status: json['status'] ?? 'pendente',
-      dataInicio: json['data_inicio'] != null 
-          ? DateTime.parse(json['data_inicio']) 
-          : null,
-      dataFim: json['data_fim'] != null 
-          ? DateTime.parse(json['data_fim']) 
-          : null,
-      latitude: json['latitude'] != null 
-          ? double.tryParse(json['latitude'].toString()) 
-          : null,
-      longitude: json['longitude'] != null 
-          ? double.tryParse(json['longitude'].toString()) 
-          : null,
-      onuModelo: json['onu_modelo'],
-      onuSerial: json['onu_serial'],
-      onuStatus: json['onu_status'],
-      onuSinalOptico: json['onu_sinal_optico'] != null
-          ? double.tryParse(json['onu_sinal_optico'].toString())
-          : null,
-      relatoProblema: json['relato_problema'],
-      relatoSolucao: json['relato_solucao'],
-      materiaisUtilizados: json['materiais_utilizados'],
-      observacoes: json['observacoes'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
-      anexos: json['anexos'] != null
-          ? (json['anexos'] as List)
-              .map((a) => AnexoOS.fromJson(a))
-              .toList()
-          : null,
-    );
-  }
+factory OrdemServico.fromJson(Map<String, dynamic> json) {
+  return OrdemServico(
+    id: (json['id'] ?? '').toString(), // ✅ CONVERTER
+    numeroOs: json['numero_os'] ?? '',
+    origem: json['origem'] ?? 'SEENET',
+    idExterno: json['id_externo']?.toString(),
+    empresaId: (json['tenant_id'] ?? json['empresa_id'] ?? '').toString(), // ✅ ACEITAR AMBOS
+    tecnicoId: (json['tecnico_id'] ?? '').toString(), // ✅ CONVERTER
+    clienteNome: json['cliente_nome'] ?? 'Cliente não identificado',
+    clienteEndereco: json['cliente_endereco'],
+    clienteTelefone: json['cliente_telefone'],
+    tipoServico: json['tipo_servico'] ?? 'Manutenção',
+    prioridade: json['prioridade'] ?? 'media',
+    status: json['status'] ?? 'pendente',
+    dataInicio: json['data_inicio'] != null 
+        ? DateTime.parse(json['data_inicio']) 
+        : null,
+    dataFim: json['data_fim'] != null 
+        ? DateTime.parse(json['data_fim']) 
+        : null,
+    latitude: json['latitude'] != null 
+        ? double.tryParse(json['latitude'].toString()) 
+        : null,
+    longitude: json['longitude'] != null 
+        ? double.tryParse(json['longitude'].toString()) 
+        : null,
+    onuModelo: json['onu_modelo'],
+    onuSerial: json['onu_serial'],
+    onuStatus: json['onu_status'],
+    onuSinalOptico: json['onu_sinal_optico'] != null
+        ? double.tryParse(json['onu_sinal_optico'].toString())
+        : null,
+    relatoProblema: json['relato_problema'],
+    relatoSolucao: json['relato_solucao'],
+    materiaisUtilizados: json['materiais_utilizados'],
+    observacoes: json['observacoes'],
+    createdAt: DateTime.parse(json['created_at']),
+    updatedAt: DateTime.parse(json['updated_at']),
+    anexos: json['anexos'] != null
+        ? (json['anexos'] as List)
+            .map((a) => AnexoOS.fromJson(a))
+            .toList()
+        : null,
+  );
+}
 
   Map<String, dynamic> toJson() {
     return {
@@ -194,18 +194,18 @@ class AnexoOS {
     required this.osId,
     required this.tipo,
     required this.urlArquivo,
-    required this.createdAt,
+    required this.createdAt,  
   });
 
-  factory AnexoOS.fromJson(Map<String, dynamic> json) {
-    return AnexoOS(
-      id: json['id'] ?? '',
-      osId: json['os_id'] ?? '',
-      tipo: json['tipo'] ?? 'local',
-      urlArquivo: json['url_arquivo'] ?? '',
-      createdAt: DateTime.parse(json['created_at']),
-    );
-  }
+factory AnexoOS.fromJson(Map<String, dynamic> json) {
+  return AnexoOS(
+    id: (json['id'] ?? '').toString(), // ✅ CONVERTER
+    osId: (json['os_id'] ?? '').toString(), // ✅ CONVERTER
+    tipo: json['tipo'] ?? 'local',
+    urlArquivo: json['url_arquivo'] ?? '',
+    createdAt: DateTime.parse(json['created_at']),
+  );
+}
 
   Map<String, dynamic> toJson() {
     return {

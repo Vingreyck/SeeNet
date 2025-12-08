@@ -418,94 +418,6 @@ try {
 } catch (error) {
   console.error('❌ Erro ao carregar rotas integracoes:', error.message);
 }
-    
-    // ========== ROTAS DE DEBUG ==========
-    
-    app.get('/api/health', (req, res) => {
-      res.json({ 
-        status: 'OK', 
-        timestamp: new Date().toISOString(),
-        version: '1.0.0',
-        environment: process.env.NODE_ENV || 'development',
-        database: 'PostgreSQL conectado',
-        gemini: process.env.GEMINI_API_KEY ? 'Configurado' : 'Não configurado'
-      });
-    });
-
-    app.get('/api/debug/database', async (req, res) => {
-      try {
-        const tenants = await db('tenants').select('*').limit(5);
-        res.json({
-          message: 'Debug do banco PostgreSQL',
-          total_tenants: tenants.length,
-          tenants: tenants,
-          connection: 'PostgreSQL OK'
-        });
-      } catch (error) {
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    app.get('/api/debug/tenants', async (req, res) => {
-      try {
-        const Tenant = require('./models/Tenant');
-        const tenants = await Tenant.getAllTenants();
-        res.json({
-          success: true,
-          count: tenants.length,
-          tenants: tenants
-        });
-      } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-      }
-    });
-
-    app.use('*', (req, res) => {
-      res.status(404).json({ 
-        error: 'Endpoint não encontrado',
-        path: req.originalUrl,
-        method: req.method
-      });
-    });
-
-    // Handler de erros global
-    app.use((error, req, res, next) => {
-      // Estruturar informações do erro
-      const errorInfo = {
-        type: error.constructor.name,
-        message: error.message,
-        path: req.path,
-        method: req.method,
-        userId: req.user?.id,
-        tenantId: req.tenantId,
-        timestamp: new Date().toISOString()
-      };
-
-      // Log detalhado para erros não tratados
-      logger.error('Erro não tratado na aplicação', {
-        ...errorInfo,
-        stack: error.stack,
-        body: req.body,
-        query: req.query,
-        headers: req.headers
-      });
-
-      // Determinar status HTTP apropriado
-      const status = error.status || 
-        (error.name === 'ValidationError' ? 400 : 
-         error.name === 'UnauthorizedError' ? 401 : 500);
-
-      // Resposta ao cliente
-      res.status(status).json({
-        error: status === 500 ? 'Erro interno do servidor' : error.message,
-        type: error.name,
-        path: req.path,
-        ...(process.env.NODE_ENV === 'development' && {
-          details: error.message,
-          stack: error.stack
-        })
-      });
-    })
 
 // ============================================
 // ROTA DE DEBUG: TESTAR ENDPOINTS IXC
@@ -599,6 +511,96 @@ app.get('/api/debug/test-ixc-endpoints', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+    
+    // ========== ROTAS DE DEBUG ==========
+    
+    app.get('/api/health', (req, res) => {
+      res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        database: 'PostgreSQL conectado',
+        gemini: process.env.GEMINI_API_KEY ? 'Configurado' : 'Não configurado'
+      });
+    });
+
+    app.get('/api/debug/database', async (req, res) => {
+      try {
+        const tenants = await db('tenants').select('*').limit(5);
+        res.json({
+          message: 'Debug do banco PostgreSQL',
+          total_tenants: tenants.length,
+          tenants: tenants,
+          connection: 'PostgreSQL OK'
+        });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.get('/api/debug/tenants', async (req, res) => {
+      try {
+        const Tenant = require('./models/Tenant');
+        const tenants = await Tenant.getAllTenants();
+        res.json({
+          success: true,
+          count: tenants.length,
+          tenants: tenants
+        });
+      } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+      }
+    });
+
+    app.use('*', (req, res) => {
+      res.status(404).json({ 
+        error: 'Endpoint não encontrado',
+        path: req.originalUrl,
+        method: req.method
+      });
+    });
+
+    // Handler de erros global
+    app.use((error, req, res, next) => {
+      // Estruturar informações do erro
+      const errorInfo = {
+        type: error.constructor.name,
+        message: error.message,
+        path: req.path,
+        method: req.method,
+        userId: req.user?.id,
+        tenantId: req.tenantId,
+        timestamp: new Date().toISOString()
+      };
+
+      // Log detalhado para erros não tratados
+      logger.error('Erro não tratado na aplicação', {
+        ...errorInfo,
+        stack: error.stack,
+        body: req.body,
+        query: req.query,
+        headers: req.headers
+      });
+
+      // Determinar status HTTP apropriado
+      const status = error.status || 
+        (error.name === 'ValidationError' ? 400 : 
+         error.name === 'UnauthorizedError' ? 401 : 500);
+
+      // Resposta ao cliente
+      res.status(status).json({
+        error: status === 500 ? 'Erro interno do servidor' : error.message,
+        type: error.name,
+        path: req.path,
+        ...(process.env.NODE_ENV === 'development' && {
+          details: error.message,
+          stack: error.stack
+        })
+      });
+    })
+
+
 
     // Listar todas as rotas registradas
 console.log('\n=== ROTAS REGISTRADAS ===');

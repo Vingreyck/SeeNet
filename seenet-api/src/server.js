@@ -507,6 +507,99 @@ try {
       });
     })
 
+// ============================================
+// ROTA DE DEBUG: TESTAR ENDPOINTS IXC
+// ============================================
+app.get('/api/debug/test-ixc-endpoints', async (req, res) => {
+  const axios = require('axios');
+  
+  try {
+    console.log('🔍 Testando endpoints IXC...');
+    
+    // Buscar config do banco
+    const integracao = await db('integracao_ixc')
+      .where('tenant_id', 5)
+      .first();
+    
+    if (!integracao) {
+      return res.json({ error: 'Integração não configurada' });
+    }
+    
+    console.log('📡 URL API:', integracao.url_api);
+    
+    const endpoints = [
+      'su_oss_chamado',
+      'su_os',
+      'su_ordem_servico',
+      'ordem_servico',
+      'ordens_servico',
+      'os',
+      'chamado'
+    ];
+    
+    const resultados = [];
+    
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`   Testando: ${endpoint}`);
+        
+        const response = await axios.get(`${integracao.url_api}/${endpoint}`, {
+          headers: {
+            'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+            'Content-Type': 'application/json'
+          },
+          params: {
+            qtype: `${endpoint}.id`,
+            query: '',
+            page: 1,
+            rp: 10
+          },
+          timeout: 5000
+        });
+        
+        const qtd = response.data.registros?.length || 0;
+        const total = response.data.total || 0;
+        
+        console.log(`   ✅ ${endpoint}: ${qtd} registros / ${total} total`);
+        
+        resultados.push({
+          endpoint,
+          status: 'OK',
+          total: total,
+          registros: qtd,
+          campos: qtd > 0 ? Object.keys(response.data.registros[0]) : [],
+          exemplo: qtd > 0 ? response.data.registros[0] : null
+        });
+        
+      } catch (error) {
+        const statusCode = error.response?.status;
+        console.log(`   ❌ ${endpoint}: ${statusCode || error.message}`);
+        
+        resultados.push({
+          endpoint,
+          status: 'ERRO',
+          erro: statusCode || error.message
+        });
+      }
+    }
+    
+    console.log('✅ Teste concluído');
+    
+    res.json({
+      url_api: integracao.url_api,
+      resultados: resultados.sort((a, b) => {
+        if (a.status === 'OK' && b.status !== 'OK') return -1;
+        if (a.status !== 'OK' && b.status === 'OK') return 1;
+        return 0;
+      })
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
     // Listar todas as rotas registradas
 console.log('\n=== ROTAS REGISTRADAS ===');
 app._router.stack.forEach((middleware) => {
@@ -526,6 +619,7 @@ app._router.stack.forEach((middleware) => {
     });
   }
 });
+
 
     if (process.env.VERCEL !== '1') {
       app.listen(PORT, '0.0.0.0', () => {

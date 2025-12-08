@@ -511,6 +511,48 @@ app.get('/api/debug/test-ixc-endpoints', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// TESTE: Buscar OS específica por ID
+app.get('/api/debug/test-ixc-os/:osId', async (req, res) => {
+  const axios = require('axios');
+  
+  try {
+    const { osId } = req.params;
+    
+    const integracao = await db('integracao_ixc')
+      .where('tenant_id', 5)
+      .first();
+    
+    if (!integracao) {
+      return res.status(404).json({ error: 'Integração não configurada' });
+    }
+    
+    console.log(`🔍 Buscando OS ID ${osId} no IXC...`);
+    
+    // Tentar buscar por ID específico
+    const response = await axios.get(`${integracao.url_api}/su_oss_chamado/${osId}`, {
+      headers: {
+        'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 5000
+    });
+    
+    console.log('✅ Resposta recebida');
+    
+    return res.status(200).json({
+      sucesso: true,
+      os: response.data
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro:', error.response?.status, error.message);
+    return res.status(500).json({ 
+      erro: error.response?.status || error.message,
+      detalhes: error.response?.data 
+    });
+  }
+});
     
     // ========== ROTAS DE DEBUG ==========
     

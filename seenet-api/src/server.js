@@ -554,8 +554,8 @@ app.get('/api/debug/test-ixc-os/:osId', async (req, res) => {
   }
 });
 
-// Testar busca SEM filtrar por técnico
-app.get('/api/debug/test-ixc-todas-os', async (req, res) => {
+// Testar acesso a outros endpoints
+app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
   const axios = require('axios');
   
   try {
@@ -563,48 +563,77 @@ app.get('/api/debug/test-ixc-todas-os', async (req, res) => {
       .where('tenant_id', 5)
       .first();
     
-    console.log('🔍 Buscando TODAS as OSs (sem filtro de técnico)...');
+    const testes = [];
     
-    // Buscar SEM filtro de técnico
-    const response = await axios.get(`${integracao.url_api}/su_oss_chamado`, {
-      headers: {
-        'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-        'Content-Type': 'application/json'
-      },
-      params: {
-        page: 1,
-        rp: 50,
-        sortname: 'su_oss_chamado.id',
-        sortorder: 'desc'
-      },
-      timeout: 5000
-    });
+    // Teste 1: Listar clientes
+    try {
+      const r1 = await axios.get(`${integracao.url_api}/cliente`, {
+        headers: {
+          'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+          'Content-Type': 'application/json'
+        },
+        params: { page: 1, rp: 5 }
+      });
+      testes.push({ 
+        modulo: 'Clientes', 
+        total: r1.data.total || 0,
+        status: 'OK'
+      });
+    } catch (e) {
+      testes.push({ 
+        modulo: 'Clientes', 
+        erro: e.response?.status || e.message 
+      });
+    }
     
-    const oss = response.data.registros || [];
+    // Teste 2: Listar colaboradores
+    try {
+      const r2 = await axios.get(`${integracao.url_api}/funcionario`, {
+        headers: {
+          'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+          'Content-Type': 'application/json'
+        },
+        params: { page: 1, rp: 5 }
+      });
+      testes.push({ 
+        modulo: 'Funcionários', 
+        total: r2.data.total || 0,
+        status: 'OK'
+      });
+    } catch (e) {
+      testes.push({ 
+        modulo: 'Funcionários', 
+        erro: e.response?.status || e.message 
+      });
+    }
     
-    console.log(`✅ ${oss.length} OSs encontradas no total`);
+    // Teste 3: Listar OSs
+    try {
+      const r3 = await axios.get(`${integracao.url_api}/su_oss_chamado`, {
+        headers: {
+          'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+          'Content-Type': 'application/json'
+        },
+        params: { page: 1, rp: 5 }
+      });
+      testes.push({ 
+        modulo: 'Ordens de Serviço', 
+        total: r3.data.total || 0,
+        status: 'OK'
+      });
+    } catch (e) {
+      testes.push({ 
+        modulo: 'Ordens de Serviço', 
+        erro: e.response?.status || e.message 
+      });
+    }
     
-    // Mostrar as 5 mais recentes
-    const recentes = oss.slice(0, 5).map(os => ({
-      id: os.id,
-      protocolo: os.protocolo,
-      cliente: os.cliente_razao || os.razao,
-      tecnico_id: os.id_responsavel || os.id_tecnico,
-      tecnico_nome: os.responsavel || os.tecnico,
-      setor: os.setor || os.id_setor,
-      status: os.status
-    }));
-    
-    return res.json({
-      total: response.data.total || 0,
-      encontradas: oss.length,
-      os_recentes: recentes
-    });
+    return res.json({ testes });
     
   } catch (error) {
-    console.error('❌ Erro:', error.message);
     return res.status(500).json({ error: error.message });
   }
+});
 });
     
     // ========== ROTAS DE DEBUG ==========

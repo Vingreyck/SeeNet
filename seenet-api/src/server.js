@@ -563,6 +563,10 @@ app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
       .where('tenant_id', 5)
       .first();
     
+    if (!integracao) {
+      return res.status(404).json({ error: 'Integração não configurada' });
+    }
+    
     const testes = [];
     
     // Teste 1: Listar clientes
@@ -572,7 +576,8 @@ app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
           'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
           'Content-Type': 'application/json'
         },
-        params: { page: 1, rp: 5 }
+        params: { page: 1, rp: 5 },
+        timeout: 5000
       });
       testes.push({ 
         modulo: 'Clientes', 
@@ -593,7 +598,8 @@ app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
           'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
           'Content-Type': 'application/json'
         },
-        params: { page: 1, rp: 5 }
+        params: { page: 1, rp: 5 },
+        timeout: 5000
       });
       testes.push({ 
         modulo: 'Funcionários', 
@@ -614,7 +620,8 @@ app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
           'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
           'Content-Type': 'application/json'
         },
-        params: { page: 1, rp: 5 }
+        params: { page: 1, rp: 5 },
+        timeout: 5000
       });
       testes.push({ 
         modulo: 'Ordens de Serviço', 
@@ -628,12 +635,12 @@ app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
       });
     }
     
-    return res.json({ testes });
+    return res.status(200).json({ testes });
     
   } catch (error) {
+    console.error('❌ Erro:', error);
     return res.status(500).json({ error: error.message });
   }
-});
 });
     
     // ========== ROTAS DE DEBUG ==========

@@ -554,28 +554,56 @@ app.get('/api/debug/test-ixc-os/:osId', async (req, res) => {
   }
 });
 
-// Descobrir IP público do Railway
-app.get('/api/debug/meu-ip', async (req, res) => {
+// Testar busca SEM filtrar por técnico
+app.get('/api/debug/test-ixc-todas-os', async (req, res) => {
   const axios = require('axios');
   
   try {
-    // Buscar IP público do servidor
-    const ipPublico = await axios.get('https://api.ipify.org?format=json', {
+    const integracao = await db('integracao_ixc')
+      .where('tenant_id', 5)
+      .first();
+    
+    console.log('🔍 Buscando TODAS as OSs (sem filtro de técnico)...');
+    
+    // Buscar SEM filtro de técnico
+    const response = await axios.get(`${integracao.url_api}/su_oss_chamado`, {
+      headers: {
+        'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+        'Content-Type': 'application/json'
+      },
+      params: {
+        page: 1,
+        rp: 50,
+        sortname: 'su_oss_chamado.id',
+        sortorder: 'desc'
+      },
       timeout: 5000
     });
     
+    const oss = response.data.registros || [];
+    
+    console.log(`✅ ${oss.length} OSs encontradas no total`);
+    
+    // Mostrar as 5 mais recentes
+    const recentes = oss.slice(0, 5).map(os => ({
+      id: os.id,
+      protocolo: os.protocolo,
+      cliente: os.cliente_razao || os.razao,
+      tecnico_id: os.id_responsavel || os.id_tecnico,
+      tecnico_nome: os.responsavel || os.tecnico,
+      setor: os.setor || os.id_setor,
+      status: os.status
+    }));
+    
     return res.json({
-      ip_publico_servidor: ipPublico.data.ip,
-      ip_da_requisicao: req.ip,
-      ip_x_forwarded: req.headers['x-forwarded-for'],
-      ip_x_real: req.headers['x-real-ip']
+      total: response.data.total || 0,
+      encontradas: oss.length,
+      os_recentes: recentes
     });
+    
   } catch (error) {
-    return res.json({
-      erro: error.message,
-      ip_da_requisicao: req.ip,
-      headers: req.headers
-    });
+    console.error('❌ Erro:', error.message);
+    return res.status(500).json({ error: error.message });
   }
 });
     

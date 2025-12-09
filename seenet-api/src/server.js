@@ -553,6 +553,31 @@ app.get('/api/debug/test-ixc-os/:osId', async (req, res) => {
     });
   }
 });
+
+// Descobrir IP público do Railway
+app.get('/api/debug/meu-ip', async (req, res) => {
+  const axios = require('axios');
+  
+  try {
+    // Buscar IP público do servidor
+    const ipPublico = await axios.get('https://api.ipify.org?format=json', {
+      timeout: 5000
+    });
+    
+    return res.json({
+      ip_publico_servidor: ipPublico.data.ip,
+      ip_da_requisicao: req.ip,
+      ip_x_forwarded: req.headers['x-forwarded-for'],
+      ip_x_real: req.headers['x-real-ip']
+    });
+  } catch (error) {
+    return res.json({
+      erro: error.message,
+      ip_da_requisicao: req.ip,
+      headers: req.headers
+    });
+  }
+});
     
     // ========== ROTAS DE DEBUG ==========
     

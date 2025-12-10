@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 const IXC_URL = 'https://ixc.bbnetup.com.br/webservice/v1';
-const IXC_TOKEN = '122:467cc081224939855b67fbc685cfd08ee7612c8913b29fe8369d7403285963ec';
+const IXC_TOKEN = '122:c4865552439b671842f0c3d34fcf6e5213a7d5ad2b029964d042426f157ddad2';
 
 const endpoints = [
   'su_oss_chamado',
@@ -16,13 +16,13 @@ const endpoints = [
   'chamados',
   'atendimento',
   'atendimentos',
-  'Clientes',
+  'cliente',
   'su_atendimento'
 ];
 
 async function testarEndpoints() {
-  console.log('=' .repeat(60));
-  console.log('TESTANDO ENDPOINTS POSSÍVEIS PARA ORDEM DE SERVIÇO');
+  console.log('='.repeat(60));
+  console.log('TESTANDO ENDPOINTS COM POST (MÉTODO CORRETO)');
   console.log('='.repeat(60) + '\n');
   
   let encontrados = [];
@@ -31,16 +31,20 @@ async function testarEndpoints() {
     try {
       process.stdout.write(`📡 ${endpoint.padEnd(25)}`);
       
-      const response = await axios.get(`${IXC_URL}/${endpoint}`, {
+      // USAR POST COM URLSearchParams (CORRETO!)
+      const params = new URLSearchParams({
+        qtype: 'id',
+        query: '',
+        oper: '!=',
+        page: '1',
+        rp: '5'
+      });
+      
+      const response = await axios.post(`${IXC_URL}/${endpoint}`, params.toString(), {
         headers: {
           'Authorization': `Basic ${Buffer.from(IXC_TOKEN).toString('base64')}`,
-          'Content-Type': 'application/json'
-        },
-        params: {
-          qtype: `${endpoint}.id`,
-          query: '',
-          page: 1,
-          rp: 5
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'listar'
         },
         timeout: 8000
       });
@@ -85,6 +89,7 @@ async function testarEndpoints() {
     console.log('   1. Token sem permissão para OSs');
     console.log('   2. Não existem OSs no sistema');
     console.log('   3. Endpoint tem nome diferente');
+    console.log('   4. Filtros de setor/funcionário bloqueando');
   } else {
     encontrados.forEach((item, index) => {
       console.log(`\n${index + 1}. 📋 Endpoint: ${item.endpoint}`);

@@ -11,7 +11,7 @@ class IXCService {
       baseURL: this.baseUrl,
       headers: {
         'Authorization': `Basic ${Buffer.from(this.token).toString('base64')}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
       timeout: 30000, // 30 segundos
     });
@@ -26,42 +26,47 @@ class IXCService {
     try {
       console.log('🔍 Buscando OSs no IXC...', filtros);
 
-      const params = {
-        qtype: 'su_oss_chamado.id',
+      const params = new URLSearchParams({
+        qtype: 'id',
         query: filtros.id || '',
-        oper: 'like',
-        page: 1,
-        rp: 1000, // Buscar até 1000 registros
-        sortname: 'su_oss_chamado.id',
-        sortorder: 'desc',
-      };
+        oper: filtros.id ? '=' : '!=',
+        page: '1',
+        rp: '1000',
+        sortname: 'id',
+        sortorder: 'desc'
+      });
 
       // Adicionar filtros opcionais
       if (filtros.tecnicoId) {
-        params.grid_param = JSON.stringify([{
+        params.set('grid_param', JSON.stringify([{
           TB: 'su_oss_chamado.id_tecnico',
           OP: '=',
           P: filtros.tecnicoId.toString()
-        }]);
+        }]));
       }
 
       if (filtros.status) {
-        params.grid_param = JSON.stringify([{
+        params.set('grid_param', JSON.stringify([{
           TB: 'su_oss_chamado.status',
           OP: '=',
           P: filtros.status
-        }]);
+        }]));
       }
 
       if (filtros.dataInicio) {
-        params.grid_param = JSON.stringify([{
+        params.set('grid_param', JSON.stringify([{
           TB: 'su_oss_chamado.data_abertura',
           OP: '>=',
           P: filtros.dataInicio
-        }]);
+        }]));
       }
 
-      const response = await this.client.get('/su_oss_chamado', { params });
+      const response = await this.client.post('/su_oss_chamado', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'listar'
+        }
+      });
 
       console.log(`✅ ${response.data.total || 0} OSs encontradas no IXC`);
       
@@ -81,7 +86,20 @@ class IXCService {
     try {
       console.log(`🔍 Buscando detalhes da OS ${osId} no IXC...`);
 
-      const response = await this.client.get(`/su_oss_chamado/${osId}`);
+      const params = new URLSearchParams({
+        qtype: 'id',
+        query: osId.toString(),
+        oper: '=',
+        page: '1',
+        rp: '1'
+      });
+
+      const response = await this.client.post('/su_oss_chamado', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'listar'
+        }
+      });
 
       console.log(`✅ Detalhes da OS ${osId} obtidos`);
       
@@ -101,7 +119,20 @@ class IXCService {
     try {
       console.log(`👤 Buscando cliente ${clienteId} no IXC...`);
 
-      const response = await this.client.get(`/cliente/${clienteId}`);
+      const params = new URLSearchParams({
+        qtype: 'id',
+        query: clienteId.toString(),
+        oper: '=',
+        page: '1',
+        rp: '1'
+      });
+
+      const response = await this.client.post('/cliente', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'listar'
+        }
+      });
 
       console.log(`✅ Dados do cliente ${clienteId} obtidos`);
       
@@ -120,13 +151,18 @@ class IXCService {
     try {
       console.log('👷 Buscando técnicos no IXC...');
 
-      const response = await this.client.get('/colaborador', {
-        params: {
-          qtype: 'colaborador.id',
-          query: '',
-          oper: 'like',
-          page: 1,
-          rp: 100,
+      const params = new URLSearchParams({
+        qtype: 'id',
+        query: '',
+        oper: '!=',
+        page: '1',
+        rp: '100'
+      });
+
+      const response = await this.client.post('/colaborador', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'listar'
         }
       });
 
@@ -149,12 +185,17 @@ class IXCService {
     try {
       console.log(`📝 Atualizando OS ${osId} no IXC...`);
 
-      const payload = {
-        id: osId,
+      const payload = new URLSearchParams({
+        id: osId.toString(),
         ...dados
-      };
+      });
 
-      const response = await this.client.post(`/su_oss_chamado`, payload);
+      const response = await this.client.post('/su_oss_chamado', payload.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'listar'
+        }
+      });
 
       console.log(`✅ OS ${osId} atualizada com sucesso no IXC`);
       
@@ -175,28 +216,33 @@ class IXCService {
     try {
       console.log(`✅ Finalizando OS ${osId} no IXC...`);
 
-      const payload = {
-        id: osId,
-        status: 'F', // F = Finalizada
+      const payload = new URLSearchParams({
+        id: osId.toString(),
+        status: 'F',
         data_finalizacao: new Date().toISOString().split('T')[0],
         observacao: dados.observacoes || '',
-        tecnico_executante: dados.tecnicoId,
-      };
+        tecnico_executante: dados.tecnicoId.toString()
+      });
 
       // Adicionar informações extras se disponíveis
       if (dados.relatoProblema) {
-        payload.diagnostico = dados.relatoProblema;
+        payload.append('diagnostico', dados.relatoProblema);
       }
 
       if (dados.relatoSolucao) {
-        payload.solucao = dados.relatoSolucao;
+        payload.append('solucao', dados.relatoSolucao);
       }
 
       if (dados.materiaisUtilizados) {
-        payload.materiais = dados.materiaisUtilizados;
+        payload.append('materiais', dados.materiaisUtilizados);
       }
 
-      const response = await this.client.post(`/su_oss_chamado`, payload);
+      const response = await this.client.post('/su_oss_chamado', payload.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'listar'
+        }
+      });
 
       console.log(`✅ OS ${osId} finalizada com sucesso no IXC`);
       
@@ -215,8 +261,19 @@ class IXCService {
     try {
       console.log('🧪 Testando conexão com IXC...');
       
-      await this.client.get('/su_oss_chamado', {
-        params: { page: 1, rp: 1 }
+      const params = new URLSearchParams({
+        qtype: 'id',
+        query: '',
+        oper: '!=',
+        page: '1',
+        rp: '1'
+      });
+
+      await this.client.post('/su_oss_chamado', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'listar'
+        }
       });
 
       console.log('✅ Conexão com IXC OK');

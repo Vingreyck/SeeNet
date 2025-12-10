@@ -455,19 +455,25 @@ app.get('/api/debug/test-ixc-endpoints', async (req, res) => {
       try {
         console.log(`   Testando: ${endpoint}`);
         
-        const response = await axios.get(`${integracao.url_api}/${endpoint}`, {
-          headers: {
-            'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-            'Content-Type': 'application/json'
-          },
-          params: {
-            qtype: `${endpoint}.id`,
-            query: '',
-            page: 1,
-            rp: 10
-          },
-          timeout: 5000
-        });
+const params = new URLSearchParams({
+  qtype: 'id',
+  query: '',
+  oper: '!=',
+  page: '1',
+  rp: '10'
+});
+
+const response = await axios.post(`${integracao.url_api}/${endpoint}`,
+  params.toString(),
+  {
+    headers: {
+      'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'ixcsoft': 'listar'
+    },
+    timeout: 5000
+  }
+);
         
         const qtd = response.data.registros?.length || 0;
         const total = response.data.total || 0;
@@ -530,13 +536,25 @@ app.get('/api/debug/test-ixc-os/:osId', async (req, res) => {
     console.log(`🔍 Buscando OS ID ${osId} no IXC...`);
     
     // Tentar buscar por ID específico
-    const response = await axios.get(`${integracao.url_api}/su_oss_chamado/${osId}`, {
-      headers: {
-        'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 5000
-    });
+const params = new URLSearchParams({
+  qtype: 'id',
+  query: osId.toString(),
+  oper: '=',
+  page: '1',
+  rp: '1'
+});
+
+const response = await axios.post(`${integracao.url_api}/su_oss_chamado`,
+  params.toString(),
+  {
+    headers: {
+      'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'ixcsoft': 'listar'
+    },
+    timeout: 5000
+  }
+);
     
     console.log('✅ Resposta recebida');
     
@@ -555,6 +573,7 @@ app.get('/api/debug/test-ixc-os/:osId', async (req, res) => {
 });
 
 // Testar acesso a outros endpoints
+// Testar acesso a outros endpoints
 app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
   const axios = require('axios');
   
@@ -571,14 +590,26 @@ app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
     
     // Teste 1: Listar clientes
     try {
-      const r1 = await axios.get(`${integracao.url_api}/cliente`, {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-          'Content-Type': 'application/json'
-        },
-        params: { page: 1, rp: 5 },
-        timeout: 5000
+      const params1 = new URLSearchParams({
+        qtype: 'id',
+        query: '',
+        oper: '!=',
+        page: '1',
+        rp: '5'
       });
+
+      const r1 = await axios.post(`${integracao.url_api}/cliente`,
+        params1.toString(),
+        {
+          headers: {
+            'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'ixcsoft': 'listar'
+          },
+          timeout: 5000
+        }
+      );
+      
       testes.push({ 
         modulo: 'Clientes', 
         total: r1.data.total || 0,
@@ -593,14 +624,26 @@ app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
     
     // Teste 2: Listar colaboradores
     try {
-      const r2 = await axios.get(`${integracao.url_api}/funcionario`, {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-          'Content-Type': 'application/json'
-        },
-        params: { page: 1, rp: 5 },
-        timeout: 5000
+      const params2 = new URLSearchParams({
+        qtype: 'id',
+        query: '',
+        oper: '!=',
+        page: '1',
+        rp: '5'
       });
+
+      const r2 = await axios.post(`${integracao.url_api}/funcionario`,
+        params2.toString(),
+        {
+          headers: {
+            'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'ixcsoft': 'listar'
+          },
+          timeout: 5000
+        }
+      );
+      
       testes.push({ 
         modulo: 'Funcionários', 
         total: r2.data.total || 0,
@@ -615,14 +658,26 @@ app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
     
     // Teste 3: Listar OSs
     try {
-      const r3 = await axios.get(`${integracao.url_api}/su_oss_chamado`, {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-          'Content-Type': 'application/json'
-        },
-        params: { page: 1, rp: 5 },
-        timeout: 5000
+      const params3 = new URLSearchParams({
+        qtype: 'id',
+        query: '',
+        oper: '!=',
+        page: '1',
+        rp: '5'
       });
+
+      const r3 = await axios.post(`${integracao.url_api}/su_oss_chamado`,
+        params3.toString(),
+        {
+          headers: {
+            'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'ixcsoft': 'listar'
+          },
+          timeout: 5000
+        }
+      );
+      
       testes.push({ 
         modulo: 'Ordens de Serviço', 
         total: r3.data.total || 0,
@@ -659,19 +714,27 @@ app.get('/api/debug/test-ixc-todas-os', async (req, res) => {
     console.log('🔍 Buscando TODAS as OSs (sem filtro de técnico)...');
     
     // Buscar SEM filtro de técnico
-    const response = await axios.get(`${integracao.url_api}/su_oss_chamado`, {
-      headers: {
-        'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-        'Content-Type': 'application/json'
-      },
-      params: {
-        page: 1,
-        rp: 50,
-        sortname: 'su_oss_chamado.id',
-        sortorder: 'desc'
-      },
-      timeout: 5000
-    });
+const params = new URLSearchParams({
+  qtype: 'id',
+  query: '',
+  oper: '!=',
+  page: '1',
+  rp: '50',
+  sortname: 'id',
+  sortorder: 'desc'
+});
+
+const response = await axios.post(`${integracao.url_api}/su_oss_chamado`, 
+  params.toString(),
+  {
+    headers: {
+      'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'ixcsoft': 'listar'
+    },
+    timeout: 5000
+  }
+);
     
     const oss = response.data.registros || [];
     

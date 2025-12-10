@@ -642,6 +642,66 @@ app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
+
+// Testar busca de TODAS as OSs (sem filtro)
+app.get('/api/debug/test-ixc-todas-os', async (req, res) => {
+  const axios = require('axios');
+  
+  try {
+    const integracao = await db('integracao_ixc')
+      .where('tenant_id', 5)
+      .first();
+    
+    if (!integracao) {
+      return res.status(404).json({ error: 'Integração não configurada' });
+    }
+    
+    console.log('🔍 Buscando TODAS as OSs (sem filtro de técnico)...');
+    
+    // Buscar SEM filtro de técnico
+    const response = await axios.get(`${integracao.url_api}/su_oss_chamado`, {
+      headers: {
+        'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+        'Content-Type': 'application/json'
+      },
+      params: {
+        page: 1,
+        rp: 50,
+        sortname: 'su_oss_chamado.id',
+        sortorder: 'desc'
+      },
+      timeout: 5000
+    });
+    
+    const oss = response.data.registros || [];
+    
+    console.log(`✅ ${oss.length} OSs encontradas no total`);
+    
+    // Mostrar as 5 mais recentes
+    const recentes = oss.slice(0, 5).map(os => ({
+      id: os.id,
+      protocolo: os.protocolo,
+      cliente: os.cliente_razao || os.razao,
+      tecnico_id: os.id_responsavel || os.id_tecnico,
+      tecnico_nome: os.responsavel || os.tecnico,
+      setor: os.setor || os.id_setor,
+      status: os.status
+    }));
+    
+    return res.status(200).json({
+      total: response.data.total || 0,
+      encontradas: oss.length,
+      os_recentes: recentes
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro:', error.message);
+    return res.status(500).json({ 
+      error: error.message,
+      detalhes: error.response?.data 
+    });
+  }
+});
     
     // ========== ROTAS DE DEBUG ==========
     

@@ -702,6 +702,22 @@ app.get('/api/debug/test-ixc-todas-os', async (req, res) => {
     });
   }
 });
+
+// Descobrir IP REAL do Railway AGORA
+app.get('/api/debug/meu-ip-agora', async (req, res) => {
+  const axios = require('axios');
+  
+  try {
+    const ipPublico = await axios.get('https://api.ipify.org?format=json');
+    
+    return res.json({
+      ip_atual_railway: ipPublico.data.ip,
+      data_hora: new Date().toISOString()
+    });
+  } catch (error) {
+    return res.json({ erro: error.message });
+  }
+});
     
     // ========== ROTAS DE DEBUG ==========
     

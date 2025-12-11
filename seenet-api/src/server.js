@@ -698,6 +698,49 @@ app.get('/api/debug/test-ixc-permissoes', async (req, res) => {
   }
 });
 
+// Testar se consegue listar QUALQUER coisa
+app.get('/api/debug/test-ixc-listar-modulos', async (req, res) => {
+  const axios = require('axios');
+  
+  try {
+    const integracao = await db('integracao_ixc')
+      .where('tenant_id', 5)
+      .first();
+    
+    // Tentar listar colaboradores (sabemos que funciona)
+    const params = new URLSearchParams({
+      qtype: 'id',
+      query: '',
+      oper: '!=',
+      page: '1',
+      rp: '5'
+    });
+
+    const response = await axios.post(`${integracao.url_api}/colaborador`,
+      params.toString(),
+      {
+        headers: {
+          'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'listar'
+        },
+        timeout: 5000
+      }
+    );
+    
+    return res.json({
+      total_colaboradores: response.data.total || 0,
+      colaboradores: response.data.registros || []
+    });
+    
+  } catch (error) {
+    return res.status(500).json({ 
+      erro: error.message,
+      detalhes: error.response?.data 
+    });
+  }
+});
+
 // Testar busca de TODAS as OSs (sem filtro)
 app.get('/api/debug/test-ixc-todas-os', async (req, res) => {
   const axios = require('axios');

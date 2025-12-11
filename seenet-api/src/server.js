@@ -741,6 +741,124 @@ app.get('/api/debug/test-ixc-listar-modulos', async (req, res) => {
   }
 });
 
+// Testar endpoints alternativos de OS
+app.get('/api/debug/test-ixc-endpoints-alternativos', async (req, res) => {
+  const axios = require('axios');
+  
+  try {
+    const integracao = await db('integracao_ixc')
+      .where('tenant_id', 5)
+      .first();
+    
+    if (!integracao) {
+      return res.json({ error: 'Integração não configurada' });
+    }
+    
+    // Testar variações de endpoints
+    const endpoints = [
+      'su_oss_chamado',
+      'su_chamado',
+      'chamado',
+      'chamados',
+      'ordem',
+      'ordens',
+      'su_ordem',
+      'su_ordens',
+      'ticket',
+      'tickets',
+      'su_ticket',
+      'atendimento',
+      'atendimentos',
+      'su_atendimento',
+      'su_atendimentos',
+      'os',
+      'oss',
+      'su_os',
+      'su_oss'
+    ];
+    
+    const resultados = [];
+    
+    for (const endpoint of endpoints) {
+      try {
+        const params = new URLSearchParams({
+          qtype: 'id',
+          query: '',
+          oper: '!=',
+          page: '1',
+          rp: '5'
+        });
+
+        const response = await axios.post(
+          `${integracao.url_api}/${endpoint}`,
+          params.toString(),
+          {
+            headers: {
+              'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'ixcsoft': 'listar'
+            },
+            timeout: 5000
+          }
+        );
+        
+        const total = response.data.total || 0;
+        
+        if (total > 0) {
+          resultados.push({
+            endpoint,
+            status: 'OK',
+            total: total,
+            registros: response.data.registros?.length || 0,
+            campos: response.data.registros?.[0] ? Object.keys(response.data.registros[0]) : [],
+            exemplo: response.data.registros?.[0] || null
+          });
+        } else {
+          resultados.push({
+            endpoint,
+            status: 'OK_MAS_VAZIO',
+            total: 0
+          });
+        }
+        
+      } catch (error) {
+        if (error.response?.status === 404) {
+          resultados.push({
+            endpoint,
+            status: '404_NAO_EXISTE'
+          });
+        } else {
+          resultados.push({
+            endpoint,
+            status: 'ERRO',
+            erro: error.response?.status || error.message
+          });
+        }
+      }
+      
+      // Pausa entre requests
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
+    // Ordenar: endpoints com dados primeiro
+    resultados.sort((a, b) => {
+      if (a.total > 0 && b.total === 0) return -1;
+      if (a.total === 0 && b.total > 0) return 1;
+      return 0;
+    });
+    
+    return res.json({
+      url_api: integracao.url_api,
+      total_testados: endpoints.length,
+      com_dados: resultados.filter(r => r.total > 0).length,
+      resultados
+    });
+    
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // Testar busca de TODAS as OSs (sem filtro)
 app.get('/api/debug/test-ixc-todas-os', async (req, res) => {
   const axios = require('axios');

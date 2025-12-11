@@ -859,6 +859,47 @@ app.get('/api/debug/test-ixc-endpoints-alternativos', async (req, res) => {
   }
 });
 
+// Testar com GET + JSON (igual o suporte usou)
+app.get('/api/debug/test-ixc-get-json', async (req, res) => {
+  const axios = require('axios');
+  
+  try {
+    const integracao = await db('integracao_ixc')
+      .where('tenant_id', 5)
+      .first();
+    
+    // Usar GET com JSON (como o suporte fez)
+    const response = await axios.get(`${integracao.url_api}/cliente`, {
+      headers: {
+        'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+        'Content-Type': 'application/json',
+        'ixcsoft': 'listar'
+      },
+      data: {
+        qtype: 'cliente.id',
+        query: '1',
+        oper: '>=',
+        page: '1',
+        rp: '19',
+        sortname: 'cliente.id',
+        sortorder: 'desc'
+      }
+    });
+    
+    return res.json({
+      total: response.data.total || 0,
+      registros: response.data.registros?.length || 0,
+      dados: response.data
+    });
+    
+  } catch (error) {
+    return res.status(500).json({ 
+      erro: error.message,
+      detalhes: error.response?.data 
+    });
+  }
+});
+
 // Testar busca de TODAS as OSs (sem filtro)
 app.get('/api/debug/test-ixc-todas-os', async (req, res) => {
   const axios = require('axios');

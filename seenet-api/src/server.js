@@ -75,6 +75,57 @@ app.get('/api/test', (req, res) => {
   });
 });
 
+//BACKUP BANCO NEON
+app.get('/api/admin/backup-emergency', async (req, res) => {
+  try {
+    console.log('🚨 Backup emergência iniciado...');
+    
+    const { db } = require('./config/database');
+    
+    const tables = await db.raw(`
+      SELECT tablename 
+      FROM pg_tables 
+      WHERE schemaname = 'public'
+      ORDER BY tablename
+    `);
+    
+    let backup = `-- Backup Emergência SeeNet\n`;
+    backup += `-- Data: ${new Date().toISOString()}\n\n`;
+    
+    for (const { tablename } of tables.rows) {
+      console.log(`📦 ${tablename}`);
+      
+      const dados = await db(tablename).select('*');
+      
+      if (dados.length > 0) {
+        backup += `\n-- ${tablename} (${dados.length} registros)\n`;
+        backup += `TRUNCATE TABLE ${tablename} CASCADE;\n`;
+        
+        for (const row of dados) {
+          const cols = Object.keys(row);
+          const vals = cols.map(c => {
+            const val = row[c];
+            if (val === null) return 'NULL';
+            if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
+            if (val instanceof Date) return `'${val.toISOString()}'`;
+            if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
+            return val;
+          });
+          backup += `INSERT INTO ${tablename} (${cols.join(',')}) VALUES (${vals.join(',')});\n`;
+        }
+      }
+    }
+    
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', 'attachment; filename=backup_seenet.sql');
+    res.send(backup);
+    
+  } catch (error) {
+    console.error('❌ Erro:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== INICIALIZAR BANCO E ROTAS ==========
 async function startServer() {
   try {

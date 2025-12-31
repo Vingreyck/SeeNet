@@ -24,16 +24,18 @@ const logger = winston.createLogger({
 // CONFIGURAÇÃO POSTGRESQL COM CAMINHOS DE MIGRAÇÃO
 const dbConfig = {
   client: 'pg',
-  connection: {
+  connection: process.env.DATABASE_URL || {
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT) || 5432,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    ssl: { rejectUnauthorized: false }
+    ssl: process.env.DATABASE_URL?.includes('sslmode=disable') 
+      ? false 
+      : { rejectUnauthorized: false }
   },
   migrations: {
-    directory: path.join(__dirname, '../migrations') // Ajuste o caminho relativo
+    directory: path.join(__dirname, '../migrations')
   },
   seeds: {
     directory: path.join(__dirname, '../seeds')

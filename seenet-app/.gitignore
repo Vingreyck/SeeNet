@@ -51,6 +51,7 @@ lib/config/env.config_example.dart
 *.p12
 .env
 .env.local
+.env.development
 .env.production
 local.properties
 key.properties

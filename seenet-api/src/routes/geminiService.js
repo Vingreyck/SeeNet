@@ -100,35 +100,74 @@ IMPORTANTE: Seja direto, prático e focado na solução imediata.`;
 
         throw new Error('Resposta inválida da API');
 
-      } catch (error) {
-        logger.warn('\n⚠️ === FALHA NA CHAMADA GEMINI ===');
-        logger.warn(`Tentativa ${attempt}/${this.maxRetries}`);
-        logger.warn('Tipo de erro:', error.constructor.name);
-        logger.warn('Mensagem:', error.message);
+      }} catch (error) {
+  // ===== LOGS DETALHADOS =====
+  console.error('\n❌ ========================================');
+  console.error(`❌ FALHA GEMINI - Tentativa ${attempt}/${this.maxRetries}`);
+  console.error('❌ ========================================');
+  console.error('📍 Tipo:', error.constructor.name);
+  console.error('📍 Mensagem:', error.message);
+  console.error('📍 Código:', error.code || 'N/A');
+  
+  // Se tiver resposta HTTP
+  if (error.response) {
+    console.error('\n🔴 RESPOSTA HTTP DE ERRO:');
+    console.error('   Status:', error.response.status);
+    console.error('   Status Text:', error.response.statusText);
+    console.error('   Headers:', JSON.stringify(error.response.headers, null, 2));
+    console.error('   Data (body):', JSON.stringify(error.response.data, null, 2));
+  } else if (error.request) {
+    console.error('\n🔴 REQUEST FOI ENVIADO MAS SEM RESPOSTA:');
+    console.error('   Request:', error.request);
+  } else {
+    console.error('\n🔴 ERRO ANTES DE ENVIAR REQUEST:');
+    console.error('   Detalhes:', error.message);
+  }
+  
+  console.error('\n📚 Stack trace:');
+  console.error(error.stack);
+  console.error('❌ ========================================\n');
+  
+  // Logs antigos do logger (manter)
+  logger.warn('\n⚠️ === FALHA NA CHAMADA GEMINI ===');
+  logger.warn(`Tentativa ${attempt}/${this.maxRetries}`);
+  logger.warn('Tipo de erro:', error.constructor.name);
+  logger.warn('Mensagem:', error.message);
 
-        // Log detalhado da resposta de erro
-        if (error.response) {
-          logger.error('Detalhes da resposta de erro:');
-          logger.error('Status:', error.response.status);
-          logger.error('Status Text:', error.response.statusText);
-          logger.error('Data:', JSON.stringify(error.response.data, null, 2));
-          logger.error('Headers:', JSON.stringify(error.response.headers, null, 2));
-        }
+  if (error.response) {
+    logger.error('Detalhes da resposta de erro:');
+    logger.error('Status:', error.response.status);
+    logger.error('Status Text:', error.response.statusText);
+    logger.error('Data:', JSON.stringify(error.response.data, null, 2));
+    logger.error('Headers:', JSON.stringify(error.response.headers, null, 2));
+  }
 
-        if (attempt === this.maxRetries) {
-          logger.error('\n❌ === TODAS AS TENTATIVAS FALHARAM ===');
-          logger.error('Stack trace:', error.stack);
-          
-          const finalError = new Error(`Falha na API Gemini após ${this.maxRetries} tentativas`);
-          finalError.originalError = error;
-          finalError.lastResponse = error.response;
-          finalError.attempts = this.maxRetries;
-          throw finalError;
-        }
+  if (attempt === this.maxRetries) {
+    console.error('\n💥 ========================================');
+    console.error('💥 TODAS AS 3 TENTATIVAS FALHARAM!');
+    console.error('💥 ========================================');
+    console.error('🔥 Último erro completo:', JSON.stringify({
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      responseData: error.response?.data
+    }, null, 2));
+    console.error('💥 ========================================\n');
+    
+    logger.error('\n❌ === TODAS AS TENTATIVAS FALHARAM ===');
+    logger.error('Stack trace:', error.stack);
+    
+    const finalError = new Error(`Falha na API Gemini após ${this.maxRetries} tentativas`);
+    finalError.originalError = error;
+    finalError.lastResponse = error.response;
+    finalError.attempts = this.maxRetries;
+    throw finalError;
+  }
 
-        // Aguardar antes da próxima tentativa
-        await new Promise(resolve => setTimeout(resolve, this.retryDelay * attempt));
-      }
+  // Aguardar antes da próxima tentativa
+  await new Promise(resolve => setTimeout(resolve, this.retryDelay * attempt));
+}
     }
   }
 

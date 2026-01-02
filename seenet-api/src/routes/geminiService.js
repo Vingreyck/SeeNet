@@ -100,7 +100,7 @@ IMPORTANTE: Seja direto, prático e focado na solução imediata.`;
 
         throw new Error('Resposta inválida da API');
 
-      }} catch (error) {
+      } catch (error) {
   // ===== LOGS DETALHADOS =====
   console.error('\n❌ ========================================');
   console.error(`❌ FALHA GEMINI - Tentativa ${attempt}/${this.maxRetries}`);

@@ -1,5 +1,11 @@
-node_modules/ 
-.env 
-service-account.json 
-*.log 
+# Environment variables (NUNCA commitar!)
+.env
+.env.local
 .env.development
+.env.production
+.env*.local
+
+# Service account JSON
+service-account.json
+google-service-account.json
+*service-account*.json

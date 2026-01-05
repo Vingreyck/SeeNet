@@ -5,6 +5,7 @@ import 'package:seenet/registro/registroview.controller.dart';
 
 class LogarButton extends GetView<RegistroController> {
   const LogarButton({super.key});
+  
 
   @override
   Widget build(BuildContext context) {

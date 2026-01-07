@@ -25,7 +25,7 @@ class CategoriaCheckmark {
       'descricao': descricao,
       'ativo': ativo ? 1 : 0,
       'ordem': ordem,
-      'data_upload': dataCriacao?.toIso8601String(),
+      'data_criacao': dataCriacao?.toIso8601String(),
     };
   }
 
@@ -39,7 +39,7 @@ class CategoriaCheckmark {
       descricao: map['descricao']?.toString().trim(),
       ativo: map['ativo'] == 1 || map['ativo'] == true,
       ordem: map['ordem'] ?? 0,
-      dataCriacao: DateParser.parseDateTime(map['data_upload']),
+      dataCriacao: DateParser.parseDateTime(map['data_criacao']),
     );
   }
 }

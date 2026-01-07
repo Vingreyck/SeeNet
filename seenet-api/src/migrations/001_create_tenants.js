@@ -10,8 +10,8 @@ exports.up = function(knex) {
     table.json('limites').defaultTo('{}');
     table.string('contato_email', 255);
     table.string('contato_telefone', 20);
-    table.timestamp('data_upload').defaultTo(knex.fn.now());
-    table.timestamp('data_atualizacao').defaultTo(knex.fn.now());
+    table.timestamp('data_criacao').defaultTo(knex.fn.now());
+    table.timestamp('updated_at').defaultTo(knex.fn.now());
     
     // Índices
     table.index('codigo');

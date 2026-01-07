@@ -30,7 +30,7 @@ class OrdensServicoController {
             WHEN 'baixa' THEN 4
           END
         `)
-        .orderBy('os.data_upload', 'desc');
+        .orderBy('os.data_criacao', 'desc');
 
       console.log(`✅ ${rows.length} OS(s) encontrada(s)`);
 

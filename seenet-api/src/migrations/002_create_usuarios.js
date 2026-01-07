@@ -10,8 +10,8 @@ exports.up = function(knex) {
     table.integer('tentativas_login').defaultTo(0);
     table.timestamp('ultimo_login');
     table.json('configuracoes').defaultTo('{}');
-    table.timestamp('data_upload').defaultTo(knex.fn.now());
-    table.timestamp('data_atualizacao').defaultTo(knex.fn.now());
+    table.timestamp('data_criacao').defaultTo(knex.fn.now());
+    table.timestamp('updated_at').defaultTo(knex.fn.now());
     
     // Foreign keys
     table.foreign('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');

@@ -105,7 +105,7 @@ SELECT
     nome, 
     email, 
     tipo_usuario,
-    DATE_FORMAT(data_upload, '%d/%m/%Y %H:%i') as criado_em
+    DATE_FORMAT(data_criacao, '%d/%m/%Y %H:%i') as criado_em
 FROM usuarios 
 ORDER BY id;
 

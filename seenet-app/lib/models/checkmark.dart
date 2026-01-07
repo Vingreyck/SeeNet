@@ -31,7 +31,7 @@ class Checkmark {
       'prompt_gemini': promptGemini,
       'ativo': ativo ? 1 : 0,
       'ordem': ordem,
-      'data_upload': dataCriacao?.toIso8601String(),
+      'data_criacao': dataCriacao?.toIso8601String(),
     };
   }
 
@@ -59,7 +59,7 @@ class Checkmark {
                    map['prompt']?.toString() ?? '',
     ativo: map['ativo'] == 1 || map['ativo'] == true || map['ativo'] == 'true',
     ordem: map['ordem'] ?? 0,
-    dataCriacao: DateParser.parseDateTime(map['data_upload'] ?? map['dataCriacao']),
+    dataCriacao: DateParser.parseDateTime(map['data_criacao'] ?? map['dataCriacao']),
   );
   }
 }

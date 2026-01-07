@@ -9,9 +9,9 @@ exports.up = function(knex) {
     table.string('cliente_info', 500); // Informações do cliente
     table.string('localizacao', 255); // Local do atendimento
     table.timestamp('data_inicio').defaultTo(knex.fn.now());
-    table.timestamp('data_conclusao');
-    table.timestamp('data_upload').defaultTo(knex.fn.now());
-    table.timestamp('data_atualizacao').defaultTo(knex.fn.now());
+    table.timestamp('data_fim');
+    table.timestamp('data_criacao').defaultTo(knex.fn.now());
+    table.timestamp('updated_at').defaultTo(knex.fn.now());
     
     // Foreign keys
     table.foreign('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
@@ -20,7 +20,7 @@ exports.up = function(knex) {
     // Índices
     table.index(['tenant_id', 'tecnico_id']);
     table.index(['tenant_id', 'status']);
-    table.index('data_upload');
+    table.index('data_criacao');
   });
 };
 

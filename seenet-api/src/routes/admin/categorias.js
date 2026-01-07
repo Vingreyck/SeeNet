@@ -131,7 +131,7 @@ router.post(
           ordem: ordemFinal,
           ativo: true,
           global: false,
-          data_upload: new Date()
+          data_criacao: new Date()
         })
         .returning('*');
 
@@ -226,7 +226,7 @@ router.put('/:id', async (req, res) => {
     }
     
     // ❌ REMOVER ESTA LINHA:
-    // updateData.data_atualizacao = new Date();
+    // updateData.updated_at = new Date();
 
     console.log('   Dados para update:', JSON.stringify(updateData));
 

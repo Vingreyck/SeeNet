@@ -122,7 +122,7 @@ router.post('/register', [
     const senhaHash = await bcrypt.hash(senha, 12);
     console.log('✅ Senha hasheada');
 
-    // ✅ CORREÇÃO: Remover data_upload (usar default do banco)
+    // ✅ CORREÇÃO: Remover data_criacao (usar default do banco)
     const novoUsuario = {
       nome,
       email: email.toLowerCase(),
@@ -130,7 +130,7 @@ router.post('/register', [
       tenant_id: tenant.id,
       tipo_usuario: 'tecnico',
       ativo: true,
-      // ❌ REMOVIDO: data_upload (deixar o banco usar o default)
+      // ❌ REMOVIDO: data_criacao (deixar o banco usar o default)
     };
 
     console.log('📝 Objeto para inserir:', {
@@ -480,7 +480,7 @@ router.put('/usuarios/:id', [
 
     // Preparar dados para atualização
     const updateData = {
-      data_atualizacao: new Date().toISOString()
+      updated_at: new Date().toISOString()
     };
 
     if (nome) updateData.nome = nome;
@@ -534,7 +534,7 @@ router.put('/usuarios/:id/resetar-senha', [
     
     await db('usuarios').where('id', id).update({
       senha: senhaHash,
-      data_atualizacao: new Date().toISOString()
+      updated_at: new Date().toISOString()
     });
 
     await auditService.log({
@@ -574,7 +574,7 @@ router.put('/usuarios/:id/status', [
 
     await db('usuarios').where('id', id).update({
       ativo,
-      data_atualizacao: new Date().toISOString()
+      updated_at: new Date().toISOString()
     });
 
     await auditService.log({
@@ -627,12 +627,12 @@ router.get('/debug/usuarios', async (req, res) => {
         'usuarios.email',
         'usuarios.tipo_usuario',
         'usuarios.ativo',
-        'usuarios.data_upload',
+        'usuarios.data_criacao',
         'usuarios.ultimo_login',
         'tenants.nome as empresa',
         'tenants.codigo as codigo_empresa'
       )
-      .orderBy('usuarios.data_upload', 'desc');
+      .orderBy('usuarios.data_criacao', 'desc');
     
     res.json({
       message: 'Usuários na API Node.js',
@@ -663,7 +663,7 @@ router.post('/debug/update-user-type', async (req, res) => {
       .where('email', email.toLowerCase())
       .update({ 
         tipo_usuario: tipo,
-        data_atualizacao: new Date().toISOString()
+        updated_at: new Date().toISOString()
       });
 
     if (updated === 0) {

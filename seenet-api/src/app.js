@@ -287,7 +287,7 @@ app.post('/api/diagnostics/gerar',
         status_api: statusApi,
         modelo_ia: modeloIa,
         tokens_utilizados: tokensUtilizados,
-        data_upload: new Date().toISOString()
+        data_criacao: new Date().toISOString()
       });
 
       logger.info(`   Status: ${statusApi}`);

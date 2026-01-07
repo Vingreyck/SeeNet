@@ -31,7 +31,7 @@ router.post('/', [
       descricao,
       status: 'em_andamento',
       data_inicio: new Date().toISOString(),
-      data_upload: new Date().toISOString(),
+      data_criacao: new Date().toISOString(),
     }).returning('id');
     
     // ✅ Extrair o ID corretamente (pode ser [123] ou [{id: 123}])
@@ -85,8 +85,8 @@ router.put('/:avaliacaoId/finalizar', async (req, res) => {
       .where('id', avaliacaoId)
       .update({
         status: 'concluida',
-        data_conclusao: new Date().toISOString(),
-        data_atualizacao: new Date().toISOString(),
+        data_fim: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
 
     await auditService.log({
@@ -131,7 +131,7 @@ router.get('/minhas', [
     const total = await totalQuery.count('id as count').first();
 
     const avaliacoes = await query
-      .orderBy('data_upload', 'desc')
+      .orderBy('data_criacao', 'desc')
       .limit(limit)
       .offset(offset)
       .select(
@@ -140,8 +140,8 @@ router.get('/minhas', [
         'descricao',
         'status',
         'data_inicio',
-        'data_conclusao',
-        'data_upload'
+        'data_fim',
+        'data_criacao'
       );
 
     res.json({

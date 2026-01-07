@@ -57,10 +57,10 @@ async function check() {
     // Últimos checkmarks criados
     console.log('\n📝 Últimos 5 checkmarks:');
     const lastCheckmarks = await client.query(
-      'SELECT id, titulo, data_upload FROM checkmarks ORDER BY id DESC LIMIT 5'
+      'SELECT id, titulo, data_criacao FROM checkmarks ORDER BY id DESC LIMIT 5'
     );
     lastCheckmarks.rows.forEach(c => {
-      const data = c.data_upload ? new Date(c.data_upload).toLocaleDateString() : 'N/A';
+      const data = c.data_criacao ? new Date(c.data_criacao).toLocaleDateString() : 'N/A';
       console.log(`  - ID ${c.id}: ${c.titulo} (${data})`);
     });
 

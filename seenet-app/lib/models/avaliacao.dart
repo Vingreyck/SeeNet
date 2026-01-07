@@ -32,9 +32,9 @@ class Avaliacao {
       'descricao': descricao,
       'status': status,
       'data_inicio': dataInicio?.toIso8601String(),
-      'data_conclusao': dataConclusao?.toIso8601String(),
-      'data_upload': dataCriacao?.toIso8601String(),
-      'data_atualizacao': dataAtualizacao?.toIso8601String(),
+      'data_fim': dataConclusao?.toIso8601String(),
+      'data_criacao': dataCriacao?.toIso8601String(),
+      'updated_at': dataAtualizacao?.toIso8601String(),
     };
   }
 
@@ -54,9 +54,9 @@ class Avaliacao {
       descricao: map['descricao']?.toString().trim(),
       status: map['status'] ?? 'em_andamento',
       dataInicio: DateParser.parseDateTime(map['data_inicio']),
-      dataConclusao: DateParser.parseDateTime(map['data_conclusao']),
-      dataCriacao: DateParser.parseDateTime(map['data_upload']),
-      dataAtualizacao: DateParser.parseDateTime(map['data_atualizacao']),
+      dataConclusao: DateParser.parseDateTime(map['data_fim']),
+      dataCriacao: DateParser.parseDateTime(map['data_criacao']),
+      dataAtualizacao: DateParser.parseDateTime(map['updated_at']),
     );
   }
 

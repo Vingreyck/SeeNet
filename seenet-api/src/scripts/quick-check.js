@@ -42,9 +42,9 @@ async function check() {
     console.log('\n📝 Últimos 10 checkmarks criados:');
     const last = await client.query(
       `SELECT id, titulo, tenant_id, 
-              TO_CHAR(data_upload, 'DD/MM/YYYY HH24:MI') as data 
+              TO_CHAR(data_criacao, 'DD/MM/YYYY HH24:MI') as data 
        FROM checkmarks 
-       ORDER BY data_upload DESC 
+       ORDER BY data_criacao DESC 
        LIMIT 10`
     );
     
@@ -56,9 +56,9 @@ async function check() {
     console.log('\n🔬 Últimos 5 diagnósticos:');
     const diags = await client.query(
       `SELECT id, tenant_id, 
-              TO_CHAR(data_upload, 'DD/MM/YYYY HH24:MI') as data 
+              TO_CHAR(data_criacao, 'DD/MM/YYYY HH24:MI') as data 
        FROM diagnosticos 
-       ORDER BY data_upload DESC 
+       ORDER BY data_criacao DESC 
        LIMIT 5`
     );
     

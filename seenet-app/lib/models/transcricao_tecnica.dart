@@ -45,8 +45,8 @@ class TranscricaoTecnica {
       'categoria_problema': categoriaProblema,
       'cliente_info': clienteInfo,
       'data_inicio': dataInicio?.toIso8601String(),
-      'data_conclusao': dataConclusao?.toIso8601String(),
-      'data_upload': dataCriacao?.toIso8601String(),
+      'data_fim': dataConclusao?.toIso8601String(),
+      'data_criacao': dataCriacao?.toIso8601String(),
     };
   }
 
@@ -74,8 +74,8 @@ class TranscricaoTecnica {
       categoriaProblema: map['categoria_problema']?.toString().trim(),
       clienteInfo: map['cliente_info']?.toString().trim(),
       dataInicio: DateParser.parseDateTime(map['data_inicio']),
-      dataConclusao: DateParser.parseDateTime(map['data_conclusao']),
-      dataCriacao: DateParser.parseDateTime(map['data_upload']),
+      dataConclusao: DateParser.parseDateTime(map['data_fim']),
+      dataCriacao: DateParser.parseDateTime(map['data_criacao']),
     );
   }
 

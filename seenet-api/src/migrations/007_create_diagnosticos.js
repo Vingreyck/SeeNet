@@ -12,7 +12,7 @@ exports.up = function(knex) {
     table.integer('tokens_utilizados');
     table.string('modelo_ia', 50); // Gemini, etc.
     table.decimal('custo_api', 10, 6); // Custo da requisição
-    table.timestamp('data_criacao').defaultTo(knex.fn.now());
+    table.timestamp('data_upload').defaultTo(knex.fn.now());
     
     // Foreign keys
     table.foreign('tenant_id').references('id').inTable('tenants').onDelete('CASCADE');
@@ -22,7 +22,7 @@ exports.up = function(knex) {
     // Índices
     table.index(['tenant_id', 'avaliacao_id']);
     table.index(['tenant_id', 'status_api']);
-    table.index('data_criacao');
+    table.index('data_upload');
   });
 };
 

@@ -68,7 +68,7 @@ router.get('/logs', authMiddleware, requireAdmin, async (req, res) => {
       acao,
       nivel,
       data_inicio,
-      data_fim,
+      data_conclusao,
       limite = 100,
       offset = 0
     } = req.query;
@@ -86,7 +86,7 @@ router.get('/logs', authMiddleware, requireAdmin, async (req, res) => {
     if (acao) query = query.where('l.acao', acao);
     if (nivel) query = query.where('l.nivel', nivel);
     if (data_inicio) query = query.where('l.data_acao', '>=', data_inicio);
-    if (data_fim) query = query.where('l.data_acao', '<=', data_fim);
+    if (data_conclusao) query = query.where('l.data_acao', '<=', data_conclusao);
     
     const logs = await query
       .orderBy('l.data_acao', 'desc')
@@ -116,20 +116,20 @@ router.get('/logs', authMiddleware, requireAdmin, async (req, res) => {
 // ========== ESTATÍSTICAS GERAIS (ADMIN) ==========
 router.get('/stats', authMiddleware, requireAdmin, async (req, res) => {
   try {
-    const { data_inicio, data_fim } = req.query;
+    const { data_inicio, data_conclusao } = req.query;
     
     let baseQuery = db('logs_sistema')
       .where('tenant_id', req.user.tenant_id);
     
-    if (data_inicio && data_fim) {
-      baseQuery = baseQuery.whereBetween('data_acao', [data_inicio, data_fim]);
+    if (data_inicio && data_conclusao) {
+      baseQuery = baseQuery.whereBetween('data_acao', [data_inicio, data_conclusao]);
     }
     
     const totalPorAcao = await db('logs_sistema')
       .where('tenant_id', req.user.tenant_id)
       .modify((qb) => {
-        if (data_inicio && data_fim) {
-          qb.whereBetween('data_acao', [data_inicio, data_fim]);
+        if (data_inicio && data_conclusao) {
+          qb.whereBetween('data_acao', [data_inicio, data_conclusao]);
         }
       })
       .select('acao')
@@ -140,8 +140,8 @@ router.get('/stats', authMiddleware, requireAdmin, async (req, res) => {
     const totalPorNivel = await db('logs_sistema')
       .where('tenant_id', req.user.tenant_id)
       .modify((qb) => {
-        if (data_inicio && data_fim) {
-          qb.whereBetween('data_acao', [data_inicio, data_fim]);
+        if (data_inicio && data_conclusao) {
+          qb.whereBetween('data_acao', [data_inicio, data_conclusao]);
         }
       })
       .select('nivel')
@@ -152,8 +152,8 @@ router.get('/stats', authMiddleware, requireAdmin, async (req, res) => {
       .join('usuarios as u', 'l.usuario_id', 'u.id')
       .where('l.tenant_id', req.user.tenant_id)
       .modify((qb) => {
-        if (data_inicio && data_fim) {
-          qb.whereBetween('l.data_acao', [data_inicio, data_fim]);
+        if (data_inicio && data_conclusao) {
+          qb.whereBetween('l.data_acao', [data_inicio, data_conclusao]);
         }
       })
       .select('u.nome', 'u.email')
@@ -166,8 +166,8 @@ router.get('/stats', authMiddleware, requireAdmin, async (req, res) => {
       .whereIn('nivel', ['warning', 'error'])
       .where('tenant_id', req.user.tenant_id)
       .modify((qb) => {
-        if (data_inicio && data_fim) {
-          qb.whereBetween('data_acao', [data_inicio, data_fim]);
+        if (data_inicio && data_conclusao) {
+          qb.whereBetween('data_acao', [data_inicio, data_conclusao]);
         }
       })
       .orderBy('data_acao', 'desc')
@@ -180,7 +180,7 @@ router.get('/stats', authMiddleware, requireAdmin, async (req, res) => {
       data: {
         periodo: {
           inicio: data_inicio || 'Início',
-          fim: data_fim || 'Agora'
+          fim: data_conclusao || 'Agora'
         },
         resumo: {
           total_logs: totalLogs,
@@ -239,13 +239,13 @@ router.get('/stats/quick', authMiddleware, requireAdmin, async (req, res) => {
 // ========== EXPORTAR LOGS (ADMIN) ==========
 router.get('/logs/export', authMiddleware, requireAdmin, async (req, res) => {
   try {
-    const { data_inicio, data_fim, formato = 'json' } = req.query;
+    const { data_inicio, data_conclusao, formato = 'json' } = req.query;
     
     let query = db('logs_sistema')
       .where('tenant_id', req.user.tenant_id);
     
-    if (data_inicio && data_fim) {
-      query = query.whereBetween('data_acao', [data_inicio, data_fim]);
+    if (data_inicio && data_conclusao) {
+      query = query.whereBetween('data_acao', [data_inicio, data_conclusao]);
     }
     
     const logs = await query.orderBy('data_acao', 'desc');
@@ -284,7 +284,7 @@ router.get('/users', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const users = await db('usuarios')
       .where('tenant_id', req.user.tenant_id)
-      .select('id', 'nome', 'email', 'tipo_usuario', 'ativo', 'data_criacao', 'data_atualizacao') // ✅ ADICIONADO 'ativo'
+      .select('id', 'nome', 'email', 'tipo_usuario', 'ativo', 'data_upload', 'data_atualizacao') // ✅ ADICIONADO 'ativo'
       .orderBy('nome');
     
     res.json(users);

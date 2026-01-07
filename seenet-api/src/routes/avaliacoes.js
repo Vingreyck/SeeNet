@@ -31,7 +31,7 @@ router.post('/', [
       descricao,
       status: 'em_andamento',
       data_inicio: new Date().toISOString(),
-      data_criacao: new Date().toISOString(),
+      data_upload: new Date().toISOString(),
     }).returning('id');
     
     // ✅ Extrair o ID corretamente (pode ser [123] ou [{id: 123}])
@@ -131,7 +131,7 @@ router.get('/minhas', [
     const total = await totalQuery.count('id as count').first();
 
     const avaliacoes = await query
-      .orderBy('data_criacao', 'desc')
+      .orderBy('data_upload', 'desc')
       .limit(limit)
       .offset(offset)
       .select(
@@ -141,7 +141,7 @@ router.get('/minhas', [
         'status',
         'data_inicio',
         'data_conclusao',
-        'data_criacao'
+        'data_upload'
       );
 
     res.json({

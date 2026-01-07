@@ -59,7 +59,7 @@ router.post('/ixc/configurar', async (req, res) => {
         url_api = EXCLUDED.url_api,
         token_api = EXCLUDED.token_api,
         ativo = true,
-        updated_at = NOW()
+        data_atualizacao = NOW()
     `, [tenantId, url_api, tokenCriptografado]);
 
     await client.query('COMMIT');
@@ -112,7 +112,7 @@ router.post('/ixc/mapear-tecnico', async (req, res) => {
       DO UPDATE SET
         tecnico_ixc_id = EXCLUDED.tecnico_ixc_id,
         tecnico_ixc_nome = EXCLUDED.tecnico_ixc_nome,
-        updated_at = NOW()
+        data_atualizacao = NOW()
     `, [tenantId, tecnico_seenet_id, tecnico_ixc_id, tecnico_ixc_nome]);
 
     await client.query('COMMIT');

@@ -34,7 +34,7 @@ class Usuario {
       'senha': senha,
       'tipo_usuario': tipoUsuario,
       'ativo': ativo ? 1 : 0,
-      'data_criacao': dataCriacao?.toIso8601String(),
+      'data_upload': dataCriacao?.toIso8601String(),
       'data_atualizacao': dataAtualizacao?.toIso8601String(),
     };
   }
@@ -58,7 +58,7 @@ class Usuario {
       senha: map['senha']?.toString() ?? '',
       tipoUsuario: map['tipo_usuario'].toString().trim().toLowerCase(),
       ativo: map['ativo'] == 1 || map['ativo'] == true,
-      dataCriacao: DateParser.parseDateTime(map['data_criacao']),
+      dataCriacao: DateParser.parseDateTime(map['data_upload']),
       dataAtualizacao: DateParser.parseDateTime(map['data_atualizacao']),
     );
   }

@@ -30,7 +30,7 @@ class OrdensServicoController {
             WHEN 'baixa' THEN 4
           END
         `)
-        .orderBy('os.created_at', 'desc');
+        .orderBy('os.data_upload', 'desc');
 
       console.log(`✅ ${rows.length} OS(s) encontrada(s)`);
 
@@ -78,8 +78,8 @@ class OrdensServicoController {
 
       // Buscar anexos
       const anexos = await db('os_anexos')
-        .where('os_id', id)
-        .select('id', 'tipo', 'url_arquivo', 'nome_arquivo', 'created_at');
+        .where('ordem_servico_id', id)
+        .select('id', 'tipo', 'url_arquivo', 'nome_arquivo', 'data_upload');
 
       os.anexos = anexos;
 
@@ -141,7 +141,7 @@ class OrdensServicoController {
           data_inicio: db.fn.now(),
           latitude: latitude,
           longitude: longitude,
-          updated_at: db.fn.now()
+          data_atualizacao: db.fn.now()
         });
 
       await trx.commit();
@@ -215,7 +215,7 @@ class OrdensServicoController {
         .where('id', id)
         .update({
           status: 'concluida',
-          data_fim: db.fn.now(),
+          data_conclusao: db.fn.now(),
           latitude: latitude || os.latitude,
           longitude: longitude || os.longitude,
           onu_modelo,
@@ -224,14 +224,14 @@ class OrdensServicoController {
           onu_sinal_optico,
           materiais_utilizados,
           observacoes,
-          updated_at: db.fn.now()
+          data_atualizacao: db.fn.now()
         });
 
       // Processar anexos (fotos)
       if (fotos && fotos.length > 0) {
         for (const fotoPath of fotos) {
           await trx('os_anexos').insert({
-            os_id: id,
+            ordem_servico_id: id,
             tipo: 'local',
             url_arquivo: fotoPath,
             nome_arquivo: fotoPath.split('/').pop()

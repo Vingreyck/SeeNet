@@ -131,7 +131,7 @@ router.post(
           ordem: ordemFinal,
           ativo: true,
           global: false,
-          data_criacao: new Date()
+          data_upload: new Date()
         })
         .returning('*');
 

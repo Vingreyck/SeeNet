@@ -46,7 +46,7 @@ class TranscricaoTecnica {
       'cliente_info': clienteInfo,
       'data_inicio': dataInicio?.toIso8601String(),
       'data_conclusao': dataConclusao?.toIso8601String(),
-      'data_criacao': dataCriacao?.toIso8601String(),
+      'data_upload': dataCriacao?.toIso8601String(),
     };
   }
 
@@ -75,7 +75,7 @@ class TranscricaoTecnica {
       clienteInfo: map['cliente_info']?.toString().trim(),
       dataInicio: DateParser.parseDateTime(map['data_inicio']),
       dataConclusao: DateParser.parseDateTime(map['data_conclusao']),
-      dataCriacao: DateParser.parseDateTime(map['data_criacao']),
+      dataCriacao: DateParser.parseDateTime(map['data_upload']),
     );
   }
 

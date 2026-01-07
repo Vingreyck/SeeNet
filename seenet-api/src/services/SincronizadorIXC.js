@@ -207,7 +207,7 @@ class SincronizadorIXC {
               prioridade: dadosOS.prioridade,
               observacoes: dadosOS.observacoes,
               dados_ixc: dadosOS.dados_ixc,
-              updated_at: db.fn.now()
+              data_atualizacao: db.fn.now()
             });
 
           console.log(`   ♻️ OS ${dadosOS.numero_os} atualizada`);

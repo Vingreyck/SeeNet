@@ -199,7 +199,7 @@ Future<List<Map<String, dynamic>>> buscarLogs({
     if (acao != null) queryParams['acao'] = acao;
     if (nivel != null) queryParams['nivel'] = nivel;
     if (dataInicio != null) queryParams['data_inicio'] = dataInicio.toIso8601String();
-    if (dataFim != null) queryParams['data_fim'] = dataFim.toIso8601String();
+    if (dataFim != null) queryParams['data_conclusao'] = dataFim.toIso8601String();
     
     final response = await _api.get(
       '/admin/logs',
@@ -296,7 +296,7 @@ Future<Map<String, dynamic>> gerarRelatorio({
     Map<String, String> queryParams = {};
     
     if (dataInicio != null) queryParams['data_inicio'] = dataInicio.toIso8601String();
-    if (dataFim != null) queryParams['data_fim'] = dataFim.toIso8601String();
+    if (dataFim != null) queryParams['data_conclusao'] = dataFim.toIso8601String();
     
     final response = await _api.get(
       '/admin/stats',
@@ -438,7 +438,7 @@ Future<String> exportarLogs({
     Map<String, String> queryParams = {'formato': formato};
     
     if (dataInicio != null) queryParams['data_inicio'] = dataInicio.toIso8601String();
-    if (dataFim != null) queryParams['data_fim'] = dataFim.toIso8601String();
+    if (dataFim != null) queryParams['data_conclusao'] = dataFim.toIso8601String();
     
     print('🔍 Exportando logs com params: $queryParams');
     

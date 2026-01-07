@@ -136,7 +136,7 @@ router.post('/categorias', adminMiddleware, [
       descricao,
       ordem,
       ativo: true,
-      data_criacao: new Date().toISOString()
+      data_upload: new Date().toISOString()
     });
 
     // Log de auditoria
@@ -237,7 +237,7 @@ router.post('/checkmarks', adminMiddleware, [
       prompt_gemini,
       ordem,
       ativo: true,
-      data_criacao: new Date().toISOString()
+      data_upload: new Date().toISOString()
     };
     console.log('📝 Dados para inserção:', insertData);
 

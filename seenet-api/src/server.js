@@ -360,7 +360,7 @@ try {
             status_api: statusApi,
             modelo_ia: modeloIa,
             tokens_utilizados: tokensUtilizados,
-            data_criacao: new Date().toISOString()
+            data_upload: new Date().toISOString()
           }).returning(['id', 'resposta_gemini', 'resumo_diagnostico', 'tokens_utilizados']);
           
           const diagnostico = result[0];

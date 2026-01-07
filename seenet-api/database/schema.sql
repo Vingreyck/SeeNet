@@ -24,7 +24,7 @@ CREATE TABLE usuarios (
     ativo BOOLEAN DEFAULT TRUE,
     tentativas_login INTEGER DEFAULT 0,
     ultimo_login TIMESTAMP,
-    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -42,7 +42,7 @@ CREATE TABLE categorias_checkmark (
     descricao TEXT,
     ativo BOOLEAN DEFAULT TRUE,
     ordem INTEGER DEFAULT 0,
-    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Índices
@@ -59,7 +59,7 @@ CREATE TABLE checkmarks (
     prompt_gemini TEXT NOT NULL,
     ativo BOOLEAN DEFAULT TRUE,
     ordem INTEGER DEFAULT 0,
-    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (categoria_id) REFERENCES categorias_checkmark(id) ON DELETE CASCADE
 );
 
@@ -78,7 +78,7 @@ CREATE TABLE avaliacoes (
     status VARCHAR(20) DEFAULT 'em_andamento' CHECK (status IN ('em_andamento', 'concluida', 'cancelada')),
     data_inicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_conclusao TIMESTAMP,
-    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tecnico_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
@@ -86,7 +86,7 @@ CREATE TABLE avaliacoes (
 -- Índices
 CREATE INDEX idx_avaliacoes_tecnico ON avaliacoes(tecnico_id);
 CREATE INDEX idx_avaliacoes_status ON avaliacoes(status);
-CREATE INDEX idx_avaliacoes_data ON avaliacoes(data_criacao);
+CREATE INDEX idx_avaliacoes_data ON avaliacoes(data_upload);
 
 -- ============================================
 -- TABELA: respostas_checkmark
@@ -120,7 +120,7 @@ CREATE TABLE diagnosticos (
     status_api VARCHAR(20) DEFAULT 'pendente' CHECK (status_api IN ('pendente', 'sucesso', 'erro')),
     erro_api TEXT,
     tokens_utilizados INTEGER,
-    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (avaliacao_id) REFERENCES avaliacoes(id) ON DELETE CASCADE,
     FOREIGN KEY (categoria_id) REFERENCES categorias_checkmark(id) ON DELETE CASCADE
 );
@@ -146,13 +146,13 @@ CREATE TABLE transcricoes_tecnicas (
     cliente_info TEXT,
     data_inicio TIMESTAMP,
     data_conclusao TIMESTAMP,
-    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tecnico_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 
 -- Índices
 CREATE INDEX idx_transcricoes_tecnico ON transcricoes_tecnicas(tecnico_id);
-CREATE INDEX idx_transcricoes_data ON transcricoes_tecnicas(data_criacao);
+CREATE INDEX idx_transcricoes_data ON transcricoes_tecnicas(data_upload);
 CREATE INDEX idx_transcricoes_status ON transcricoes_tecnicas(status);
 
 -- ============================================
@@ -183,7 +183,7 @@ CREATE INDEX idx_logs_nivel ON logs_sistema(nivel);
 -- ============================================
 -- TRIGGER PARA AUTO-UPDATE timestamp
 -- ============================================
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+CREATE OR REPLACE FUNCTION update_data_atualizacao_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.data_atualizacao = CURRENT_TIMESTAMP;
@@ -192,13 +192,13 @@ END;
 $$ language 'plpgsql';
 
 -- Aplicar trigger nas tabelas necessárias
-CREATE TRIGGER update_usuarios_updated_at 
+CREATE TRIGGER update_usuarios_data_atualizacao 
     BEFORE UPDATE ON usuarios 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    FOR EACH ROW EXECUTE FUNCTION update_data_atualizacao_column();
 
-CREATE TRIGGER update_avaliacoes_updated_at 
+CREATE TRIGGER update_avaliacoes_data_atualizacao 
     BEFORE UPDATE ON avaliacoes 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    FOR EACH ROW EXECUTE FUNCTION update_data_atualizacao_column();
 
 -- ============================================
 -- INSERIR DADOS INICIAIS

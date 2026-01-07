@@ -37,7 +37,7 @@ class Diagnostico {
       'status_api': statusApi,
       'erro_api': erroApi,
       'tokens_utilizados': tokensUtilizados,
-      'data_criacao': dataCriacao?.toIso8601String(),
+      'data_upload': dataCriacao?.toIso8601String(),
     };
   }
 
@@ -63,7 +63,7 @@ class Diagnostico {
       statusApi: map['status_api'] ?? 'pendente',
       erroApi: map['erro_api']?.toString(),
       tokensUtilizados: map['tokens_utilizados'],
-      dataCriacao: DateParser.parseDateTime(map['data_criacao']),
+      dataCriacao: DateParser.parseDateTime(map['data_upload']),
     );
   }
 

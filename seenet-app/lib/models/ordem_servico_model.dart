@@ -90,8 +90,8 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
     dataInicio: json['data_inicio'] != null 
         ? DateTime.parse(json['data_inicio']) 
         : null,
-    dataFim: json['data_fim'] != null 
-        ? DateTime.parse(json['data_fim']) 
+    dataFim: json['data_conclusao'] != null 
+        ? DateTime.parse(json['data_conclusao']) 
         : null,
     latitude: json['latitude'] != null 
         ? double.tryParse(json['latitude'].toString()) 
@@ -109,8 +109,8 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
     relatoSolucao: json['relato_solucao'],
     materiaisUtilizados: json['materiais_utilizados'],
     observacoes: json['observacoes'],
-    createdAt: DateTime.parse(json['created_at']),
-    updatedAt: DateTime.parse(json['updated_at']),
+    createdAt: DateTime.parse(json['data_upload']),
+    updatedAt: DateTime.parse(json['data_atualizacao']),
     anexos: json['anexos'] != null
         ? (json['anexos'] as List)
             .map((a) => AnexoOS.fromJson(a))
@@ -134,7 +134,7 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
       'prioridade': prioridade,
       'status': status,
       'data_inicio': dataInicio?.toIso8601String(),
-      'data_fim': dataFim?.toIso8601String(),
+      'data_conclusao': dataFim?.toIso8601String(),
       'latitude': latitude,
       'longitude': longitude,
       'onu_modelo': onuModelo,
@@ -145,8 +145,8 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
       'relato_solucao': relatoSolucao,
       'materiais_utilizados': materiaisUtilizados,
       'observacoes': observacoes,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
+      'data_upload': createdAt.toIso8601String(),
+      'data_atualizacao': updatedAt.toIso8601String(),
       'anexos': anexos?.map((a) => a.toJson()).toList(),
     };
   }
@@ -200,20 +200,20 @@ class AnexoOS {
 factory AnexoOS.fromJson(Map<String, dynamic> json) {
   return AnexoOS(
     id: (json['id'] ?? '').toString(), // ✅ CONVERTER
-    osId: (json['os_id'] ?? '').toString(), // ✅ CONVERTER
+    osId: (json['ordem_servico_id'] ?? '').toString(), // ✅ CONVERTER
     tipo: json['tipo'] ?? 'local',
     urlArquivo: json['url_arquivo'] ?? '',
-    createdAt: DateTime.parse(json['created_at']),
+    createdAt: DateTime.parse(json['data_upload']),
   );
 }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'os_id': osId,
+      'ordem_servico_id': osId,
       'tipo': tipo,
       'url_arquivo': urlArquivo,
-      'created_at': createdAt.toIso8601String(),
+      'data_upload': createdAt.toIso8601String(),
     };
   }
 }

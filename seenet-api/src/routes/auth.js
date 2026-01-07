@@ -122,7 +122,7 @@ router.post('/register', [
     const senhaHash = await bcrypt.hash(senha, 12);
     console.log('✅ Senha hasheada');
 
-    // ✅ CORREÇÃO: Remover data_criacao (usar default do banco)
+    // ✅ CORREÇÃO: Remover data_upload (usar default do banco)
     const novoUsuario = {
       nome,
       email: email.toLowerCase(),
@@ -130,7 +130,7 @@ router.post('/register', [
       tenant_id: tenant.id,
       tipo_usuario: 'tecnico',
       ativo: true,
-      // ❌ REMOVIDO: data_criacao (deixar o banco usar o default)
+      // ❌ REMOVIDO: data_upload (deixar o banco usar o default)
     };
 
     console.log('📝 Objeto para inserir:', {
@@ -627,12 +627,12 @@ router.get('/debug/usuarios', async (req, res) => {
         'usuarios.email',
         'usuarios.tipo_usuario',
         'usuarios.ativo',
-        'usuarios.data_criacao',
+        'usuarios.data_upload',
         'usuarios.ultimo_login',
         'tenants.nome as empresa',
         'tenants.codigo as codigo_empresa'
       )
-      .orderBy('usuarios.data_criacao', 'desc');
+      .orderBy('usuarios.data_upload', 'desc');
     
     res.json({
       message: 'Usuários na API Node.js',

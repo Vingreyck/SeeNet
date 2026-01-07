@@ -72,7 +72,7 @@ router.post('/gerar', [
         status_api: 'sucesso',
         modelo_ia: 'gemini-1.5-flash',
         tokens_utilizados: contarTokens(prompt + resposta),
-        data_criacao: new Date().toISOString()
+        data_upload: new Date().toISOString()
       });
 
       // Log de auditoria
@@ -107,7 +107,7 @@ router.post('/gerar', [
         status_api: 'erro',
         erro_api: apiError.message,
         modelo_ia: 'fallback',
-        data_criacao: new Date().toISOString()
+        data_upload: new Date().toISOString()
       });
 
       logger.warn(`⚠️ Fallback de diagnóstico: ${diagnosticoId} (Tenant: ${req.tenantCode})`);
@@ -143,14 +143,14 @@ router.get('/avaliacao/:avaliacaoId', async (req, res) => {
     const diagnosticos = await db('diagnosticos')
       .where('tenant_id', req.tenantId)
       .where('avaliacao_id', avaliacaoId)
-      .orderBy('data_criacao', 'desc')
+      .orderBy('data_upload', 'desc')
       .select(
         'id',
         'resumo_diagnostico',
         'status_api',
         'modelo_ia',
         'tokens_utilizados',
-        'data_criacao'
+        'data_upload'
       );
 
     res.json({ diagnosticos });

@@ -54,7 +54,7 @@ router.post('/', [
       cliente_info,
       data_inicio: new Date().toISOString(),
       data_conclusao: new Date().toISOString(),
-      data_criacao: new Date().toISOString()
+      data_upload: new Date().toISOString()
     });
 
     // Log de auditoria
@@ -117,7 +117,7 @@ router.get('/minhas', [
 
     // Buscar transcrições
     const transcricoes = await query
-      .orderBy('data_criacao', 'desc')
+      .orderBy('data_upload', 'desc')
       .limit(limit)
       .offset(offset)
       .select(
@@ -126,7 +126,7 @@ router.get('/minhas', [
         'categoria_problema',
         'duracao_segundos',
         'status',
-        'data_criacao'
+        'data_upload'
       );
 
     res.json({
@@ -176,7 +176,7 @@ router.get('/stats/resumo', async (req, res) => {
     const stats = await db.raw(`
       SELECT 
         COUNT(*) as total_transcricoes,
-        COUNT(CASE WHEN data_criacao >= ? THEN 1 END) as este_mes,
+        COUNT(CASE WHEN data_upload >= ? THEN 1 END) as este_mes,
         AVG(duracao_segundos) as duracao_media,
         SUM(duracao_segundos) as tempo_total
       FROM transcricoes_tecnicas 

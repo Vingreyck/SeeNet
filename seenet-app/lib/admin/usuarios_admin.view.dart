@@ -56,7 +56,7 @@ Future<void> carregarUsuarios() async {
           senha: '',
           tipoUsuario: userData['tipo_usuario'] as String? ?? 'tecnico',
           ativo: userData['ativo'] == 1 || userData['ativo'] == true,
-          dataCriacao: DateTime.tryParse(userData['data_criacao'] as String? ?? ''),
+          dataCriacao: DateTime.tryParse(userData['data_upload'] as String? ?? ''),
         ));
       } catch (e) {
         print('⚠️ Erro ao processar usuário: $e');

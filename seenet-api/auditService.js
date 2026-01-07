@@ -52,9 +52,9 @@ class AuditService {
     if (filtros.data_inicio) {
       query = query.where('data_acao', '>=', filtros.data_inicio);
     }
-
-    if (filtros.data_fim) {
-      query = query.where('data_acao', '<=', filtros.data_fim);
+data_conclusao
+    if (filtros.data_conclusao) {
+      query = query.where('data_acao', '<=', filtros.data_conclusao);
     }
 
     return await query

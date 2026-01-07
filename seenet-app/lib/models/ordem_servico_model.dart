@@ -75,18 +75,20 @@ class OrdemServico {
 
 factory OrdemServico.fromJson(Map<String, dynamic> json) {
   return OrdemServico(
-    id: (json['id'] ?? '').toString(), // ✅ CONVERTER
-    numeroOs: json['numero_os'] ?? '',
-    origem: json['origem'] ?? 'SEENET',
+    id: (json['id'] ?? 0).toString(),
+    numeroOs: json['numero_os']?.toString() ?? 
+              json['numero_os_ixc']?.toString() ?? 
+              'S/N',
+    origem: json['origem']?.toString() ?? 'SEENET',
     idExterno: json['id_externo']?.toString(),
-    empresaId: (json['tenant_id'] ?? json['empresa_id'] ?? '').toString(), // ✅ ACEITAR AMBOS
-    tecnicoId: (json['tecnico_id'] ?? '').toString(), // ✅ CONVERTER
-    clienteNome: json['cliente_nome'] ?? 'Cliente não identificado',
-    clienteEndereco: json['cliente_endereco'],
-    clienteTelefone: json['cliente_telefone'],
-    tipoServico: json['tipo_servico'] ?? 'Manutenção',
-    prioridade: json['prioridade'] ?? 'media',
-    status: json['status'] ?? 'pendente',
+    empresaId: (json['tenant_id'] ?? 0).toString(),
+    tecnicoId: (json['tecnico_id'] ?? 0).toString(),
+    clienteNome: json['cliente_nome']?.toString() ?? 'Cliente não identificado',
+    clienteEndereco: json['cliente_endereco']?.toString(),
+    clienteTelefone: json['cliente_telefone']?.toString(),
+    tipoServico: json['tipo_servico']?.toString() ?? 'Manutenção',
+    prioridade: json['prioridade']?.toString() ?? 'media',
+    status: json['status']?.toString() ?? 'pendente',
     dataInicio: json['data_inicio'] != null 
         ? DateTime.parse(json['data_inicio']) 
         : null,
@@ -99,18 +101,22 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
     longitude: json['longitude'] != null 
         ? double.tryParse(json['longitude'].toString()) 
         : null,
-    onuModelo: json['onu_modelo'],
-    onuSerial: json['onu_serial'],
-    onuStatus: json['onu_status'],
+    onuModelo: json['onu_modelo']?.toString(),
+    onuSerial: json['onu_serial']?.toString(),
+    onuStatus: json['onu_status']?.toString(),
     onuSinalOptico: json['onu_sinal_optico'] != null
         ? double.tryParse(json['onu_sinal_optico'].toString())
         : null,
-    relatoProblema: json['relato_problema'],
-    relatoSolucao: json['relato_solucao'],
-    materiaisUtilizados: json['materiais_utilizados'],
-    observacoes: json['observacoes'],
-    createdAt: DateTime.parse(json['data_criacao']),
-    updatedAt: DateTime.parse(json['data_atualizacao']),
+    relatoProblema: json['relato_problema']?.toString(),
+    relatoSolucao: json['relato_solucao']?.toString(),
+    materiaisUtilizados: json['materiais_utilizados']?.toString(),
+    observacoes: json['observacoes']?.toString(),
+    createdAt: json['data_criacao'] != null 
+        ? DateTime.parse(json['data_criacao'])
+        : DateTime.now(),
+    updatedAt: json['data_atualizacao'] != null 
+        ? DateTime.parse(json['data_atualizacao'])
+        : DateTime.now(),
     anexos: json['anexos'] != null
         ? (json['anexos'] as List)
             .map((a) => AnexoOS.fromJson(a))

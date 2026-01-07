@@ -109,7 +109,7 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
     relatoSolucao: json['relato_solucao'],
     materiaisUtilizados: json['materiais_utilizados'],
     observacoes: json['observacoes'],
-    createdAt: DateTime.parse(json['data_upload']),
+    createdAt: DateTime.parse(json['data_criacao']),
     updatedAt: DateTime.parse(json['data_atualizacao']),
     anexos: json['anexos'] != null
         ? (json['anexos'] as List)
@@ -145,7 +145,7 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
       'relato_solucao': relatoSolucao,
       'materiais_utilizados': materiaisUtilizados,
       'observacoes': observacoes,
-      'data_upload': createdAt.toIso8601String(),
+      'data_criacao': createdAt.toIso8601String(),
       'data_atualizacao': updatedAt.toIso8601String(),
       'anexos': anexos?.map((a) => a.toJson()).toList(),
     };

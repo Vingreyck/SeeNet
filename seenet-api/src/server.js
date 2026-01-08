@@ -1040,7 +1040,8 @@ app.get('/api/debug/force-sync', async (req, res) => {
     console.log('🚀 === SYNC FORÇADO VIA DEBUG ===');
     
     // Chamar sincronizador
-    const sincronizador = require('./services/SincronizadorIXC');
+    const SincronizadorIXC = require('./services/SincronizadorIXC');
+    const sincronizador = new SincronizadorIXC();
     await sincronizador.sincronizarTodasEmpresas();
     
     res.json({

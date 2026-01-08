@@ -186,7 +186,7 @@ class SincronizadorIXC {
       const status = statusMap[osIXC.status] || 'pendente';
 
       const dadosOS = {
-        numero_os: osIXC.numero_os || `IXC-${osIXC.id}`,
+        numero_os: osIXC.protocolo || `IXC-${osIXC.id}`,
         origem: 'IXC',
         id_externo: osIXC.id.toString(),
         tenant_id: tenantId,
@@ -195,17 +195,20 @@ class SincronizadorIXC {
         cliente_endereco: clienteEndereco,
         cliente_telefone: clienteTelefone,
         cliente_id_externo: osIXC.id_cliente?.toString(),
-        tipo_servico: osIXC.tipo_servico || 'Manutenção',
+        tipo_servico: osIXC.tipo_servico || this.obterTipoServico(osIXC.tipo),
         prioridade: prioridade,
         status: status,
         observacoes: osIXC.observacao || null,
         
         // ✅ ADICIONAR ESTAS LINHAS:
-        data_abertura: osIXC.data_abertura || osIXC.data_atendimento || osIXC.data_cadastro || null,
-        data_agendamento: osIXC.data_agendamento || null,
+        data_abertura: this.parseDataIXC(osIXC.data_abertura),
+        data_agendamento: this.parseDataIXC(osIXC.data_agenda),
+        data_inicio: this.parseDataIXC(osIXC.data_inicio),
+        data_conclusao: this.parseDataIXC(osIXC.data_final),
         
         dados_ixc: JSON.stringify(osIXC)
       };
+      
 
       if (osExistente) {
         // Atualizar OS existente (apenas se não estiver concluída no SeeNet)
@@ -217,12 +220,14 @@ class SincronizadorIXC {
             prioridade: dadosOS.prioridade,
             observacoes: dadosOS.observacoes,
             
-            // ✅ ADICIONAR:
+            // ✅ ATUALIZAR DATAS:
             data_abertura: dadosOS.data_abertura,
             data_agendamento: dadosOS.data_agendamento,
+            data_inicio: dadosOS.data_inicio,
+            data_conclusao: dadosOS.data_conclusao,
             
             dados_ixc: dadosOS.dados_ixc,
-            data_atualizacao: db.fn.now()  // ✅ Corrigir também!
+            data_atualizacao: db.fn.now()
           });
 
           console.log(`   ♻️ OS ${dadosOS.numero_os} atualizada`);
@@ -236,6 +241,35 @@ class SincronizadorIXC {
       console.error(`   ❌ Erro ao sincronizar OS ${osIXC.id}:`, error.message);
     }
   }
+    parseDataIXC(dataString) {
+    if (!dataString || dataString === '0000-00-00 00:00:00' || dataString === '0000-00-00') {
+      return null;
+    }
+    try {
+      const data = new Date(dataString);
+      // Verificar se é data válida
+      if (isNaN(data.getTime())) {
+        return null;
+      }
+      return data;
+    } catch (error) {
+      console.error(`⚠️ Erro ao converter data: ${dataString}`);
+      return null;
+    }
+  }
+    obterTipoServico(tipoIXC) {
+    const tiposMap = {
+      'I': 'Instalação',
+      'M': 'Manutenção',
+      'R': 'Reparo',
+      'C': 'Comercial',
+      'V': 'Visita Técnica'
+    };
+    return tiposMap[tipoIXC] || 'Manutenção';
+  }
+
+  
 }
+
 
 module.exports = SincronizadorIXC;

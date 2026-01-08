@@ -17,7 +17,7 @@ class OrdensServicoController {
         .join('usuarios as u', 'u.id', 'os.tecnico_id')
         .where('os.tecnico_id', userId)
         .where('os.tenant_id', tenantId)
-        .whereNot('os.status', 'cancelada')
+        .whereIn('os.status', ['pendente', 'em_execucao'])
         .select(
           'os.*',
           'u.nome as tecnico_nome'

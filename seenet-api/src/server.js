@@ -1034,29 +1034,30 @@ app.get('/api/debug/meu-ip-agora', async (req, res) => {
     return res.json({ erro: error.message });
   }
 });
-// Rota para forçar sincronização de todas as empresas via debug sem token necessario agora 
 app.get('/api/debug/force-sync', async (req, res) => {
   try {
     console.log('🚀 === SYNC FORÇADO VIA DEBUG ===');
     
-    // Chamar sincronizador
-    const SincronizadorIXC = require('./services/SincronizadorIXC');
-    const sincronizador = new SincronizadorIXC();
-    await sincronizador.sincronizarTodasEmpresas();
-    
+    // Responder imediatamente
     res.json({
       success: true,
-      message: 'Sincronização executada'
+      message: 'Sincronização iniciada em background'
     });
+    
+    // Executar em background (não aguardar)
+    const SincronizadorIXC = require('./services/SincronizadorIXC');
+    const sincronizador = new SincronizadorIXC();
+    sincronizador.sincronizarTodasEmpresas().catch(err => {
+      console.error('❌ Erro no sync background:', err);
+    });
+    
   } catch (error) {
-    console.error('❌ Erro:', error);
     res.status(500).json({
       success: false,
       error: error.message
     });
   }
 });
-
 // Rota para forçar sincronização de todas as empresas
   app.get('/api/sync/force', authMiddleware, async (req, res) => {
   try {

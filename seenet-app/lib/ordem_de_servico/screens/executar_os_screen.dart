@@ -104,7 +104,7 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-                        onPressed: () => Get.back(),
+                        onPressed: () => Navigator.pop(context),
                       ),
                       const SizedBox(width: 8),
                       Column(

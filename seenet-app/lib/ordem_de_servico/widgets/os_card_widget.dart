@@ -133,7 +133,9 @@ class OSCardWidget extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  DateFormat('dd/MM/yyyy HH:mm').format(os.createdAt),
+                  os.dataAbertura != null
+                      ? DateFormat('dd/MM/yyyy HH:mm').format(os.dataAbertura!)
+                      : 'Sem data',
                   style: const TextStyle(color: Colors.white54, fontSize: 12),
                 ),
               ],

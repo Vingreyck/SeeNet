@@ -161,7 +161,9 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
                         _buildInfoRow('Tipo de Serviço', os.tipoServico),
                         _buildInfoRow(
                           'Data de Abertura',
-                          DateFormat('dd/MM/yyyy HH:mm').format(os.createdAt),
+                          os.dataAbertura != null
+                              ? DateFormat('dd/MM/yyyy HH:mm').format(os.dataAbertura!)
+                              : 'Sem data',
                         ),
                       ],
                     ),

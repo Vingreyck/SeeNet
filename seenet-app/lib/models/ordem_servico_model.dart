@@ -19,6 +19,7 @@ class OrdemServico {
   final String status; // 'pendente', 'em_execucao', 'concluida'
   
   // Dados da execução
+  final DateTime? dataAbertura;
   final DateTime? dataInicio;
   final DateTime? dataFim;
   final double? latitude;
@@ -56,6 +57,7 @@ class OrdemServico {
     required this.tipoServico,
     this.prioridade = 'media',
     this.status = 'pendente',
+    this.dataAbertura,
     this.dataInicio,
     this.dataFim,
     this.latitude,
@@ -89,6 +91,9 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
     tipoServico: json['tipo_servico']?.toString() ?? 'Manutenção',
     prioridade: json['prioridade']?.toString() ?? 'media',
     status: json['status']?.toString() ?? 'pendente',
+    dataAbertura: json['data_abertura'] != null   // ✅ ADICIONAR!
+        ? DateTime.parse(json['data_abertura']) 
+        : null,
     dataInicio: json['data_inicio'] != null 
         ? DateTime.parse(json['data_inicio']) 
         : null,
@@ -139,6 +144,7 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
       'tipo_servico': tipoServico,
       'prioridade': prioridade,
       'status': status,
+      'data_abertura': dataAbertura?.toIso8601String(),
       'data_inicio': dataInicio?.toIso8601String(),
       'data_conclusao': dataFim?.toIso8601String(),
       'latitude': latitude,

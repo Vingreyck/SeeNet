@@ -1034,7 +1034,29 @@ app.get('/api/debug/meu-ip-agora', async (req, res) => {
     return res.json({ erro: error.message });
   }
 });
+
+// Rota para forçar sincronização de todas as empresas
+  app.get('/api/sync/force', authMiddleware, async (req, res) => {
+  try {
+    console.log('🚀 Sincronização forçada via GET');
     
+    // Chamar função de sincronização
+    // (ajuste conforme sua implementação)
+    const resultado = await sincronizarTodasEmpresas();
+    
+    res.json({
+      success: true,
+      message: 'Sincronização executada',
+      data: resultado
+    });
+  } catch (error) {
+    console.error('❌ Erro ao forçar sync:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
     // ========== ROTAS DE DEBUG ==========
     
     app.get('/api/health', (req, res) => {

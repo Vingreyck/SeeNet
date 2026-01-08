@@ -68,6 +68,7 @@ class SincronizadorIXC {
       console.log('✅ Ciclo de sincronização concluído\n');
     } catch (error) {
       console.error('❌ Erro no ciclo de sincronização:', error);
+      console.error('📍 Stack:', error.stack);  // ✅ ADICIONAR
     }
   }
 
@@ -114,10 +115,13 @@ class SincronizadorIXC {
           console.log(`   📋 ${ossIXC.length} OS(s) encontrada(s) no IXC`);
 
           // 3. Sincronizar cada OS
-          for (const osIXC of ossIXC) {
-            await this.sincronizarOS(trx, integracao.tenant_id, mapeamento.tecnico_seenet_id, osIXC, ixc);
-            totalOSsSincronizadas++;
-          }
+        for (const osIXC of ossIXC) {
+          // ✅ ADICIONAR ESTE LOG:
+          console.log('🔍 DEBUG - Estrutura OS IXC:', JSON.stringify(osIXC, null, 2));
+          
+          await this.sincronizarOS(trx, integracao.tenant_id, mapeamento.tecnico_seenet_id, osIXC, ixc);
+          totalOSsSincronizadas++;
+        }
         } catch (error) {
           console.error(`   ❌ Erro ao sincronizar técnico ${mapeamento.tecnico_seenet_nome}:`, error.message);
         }
@@ -133,6 +137,7 @@ class SincronizadorIXC {
     } catch (error) {
       await trx.rollback();
       console.error(`❌ Erro ao sincronizar empresa ${integracao.empresa_nome}:`, error);
+      console.error('📍 Stack:', error.stack);
     }
   }
 
@@ -194,21 +199,31 @@ class SincronizadorIXC {
         prioridade: prioridade,
         status: status,
         observacoes: osIXC.observacao || null,
+        
+        // ✅ ADICIONAR ESTAS LINHAS:
+        data_abertura: osIXC.data_abertura || osIXC.data_atendimento || osIXC.data_cadastro || null,
+        data_agendamento: osIXC.data_agendamento || null,
+        
         dados_ixc: JSON.stringify(osIXC)
       };
 
       if (osExistente) {
         // Atualizar OS existente (apenas se não estiver concluída no SeeNet)
-        if (osExistente.status !== 'concluida') {
-          await trx('ordem_servico')
-            .where('id', osExistente.id)
-            .update({
-              status: dadosOS.status,
-              prioridade: dadosOS.prioridade,
-              observacoes: dadosOS.observacoes,
-              dados_ixc: dadosOS.dados_ixc,
-              updated_at: db.fn.now()
-            });
+      if (osExistente.status !== 'concluida') {
+        await trx('ordem_servico')
+          .where('id', osExistente.id)
+          .update({
+            status: dadosOS.status,
+            prioridade: dadosOS.prioridade,
+            observacoes: dadosOS.observacoes,
+            
+            // ✅ ADICIONAR:
+            data_abertura: dadosOS.data_abertura,
+            data_agendamento: dadosOS.data_agendamento,
+            
+            dados_ixc: dadosOS.dados_ixc,
+            data_atualizacao: db.fn.now()  // ✅ Corrigir também!
+          });
 
           console.log(`   ♻️ OS ${dadosOS.numero_os} atualizada`);
         }

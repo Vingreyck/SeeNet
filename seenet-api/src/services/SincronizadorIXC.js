@@ -3,9 +3,11 @@ const IXCService = require('./IXCService');
 
 class SincronizadorIXC {
   constructor() {
-    this.intervalo = 60000; // 60 segundos
+    this.intervalo = 300000; // 60 segundos
     this.sincronizacaoAtiva = false;
     this.intervalId = null;
+    this.cacheClientes = new Map(); // ✅ ADICIONAR
+    this.maxOSsPorSync = 50; // ✅ ADICIONAR
   }
 
   iniciar() {
@@ -16,6 +18,7 @@ class SincronizadorIXC {
 
     console.log('🚀 Iniciando sincronização automática com IXC...');
     console.log(`⏱️ Intervalo: ${this.intervalo / 1000} segundos`);
+    console.log(`📊 Máximo: ${this.maxOSsPorSync} OSs por ciclo`);
 
     this.sincronizacaoAtiva = true;
 
@@ -38,6 +41,7 @@ class SincronizadorIXC {
     
     clearInterval(this.intervalId);
     this.sincronizacaoAtiva = false;
+    this.cacheClientes.clear();
   }
 
   async sincronizarTodasEmpresas() {
@@ -64,7 +68,8 @@ class SincronizadorIXC {
       for (const integracao of integracoes) {
         await this.sincronizarEmpresa(integracao);
       }
-
+      this.cacheClientes.clear();
+      console.log('🧹 Cache de clientes limpo');
       console.log('✅ Ciclo de sincronização concluído\n');
     } catch (error) {
       console.error('❌ Erro no ciclo de sincronização:', error);
@@ -83,10 +88,11 @@ class SincronizadorIXC {
 
       // 1. Buscar mapeamento de técnicos
       const mapeamentos = await trx('mapeamento_tecnicos_ixc as m')
-        .join('usuarios as u', 'u.id', 'm.tecnico_seenet_id')
+        .join('usuarios as u', 'u.id', 'm.usuario_id') // ✅ TROCAR tecnico_seenet_id por usuario_id
         .where('m.tenant_id', integracao.tenant_id)
+        .where('m.ativo', true) // ✅ ADICIONAR
         .select(
-          'm.tecnico_seenet_id',
+          'm.usuario_id',
           'm.tecnico_ixc_id',
           'm.tecnico_ixc_nome',
           'u.nome as tecnico_seenet_nome'
@@ -111,13 +117,19 @@ class SincronizadorIXC {
           const ossIXC = await ixc.buscarOSs({
             tecnicoId: mapeamento.tecnico_ixc_id,
           });
-
           console.log(`   📋 ${ossIXC.length} OS(s) encontrada(s) no IXC`);
 
+          // ✅ ADICIONAR AQUI:
+          const ossParaProcessar = ossIXC.slice(0, this.maxOSsPorSync);
+          
+          if (ossIXC.length > this.maxOSsPorSync) {
+            console.log(`   ⚠️ Limitando a ${this.maxOSsPorSync} OSs para não sobrecarregar`);
+          }
+
           // 3. Sincronizar cada OS
-        for (const osIXC of ossIXC) {
+        for (const osIXC of ossParaProcessar) {
           // ✅ ADICIONAR ESTE LOG:
-          console.log('🔍 DEBUG - Estrutura OS IXC:', JSON.stringify(osIXC, null, 2));
+          await this.sincronizarOS(trx, integracao.tenant_id, mapeamento.usuario_id, osIXC, ixc); // ✅ trocar tecnico_seenet_id por usuario_id
           
           await this.sincronizarOS(trx, integracao.tenant_id, mapeamento.tecnico_seenet_id, osIXC, ixc);
           totalOSsSincronizadas++;
@@ -154,16 +166,26 @@ class SincronizadorIXC {
       let clienteEndereco = osIXC.endereco || null;
       let clienteTelefone = osIXC.telefone || null;
 
-      if (osIXC.id_cliente) {
-        try {
-          const clienteIXC = await ixcService.buscarCliente(osIXC.id_cliente);
-          if (clienteIXC) {
-            clienteNome = clienteIXC.razao || clienteNome;
-            clienteEndereco = clienteIXC.endereco || clienteEndereco;
-            clienteTelefone = clienteIXC.telefone_celular || clienteIXC.telefone || clienteTelefone;
+      if (osIXC.id_cliente && (!clienteNome || clienteNome === 'Cliente não identificado')) {
+        // Verificar cache primeiro
+        let clienteIXC = this.cacheClientes.get(osIXC.id_cliente);
+        
+        if (!clienteIXC) {
+          // Buscar e cachear
+          try {
+            clienteIXC = await ixcService.buscarCliente(osIXC.id_cliente);
+            if (clienteIXC) {
+              this.cacheClientes.set(osIXC.id_cliente, clienteIXC);
+            }
+          } catch (error) {
+            // Falha silenciosa
           }
-        } catch (error) {
-          console.log(`   ⚠️ Não foi possível buscar dados do cliente ${osIXC.id_cliente}`);
+        }
+        
+        if (clienteIXC) {
+          clienteNome = clienteIXC.razao || clienteNome;
+          clienteEndereco = clienteIXC.endereco || clienteEndereco;
+          clienteTelefone = clienteIXC.telefone_celular || clienteIXC.telefone || clienteTelefone;
         }
       }
 
@@ -172,7 +194,8 @@ class SincronizadorIXC {
         'A': 'alta',
         'M': 'media',
         'B': 'baixa',
-        'U': 'urgente'
+        'U': 'urgente',
+        'N': 'media' // ✅ ADICIONAR
       };
       const prioridade = prioridadeMap[osIXC.prioridade] || 'media';
 

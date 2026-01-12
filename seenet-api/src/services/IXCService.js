@@ -22,60 +22,66 @@ class IXCService {
    * @param {Object} filtros - Filtros para busca
    * @returns {Array} Lista de OSs
    */
-  async buscarOSs(filtros = {}) {
-    try {
-      console.log('🔍 Buscando OSs no IXC...', filtros);
+async buscarOSs(filtros = {}) {
+  try {
+    console.log('🔍 Buscando OSs no IXC...', filtros);
 
-      const params = new URLSearchParams({
-        qtype: 'id',
-        query: filtros.id || '',
-        oper: filtros.id ? '=' : '!=',
-        page: '1',
-        rp: '1000',
-        sortname: 'id',
-        sortorder: 'desc'
+    const params = new URLSearchParams({
+      qtype: 'id',
+      query: filtros.id || '',
+      oper: filtros.id ? '=' : '!=',
+      page: '1',
+      rp: '1000',
+      sortname: 'id',
+      sortorder: 'desc'
+    });
+
+    // ✅ COMBINAR FILTROS EM ARRAY
+    const gridParams = [];
+
+    if (filtros.tecnicoId) {
+      gridParams.push({
+        TB: 'su_oss_chamado.id_tecnico',
+        OP: '=',
+        P: filtros.tecnicoId.toString()
       });
-
-      // Adicionar filtros opcionais
-      if (filtros.tecnicoId) {
-        params.set('grid_param', JSON.stringify([{
-          TB: 'su_oss_chamado.id_tecnico',
-          OP: '=',
-          P: filtros.tecnicoId.toString()
-        }]));
-      }
-
-      if (filtros.status) {
-        params.set('grid_param', JSON.stringify([{
-          TB: 'su_oss_chamado.status',
-          OP: '=',
-          P: filtros.status
-        }]));
-      }
-
-      if (filtros.dataInicio) {
-        params.set('grid_param', JSON.stringify([{
-          TB: 'su_oss_chamado.data_abertura',
-          OP: '>=',
-          P: filtros.dataInicio
-        }]));
-      }
-
-      const response = await this.client.post('/su_oss_chamado', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'listar'
-        }
-      });
-
-      console.log(`✅ ${response.data.total || 0} OSs encontradas no IXC`);
-      
-      return response.data.registros || [];
-    } catch (error) {
-      console.error('❌ Erro ao buscar OSs no IXC:', error.message);
-      throw error;
     }
+
+    if (filtros.status) {
+      gridParams.push({
+        TB: 'su_oss_chamado.status',
+        OP: '=',
+        P: filtros.status
+      });
+    }
+
+    if (filtros.dataInicio) {
+      gridParams.push({
+        TB: 'su_oss_chamado.data_abertura',
+        OP: '>=',
+        P: filtros.dataInicio
+      });
+    }
+
+    if (gridParams.length > 0) {
+      params.set('grid_param', JSON.stringify(gridParams));
+    }
+
+    const response = await this.client.post('/su_oss_chamado', params.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'ixcsoft': 'listar'
+      }
+    });
+
+    console.log(`✅ ${response.data.total || 0} OSs encontradas no IXC`);
+    
+    return response.data.registros || [];
+  } catch (error) {
+    console.error('❌ Erro ao buscar OSs no IXC:', error.message);
+    throw error;
   }
+}
 
   /**
    * Buscar detalhes de uma OS específica

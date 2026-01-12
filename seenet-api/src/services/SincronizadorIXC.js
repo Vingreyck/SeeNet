@@ -253,7 +253,6 @@ class SincronizadorIXC {
             data_atualizacao: db.fn.now()
           });
 
-          console.log(`   ♻️ OS ${dadosOS.numero_os} atualizada`);
         }
       } else {
         // Inserir nova OS

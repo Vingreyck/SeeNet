@@ -125,6 +125,8 @@ class SincronizadorIXC {
           if (ossIXC.length > this.maxOSsPorSync) {
             console.log(`   ⚠️ Limitando a ${this.maxOSsPorSync} OSs para não sobrecarregar`);
           }
+              
+          const idsExternosIXC = ossIXC.map(os => os.id.toString());
 
           // 3. Sincronizar cada OS
         for (const osIXC of ossParaProcessar) {
@@ -134,6 +136,20 @@ class SincronizadorIXC {
           await this.sincronizarOS(trx, integracao.tenant_id, mapeamento.tecnico_seenet_id, osIXC, ixc);
           totalOSsSincronizadas++;
         }
+          const ossCanceladas = await trx('ordem_servico')
+      .where('tenant_id', integracao.tenant_id)
+      .where('tecnico_id', mapeamento.usuario_id)
+      .where('origem', 'IXC')
+      .whereNotIn('id_externo', idsExternosIXC)
+      .whereNot('status', 'cancelada')
+      .update({
+        status: 'cancelada',
+        data_atualizacao: db.fn.now()
+      });
+
+    if (ossCanceladas > 0) {
+      console.log(`   🗑️ ${ossCanceladas} OS(s) cancelada(s) (não encontradas no IXC)`);
+    }
         } catch (error) {
           console.error(`   ❌ Erro ao sincronizar técnico ${mapeamento.tecnico_seenet_nome}:`, error.message);
         }

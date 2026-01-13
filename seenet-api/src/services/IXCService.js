@@ -218,46 +218,32 @@ async buscarOSs(filtros = {}) {
    * @param {Object} dados - Dados da finalização
    * @returns {Object} Resposta do IXC
    */
-  async finalizarOS(osId, dados) {
-    try {
-      console.log(`✅ Finalizando OS ${osId} no IXC...`);
+async finalizarOS(osId, dados) {
+  try {
+    console.log(`✅ Finalizando OS ${osId} no IXC...`);
 
-      const payload = new URLSearchParams({
-        id: osId.toString(),
-        status: 'F',
-        data_finalizacao: new Date().toISOString().split('T')[0],
-        observacao: dados.observacoes || '',
-        tecnico_executante: dados.tecnicoId.toString()
-      });
+    const payload = new URLSearchParams({
+      id: osId.toString(),
+      status: 'F', // Finalizada
+      mensagem_resposta: dados.mensagem_resposta || '',
+      observacao: dados.observacoes || ''
+    });
 
-      // Adicionar informações extras se disponíveis
-      if (dados.relatoProblema) {
-        payload.append('diagnostico', dados.relatoProblema);
+    const response = await this.client.post('/su_oss_chamado', payload.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'ixcsoft': 'alterar'  // ✅ Importante: usar 'alterar' para update
       }
+    });
 
-      if (dados.relatoSolucao) {
-        payload.append('solucao', dados.relatoSolucao);
-      }
-
-      if (dados.materiaisUtilizados) {
-        payload.append('materiais', dados.materiaisUtilizados);
-      }
-
-      const response = await this.client.post('/su_oss_chamado', payload.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'listar'
-        }
-      });
-
-      console.log(`✅ OS ${osId} finalizada com sucesso no IXC`);
-      
-      return response.data;
-    } catch (error) {
-      console.error(`❌ Erro ao finalizar OS ${osId}:`, error.message);
-      throw error;
-    }
+    console.log(`✅ OS ${osId} finalizada no IXC`);
+    
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Erro ao finalizar OS ${osId} no IXC:`, error.message);
+    throw error;
   }
+}
 
   /**
    * Testar conexão com IXC

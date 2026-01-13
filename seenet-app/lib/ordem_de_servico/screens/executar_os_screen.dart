@@ -23,6 +23,8 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
   final TextEditingController onuSerialController = TextEditingController();
   final TextEditingController onuStatusController = TextEditingController();
   final TextEditingController onuSinalController = TextEditingController();
+  final TextEditingController relatoProblemaController = TextEditingController();  // ✅ ADICIONAR
+  final TextEditingController relatoSolucaoController = TextEditingController();   // ✅ ADICIONAR
   final TextEditingController materiaisController = TextEditingController();
   final TextEditingController observacoesController = TextEditingController();
 
@@ -57,6 +59,8 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
     onuSerialController.dispose();
     onuStatusController.dispose();
     onuSinalController.dispose();
+    relatoProblemaController.dispose();    // ✅ ADICIONAR
+    relatoSolucaoController.dispose();     // ✅ ADICIONAR
     materiaisController.dispose();
     observacoesController.dispose();
     super.dispose();
@@ -218,6 +222,31 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
                           label: 'Sinal Óptico (dBm)',
                           hint: 'Ex: -24.5',
                           keyboardType: TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ✅ RELATOS (OBRIGATÓRIO)
+                  _buildSecao(
+                    titulo: 'Relatos (Obrigatório)',
+                    icone: Icons.description,
+                    child: Column(
+                      children: [
+                        _buildTextField(
+                          controller: relatoProblemaController,
+                          label: 'Problema Identificado *',
+                          hint: 'Descreva o problema encontrado...',
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: relatoSolucaoController,
+                          label: 'Solução Aplicada *',
+                          hint: 'Descreva a solução aplicada...',
+                          maxLines: 3,
                         ),
                       ],
                     ),
@@ -447,13 +476,15 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
 
   Future<void> _iniciarOS() async {
     if (latitude == null || longitude == null) {
-      Get.snackbar(
-        'Atenção',
-        'É necessário capturar a localização antes de iniciar.',
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-        icon: const Icon(Icons.warning, color: Colors.white),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('É necessário capturar a localização antes de iniciar.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
       return;
     }
 
@@ -463,86 +494,144 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
       setState(() {
         osIniciada = true;
       });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Execução iniciada! Preencha os dados.'),
+            backgroundColor: Color(0xFF00FF88),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao iniciar execução. Tente novamente.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
-  Future<void> _finalizarOS() async {
-    // Validações
-    if (latitude == null || longitude == null) {
-      Get.snackbar(
-        'Atenção',
-        'É necessário ter a localização registrada.',
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
-      return;
-    }
-
-    if (observacoesController.text.trim().isEmpty) {
-      Get.snackbar(
-        'Atenção',
-        'Por favor, adicione observações sobre o atendimento.',
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
-      return;
-    }
-
-    // Confirmar finalização
-    final confirmar = await Get.dialog<bool>(
-      AlertDialog(
-        backgroundColor: const Color(0xFF232323),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Finalizar OS?',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+Future<void> _finalizarOS() async {
+  // Validações
+  if (latitude == null || longitude == null) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('É necessário ter a localização registrada.'),
+          backgroundColor: Colors.orange,
         ),
-        content: const Text(
-          'Ao finalizar, os dados serão enviados para o IXC e não poderão ser mais editados.',
-          style: TextStyle(color: Colors.white70),
+      );
+    }
+    return;
+  }
+
+  if (relatoProblemaController.text.trim().isEmpty) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, descreva o problema identificado.'),
+          backgroundColor: Colors.orange,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () => Get.back(result: true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF88),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text(
-              'Finalizar',
-              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
+      );
+    }
+    return;
+  }
+
+  if (relatoSolucaoController.text.trim().isEmpty) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, descreva a solução aplicada.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+    return;
+  }
+
+  // Confirmar finalização
+  final confirmar = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF232323),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text(
+        'Finalizar OS?',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
       ),
-    );
+      content: const Text(
+        'Ao finalizar, os dados serão enviados para o IXC e não poderão ser mais editados.',
+        style: TextStyle(color: Colors.white70),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00FF88),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text(
+            'Finalizar',
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    ),
+  );
 
-    if (confirmar != true) return;
+  if (confirmar != true) return;
 
-    // Preparar dados
-    final dados = {
-      'latitude': latitude,
-      'longitude': longitude,
-      'onu_modelo': onuModeloController.text.trim(),
-      'onu_serial': onuSerialController.text.trim(),
-      'onu_status': onuStatusController.text.trim(),
-      'onu_sinal_optico': onuSinalController.text.trim().isNotEmpty
-          ? double.tryParse(onuSinalController.text.trim())
-          : null,
-      'materiais_utilizados': materiaisController.text.trim(),
-      'observacoes': observacoesController.text.trim(),
-      'fotos': fotosAnexadas,
-    };
+  // Preparar dados
+  final dados = {
+    'latitude': latitude,
+    'longitude': longitude,
+    'onu_modelo': onuModeloController.text.trim(),
+    'onu_serial': onuSerialController.text.trim(),
+    'onu_status': onuStatusController.text.trim(),
+    'onu_sinal_optico': onuSinalController.text.trim().isNotEmpty
+        ? double.tryParse(onuSinalController.text.trim())
+        : null,
+    'relato_problema': relatoProblemaController.text.trim(),     // ✅ ADICIONAR
+    'relato_solucao': relatoSolucaoController.text.trim(),       // ✅ ADICIONAR
+    'materiais_utilizados': materiaisController.text.trim(),
+    'observacoes': observacoesController.text.trim(),
+    'fotos': fotosAnexadas,
+  };
 
-    final sucesso = await controller.finalizarExecucao(os.id, dados);
+  final sucesso = await controller.finalizarExecucao(os.id, dados);
 
-    if (sucesso) {
-      Get.back(); // Volta para lista de OSs
-      Get.back(); // Volta para o checklist
+  if (sucesso) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('OS finalizada e enviada ao IXC com sucesso!'),
+          backgroundColor: Color(0xFF00FF88),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      Navigator.pop(context, true); // Retorna true para recarregar lista
+    }
+  } else {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro ao finalizar OS. Tente novamente.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
     }
   }
+}
 }

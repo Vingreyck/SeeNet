@@ -24,63 +24,64 @@ class IXCService {
    */
 async buscarOSs(filtros = {}) {
   try {
-    const params = new URLSearchParams({
-      qtype: 'su_oss_chamado.id_tecnico',
-      query: filtros.tecnicoId?.toString() || '',
-      oper: 'igual',
-      page: '1',
-      rp: '50',
-      sortname: 'su_oss_chamado.id',
-      sortorder: 'desc',
-    });
-
-    // ✅ ADICIONAR LOGS AQUI
     console.log('🔍 DEBUG IXC - Filtros recebidos:', filtros);
-    console.log('🔍 DEBUG IXC - Params montados:', params.toString());
 
-    // Combinar filtros em array
-    const gridParams = [];
+    // ✅ FORMATO CORRETO DA API IXC v1
+    const params = {
+      grid_param: JSON.stringify([
+        {
+          TB: 'su_oss_chamado.id_tecnico',
+          OP: '=',
+          P: filtros.tecnicoId?.toString() || ''
+        },
+        {
+          TB: 'su_oss_chamado.status',
+          OP: 'IN',
+          P: "('A','EA')"
+        }
+      ])
+    };
 
-    if (filtros.tecnicoId) {
-      gridParams.push({
-        TB: 'su_oss_chamado.id_tecnico',
-        OP: '=',
-        P: filtros.tecnicoId.toString()
-      });
-    }
+    console.log('🔍 DEBUG IXC - Params:', JSON.stringify(params, null, 2));
 
-    // ✅ BUSCAR STATUS A e EA
-    gridParams.push({
-      TB: 'su_oss_chamado.status',
-      OP: 'IN',
-      P: "('A','EA')"
+    // ✅ CHAMAR ENDPOINT CORRETO
+    const response = await this.client.get('/su_oss_chamado', {
+      params,
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
 
-    if (gridParams.length > 0) {
-      params.set('grid_param', JSON.stringify(gridParams));
-    }
-
-    // ✅ ADICIONAR LOG DA GRID_PARAM
-    console.log('🔍 DEBUG IXC - Grid Params:', params.get('grid_param'));
-
-    const response = await this.client.get('/su_oss_chamado', { params });
-
-    // ✅ ADICIONAR LOG DA RESPOSTA COMPLETA
     console.log('🔍 DEBUG IXC - Response status:', response.status);
-    console.log('🔍 DEBUG IXC - Response data:', JSON.stringify(response.data, null, 2));
+    console.log('🔍 DEBUG IXC - Response type:', response.data?.type);
+
+    // Verificar se houve erro
+    if (response.data?.type === 'error') {
+      console.error('❌ Erro retornado pelo IXC:', response.data.message);
+      return [];
+    }
 
     const registros = response.data?.registros || [];
 
     console.log(`✅ ${registros.length} OSs encontradas no IXC`);
+
+    // Log das OSs encontradas
+    if (registros.length > 0) {
+      console.log('📋 OSs encontradas:', registros.map(os => ({
+        id: os.id,
+        cliente: os.cliente_nome || os.nome_cliente,
+        status: os.status
+      })));
+    }
 
     return registros;
   } catch (error) {
     console.error('❌ Erro ao buscar OSs do IXC:', error.message);
     if (error.response) {
       console.error('❌ Response status:', error.response.status);
-      console.error('❌ Response data:', error.response.data);
+      console.error('❌ Response data:', JSON.stringify(error.response.data, null, 2));
     }
-    throw error;
+    return [];
   }
 }
 

@@ -182,6 +182,7 @@ async finalizarOS(req, res) {
       relato_solucao,       // ✅ ADICIONAR
       materiais_utilizados,
       observacoes,
+      assinatura,
       fotos
     } = req.body;
     const userId = req.user.id;
@@ -237,6 +238,7 @@ async finalizarOS(req, res) {
         relato_solucao,        // ✅ ADICIONAR
         materiais_utilizados,
         observacoes,
+        assinatura_cliente: assinatura,
         data_atualizacao: db.fn.now()
       });
 

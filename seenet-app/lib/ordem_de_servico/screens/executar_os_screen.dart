@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:typed_data';  // ✅ ADICIONAR
+import 'dart:convert';     // ✅ ADICIONAR
 import '../../controllers/ordem_servico_controller.dart';
 import '../../models/ordem_servico_model.dart';
 import '../widgets/localizacao_widget.dart';
 import '../widgets/anexos_widget.dart';
-import '../widgets/relato_widget.dart';
+import '../widgets/assinatura_widget.dart';  // ✅ ADICIONAR (criar depois)
 import 'package:intl/intl.dart';
 
 class ExecutarOSScreen extends StatefulWidget {
@@ -23,8 +25,8 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
   final TextEditingController onuSerialController = TextEditingController();
   final TextEditingController onuStatusController = TextEditingController();
   final TextEditingController onuSinalController = TextEditingController();
-  final TextEditingController relatoProblemaController = TextEditingController();  // ✅ ADICIONAR
-  final TextEditingController relatoSolucaoController = TextEditingController();   // ✅ ADICIONAR
+  final TextEditingController relatoProblemaController = TextEditingController();
+  final TextEditingController relatoSolucaoController = TextEditingController();
   final TextEditingController materiaisController = TextEditingController();
   final TextEditingController observacoesController = TextEditingController();
 
@@ -33,6 +35,7 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
   double? longitude;
   List<String> fotosAnexadas = [];
   bool osIniciada = false;
+  Uint8List? _assinaturaBytes;
 
   @override
   void initState() {
@@ -296,6 +299,21 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
                   ),
 
                   const SizedBox(height: 20),
+
+                  if (osIniciada)
+                    _buildSecao(
+                      titulo: 'Assinatura do Cliente',
+                      icone: Icons.draw,
+                      child: AssinaturaWidget(
+                        onAssinaturaSalva: (assinatura) {
+                          setState(() {
+                            _assinaturaBytes = assinatura;
+                          });
+                        },
+                      ),
+                    ),
+
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -517,121 +535,136 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
     }
   }
 
-Future<void> _finalizarOS() async {
-  // Validações
-  if (latitude == null || longitude == null) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('É necessário ter a localização registrada.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-    return;
-  }
-
-  if (relatoProblemaController.text.trim().isEmpty) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, descreva o problema identificado.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-    return;
-  }
-
-  if (relatoSolucaoController.text.trim().isEmpty) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, descreva a solução aplicada.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-    return;
-  }
-
-  // Confirmar finalização
-  final confirmar = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: const Color(0xFF232323),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
-        'Finalizar OS?',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      ),
-      content: const Text(
-        'Ao finalizar, os dados serão enviados para o IXC e não poderão ser mais editados.',
-        style: TextStyle(color: Colors.white70),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00FF88),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  Future<void> _finalizarOS() async {
+    // Validações
+    if (latitude == null || longitude == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('É necessário ter a localização registrada.'),
+            backgroundColor: Colors.orange,
           ),
-          child: const Text(
-            'Finalizar',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ],
-    ),
-  );
-
-  if (confirmar != true) return;
-
-  // Preparar dados
-  final dados = {
-    'latitude': latitude,
-    'longitude': longitude,
-    'onu_modelo': onuModeloController.text.trim(),
-    'onu_serial': onuSerialController.text.trim(),
-    'onu_status': onuStatusController.text.trim(),
-    'onu_sinal_optico': onuSinalController.text.trim().isNotEmpty
-        ? double.tryParse(onuSinalController.text.trim())
-        : null,
-    'relato_problema': relatoProblemaController.text.trim(),     // ✅ ADICIONAR
-    'relato_solucao': relatoSolucaoController.text.trim(),       // ✅ ADICIONAR
-    'materiais_utilizados': materiaisController.text.trim(),
-    'observacoes': observacoesController.text.trim(),
-    'fotos': fotosAnexadas,
-  };
-
-  final sucesso = await controller.finalizarExecucao(os.id, dados);
-
-  if (sucesso) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('OS finalizada e enviada ao IXC com sucesso!'),
-          backgroundColor: Color(0xFF00FF88),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      
-      Navigator.pop(context, true); // Retorna true para recarregar lista
+        );
+      }
+      return;
     }
-  } else {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro ao finalizar OS. Tente novamente.'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
+
+    if (relatoProblemaController.text.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor, descreva o problema identificado.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (relatoSolucaoController.text.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor, descreva a solução aplicada.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // ✅ ADICIONAR VALIDAÇÃO DE ASSINATURA:
+    if (_assinaturaBytes == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('É necessária a assinatura do cliente.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Confirmar finalização
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF232323),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Finalizar OS?',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-      );
+        content: const Text(
+          'Ao finalizar, os dados serão enviados para o IXC e não poderão ser mais editados.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00FF88),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text(
+              'Finalizar',
+              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    // Preparar dados
+    final dados = {
+      'latitude': latitude,
+      'longitude': longitude,
+      'onu_modelo': onuModeloController.text.trim(),
+      'onu_serial': onuSerialController.text.trim(),
+      'onu_status': onuStatusController.text.trim(),
+      'onu_sinal_optico': onuSinalController.text.trim().isNotEmpty
+          ? double.tryParse(onuSinalController.text.trim())
+          : null,
+      'relato_problema': relatoProblemaController.text.trim(),
+      'relato_solucao': relatoSolucaoController.text.trim(),
+      'materiais_utilizados': materiaisController.text.trim(),
+      'observacoes': observacoesController.text.trim(),
+      'fotos': fotosAnexadas,
+      'assinatura': base64Encode(_assinaturaBytes!),  // ✅ ADICIONAR
+    };
+
+    final sucesso = await controller.finalizarExecucao(os.id, dados);
+
+    if (sucesso) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('OS finalizada e enviada ao IXC com sucesso!'),
+            backgroundColor: Color(0xFF00FF88),
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        Navigator.pop(context, true);
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao finalizar OS. Tente novamente.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
-}
 }

@@ -250,9 +250,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           const SizedBox(height: 24),
           _buildCard(
             child: AnexosWidget(
-              onFotosAlteradas: (fotos) {
+              onAnexosAlterados: (anexos) {
                 setState(() {
-                  fotosAnexadas = fotos;
+                  // Extrair apenas os caminhos das fotos
+                  fotosAnexadas = anexos.map((a) => a.foto.path).toList();
                 });
               },
             ),

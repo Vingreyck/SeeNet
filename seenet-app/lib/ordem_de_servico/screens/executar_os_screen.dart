@@ -262,9 +262,10 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
                     titulo: 'Fotos do Local',
                     icone: Icons.camera_alt,
                     child: AnexosWidget(
-                      onFotosAlteradas: (fotos) {
+                      onAnexosAlterados: (anexos) {
                         setState(() {
-                          fotosAnexadas = fotos;
+                          // Extrair apenas os caminhos das fotos
+                          fotosAnexadas = anexos.map((a) => a.foto.path).toList();
                         });
                       },
                     ),

@@ -24,19 +24,21 @@ class IXCService {
    */
 async buscarOSs(filtros = {}) {
   try {
-    console.log('🔍 Buscando OSs no IXC...', filtros);
-
     const params = new URLSearchParams({
-      qtype: 'id',
-      query: filtros.id || '',
-      oper: filtros.id ? '=' : '!=',
+      qtype: 'su_oss_chamado.id_tecnico',
+      query: filtros.tecnicoId?.toString() || '',
+      oper: 'igual',
       page: '1',
-      rp: '1000',
-      sortname: 'id',
-      sortorder: 'desc'
+      rp: '50',
+      sortname: 'su_oss_chamado.id',
+      sortorder: 'desc',
     });
 
-    // ✅ COMBINAR FILTROS EM ARRAY
+    // ✅ ADICIONAR LOGS AQUI
+    console.log('🔍 DEBUG IXC - Filtros recebidos:', filtros);
+    console.log('🔍 DEBUG IXC - Params montados:', params.toString());
+
+    // Combinar filtros em array
     const gridParams = [];
 
     if (filtros.tecnicoId) {
@@ -47,38 +49,37 @@ async buscarOSs(filtros = {}) {
       });
     }
 
-    if (filtros.status) {
-      gridParams.push({
-        TB: 'su_oss_chamado.status',
-        OP: '=',
-        P: filtros.status
-      });
-    }
-
-    if (filtros.dataInicio) {
-      gridParams.push({
-        TB: 'su_oss_chamado.data_abertura',
-        OP: '>=',
-        P: filtros.dataInicio
-      });
-    }
+    // ✅ BUSCAR STATUS A e EA
+    gridParams.push({
+      TB: 'su_oss_chamado.status',
+      OP: 'IN',
+      P: "('A','EA')"
+    });
 
     if (gridParams.length > 0) {
       params.set('grid_param', JSON.stringify(gridParams));
     }
 
-    const response = await this.client.post('/su_oss_chamado', params.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'ixcsoft': 'listar'
-      }
-    });
+    // ✅ ADICIONAR LOG DA GRID_PARAM
+    console.log('🔍 DEBUG IXC - Grid Params:', params.get('grid_param'));
 
-    console.log(`✅ ${response.data.total || 0} OSs encontradas no IXC`);
-    
-    return response.data.registros || [];
+    const response = await this.client.get('/su_oss_chamado', { params });
+
+    // ✅ ADICIONAR LOG DA RESPOSTA COMPLETA
+    console.log('🔍 DEBUG IXC - Response status:', response.status);
+    console.log('🔍 DEBUG IXC - Response data:', JSON.stringify(response.data, null, 2));
+
+    const registros = response.data?.registros || [];
+
+    console.log(`✅ ${registros.length} OSs encontradas no IXC`);
+
+    return registros;
   } catch (error) {
-    console.error('❌ Erro ao buscar OSs no IXC:', error.message);
+    console.error('❌ Erro ao buscar OSs do IXC:', error.message);
+    if (error.response) {
+      console.error('❌ Response status:', error.response.status);
+      console.error('❌ Response data:', error.response.data);
+    }
     throw error;
   }
 }

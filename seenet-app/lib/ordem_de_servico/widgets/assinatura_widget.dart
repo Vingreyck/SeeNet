@@ -44,9 +44,12 @@ class _AssinaturaWidgetState extends State<AssinaturaWidget> {
               width: 2,
             ),
           ),
-          child: Signature(
-            controller: _controller,
-            backgroundColor: const Color(0xFF1A1A1A),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Signature(
+              controller: _controller,
+              backgroundColor: const Color(0xFF1A1A1A),
+            ),
           ),
         ),
 
@@ -60,13 +63,22 @@ class _AssinaturaWidgetState extends State<AssinaturaWidget> {
               Icon(Icons.check_circle, color: Color(0xFF00FF88), size: 20),
               SizedBox(width: 8),
               Text(
-                'Assinatura confirmada',
+                'Assinatura confirmada ✓',
                 style: TextStyle(
                   color: Color(0xFF00FF88),
                   fontWeight: FontWeight.bold,
+                  fontSize: 14,
                 ),
               ),
             ],
+          )
+        else
+          const Text(
+            'Assine no espaço acima',
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 12,
+            ),
           ),
 
         const SizedBox(height: 12),
@@ -88,7 +100,10 @@ class _AssinaturaWidgetState extends State<AssinaturaWidget> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
                   side: const BorderSide(color: Colors.white54),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
@@ -101,7 +116,10 @@ class _AssinaturaWidgetState extends State<AssinaturaWidget> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00FF88),
                   foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
@@ -113,13 +131,15 @@ class _AssinaturaWidgetState extends State<AssinaturaWidget> {
 
   Future<void> _salvarAssinatura() async {
     if (_controller.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, assine antes de confirmar'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor, assine antes de confirmar'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
       return;
     }
 
@@ -134,7 +154,7 @@ class _AssinaturaWidgetState extends State<AssinaturaWidget> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Assinatura confirmada!'),
+          content: Text('✓ Assinatura confirmada!'),
           backgroundColor: Color(0xFF00FF88),
           duration: Duration(seconds: 1),
         ),

@@ -178,24 +178,32 @@ async finalizarOS(req, res) {
       onu_serial,
       onu_status,
       onu_sinal_optico,
-      relato_problema,      // ✅ ADICIONAR
-      relato_solucao,       // ✅ ADICIONAR
+      relato_problema,
+      relato_solucao,
       materiais_utilizados,
       observacoes,
-      assinatura,
-      fotos
+      fotos,
+      assinatura
     } = req.body;
     const userId = req.user.id;
     const tenantId = req.tenantId;
 
     console.log(`✅ Finalizando OS ${id}`);
 
-    // Validações
+    // Validações obrigatórias
     if (!relato_problema || !relato_solucao) {
       await trx.rollback();
       return res.status(400).json({
         success: false,
         error: 'Relato do problema e solução são obrigatórios'
+      });
+    }
+
+    if (!assinatura) {
+      await trx.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'Assinatura do cliente é obrigatória'
       });
     }
 
@@ -234,8 +242,8 @@ async finalizarOS(req, res) {
         onu_serial,
         onu_status,
         onu_sinal_optico,
-        relato_problema,       // ✅ ADICIONAR
-        relato_solucao,        // ✅ ADICIONAR
+        relato_problema,
+        relato_solucao,
         materiais_utilizados,
         observacoes,
         assinatura_cliente: assinatura,
@@ -295,9 +303,9 @@ async finalizarOS(req, res) {
   }
 }
 
-  /**
-   * Sincronizar finalização com IXC
-   */
+/**
+ * Sincronizar finalização com IXC
+ */
 async sincronizarFinalizacaoComIXC(trx, os, dados) {
   console.log(`🔄 Sincronizando finalização da OS ${os.numero_os} com IXC...`);
 
@@ -313,7 +321,7 @@ async sincronizarFinalizacaoComIXC(trx, os, dados) {
 
   // Buscar mapeamento do técnico
   const mapeamento = await trx('mapeamento_tecnicos_ixc')
-    .where('usuario_id', dados.userId)  // ✅ CORRIGIR: usuario_id
+    .where('usuario_id', dados.userId)
     .where('tenant_id', os.tenant_id)
     .first();
 
@@ -321,37 +329,50 @@ async sincronizarFinalizacaoComIXC(trx, os, dados) {
     throw new Error('Técnico não mapeado no IXC');
   }
 
-  // ✅ MONTAR MENSAGEM COMPLETA
+  // Montar mensagem completa
   let mensagemResposta = '';
-  
+
+  mensagemResposta += '═══════════════════════════════════\n';
+  mensagemResposta += '  RELATÓRIO DE ATENDIMENTO TÉCNICO\n';
+  mensagemResposta += '═══════════════════════════════════\n\n';
+
   if (dados.relato_problema) {
-    mensagemResposta += `=== PROBLEMA IDENTIFICADO ===\n${dados.relato_problema}\n\n`;
-  }
-  
-  if (dados.relato_solucao) {
-    mensagemResposta += `=== SOLUÇÃO APLICADA ===\n${dados.relato_solucao}\n\n`;
-  }
-  
-  if (dados.onu_modelo || dados.onu_serial) {
-    mensagemResposta += `=== DADOS DA ONU ===\n`;
-    if (dados.onu_modelo) mensagemResposta += `Modelo: ${dados.onu_modelo}\n`;
-    if (dados.onu_serial) mensagemResposta += `Serial: ${dados.onu_serial}\n`;
-    if (dados.onu_status) mensagemResposta += `Status: ${dados.onu_status}\n`;
-    if (dados.onu_sinal_optico) mensagemResposta += `Sinal Óptico: ${dados.onu_sinal_optico} dBm\n`;
-    mensagemResposta += '\n';
-  }
-  
-  if (dados.materiais_utilizados) {
-    mensagemResposta += `=== MATERIAIS UTILIZADOS ===\n${dados.materiais_utilizados}\n\n`;
-  }
-  
-  if (dados.observacoes) {
-    mensagemResposta += `=== OBSERVAÇÕES ===\n${dados.observacoes}\n`;
+    mensagemResposta += '📋 PROBLEMA IDENTIFICADO:\n';
+    mensagemResposta += `${dados.relato_problema}\n\n`;
   }
 
+  if (dados.relato_solucao) {
+    mensagemResposta += '✅ SOLUÇÃO APLICADA:\n';
+    mensagemResposta += `${dados.relato_solucao}\n\n`;
+  }
+
+  if (dados.onu_modelo || dados.onu_serial || dados.onu_status) {
+    mensagemResposta += '🔧 DADOS TÉCNICOS DA ONU:\n';
+    if (dados.onu_modelo) mensagemResposta += `• Modelo: ${dados.onu_modelo}\n`;
+    if (dados.onu_serial) mensagemResposta += `• Serial: ${dados.onu_serial}\n`;
+    if (dados.onu_status) mensagemResposta += `• Status: ${dados.onu_status}\n`;
+    if (dados.onu_sinal_optico) mensagemResposta += `• Sinal Óptico: ${dados.onu_sinal_optico} dBm\n`;
+    mensagemResposta += '\n';
+  }
+
+  if (dados.materiais_utilizados) {
+    mensagemResposta += '🛠️ MATERIAIS UTILIZADOS:\n';
+    mensagemResposta += `${dados.materiais_utilizados}\n\n`;
+  }
+
+  if (dados.observacoes) {
+    mensagemResposta += '💬 OBSERVAÇÕES ADICIONAIS:\n';
+    mensagemResposta += `${dados.observacoes}\n\n`;
+  }
+
+  mensagemResposta += '═══════════════════════════════════\n';
+  mensagemResposta += `📱 Atendimento via SeeNet\n`;
+  mensagemResposta += '═══════════════════════════════════';
+
   // Criar cliente IXC e finalizar
+  const IXCService = require('../services/IXCService');
   const ixc = new IXCService(integracao.url_api, integracao.token_api);
-  
+
   await ixc.finalizarOS(parseInt(os.id_externo), {
     mensagem_resposta: mensagemResposta,
     observacoes: dados.observacoes,
@@ -359,7 +380,6 @@ async sincronizarFinalizacaoComIXC(trx, os, dados) {
   });
 
   console.log(`✅ OS ${os.numero_os} sincronizada com IXC`);
-  console.log(`📝 Mensagem enviada:\n${mensagemResposta}`);
 }
 }
 

@@ -4,6 +4,7 @@ import '../../controllers/ordem_servico_controller.dart';
 import '../../models/ordem_servico_model.dart';
 import '../widgets/os_card_widget.dart';
 import 'package:seenet/widgets/skeleton_loader.dart';
+import 'executar_os_wizard_screen.dart';
 
 class OrdensServicoScreen extends StatefulWidget {
   const OrdensServicoScreen({super.key});
@@ -170,7 +171,8 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen> with SingleTi
           return OSCardWidget(
             os: os,
             onTap: () {
-              Get.toNamed('/ordens-servico/executar', arguments: os);
+              // ✅ MODIFICADO - Abre wizard direto
+              Get.to(() => const ExecutarOSWizardScreen(), arguments: os);
             },
           );
         },

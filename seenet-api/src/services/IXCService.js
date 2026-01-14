@@ -25,62 +25,80 @@ class IXCService {
 async buscarOSs(filtros = {}) {
   try {
     console.log('🔍 DEBUG IXC - Filtros recebidos:', filtros);
+    console.log('🔍 DEBUG IXC - URL Base:', this.client.defaults.baseURL);
 
-    // ✅ FORMATO CORRETO DA API IXC v1
-    const params = {
-      grid_param: JSON.stringify([
-        {
-          TB: 'su_oss_chamado.id_tecnico',
-          OP: '=',
-          P: filtros.tecnicoId?.toString() || ''
-        },
-        {
-          TB: 'su_oss_chamado.status',
-          OP: 'IN',
-          P: "('A','EA')"
+    // ✅ TESTE 1: Buscar SEM filtros para ver se endpoint existe
+    console.log('🧪 TESTE 1: Chamando endpoint sem filtros...');
+    try {
+      const testResponse = await this.client.get('/su_oss_chamado');
+      console.log('✅ TESTE 1 OK - Response type:', testResponse.data?.type);
+      console.log('✅ TESTE 1 OK - Total registros:', testResponse.data?.total || 0);
+    } catch (testError) {
+      console.error('❌ TESTE 1 FALHOU:', testError.response?.data || testError.message);
+    }
+
+    // ✅ TESTE 2: Tentar com qtype tradicional (sem grid_param)
+    console.log('🧪 TESTE 2: Chamando com qtype tradicional...');
+    try {
+      const test2Response = await this.client.get('/su_oss_chamado', {
+        params: {
+          qtype: 'su_oss_chamado.id_tecnico',
+          query: filtros.tecnicoId?.toString() || '31',
+          oper: 'igual'
         }
-      ])
-    };
+      });
+      console.log('✅ TESTE 2 OK - Response type:', test2Response.data?.type);
+      console.log('✅ TESTE 2 OK - Total registros:', test2Response.data?.total || 0);
 
-    console.log('🔍 DEBUG IXC - Params:', JSON.stringify(params, null, 2));
-
-    // ✅ CHAMAR ENDPOINT CORRETO
-    const response = await this.client.get('/su_oss_chamado', {
-      params,
-      headers: {
-        'Content-Type': 'application/json'
+      // Se funcionou, retornar esses registros
+      if (test2Response.data?.type === 'success' || test2Response.data?.registros) {
+        const registros = test2Response.data?.registros || [];
+        console.log(`✅ ${registros.length} OSs encontradas no IXC`);
+        return registros;
       }
-    });
-
-    console.log('🔍 DEBUG IXC - Response status:', response.status);
-    console.log('🔍 DEBUG IXC - Response type:', response.data?.type);
-
-    // Verificar se houve erro
-    if (response.data?.type === 'error') {
-      console.error('❌ Erro retornado pelo IXC:', response.data.message);
-      return [];
+    } catch (test2Error) {
+      console.error('❌ TESTE 2 FALHOU:', test2Error.response?.data || test2Error.message);
     }
 
-    const registros = response.data?.registros || [];
+    // ✅ TESTE 3: Tentar com grid_param mas SEM status
+    console.log('🧪 TESTE 3: Chamando com grid_param só técnico...');
+    try {
+      const test3Response = await this.client.get('/su_oss_chamado', {
+        params: {
+          grid_param: JSON.stringify([
+            {
+              TB: 'su_oss_chamado.id_tecnico',
+              OP: '=',
+              P: filtros.tecnicoId?.toString() || '31'
+            }
+          ])
+        }
+      });
+      console.log('✅ TESTE 3 OK - Response type:', test3Response.data?.type);
+      console.log('✅ TESTE 3 OK - Total registros:', test3Response.data?.total || 0);
 
-    console.log(`✅ ${registros.length} OSs encontradas no IXC`);
-
-    // Log das OSs encontradas
-    if (registros.length > 0) {
-      console.log('📋 OSs encontradas:', registros.map(os => ({
-        id: os.id,
-        cliente: os.cliente_nome || os.nome_cliente,
-        status: os.status
-      })));
+      if (test3Response.data?.type === 'success' || test3Response.data?.registros) {
+        const registros = test3Response.data?.registros || [];
+        console.log(`✅ ${registros.length} OSs encontradas no IXC`);
+        return registros;
+      }
+    } catch (test3Error) {
+      console.error('❌ TESTE 3 FALHOU:', test3Error.response?.data || test3Error.message);
     }
 
-    return registros;
+    // ✅ TESTE 4: Listar todos os endpoints disponíveis
+    console.log('🧪 TESTE 4: Verificando endpoints disponíveis...');
+    try {
+      const test4Response = await this.client.get('/');
+      console.log('✅ TESTE 4 - Root response:', JSON.stringify(test4Response.data, null, 2));
+    } catch (test4Error) {
+      console.error('❌ TESTE 4 FALHOU:', test4Error.response?.data || test4Error.message);
+    }
+
+    console.log('❌ Todos os testes falharam!');
+    return [];
   } catch (error) {
-    console.error('❌ Erro ao buscar OSs do IXC:', error.message);
-    if (error.response) {
-      console.error('❌ Response status:', error.response.status);
-      console.error('❌ Response data:', JSON.stringify(error.response.data, null, 2));
-    }
+    console.error('❌ Erro geral ao buscar OSs do IXC:', error.message);
     return [];
   }
 }

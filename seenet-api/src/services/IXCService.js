@@ -50,6 +50,8 @@ async buscarOSs(filtros = {}) {
     console.log('🔍 DEBUG IXC - Response status:', response.status);
     console.log('🔍 DEBUG IXC - Response type:', response.data?.type);
     console.log('🔍 DEBUG IXC - Total:', response.data?.total || 0);
+    console.log('🔍 DEBUG IXC - Response COMPLETA:', JSON.stringify(response.data, null, 2));
+
 
     if (response.data?.type === 'error') {
       console.error('❌ Erro retornado pelo IXC:', response.data.message);

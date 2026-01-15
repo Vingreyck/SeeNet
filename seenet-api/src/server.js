@@ -569,6 +569,24 @@ const response = await axios.post(`${integracao.url_api}/${endpoint}`,
   }
 });
 
+
+// ✅ ROTA TEMPORÁRIA PARA DESCOBRIR IP
+app.get('/debug-ip', async (req, res) => {
+  try {
+    const axios = require('axios');
+    const ipResponse = await axios.get('https://api.ipify.org?format=json');
+
+    res.json({
+      railway_ip: ipResponse.data.ip,
+      request_ip: req.ip,
+      forwarded_for: req.headers['x-forwarded-for'],
+      user_agent: req.headers['user-agent']
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // TESTE: Buscar OS específica por ID
 app.get('/api/debug/test-ixc-os/:osId', async (req, res) => {
   const axios = require('axios');

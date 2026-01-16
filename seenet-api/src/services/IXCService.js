@@ -22,71 +22,46 @@ class IXCService {
    * @param {Object} filtros - Filtros para busca
    * @returns {Array} Lista de OSs
    */
-async buscarOSs(filtros = {}) {
-  try {
-    console.log('🔍 DEBUG IXC - Filtros recebidos:', filtros);
-    console.log('🔍 DEBUG IXC - URL Base:', this.client.defaults.baseURL);
+  async buscarOSs(filtros = {}) {
+    try {
+      // ✅ USAR POST COMO OS OUTROS MÉTODOS
+      const params = new URLSearchParams({
+        qtype: 'su_oss_chamado.id_tecnico',
+        query: filtros.tecnicoId?.toString() || '',
+        oper: '=',
+        page: '1',
+        rp: '50',
+        sortname: 'su_oss_chamado.id',
+        sortorder: 'desc'
+      });
 
-    // ✅ USAR POST COMO OS OUTROS MÉTODOS
-    const params = new URLSearchParams({
-      qtype: 'su_oss_chamado.id_tecnico',
-      query: filtros.tecnicoId?.toString() || '',
-      oper: '=',
-      page: '1',
-      rp: '50',
-      sortname: 'su_oss_chamado.id',
-      sortorder: 'desc'
-    });
+      const response = await this.client.post('/su_oss_chamado', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'listar'
+        }
+      });
 
-    console.log('🔍 DEBUG IXC - Params:', params.toString());
-
-    const response = await this.client.post('/su_oss_chamado', params.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'ixcsoft': 'listar'
+      if (response.data?.type === 'error') {
+        console.error('❌ Erro retornado pelo IXC:', response.data.message);
+        return [];
       }
-    });
 
-    console.log('🔍 DEBUG IXC - Response status:', response.status);
-    console.log('🔍 DEBUG IXC - Response type:', response.data?.type);
-    console.log('🔍 DEBUG IXC - Total:', response.data?.total || 0);
-    console.log('🔍 DEBUG IXC - Response COMPLETA:', JSON.stringify(response.data, null, 2));
+      const registros = response.data?.registros || [];
 
+      // Filtrar apenas status A e EA
+      const registrosFiltrados = registros.filter(os => {
+        return os.status === 'A' || os.status === 'EA';
+      });
 
-    if (response.data?.type === 'error') {
-      console.error('❌ Erro retornado pelo IXC:', response.data.message);
+      console.log(`✅ ${registrosFiltrados.length}/${registros.length} OSs abertas (técnico: ${filtros.tecnicoId})`);
+
+      return registrosFiltrados;
+    } catch (error) {
+      console.error('❌ Erro ao buscar OSs do IXC:', error.message);
       return [];
     }
-
-    const registros = response.data?.registros || [];
-
-    // Filtrar apenas status A e EA
-    const registrosFiltrados = registros.filter(os => {
-      return os.status === 'A' || os.status === 'EA';
-    });
-
-    console.log(`✅ ${registros.length} OSs encontradas no IXC`);
-    console.log(`✅ ${registrosFiltrados.length} OSs após filtro de status (A ou EA)`);
-
-    if (registrosFiltrados.length > 0) {
-      console.log('📋 OSs filtradas:', registrosFiltrados.map(os => ({
-        id: os.id,
-        cliente: os.cliente_nome || os.nome_cliente,
-        status: os.status,
-        tecnico: os.id_tecnico
-      })));
-    }
-
-    return registrosFiltrados;
-  } catch (error) {
-    console.error('❌ Erro ao buscar OSs do IXC:', error.message);
-    if (error.response) {
-      console.error('❌ Response status:', error.response.status);
-      console.error('❌ Response data:', JSON.stringify(error.response.data, null, 2));
-    }
-    return [];
   }
-}
 
   /**
    * Buscar detalhes de uma OS específica
@@ -95,8 +70,6 @@ async buscarOSs(filtros = {}) {
    */
   async buscarDetalhesOS(osId) {
     try {
-      console.log(`🔍 Buscando detalhes da OS ${osId} no IXC...`);
-
       const params = new URLSearchParams({
         qtype: 'id',
         query: osId.toString(),
@@ -112,8 +85,6 @@ async buscarOSs(filtros = {}) {
         }
       });
 
-      console.log(`✅ Detalhes da OS ${osId} obtidos`);
-      
       return response.data.registros?.[0] || response.data;
     } catch (error) {
       console.error(`❌ Erro ao buscar OS ${osId}:`, error.message);
@@ -128,8 +99,6 @@ async buscarOSs(filtros = {}) {
    */
   async buscarCliente(clienteId) {
     try {
-      console.log(`👤 Buscando cliente ${clienteId} no IXC...`);
-
       const params = new URLSearchParams({
         qtype: 'id',
         query: clienteId.toString(),
@@ -145,8 +114,6 @@ async buscarOSs(filtros = {}) {
         }
       });
 
-      console.log(`✅ Dados do cliente ${clienteId} obtidos`);
-      
       return response.data.registros?.[0] || response.data;
     } catch (error) {
       console.error(`❌ Erro ao buscar cliente ${clienteId}:`, error.message);
@@ -160,8 +127,6 @@ async buscarOSs(filtros = {}) {
    */
   async listarTecnicos() {
     try {
-      console.log('👷 Buscando técnicos no IXC...');
-
       const params = new URLSearchParams({
         qtype: 'id',
         query: '',
@@ -178,7 +143,7 @@ async buscarOSs(filtros = {}) {
       });
 
       console.log(`✅ ${response.data.total || 0} técnicos encontrados`);
-      
+
       return response.data.registros || [];
     } catch (error) {
       console.error('❌ Erro ao buscar técnicos:', error.message);
@@ -208,8 +173,8 @@ async buscarOSs(filtros = {}) {
         }
       });
 
-      console.log(`✅ OS ${osId} atualizada com sucesso no IXC`);
-      
+      console.log(`✅ OS ${osId} atualizada`);
+
       return response.data;
     } catch (error) {
       console.error(`❌ Erro ao atualizar OS ${osId}:`, error.message);
@@ -223,32 +188,32 @@ async buscarOSs(filtros = {}) {
    * @param {Object} dados - Dados da finalização
    * @returns {Object} Resposta do IXC
    */
-async finalizarOS(osId, dados) {
-  try {
-    console.log(`✅ Finalizando OS ${osId} no IXC...`);
+  async finalizarOS(osId, dados) {
+    try {
+      console.log(`✅ Finalizando OS ${osId} no IXC...`);
 
-    const payload = new URLSearchParams({
-      id: osId.toString(),
-      status: 'F', // Finalizada
-      mensagem_resposta: dados.mensagem_resposta || '',
-      observacao: dados.observacoes || ''
-    });
+      const payload = new URLSearchParams({
+        id: osId.toString(),
+        status: 'F', // Finalizada
+        mensagem_resposta: dados.mensagem_resposta || '',
+        observacao: dados.observacoes || ''
+      });
 
-    const response = await this.client.post('/su_oss_chamado', payload.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'ixcsoft': 'alterar'  // ✅ Importante: usar 'alterar' para update
-      }
-    });
+      const response = await this.client.post('/su_oss_chamado', payload.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ixcsoft': 'alterar'  // ✅ Importante: usar 'alterar' para update
+        }
+      });
 
-    console.log(`✅ OS ${osId} finalizada no IXC`);
-    
-    return response.data;
-  } catch (error) {
-    console.error(`❌ Erro ao finalizar OS ${osId} no IXC:`, error.message);
-    throw error;
+      console.log(`✅ OS ${osId} finalizada no IXC`);
+
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Erro ao finalizar OS ${osId} no IXC:`, error.message);
+      throw error;
+    }
   }
-}
 
   /**
    * Testar conexão com IXC
@@ -256,8 +221,6 @@ async finalizarOS(osId, dados) {
    */
   async testarConexao() {
     try {
-      console.log('🧪 Testando conexão com IXC...');
-      
       const params = new URLSearchParams({
         qtype: 'id',
         query: '',

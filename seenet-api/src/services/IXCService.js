@@ -1,32 +1,27 @@
 const axios = require('axios');
-const crypto = require('crypto');
 
 class IXCService {
   constructor(urlApi, tokenApi) {
     this.baseUrl = urlApi;
     this.token = tokenApi;
-    
-    // Criar cliente axios com configuração base
+
     this.client = axios.create({
       baseURL: this.baseUrl,
       headers: {
         'Authorization': `Basic ${Buffer.from(this.token).toString('base64')}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      timeout: 30000, // 30 segundos
+      timeout: 30000,
     });
   }
 
   /**
    * Buscar OSs (chamados) do IXC
-   * @param {Object} filtros - Filtros para busca
-   * @returns {Array} Lista de OSs
    */
   async buscarOSs(filtros = {}) {
     try {
-      // ✅ USAR POST COMO OS OUTROS MÉTODOS
       const params = new URLSearchParams({
-        qtype: 'su_oss_chamado.id_tecnico',
+        qtype: 'id_tecnico',
         query: filtros.tecnicoId?.toString() || '',
         oper: '=',
         page: '1',
@@ -49,7 +44,7 @@ class IXCService {
 
       const registros = response.data?.registros || [];
 
-      // Filtrar apenas status A e EA
+      // Filtrar apenas status A (Aberta) e EA (Em Atendimento)
       const registrosFiltrados = registros.filter(os => {
         return os.status === 'A' || os.status === 'EA';
       });
@@ -65,8 +60,6 @@ class IXCService {
 
   /**
    * Buscar detalhes de uma OS específica
-   * @param {number} osId - ID da OS no IXC
-   * @returns {Object} Dados da OS
    */
   async buscarDetalhesOS(osId) {
     try {
@@ -94,8 +87,6 @@ class IXCService {
 
   /**
    * Buscar dados do cliente
-   * @param {number} clienteId - ID do cliente no IXC
-   * @returns {Object} Dados do cliente
    */
   async buscarCliente(clienteId) {
     try {
@@ -117,13 +108,12 @@ class IXCService {
       return response.data.registros?.[0] || response.data;
     } catch (error) {
       console.error(`❌ Erro ao buscar cliente ${clienteId}:`, error.message);
-      return null; // Não quebrar se não encontrar cliente
+      return null;
     }
   }
 
   /**
    * Listar técnicos do IXC
-   * @returns {Array} Lista de técnicos
    */
   async listarTecnicos() {
     try {
@@ -152,61 +142,85 @@ class IXCService {
   }
 
   /**
-   * Atualizar/Finalizar OS no IXC
-   * @param {number} osId - ID da OS no IXC
-   * @param {Object} dados - Dados para atualizar
-   * @returns {Object} Resposta do IXC
+   * ✅ NOVO: Iniciar OS no IXC (mudar status para EA - Em Atendimento)
    */
-  async atualizarOS(osId, dados) {
+  async iniciarOS(osId, dados = {}) {
     try {
-      console.log(`📝 Atualizando OS ${osId} no IXC...`);
+      console.log(`▶️ Iniciando OS ${osId} no IXC...`);
 
-      const payload = new URLSearchParams({
-        id: osId.toString(),
-        ...dados
-      });
+      // Formatar data atual no formato do IXC
+      const agora = new Date();
+      const dataInicio = agora.toISOString().slice(0, 19).replace('T', ' ');
+
+      const payload = new URLSearchParams();
+      payload.append('id', osId.toString());
+      payload.append('status', 'EA'); // Em Atendimento
+      payload.append('data_inicio', dataInicio);
+
+      if (dados.latitude && dados.longitude) {
+        payload.append('latitude', dados.latitude.toString());
+        payload.append('longitude', dados.longitude.toString());
+      }
 
       const response = await this.client.post('/su_oss_chamado', payload.toString(), {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'listar'
+          'ixcsoft': 'alterar'
         }
       });
 
-      console.log(`✅ OS ${osId} atualizada`);
+      // Verificar se deu erro
+      if (response.data?.type === 'error') {
+        throw new Error(response.data.message || 'Erro ao iniciar OS no IXC');
+      }
+
+      console.log(`✅ OS ${osId} iniciada no IXC (status: EA)`);
 
       return response.data;
     } catch (error) {
-      console.error(`❌ Erro ao atualizar OS ${osId}:`, error.message);
+      console.error(`❌ Erro ao iniciar OS ${osId} no IXC:`, error.message);
       throw error;
     }
   }
 
   /**
-   * Finalizar OS no IXC
-   * @param {number} osId - ID da OS no IXC
-   * @param {Object} dados - Dados da finalização
-   * @returns {Object} Resposta do IXC
+   * Finalizar OS no IXC (mudar status para F - Finalizada)
    */
   async finalizarOS(osId, dados) {
     try {
       console.log(`✅ Finalizando OS ${osId} no IXC...`);
 
-      const payload = new URLSearchParams({
-        id: osId.toString(),
-        status: 'F', // Finalizada
-        mensagem_resposta: dados.mensagem_resposta || '',
-        observacao: dados.observacoes || ''
-      });
+      // Formatar data atual no formato do IXC
+      const agora = new Date();
+      const dataFinal = agora.toISOString().slice(0, 19).replace('T', ' ');
+
+      const payload = new URLSearchParams();
+      payload.append('id', osId.toString());
+      payload.append('status', 'F'); // Finalizada
+      payload.append('data_final', dataFinal);
+      payload.append('data_fechamento', dataFinal);
+
+      if (dados.mensagem_resposta) {
+        payload.append('mensagem_resposta', dados.mensagem_resposta);
+      }
+
+      if (dados.observacoes) {
+        payload.append('observacao', dados.observacoes);
+      }
 
       const response = await this.client.post('/su_oss_chamado', payload.toString(), {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'alterar'  // ✅ Importante: usar 'alterar' para update
+          'ixcsoft': 'alterar'
         }
       });
 
-      console.log(`✅ OS ${osId} finalizada no IXC`);
+      // Verificar se deu erro
+      if (response.data?.type === 'error') {
+        throw new Error(response.data.message || 'Erro ao finalizar OS no IXC');
+      }
+
+      console.log(`✅ OS ${osId} finalizada no IXC (status: F)`);
 
       return response.data;
     } catch (error) {
@@ -217,7 +231,6 @@ class IXCService {
 
   /**
    * Testar conexão com IXC
-   * @returns {boolean} true se conectou com sucesso
    */
   async testarConexao() {
     try {

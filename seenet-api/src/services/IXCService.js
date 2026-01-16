@@ -31,7 +31,7 @@ async buscarOSs(filtros = {}) {
     const params = new URLSearchParams({
       qtype: 'su_oss_chamado.id_tecnico',
       query: filtros.tecnicoId?.toString() || '',
-      oper: 'igual',
+      oper: '=',
       page: '1',
       rp: '50',
       sortname: 'su_oss_chamado.id',

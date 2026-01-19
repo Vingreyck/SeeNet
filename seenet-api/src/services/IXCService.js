@@ -78,7 +78,7 @@ class IXCService {
         }
       });
 
-      return response.data.registros?.[0] || response.data;
+      return response.data.registros?.[0] || null;
     } catch (error) {
       console.error(`❌ Erro ao buscar OS ${osId}:`, error.message);
       throw error;
@@ -142,18 +142,36 @@ class IXCService {
   }
 
   /**
-   * ✅ NOVO: Iniciar OS no IXC (mudar status para EA - Em Atendimento)
+   * Iniciar OS no IXC (mudar status para EA - Em Atendimento)
    */
   async iniciarOS(osId, dados = {}) {
     try {
       console.log(`▶️ Iniciando OS ${osId} no IXC...`);
 
+      // 1. Buscar dados atuais da OS para pegar campos obrigatórios
+      const osAtual = await this.buscarDetalhesOS(osId);
+
+      if (!osAtual) {
+        throw new Error(`OS ${osId} não encontrada no IXC`);
+      }
+
       // Formatar data atual no formato do IXC
       const agora = new Date();
       const dataInicio = agora.toISOString().slice(0, 19).replace('T', ' ');
 
+      // 2. Montar payload com campos obrigatórios + alterações
       const payload = new URLSearchParams();
       payload.append('id', osId.toString());
+
+      // Campos obrigatórios (pegar da OS atual)
+      payload.append('id_filial', osAtual.id_filial || '1');
+      payload.append('id_assunto', osAtual.id_assunto || '');
+      payload.append('setor', osAtual.setor || '1');
+      payload.append('prioridade', osAtual.prioridade || 'N');
+      payload.append('origem_endereco', osAtual.origem_endereco || 'C');
+      payload.append('id_cliente', osAtual.id_cliente || '');
+
+      // Campos que estamos alterando
       payload.append('status', 'EA'); // Em Atendimento
       payload.append('data_inicio', dataInicio);
 
@@ -190,15 +208,38 @@ class IXCService {
     try {
       console.log(`✅ Finalizando OS ${osId} no IXC...`);
 
+      // 1. Buscar dados atuais da OS para pegar campos obrigatórios
+      const osAtual = await this.buscarDetalhesOS(osId);
+
+      if (!osAtual) {
+        throw new Error(`OS ${osId} não encontrada no IXC`);
+      }
+
       // Formatar data atual no formato do IXC
       const agora = new Date();
       const dataFinal = agora.toISOString().slice(0, 19).replace('T', ' ');
 
+      // 2. Montar payload com campos obrigatórios + alterações
       const payload = new URLSearchParams();
       payload.append('id', osId.toString());
+
+      // Campos obrigatórios (pegar da OS atual)
+      payload.append('id_filial', osAtual.id_filial || '1');
+      payload.append('id_assunto', osAtual.id_assunto || '');
+      payload.append('setor', osAtual.setor || '1');
+      payload.append('prioridade', osAtual.prioridade || 'N');
+      payload.append('origem_endereco', osAtual.origem_endereco || 'C');
+      payload.append('id_cliente', osAtual.id_cliente || '');
+
+      // Campos que estamos alterando
       payload.append('status', 'F'); // Finalizada
       payload.append('data_final', dataFinal);
       payload.append('data_fechamento', dataFinal);
+
+      // Se não tinha data_inicio, usar a atual
+      if (!osAtual.data_inicio || osAtual.data_inicio === '0000-00-00 00:00:00') {
+        payload.append('data_inicio', dataFinal);
+      }
 
       if (dados.mensagem_resposta) {
         payload.append('mensagem_resposta', dados.mensagem_resposta);
@@ -215,9 +256,14 @@ class IXCService {
         }
       });
 
-      // Verificar se deu erro
+      // Verificar se deu erro (pode vir como HTML ou JSON)
       if (response.data?.type === 'error') {
         throw new Error(response.data.message || 'Erro ao finalizar OS no IXC');
+      }
+
+      // Verificar se veio HTML de erro
+      if (typeof response.data === 'string' && response.data.includes('erro')) {
+        throw new Error(response.data.replace(/<[^>]*>/g, ' ').trim());
       }
 
       console.log(`✅ OS ${osId} finalizada no IXC (status: F)`);

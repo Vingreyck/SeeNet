@@ -8,49 +8,43 @@ class OrdemServicoService {
   final String baseUrl = 'https://seenet-production.up.railway.app/api';
   final AuthService _authService = Get.find<AuthService>();
 
-  // Buscar OSs do técnico logado
+  // Headers padrão com autenticação
+  Map<String, String> get _headers {
+    final token = _authService.token;
+    final tenantCode = _authService.tenantCode;
+
+    return {
+      'Authorization': 'Bearer $token',
+      'X-Tenant-Code': tenantCode ?? '',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  // Buscar OSs do técnico logado (pendentes e em execução)
   Future<List<OrdemServico>> buscarMinhasOSs() async {
     try {
       final token = _authService.token;
-      final tenantCode = _authService.tenantCode; // ✅ ADICIONAR
-      
-      // ✅ DEBUG
-      print('🔑 === DEBUG TOKEN ===');
-      print('Token existe? ${token != null}');
-      print('TenantCode existe? ${tenantCode != null}');
-      if (token != null) {
-        print('Token (primeiros 20 chars): ${token.substring(0, 20)}...');
-      }
-      if (tenantCode != null) {
-        print('TenantCode: $tenantCode');
-      }
-      print('URL completa: $baseUrl/ordens-servico/minhas');
-      
+      final tenantCode = _authService.tenantCode;
+
       if (token == null) throw Exception('Token não encontrado');
-      if (tenantCode == null) throw Exception('Código da empresa não encontrado'); // ✅ ADICIONAR
+      if (tenantCode == null) throw Exception('Código da empresa não encontrado');
 
       final response = await http.get(
         Uri.parse('$baseUrl/ordens-servico/minhas'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'X-Tenant-Code': tenantCode, // ✅ ADICIONAR
-          'Content-Type': 'application/json',
-        },
+        headers: _headers,
       );
 
-      print('📥 Status Code: ${response.statusCode}');
-      print('📥 Response Body: ${response.body}');
+      print('📥 buscarMinhasOSs - Status: ${response.statusCode}');
 
-if (response.statusCode == 200) {
-  final responseData = json.decode(response.body);
-  
-  // ✅ VERIFICAR SE É UM MAP COM 'data' OU UM ARRAY DIRETO
-  final List<dynamic> data = responseData is Map && responseData.containsKey('data')
-      ? responseData['data']
-      : responseData;
-  
-  return data.map((json) => OrdemServico.fromJson(json)).toList();
-} else {
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+
+        final List<dynamic> data = responseData is Map && responseData.containsKey('data')
+            ? responseData['data']
+            : responseData;
+
+        return data.map((json) => OrdemServico.fromJson(json)).toList();
+      } else {
         throw Exception('Erro ao buscar OSs: ${response.statusCode}');
       }
     } catch (e) {
@@ -59,22 +53,56 @@ if (response.statusCode == 200) {
     }
   }
 
+  // ✅ NOVO: Buscar OSs concluídas
+  Future<List<OrdemServico>> buscarOSsConcluidas({String busca = '', int limite = 50}) async {
+    try {
+      final token = _authService.token;
+      final tenantCode = _authService.tenantCode;
+
+      if (token == null) throw Exception('Token não encontrado');
+      if (tenantCode == null) throw Exception('Código da empresa não encontrado');
+
+      // Montar URL com query params
+      final uri = Uri.parse('$baseUrl/ordens-servico/concluidas').replace(
+        queryParameters: {
+          'limite': limite.toString(),
+          if (busca.isNotEmpty) 'busca': busca,
+        },
+      );
+
+      final response = await http.get(uri, headers: _headers);
+
+      print('📥 buscarOSsConcluidas - Status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+
+        final List<dynamic> data = responseData is Map && responseData.containsKey('data')
+            ? responseData['data']
+            : responseData;
+
+        return data.map((json) => OrdemServico.fromJson(json)).toList();
+      } else {
+        throw Exception('Erro ao buscar OSs concluídas: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Erro em buscarOSsConcluidas: $e');
+      rethrow;
+    }
+  }
+
   // Buscar detalhes de uma OS específica
   Future<OrdemServico> buscarDetalhesOS(String osId) async {
     try {
       final token = _authService.token;
-      final tenantCode = _authService.tenantCode; // ✅ ADICIONAR
-      
+      final tenantCode = _authService.tenantCode;
+
       if (token == null) throw Exception('Token não encontrado');
-      if (tenantCode == null) throw Exception('Código da empresa não encontrado'); // ✅ ADICIONAR
+      if (tenantCode == null) throw Exception('Código da empresa não encontrado');
 
       final response = await http.get(
         Uri.parse('$baseUrl/ordens-servico/$osId/detalhes'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'X-Tenant-Code': tenantCode, // ✅ ADICIONAR
-          'Content-Type': 'application/json',
-        },
+        headers: _headers,
       );
 
       if (response.statusCode == 200) {
@@ -92,23 +120,21 @@ if (response.statusCode == 200) {
   Future<bool> iniciarOS(String osId, double latitude, double longitude) async {
     try {
       final token = _authService.token;
-      final tenantCode = _authService.tenantCode; // ✅ ADICIONAR
-      
+      final tenantCode = _authService.tenantCode;
+
       if (token == null) throw Exception('Token não encontrado');
-      if (tenantCode == null) throw Exception('Código da empresa não encontrado'); // ✅ ADICIONAR
+      if (tenantCode == null) throw Exception('Código da empresa não encontrado');
 
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/iniciar'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'X-Tenant-Code': tenantCode, // ✅ ADICIONAR
-          'Content-Type': 'application/json',
-        },
+        headers: _headers,
         body: json.encode({
           'latitude': latitude,
           'longitude': longitude,
         }),
       );
+
+      print('📥 iniciarOS - Status: ${response.statusCode}');
 
       return response.statusCode == 200;
     } catch (e) {
@@ -121,20 +147,18 @@ if (response.statusCode == 200) {
   Future<bool> finalizarOS(String osId, Map<String, dynamic> dados) async {
     try {
       final token = _authService.token;
-      final tenantCode = _authService.tenantCode; // ✅ ADICIONAR
-      
+      final tenantCode = _authService.tenantCode;
+
       if (token == null) throw Exception('Token não encontrado');
-      if (tenantCode == null) throw Exception('Código da empresa não encontrado'); // ✅ ADICIONAR
+      if (tenantCode == null) throw Exception('Código da empresa não encontrado');
 
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/finalizar'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'X-Tenant-Code': tenantCode, // ✅ ADICIONAR
-          'Content-Type': 'application/json',
-        },
+        headers: _headers,
         body: json.encode(dados),
       );
+
+      print('📥 finalizarOS - Status: ${response.statusCode}');
 
       return response.statusCode == 200;
     } catch (e) {

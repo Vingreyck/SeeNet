@@ -16,6 +16,19 @@ class IXCService {
   }
 
   /**
+   * Formatar data para o padrão IXC (YYYY-MM-DD HH:MM:SS)
+   */
+  formatarDataIXC(data = new Date()) {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    const hora = String(data.getHours()).padStart(2, '0');
+    const minuto = String(data.getMinutes()).padStart(2, '0');
+    const segundo = String(data.getSeconds()).padStart(2, '0');
+    return `${ano}-${mes}-${dia} ${hora}:${minuto}:${segundo}`;
+  }
+
+  /**
    * Buscar OSs (chamados) do IXC
    */
   async buscarOSs(filtros = {}) {
@@ -78,7 +91,13 @@ class IXCService {
         }
       });
 
-      return response.data.registros?.[0] || null;
+      const os = response.data.registros?.[0] || null;
+
+      if (!os) {
+        console.error(`❌ OS ${osId} não encontrada no IXC`);
+      }
+
+      return os;
     } catch (error) {
       console.error(`❌ Erro ao buscar OS ${osId}:`, error.message);
       throw error;
@@ -155,9 +174,9 @@ class IXCService {
         throw new Error(`OS ${osId} não encontrada no IXC`);
       }
 
-      // Formatar data atual no formato do IXC
-      const agora = new Date();
-      const dataInicio = agora.toISOString().slice(0, 19).replace('T', ' ');
+      console.log(`📋 OS ${osId} encontrada - Filial: ${osAtual.id_filial}, Assunto: ${osAtual.id_assunto}, Cliente: ${osAtual.id_cliente}`);
+
+      const dataInicio = this.formatarDataIXC();
 
       // 2. Montar payload com campos obrigatórios + alterações
       const payload = new URLSearchParams();
@@ -180,6 +199,8 @@ class IXCService {
         payload.append('longitude', dados.longitude.toString());
       }
 
+      console.log(`📤 Enviando para IXC: status=EA, data_inicio=${dataInicio}`);
+
       const response = await this.client.post('/su_oss_chamado', payload.toString(), {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -187,12 +208,17 @@ class IXCService {
         }
       });
 
-      // Verificar se deu erro
+      // Verificar resposta
       if (response.data?.type === 'error') {
+        console.error(`❌ Erro IXC:`, response.data.message);
         throw new Error(response.data.message || 'Erro ao iniciar OS no IXC');
       }
 
-      console.log(`✅ OS ${osId} iniciada no IXC (status: EA)`);
+      if (response.data?.type === 'success') {
+        console.log(`✅ OS ${osId} iniciada no IXC (status: EA)`);
+      } else {
+        console.log(`⚠️ Resposta IXC:`, JSON.stringify(response.data).substring(0, 200));
+      }
 
       return response.data;
     } catch (error) {
@@ -206,7 +232,7 @@ class IXCService {
    */
   async finalizarOS(osId, dados) {
     try {
-      console.log(`✅ Finalizando OS ${osId} no IXC...`);
+      console.log(`🏁 Finalizando OS ${osId} no IXC...`);
 
       // 1. Buscar dados atuais da OS para pegar campos obrigatórios
       const osAtual = await this.buscarDetalhesOS(osId);
@@ -215,9 +241,9 @@ class IXCService {
         throw new Error(`OS ${osId} não encontrada no IXC`);
       }
 
-      // Formatar data atual no formato do IXC
-      const agora = new Date();
-      const dataFinal = agora.toISOString().slice(0, 19).replace('T', ' ');
+      console.log(`📋 OS ${osId} encontrada - Filial: ${osAtual.id_filial}, Assunto: ${osAtual.id_assunto}, Cliente: ${osAtual.id_cliente}`);
+
+      const dataFinal = this.formatarDataIXC();
 
       // 2. Montar payload com campos obrigatórios + alterações
       const payload = new URLSearchParams();
@@ -249,6 +275,8 @@ class IXCService {
         payload.append('observacao', dados.observacoes);
       }
 
+      console.log(`📤 Enviando para IXC: status=F, data_final=${dataFinal}`);
+
       const response = await this.client.post('/su_oss_chamado', payload.toString(), {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -256,17 +284,24 @@ class IXCService {
         }
       });
 
-      // Verificar se deu erro (pode vir como HTML ou JSON)
+      // Verificar resposta
       if (response.data?.type === 'error') {
+        console.error(`❌ Erro IXC:`, response.data.message);
         throw new Error(response.data.message || 'Erro ao finalizar OS no IXC');
       }
 
-      // Verificar se veio HTML de erro
-      if (typeof response.data === 'string' && response.data.includes('erro')) {
-        throw new Error(response.data.replace(/<[^>]*>/g, ' ').trim());
+      if (response.data?.type === 'success') {
+        console.log(`✅ OS ${osId} finalizada no IXC (status: F)`);
+      } else {
+        // Pode vir HTML de erro
+        const respStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+        if (respStr.includes('erro') || respStr.includes('Preencha')) {
+          const msgLimpa = respStr.replace(/<[^>]*>/g, ' ').trim();
+          console.error(`❌ Erro HTML:`, msgLimpa.substring(0, 200));
+          throw new Error(msgLimpa);
+        }
+        console.log(`⚠️ Resposta IXC:`, respStr.substring(0, 200));
       }
-
-      console.log(`✅ OS ${osId} finalizada no IXC (status: F)`);
 
       return response.data;
     } catch (error) {

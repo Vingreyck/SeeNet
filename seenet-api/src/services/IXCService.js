@@ -5,11 +5,23 @@ class IXCService {
     this.baseUrl = urlApi;
     this.token = tokenApi;
 
-    this.client = axios.create({
+    // Cliente para requisições de LISTAGEM (POST com header ixcsoft: listar)
+    this.clientListar = axios.create({
       baseURL: this.baseUrl,
       headers: {
         'Authorization': `Basic ${Buffer.from(this.token).toString('base64')}`,
         'Content-Type': 'application/x-www-form-urlencoded',
+        'ixcsoft': 'listar'
+      },
+      timeout: 30000,
+    });
+
+    // Cliente para requisições de ALTERAÇÃO (PUT com JSON)
+    this.clientAlterar = axios.create({
+      baseURL: this.baseUrl,
+      headers: {
+        'Authorization': `Basic ${Buffer.from(this.token).toString('base64')}`,
+        'Content-Type': 'application/json'
       },
       timeout: 30000,
     });
@@ -43,12 +55,7 @@ class IXCService {
         sortorder: 'desc'
       });
 
-      const response = await this.client.post('/su_oss_chamado', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'listar'
-        }
-      });
+      const response = await this.clientListar.post('/su_oss_chamado', params.toString());
 
       if (response.data?.type === 'error') {
         console.error('❌ Erro retornado pelo IXC:', response.data.message);
@@ -72,7 +79,7 @@ class IXCService {
   }
 
   /**
-   * Buscar detalhes de uma OS específica
+   * Buscar detalhes de uma OS específica (para pegar campos obrigatórios)
    */
   async buscarDetalhesOS(osId) {
     try {
@@ -84,18 +91,16 @@ class IXCService {
         rp: '1'
       });
 
-      const response = await this.client.post('/su_oss_chamado', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'listar'
-        }
-      });
+      const response = await this.clientListar.post('/su_oss_chamado', params.toString());
 
       const os = response.data.registros?.[0] || null;
 
       if (!os) {
         console.error(`❌ OS ${osId} não encontrada no IXC`);
+        return null;
       }
+
+      console.log(`📋 OS ${osId} encontrada - Status: ${os.status}, Filial: ${os.id_filial}, Assunto: ${os.id_assunto}`);
 
       return os;
     } catch (error) {
@@ -117,12 +122,7 @@ class IXCService {
         rp: '1'
       });
 
-      const response = await this.client.post('/cliente', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'listar'
-        }
-      });
+      const response = await this.clientListar.post('/cliente', params.toString());
 
       return response.data.registros?.[0] || response.data;
     } catch (error) {
@@ -144,12 +144,7 @@ class IXCService {
         rp: '100'
       });
 
-      const response = await this.client.post('/colaborador', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'listar'
-        }
-      });
+      const response = await this.clientListar.post('/colaborador', params.toString());
 
       console.log(`✅ ${response.data.total || 0} técnicos encontrados`);
 
@@ -161,7 +156,8 @@ class IXCService {
   }
 
   /**
-   * Iniciar OS no IXC (mudar status para EA - Em Atendimento)
+   * ✅ Iniciar OS no IXC (mudar status para EA - Em Atendimento)
+   * Usa PUT com JSON na URL /su_oss_chamado/{id}
    */
   async iniciarOS(osId, dados = {}) {
     try {
@@ -174,39 +170,26 @@ class IXCService {
         throw new Error(`OS ${osId} não encontrada no IXC`);
       }
 
-      console.log(`📋 OS ${osId} encontrada - Filial: ${osAtual.id_filial}, Assunto: ${osAtual.id_assunto}, Cliente: ${osAtual.id_cliente}`);
-
       const dataInicio = this.formatarDataIXC();
 
-      // 2. Montar payload com campos obrigatórios + alterações
-      const payload = new URLSearchParams();
-      payload.append('id', osId.toString());
+      // 2. Montar payload JSON com campos obrigatórios (mesmos valores da OS) + alterações
+      const payload = {
+        // Campos obrigatórios - usar valores da OS atual
+        id_filial: osAtual.id_filial,
+        id_assunto: osAtual.id_assunto,
+        setor: osAtual.setor,
+        prioridade: osAtual.prioridade,
+        origem_endereco: osAtual.origem_endereco,
+        id_cliente: osAtual.id_cliente,
+        // Campos que estamos alterando
+        status: 'EA', // Em Atendimento
+        data_inicio: dataInicio
+      };
 
-      // Campos obrigatórios (pegar da OS atual)
-      payload.append('id_filial', osAtual.id_filial || '1');
-      payload.append('id_assunto', osAtual.id_assunto || '');
-      payload.append('setor', osAtual.setor || '1');
-      payload.append('prioridade', osAtual.prioridade || 'N');
-      payload.append('origem_endereco', osAtual.origem_endereco || 'C');
-      payload.append('id_cliente', osAtual.id_cliente || '');
+      console.log(`📤 PUT /su_oss_chamado/${osId} - status=EA, data_inicio=${dataInicio}`);
 
-      // Campos que estamos alterando
-      payload.append('status', 'EA'); // Em Atendimento
-      payload.append('data_inicio', dataInicio);
-
-      if (dados.latitude && dados.longitude) {
-        payload.append('latitude', dados.latitude.toString());
-        payload.append('longitude', dados.longitude.toString());
-      }
-
-      console.log(`📤 Enviando para IXC: status=EA, data_inicio=${dataInicio}`);
-
-      const response = await this.client.post('/su_oss_chamado', payload.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'alterar'
-        }
-      });
+      // 3. Fazer PUT com JSON
+      const response = await this.clientAlterar.put(`/su_oss_chamado/${osId}`, payload);
 
       // Verificar resposta
       if (response.data?.type === 'error') {
@@ -216,8 +199,6 @@ class IXCService {
 
       if (response.data?.type === 'success') {
         console.log(`✅ OS ${osId} iniciada no IXC (status: EA)`);
-      } else {
-        console.log(`⚠️ Resposta IXC:`, JSON.stringify(response.data).substring(0, 200));
       }
 
       return response.data;
@@ -228,7 +209,8 @@ class IXCService {
   }
 
   /**
-   * Finalizar OS no IXC (mudar status para F - Finalizada)
+   * ✅ Finalizar OS no IXC (mudar status para F - Finalizada)
+   * Usa PUT com JSON na URL /su_oss_chamado/{id}
    */
   async finalizarOS(osId, dados) {
     try {
@@ -241,48 +223,37 @@ class IXCService {
         throw new Error(`OS ${osId} não encontrada no IXC`);
       }
 
-      console.log(`📋 OS ${osId} encontrada - Filial: ${osAtual.id_filial}, Assunto: ${osAtual.id_assunto}, Cliente: ${osAtual.id_cliente}`);
-
       const dataFinal = this.formatarDataIXC();
 
-      // 2. Montar payload com campos obrigatórios + alterações
-      const payload = new URLSearchParams();
-      payload.append('id', osId.toString());
-
-      // Campos obrigatórios (pegar da OS atual)
-      payload.append('id_filial', osAtual.id_filial || '1');
-      payload.append('id_assunto', osAtual.id_assunto || '');
-      payload.append('setor', osAtual.setor || '1');
-      payload.append('prioridade', osAtual.prioridade || 'N');
-      payload.append('origem_endereco', osAtual.origem_endereco || 'C');
-      payload.append('id_cliente', osAtual.id_cliente || '');
-
-      // Campos que estamos alterando
-      payload.append('status', 'F'); // Finalizada
-      payload.append('data_final', dataFinal);
-      payload.append('data_fechamento', dataFinal);
+      // 2. Montar payload JSON com campos obrigatórios (mesmos valores da OS) + alterações
+      const payload = {
+        // Campos obrigatórios - usar valores da OS atual
+        id_filial: osAtual.id_filial,
+        id_assunto: osAtual.id_assunto,
+        setor: osAtual.setor,
+        prioridade: osAtual.prioridade,
+        origem_endereco: osAtual.origem_endereco,
+        id_cliente: osAtual.id_cliente,
+        // Campos que estamos alterando
+        status: 'F', // Finalizada
+        data_final: dataFinal,
+        data_fechamento: dataFinal
+      };
 
       // Se não tinha data_inicio, usar a atual
       if (!osAtual.data_inicio || osAtual.data_inicio === '0000-00-00 00:00:00') {
-        payload.append('data_inicio', dataFinal);
+        payload.data_inicio = dataFinal;
       }
 
+      // Adicionar mensagem de resposta se fornecida
       if (dados.mensagem_resposta) {
-        payload.append('mensagem_resposta', dados.mensagem_resposta);
+        payload.mensagem_resposta = dados.mensagem_resposta;
       }
 
-      if (dados.observacoes) {
-        payload.append('observacao', dados.observacoes);
-      }
+      console.log(`📤 PUT /su_oss_chamado/${osId} - status=F, data_final=${dataFinal}`);
 
-      console.log(`📤 Enviando para IXC: status=F, data_final=${dataFinal}`);
-
-      const response = await this.client.post('/su_oss_chamado', payload.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'alterar'
-        }
-      });
+      // 3. Fazer PUT com JSON
+      const response = await this.clientAlterar.put(`/su_oss_chamado/${osId}`, payload);
 
       // Verificar resposta
       if (response.data?.type === 'error') {
@@ -292,15 +263,6 @@ class IXCService {
 
       if (response.data?.type === 'success') {
         console.log(`✅ OS ${osId} finalizada no IXC (status: F)`);
-      } else {
-        // Pode vir HTML de erro
-        const respStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-        if (respStr.includes('erro') || respStr.includes('Preencha')) {
-          const msgLimpa = respStr.replace(/<[^>]*>/g, ' ').trim();
-          console.error(`❌ Erro HTML:`, msgLimpa.substring(0, 200));
-          throw new Error(msgLimpa);
-        }
-        console.log(`⚠️ Resposta IXC:`, respStr.substring(0, 200));
       }
 
       return response.data;
@@ -323,12 +285,7 @@ class IXCService {
         rp: '1'
       });
 
-      await this.client.post('/su_oss_chamado', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'ixcsoft': 'listar'
-        }
-      });
+      await this.clientListar.post('/su_oss_chamado', params.toString());
 
       console.log('✅ Conexão com IXC OK');
       return true;

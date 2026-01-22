@@ -467,9 +467,12 @@ class OrdensServicoController {
     const ixc = new IXCService(integracao.url_api, integracao.token_api);
 
     await ixc.finalizarOS(parseInt(os.id_externo), {
+      id_tecnico_ixc: mapeamento.tecnico_ixc_id,  // ✅ CORRETO
       mensagem_resposta: mensagemResposta,
-      observacoes: dados.observacoes,
-      tecnicoId: mapeamento.tecnico_ixc_id
+      latitude: os.latitude || '',
+      longitude: os.longitude || '',
+      data_inicio: os.data_inicio,  // Usar data de início real da OS
+      data_final: new Date().toISOString()
     });
 
     console.log(`✅ OS ${os.numero_os} sincronizada com IXC (Finalizada)`);

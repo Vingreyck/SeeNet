@@ -208,69 +208,67 @@ class IXCService {
     }
   }
 
-  /**
-   * ✅ Finalizar OS no IXC (mudar status para F - Finalizada)
-   * Usa PUT com JSON na URL /su_oss_chamado/{id}
-   */
-  async finalizarOS(osId, dados) {
-    try {
-      console.log(`🏁 Finalizando OS ${osId} no IXC...`);
+/**
+ * ✅ Finalizar OS no IXC usando endpoint correto
+ * POST /su_oss_chamado_fechar
+ */
+async finalizarOS(osId, dados) {
+  try {
+    console.log(`🏁 Finalizando OS ${osId} no IXC...`);
 
-      // 1. Buscar dados atuais da OS para pegar campos obrigatórios
-      const osAtual = await this.buscarDetalhesOS(osId);
-
-      if (!osAtual) {
-        throw new Error(`OS ${osId} não encontrada no IXC`);
-      }
-
-      const dataFinal = this.formatarDataIXC();
-
-      // 2. Montar payload JSON com campos obrigatórios (mesmos valores da OS) + alterações
-      const payload = {
-        // Campos obrigatórios - usar valores da OS atual
-        id_filial: osAtual.id_filial,
-        id_assunto: osAtual.id_assunto,
-        setor: osAtual.setor,
-        prioridade: osAtual.prioridade,
-        origem_endereco: osAtual.origem_endereco,
-        id_cliente: osAtual.id_cliente,
-        // Campos que estamos alterando
-        status: 'F', // Finalizada
-        data_final: dataFinal,
-        data_fechamento: dataFinal
-      };
-
-      // Se não tinha data_inicio, usar a atual
-      if (!osAtual.data_inicio || osAtual.data_inicio === '0000-00-00 00:00:00') {
-        payload.data_inicio = dataFinal;
-      }
-
-      // Adicionar mensagem de resposta se fornecida
-      if (dados.mensagem_resposta) {
-        payload.mensagem_resposta = dados.mensagem_resposta;
-      }
-
-      console.log(`📤 PUT /su_oss_chamado/${osId} - status=F, data_final=${dataFinal}`);
-
-      // 3. Fazer PUT com JSON
-      const response = await this.clientAlterar.put(`/su_oss_chamado/${osId}`, payload);
-
-      // Verificar resposta
-      if (response.data?.type === 'error') {
-        console.error(`❌ Erro IXC:`, response.data.message);
-        throw new Error(response.data.message || 'Erro ao finalizar OS no IXC');
-      }
-
-      if (response.data?.type === 'success') {
-        console.log(`✅ OS ${osId} finalizada no IXC (status: F)`);
-      }
-
-      return response.data;
-    } catch (error) {
-      console.error(`❌ Erro ao finalizar OS ${osId} no IXC:`, error.message);
-      throw error;
+    // Validações
+    if (!dados.id_tecnico_ixc) {
+      throw new Error('ID do técnico no IXC é obrigatório');
     }
+
+    // Preparar datas
+    const agora = new Date();
+    const dataInicio = dados.data_inicio
+      ? new Date(dados.data_inicio)
+      : new Date(agora.getTime() - 60 * 60 * 1000); // 1 hora atrás
+
+    const dataFinal = dados.data_final
+      ? new Date(dados.data_final)
+      : agora;
+
+    // Montar payload para endpoint /fechar
+    const payload = {
+      id_chamado: osId.toString(),
+      id_tecnico: dados.id_tecnico_ixc.toString(),
+      data_inicio: this.formatarDataIXC(dataInicio),
+      data_final: this.formatarDataIXC(dataFinal),
+      mensagem: dados.mensagem_resposta || 'Finalizado via SeeNet',
+      status: 'F',
+
+      // GPS (opcional)
+      latitude: dados.latitude || '',
+      longitude: dados.longitude || '',
+      gps_time: (dados.latitude && dados.longitude)
+        ? this.formatarDataIXC(agora)
+        : ''
+    };
+
+    console.log(`📤 POST /su_oss_chamado_fechar - OS ${osId}`);
+
+    // Fazer POST no endpoint correto
+    const response = await this.clientAlterar.post('/su_oss_chamado_fechar', payload);
+
+    // Verificar resposta
+    if (response.data?.type === 'error') {
+      console.error(`❌ Erro IXC:`, response.data.message);
+      throw new Error(response.data.message || 'Erro ao finalizar OS no IXC');
+    }
+
+    if (response.data?.type === 'success') {
+      console.log(`✅ OS ${osId} finalizada no IXC (status: F)`);
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Erro ao finalizar OS ${osId}:`, error.message);
+    throw error;
   }
+}
 
   /**
    * Testar conexão com IXC

@@ -136,7 +136,7 @@ class OrdemServicoService {
 
       print('📥 deslocarParaOS - Status: ${response.statusCode}');
 
-      return response.statusCode ==iniciar  200;
+      return response.statusCode ==200;
     } catch (e) {
       print('❌ Erro em deslocarParaOS: $e');
       return false;

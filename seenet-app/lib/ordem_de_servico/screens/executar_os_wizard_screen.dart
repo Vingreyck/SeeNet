@@ -45,13 +45,23 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   void initState() {
     super.initState();
     os = Get.arguments as OrdemServico;
-    osIniciada = os.status == 'em_execucao';
 
-    // Se já está iniciada, pular para etapa 1
-    if (osIniciada && os.latitude != null && os.longitude != null) {
+    // Determinar estado inicial baseado no status
+    if (os.status == 'em_execucao') {
+      osIniciada = true;
+      _etapaAtual = 1; // Já pode preencher formulário
+    } else if (os.status == 'em_deslocamento') {
+      osIniciada = false;
+      _etapaAtual = 0; // Precisa informar chegada
+    } else {
+      osIniciada = false;
+      _etapaAtual = 0; // Precisa iniciar deslocamento
+    }
+
+    // Se já tem GPS salvo, usar
+    if (os.latitude != null && os.longitude != null) {
       latitude = os.latitude;
       longitude = os.longitude;
-      _etapaAtual = 1;
     }
   }
 
@@ -710,7 +720,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
             child: ElevatedButton(
               onPressed: _proximaEtapa,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00FF88),
+                backgroundColor: _etapaAtual == 0 && os.status == 'em_deslocamento'
+                    ? Colors.orange
+                    : const Color(0xFF00FF88),
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -718,7 +730,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
                 ),
               ),
               child: Text(
-                _etapaAtual == _totalEtapas - 1 ? 'Finalizar OS' : 'Próximo',
+                // Texto dinâmico baseado no status
+                _etapaAtual == 0
+                    ? (os.status == 'pendente'
+                    ? '🚗 Iniciar Deslocamento'
+                    : os.status == 'em_deslocamento'
+                    ? '📍 Cheguei ao Local'
+                    : 'Próximo')
+                    : (_etapaAtual == _totalEtapas - 1 ? 'Finalizar OS' : 'Próximo'),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
@@ -807,29 +826,89 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   }
 
   Future<void> _iniciarOS() async {
-    final sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!);
+    // ESTADO 1: Pendente → Iniciar Deslocamento
+    if (os.status == 'pendente') {
+      print('🚗 Iniciando deslocamento...');
 
-    if (sucesso) {
+      final sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!);
+
+      if (sucesso) {
+        setState(() {
+          os.status = 'em_deslocamento'; // Atualizar status local
+          osIniciada = false; // Ainda não pode preencher
+          // Permanecer na etapa 0 - não avançar!
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🚗 Deslocamento iniciado! Dirija com segurança.'),
+              backgroundColor: Color(0xFF00FF88),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erro ao iniciar deslocamento'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+      return; // Importante: não avançar etapa
+    }
+
+    // ESTADO 2: Em Deslocamento → Chegar ao Local
+    if (os.status == 'em_deslocamento') {
+      print('📍 Informando chegada ao local...');
+
+      final sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
+
+      if (sucesso) {
+        setState(() {
+          os.status = 'em_execucao'; // Atualizar status
+          osIniciada = true; // Agora pode preencher formulário
+          _etapaAtual = 1; // Avançar para próxima etapa
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📍 Chegou ao local! Preencha os dados do atendimento.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erro ao informar chegada'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+      return;
+    }
+
+    // ESTADO 3: Já está em execução - só avançar
+    if (os.status == 'em_execucao') {
       setState(() {
         osIniciada = true;
-        _etapaAtual = 1; // Próxima etapa
+        _etapaAtual = 1; // Avançar para anexos
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Deslocamento iniciado!'),
+            content: Text('✓ Execução já iniciada!'),
             backgroundColor: Color(0xFF00FF88),
             duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erro ao iniciar execução'),
-            backgroundColor: Colors.red,
           ),
         );
       }

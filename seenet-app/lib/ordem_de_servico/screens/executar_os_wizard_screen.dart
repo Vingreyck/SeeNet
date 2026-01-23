@@ -807,7 +807,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   }
 
   Future<void> _iniciarOS() async {
-    final sucesso = await controller.iniciarExecucao(os.id, latitude!, longitude!);
+    final sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!);
 
     if (sucesso) {
       setState(() {
@@ -818,7 +818,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✓ Execução iniciada!'),
+            content: Text('Deslocamento iniciado!'),
             backgroundColor: Color(0xFF00FF88),
             duration: Duration(seconds: 2),
           ),

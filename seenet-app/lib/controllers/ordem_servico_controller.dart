@@ -73,15 +73,15 @@ class OrdemServicoController extends GetxController {
   }
 
   // Iniciar execução
-  Future<bool> iniciarExecucao(String osId, double lat, double lng) async {
+  Future<bool> deslocarParaOS(String osId, double lat, double lng) async {
     try {
-      final sucesso = await _service.iniciarOS(osId, lat, lng);
+      final sucesso = await _service.deslocarParaOS(osId, lat, lng);
 
       if (sucesso) {
         await carregarMinhasOSs(); // Recarrega a lista
         Get.snackbar(
           'Sucesso',
-          'Execução iniciada!',
+          'Deslocamento iniciado!',
           backgroundColor: const Color(0xFF00FF88),
           colorText: Colors.black,
         );
@@ -92,6 +92,33 @@ class OrdemServicoController extends GetxController {
       Get.snackbar(
         'Erro',
         'Falha ao iniciar: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+  }
+
+  // 2️⃣ Chegar ao local (técnico chegou no cliente)
+  Future<bool> chegarAoLocal(String osId, double lat, double lng) async {
+    try {
+      final sucesso = await _service.chegarAoLocal(osId, lat, lng);
+
+      if (sucesso) {
+        await carregarMinhasOSs(); // Recarrega a lista
+        Get.snackbar(
+          'Sucesso',
+          '📍 Você chegou ao local!',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      }
+
+      return sucesso;
+    } catch (e) {
+      Get.snackbar(
+        'Erro',
+        'Falha ao informar chegada: $e',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );

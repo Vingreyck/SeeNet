@@ -155,59 +155,6 @@ class IXCService {
     }
   }
 
-  /**
-   * ✅ Iniciar OS no IXC (mudar status para EA - Em Atendimento)
-   * Usa PUT com JSON na URL /su_oss_chamado/{id}
-   */
-  async iniciarOS(osId, dados = {}) {
-    try {
-      console.log(`▶️ Iniciando OS ${osId} no IXC...`);
-
-      // 1. Buscar dados atuais da OS para pegar campos obrigatórios
-      const osAtual = await this.buscarDetalhesOS(osId);
-
-      if (!osAtual) {
-        throw new Error(`OS ${osId} não encontrada no IXC`);
-      }
-
-      const dataInicio = this.formatarDataIXC();
-
-      // 2. Montar payload JSON com campos obrigatórios (mesmos valores da OS) + alterações
-      const payload = {
-        // Campos obrigatórios - usar valores da OS atual
-        id_filial: osAtual.id_filial,
-        id_assunto: osAtual.id_assunto,
-        setor: osAtual.setor,
-        prioridade: osAtual.prioridade,
-        origem_endereco: osAtual.origem_endereco,
-        id_cliente: osAtual.id_cliente,
-        // Campos que estamos alterando
-        status: 'EA', // Em Atendimento
-        data_inicio: dataInicio
-      };
-
-      console.log(`📤 PUT /su_oss_chamado/${osId} - status=EA, data_inicio=${dataInicio}`);
-
-      // 3. Fazer PUT com JSON
-      const response = await this.clientAlterar.put(`/su_oss_chamado/${osId}`, payload);
-
-      // Verificar resposta
-      if (response.data?.type === 'error') {
-        console.error(`❌ Erro IXC:`, response.data.message);
-        throw new Error(response.data.message || 'Erro ao iniciar OS no IXC');
-      }
-
-      if (response.data?.type === 'success') {
-        console.log(`✅ OS ${osId} iniciada no IXC (status: EA)`);
-      }
-
-      return response.data;
-    } catch (error) {
-      console.error(`❌ Erro ao iniciar OS ${osId} no IXC:`, error.message);
-      throw error;
-    }
-  }
-
 /**
  * ✅ Finalizar OS no IXC usando endpoint correto
  * POST /su_oss_chamado_fechar
@@ -269,7 +216,138 @@ async finalizarOS(osId, dados) {
     throw error;
   }
 }
+/**
+ * Iniciar deslocamento para OS (status D)
+ * POST /su_oss_chamado_mensagem
+ */
+async deslocarParaOS(osId, dados) {
+  try {
+    console.log(`🚗 Técnico deslocando para OS ${osId}...`);
 
+    const payload = {
+      id_chamado: osId.toString(),
+      mensagem: dados.mensagem || 'Técnico a caminho do local',
+      status: 'D', // Deslocamento
+      id_tecnico: dados.id_tecnico_ixc?.toString() || '',
+      latitude: dados.latitude || '',
+      longitude: dados.longitude || '',
+      gps_time: (dados.latitude && dados.longitude)
+        ? this.formatarDataIXC(new Date())
+        : '',
+
+      // Campos vazios obrigatórios
+      data: '',
+      id_evento: '',
+      id_resposta: '',
+      data_inicio: '',
+      data_final: '',
+      tipo_cobranca: '',
+      id_evento_status: '',
+      id_equipe: '',
+      id_proxima_tarefa: '',
+      finaliza_processo: ''
+    };
+
+    const response = await this.clientAlterar.post('/su_oss_chamado_mensagem', payload);
+
+    if (response.data?.type === 'error') {
+      throw new Error(response.data.message || 'Erro ao iniciar deslocamento');
+    }
+
+    console.log(`✅ OS ${osId} - Técnico em deslocamento (status: D)`);
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Erro ao iniciar deslocamento para OS ${osId}:`, error.message);
+    throw error;
+  }
+}
+/**
+ * Iniciar execução da OS (status EX - técnico chegou ao local)
+ * POST /su_oss_chamado_executar
+ */
+async executarOS(osId, dados) {
+  try {
+    console.log(`🔧 Iniciando execução da OS ${osId}...`);
+
+    const dataInicio = dados.data_inicio
+      ? new Date(dados.data_inicio)
+      : new Date();
+
+    const payload = {
+      id_chamado: osId.toString(),
+      mensagem: dados.mensagem || 'Iniciando execução do serviço',
+      status: 'EX', // Execução
+      id_tecnico: dados.id_tecnico_ixc?.toString() || '',
+      data_inicio: this.formatarDataIXC(dataInicio),
+      latitude: dados.latitude || '',
+      longitude: dados.longitude || '',
+      gps_time: (dados.latitude && dados.longitude)
+        ? this.formatarDataIXC(new Date())
+        : '',
+
+      // Campos vazios obrigatórios
+      id_tarefa_atual: '',
+      eh_tarefa_decisao: '',
+      sequencia_atual: '',
+      proxima_sequencia_forcada: '',
+      finaliza_processo_aux: '',
+      gera_comissao_aux: '',
+      id_processo: '',
+      data_final: '',
+      id_resposta: '',
+      id_equipe: '',
+      gera_comissao: '',
+      data: '',
+      id_evento: '',
+      id_su_diagnostico: '',
+      justificativa_sla_atrasado: '',
+      id_evento_status: '',
+      id_proxima_tarefa: ''
+    };
+
+    const response = await this.clientAlterar.post('/su_oss_chamado_executar', payload);
+
+    if (response.data?.type === 'error') {
+      throw new Error(response.data.message || 'Erro ao executar OS');
+    }
+
+    console.log(`✅ OS ${osId} em execução (status: EX)`);
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Erro ao executar OS ${osId}:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Upload de foto para a OS
+ * POST /su_oss_arquivos
+ */
+async uploadFotoOS(osId, clienteId, fotoData) {
+  try {
+    console.log(`📸 Uploading foto para OS ${osId}...`);
+
+    const payload = {
+      descricao: fotoData.descricao || 'Foto do atendimento',
+      local_arquivo: fotoData.base64, // Base64 da imagem
+      id_cliente: clienteId.toString(),
+      id_oss_chamado: osId.toString(),
+      classificacao_arquivo: 'P'
+    };
+
+    const response = await this.clientAlterar.post('/su_oss_arquivos', payload);
+
+    if (response.data?.type === 'error') {
+      throw new Error(response.data.message || 'Erro ao enviar foto');
+    }
+
+    console.log(`✅ Foto enviada para OS ${osId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Erro ao enviar foto:`, error.message);
+    throw error;
+  }
+}
   /**
    * Testar conexão com IXC
    */

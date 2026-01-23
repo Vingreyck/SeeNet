@@ -21,4 +21,24 @@ router.post('/:id/iniciar', OrdensServicoController.iniciarOS.bind(OrdensServico
 // Finalizar OS
 router.post('/:id/finalizar', OrdensServicoController.finalizarOS.bind(OrdensServicoController));
 
+// Deslocamento
+router.post(
+  '/:id/deslocar',
+  authMiddleware,
+  ordensServicoController.deslocarParaOS
+);
+
+// Chegada ao local
+router.post(
+  '/:id/chegar-local',
+  authMiddleware,
+  ordensServicoController.chegarAoLocal
+);
+
+// Finalizar (já existe, mas confirme que está assim)
+router.post(
+  '/:id/finalizar',
+  authMiddleware,
+  ordensServicoController.finalizarOS
+);
 module.exports = router;

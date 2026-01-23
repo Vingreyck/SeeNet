@@ -35,6 +35,7 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
   double? longitude;
   List<String> fotosAnexadas = [];
   bool osIniciada = false;
+  String statusAtual = 'pendente';
   Uint8List? _assinaturaBytes;
 
   @override
@@ -42,7 +43,8 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
     super.initState();
     os = Get.arguments as OrdemServico;
     osIniciada = os.status == 'em_execucao';
-    
+    statusAtual = os.status;
+
     // Preencher dados existentes se houver
     if (os.onuModelo != null) onuModeloController.text = os.onuModelo!;
     if (os.onuSerial != null) onuSerialController.text = os.onuSerial!;
@@ -339,7 +341,7 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
               ),
               child: osIniciada
                   ? _buildBotaoFinalizar()
-                  : _buildBotaoIniciar(),
+                  : _buildBotaoAcao(),
             ),
           ),
         ],
@@ -449,26 +451,59 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
     );
   }
 
-  Widget _buildBotaoIniciar() {
-    return ElevatedButton.icon(
-      onPressed: _iniciarOS,
-      icon: const Icon(Icons.play_arrow, color: Colors.black, size: 28),
-      label: const Text(
-        'Iniciar Execução',
-        style: TextStyle(
-          color: Colors.black,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
+  Widget _buildBotaoAcao() {
+    // Estado 1: Pendente → Botão Deslocamento
+    if (statusAtual == 'pendente') {
+      return ElevatedButton.icon(
+        onPressed: _iniciarDeslocamento,
+        icon: const Icon(Icons.directions_car, color: Colors.black, size: 28),
+        label: const Text(
+          '🚗 Iniciar Deslocamento',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF00FF88),
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF00FF88),
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
         ),
-      ),
-    );
+      );
+    }
+
+    // Estado 2: Em Deslocamento → Botão Chegada
+    if (statusAtual == 'em_deslocamento') {
+      return ElevatedButton.icon(
+        onPressed: _chegarAoLocal,
+        icon: const Icon(Icons.location_on, color: Colors.black, size: 28),
+        label: const Text(
+          '📍 Cheguei ao Local',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.orange,
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
+        ),
+      );
+    }
+
+    // Estado 3: Em Execução → Botão Finalizar
+    if (statusAtual == 'em_execucao') {
+      return _buildBotaoFinalizar();
+    }
+
+    return const SizedBox.shrink();
   }
 
   Widget _buildBotaoFinalizar() {
@@ -493,7 +528,7 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
     );
   }
 
-  Future<void> _iniciarOS() async {
+  Future<void> _iniciarDeslocamento() async {
     if (latitude == null || longitude == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -507,18 +542,17 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
       return;
     }
 
-    final sucesso = await controller.iniciarExecucao(os.id, latitude!, longitude!);
+    final sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!);
 
     if (sucesso) {
       setState(() {
-        osIniciada = true;
+        statusAtual = 'em_deslocamento';
       });
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Execução iniciada! Preencha os dados.'),
-            backgroundColor: Color(0xFF00FF88),
+            content: Text('🚗 Deslocamento iniciado! Dirija com segurança.'),            backgroundColor: Color(0xFF00FF88),
             duration: Duration(seconds: 2),
           ),
         );
@@ -528,6 +562,50 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Erro ao iniciar execução. Tente novamente.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _chegarAoLocal() async {
+    if (latitude == null || longitude == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('É necessário capturar a localização ao chegar.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    final sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
+
+    if (sucesso) {
+      setState(() {
+        statusAtual = 'em_execucao';
+        osIniciada = true; // Necessário para mostrar campos de finalização
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📍 Chegou ao local! Preencha os dados do atendimento.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao informar chegada. Tente novamente.'),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 3),
           ),

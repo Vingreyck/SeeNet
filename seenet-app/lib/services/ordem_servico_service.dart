@@ -117,7 +117,7 @@ class OrdemServicoService {
   }
 
   // Iniciar execução da OS
-  Future<bool> iniciarOS(String osId, double latitude, double longitude) async {
+  Future<bool> deslocarParaOS(String osId, double latitude, double longitude) async {
     try {
       final token = _authService.token;
       final tenantCode = _authService.tenantCode;
@@ -126,7 +126,7 @@ class OrdemServicoService {
       if (tenantCode == null) throw Exception('Código da empresa não encontrado');
 
       final response = await http.post(
-        Uri.parse('$baseUrl/ordens-servico/$osId/iniciar'),
+        Uri.parse('$baseUrl/ordens-servico/$osId/deslocar'),
         headers: _headers,
         body: json.encode({
           'latitude': latitude,
@@ -134,11 +134,38 @@ class OrdemServicoService {
         }),
       );
 
-      print('📥 iniciarOS - Status: ${response.statusCode}');
+      print('📥 deslocarParaOS - Status: ${response.statusCode}');
+
+      return response.statusCode ==iniciar  200;
+    } catch (e) {
+      print('❌ Erro em deslocarParaOS: $e');
+      return false;
+    }
+  }
+
+  // 2️⃣ Informar chegada ao local
+  Future<bool> chegarAoLocal(String osId, double latitude, double longitude) async {
+    try {
+      final token = _authService.token;
+      final tenantCode = _authService.tenantCode;
+
+      if (token == null) throw Exception('Token não encontrado');
+      if (tenantCode == null) throw Exception('Código da empresa não encontrado');
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/ordens-servico/$osId/chegar-local'),
+        headers: _headers,
+        body: json.encode({
+          'latitude': latitude,
+          'longitude': longitude,
+        }),
+      );
+
+      print('📥 chegarAoLocal - Status: ${response.statusCode}');
 
       return response.statusCode == 200;
     } catch (e) {
-      print('❌ Erro em iniciarOS: $e');
+      print('❌ Erro em chegarAoLocal: $e');
       return false;
     }
   }

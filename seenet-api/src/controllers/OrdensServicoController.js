@@ -144,117 +144,255 @@ class OrdensServicoController {
     }
   }
 
-  /**
-   * Iniciar execução de uma OS
-   * POST /api/ordens-servico/:id/iniciar
-   */
-  async iniciarOS(req, res) {
-    const trx = await db.transaction();
+/**
+ * Técnico iniciou deslocamento para a OS
+ * POST /api/ordens-servico/:id/deslocar
+ */
+async deslocarParaOS(req, res) {
+  const trx = await db.transaction();
 
-    try {
-      const { id } = req.params;
-      const { latitude, longitude } = req.body;
-      const userId = req.user.id;
-      const tenantId = req.tenantId;
+  try {
+    const { id } = req.params;
+    const { latitude, longitude } = req.body;
+    const userId = req.user.id;
+    const tenantId = req.tenantId;
 
-      console.log(`▶️ Iniciando OS ${id}`);
+    console.log(`🚗 Técnico deslocando para OS ${id}`);
 
-      // Verificar se a OS existe e pertence ao técnico
-      const os = await trx('ordem_servico')
-        .where('id', id)
-        .where('tenant_id', tenantId)
-        .where('tecnico_id', userId)
-        .first();
-
-      if (!os) {
-        await trx.rollback();
-        return res.status(404).json({
-          success: false,
-          error: 'OS não encontrada'
-        });
-      }
-
-      if (os.status === 'concluida') {
-        await trx.rollback();
-        return res.status(400).json({
-          success: false,
-          error: 'OS já está concluída'
-        });
-      }
-
-      if (os.status === 'em_execucao') {
-        await trx.rollback();
-        return res.status(400).json({
-          success: false,
-          error: 'OS já está em execução'
-        });
-      }
-
-      // Atualizar OS para "em_execucao" no banco local
-      await trx('ordem_servico')
-        .where('id', id)
-        .update({
-          status: 'em_execucao',
-          data_inicio: db.fn.now(),
-          latitude: latitude,
-          longitude: longitude,
-          data_atualizacao: db.fn.now()
-        });
-
-      // ✅ Sincronizar com IXC se for OS do IXC
-      if (os.origem === 'IXC' && os.id_externo) {
-        try {
-          await this.sincronizarInicioComIXC(trx, os, { latitude, longitude });
-        } catch (error) {
-          console.error('⚠️ Erro ao sincronizar início com IXC:', error.message);
-          // Não bloqueia se IXC falhar
-        }
-      }
-
-      await trx.commit();
-
-      console.log(`✅ OS ${os.numero_os} iniciada com sucesso`);
-
-      return res.json({
-        success: true,
-        message: 'OS iniciada com sucesso'
-      });
-    } catch (error) {
-      await trx.rollback();
-      console.error('❌ Erro ao iniciar OS:', error);
-      return res.status(500).json({
-        success: false,
-        error: 'Erro ao iniciar OS'
-      });
-    }
-  }
-
-  /**
-   * ✅ Sincronizar início da OS com IXC
-   */
-  async sincronizarInicioComIXC(trx, os, dados) {
-    console.log(`🔄 Sincronizando início da OS ${os.numero_os} com IXC...`);
-
-    // Buscar configuração IXC
-    const integracao = await trx('integracao_ixc')
-      .where('tenant_id', os.tenant_id)
-      .where('ativo', true)
+    // Buscar OS
+    const os = await trx('ordem_servico')
+      .where('id', id)
+      .where('tenant_id', tenantId)
+      .where('tecnico_id', userId)
       .first();
 
-    if (!integracao) {
-      throw new Error('Integração IXC não configurada');
+    if (!os) {
+      await trx.rollback();
+      return res.status(404).json({ success: false, error: 'OS não encontrada' });
     }
 
-    // Criar cliente IXC e iniciar OS
-    const ixc = new IXCService(integracao.url_api, integracao.token_api);
+    if (os.status !== 'pendente') {
+      await trx.rollback();
+      return res.status(400).json({ success: false, error: 'OS já foi iniciada' });
+    }
 
-    await ixc.iniciarOS(parseInt(os.id_externo), {
-      latitude: dados.latitude,
-      longitude: dados.longitude
+    // Atualizar status para "em_deslocamento"
+    await trx('ordem_servico')
+      .where('id', id)
+      .update({
+        status: 'em_deslocamento',
+        latitude_inicio: latitude,
+        longitude_inicio: longitude,
+        data_inicio_deslocamento: db.fn.now(),
+        data_atualizacao: db.fn.now()
+      });
+
+// ✅ Sincronizar finalização com IXC
+if (os.origem === 'IXC' && os.id_externo) {
+  try {
+    // 1. Finalizar OS no IXC
+    await this.sincronizarFinalizacaoComIXC(trx, os, {
+      onu_modelo,
+      onu_serial,
+      onu_status,
+      onu_sinal_optico,
+      relato_problema,
+      relato_solucao,
+      materiais_utilizados,
+      observacoes,
+      userId
     });
 
-    console.log(`✅ OS ${os.numero_os} marcada como "Em Atendimento" no IXC`);
+    // 2. Enviar fotos para IXC (se houver)
+    if (fotos && fotos.length > 0) {
+      console.log(`📸 Enviando ${fotos.length} foto(s) para IXC...`);
+
+      // Buscar integração IXC para upload de fotos
+      const integracao = await trx('integracao_ixc')
+        .where('tenant_id', os.tenant_id)
+        .where('ativo', true)
+        .first();
+
+      if (integracao) {
+        const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+        for (let i = 0; i < fotos.length; i++) {
+          const fotoPath = fotos[i];
+
+          try {
+            // Ler arquivo e converter para base64
+            const fs = require('fs');
+            const fotoBuffer = fs.readFileSync(fotoPath);
+            const fotoBase64 = fotoBuffer.toString('base64');
+
+            await ixc.uploadFotoOS(
+              parseInt(os.id_externo),
+              parseInt(os.cliente_id),
+              {
+                descricao: `Foto ${i + 1} - Atendimento`,
+                base64: fotoBase64
+              }
+            );
+
+            console.log(`✅ Foto ${i + 1}/${fotos.length} enviada para IXC`);
+          } catch (error) {
+            console.error(`❌ Erro ao enviar foto ${i + 1}:`, error.message);
+            // Não bloqueia se falhar
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('⚠️ Erro ao sincronizar com IXC:', error.message);
+    // Não bloqueia a finalização se IXC falhar
   }
+}
+
+    await trx.commit();
+
+    console.log(`✅ OS ${os.numero_os} - Técnico em deslocamento`);
+
+    return res.json({
+      success: true,
+      message: 'Deslocamento iniciado com sucesso'
+    });
+  } catch (error) {
+    await trx.rollback();
+    console.error('❌ Erro ao iniciar deslocamento:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao iniciar deslocamento' });
+  }
+}
+
+/**
+ * Sincronizar deslocamento com IXC
+ */
+async sincronizarDeslocamentoComIXC(trx, os, dados) {
+  console.log(`🔄 Sincronizando deslocamento da OS ${os.numero_os} com IXC...`);
+
+  const integracao = await trx('integracao_ixc')
+    .where('tenant_id', os.tenant_id)
+    .where('ativo', true)
+    .first();
+
+  if (!integracao) {
+    throw new Error('Integração IXC não configurada');
+  }
+
+  const mapeamento = await trx('mapeamento_tecnicos_ixc')
+    .where('usuario_id', os.tecnico_id)
+    .where('tenant_id', os.tenant_id)
+    .first();
+
+  const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+  await ixc.deslocarParaOS(parseInt(os.id_externo), {
+    id_tecnico_ixc: mapeamento?.tecnico_ixc_id,
+    mensagem: 'Técnico a caminho do local',
+    latitude: dados.latitude,
+    longitude: dados.longitude
+  });
+
+  console.log(`✅ OS ${os.numero_os} - Status "D" (Deslocamento) no IXC`);
+}
+
+/**
+ * Técnico chegou ao local
+ * POST /api/ordens-servico/:id/chegar-local
+ */
+async chegarAoLocal(req, res) {
+  const trx = await db.transaction();
+
+  try {
+    const { id } = req.params;
+    const { latitude, longitude } = req.body;
+    const userId = req.user.id;
+    const tenantId = req.tenantId;
+
+    console.log(`📍 Técnico chegou ao local da OS ${id}`);
+
+    const os = await trx('ordem_servico')
+      .where('id', id)
+      .where('tenant_id', tenantId)
+      .where('tecnico_id', userId)
+      .first();
+
+    if (!os) {
+      await trx.rollback();
+      return res.status(404).json({ success: false, error: 'OS não encontrada' });
+    }
+
+    if (os.status !== 'em_deslocamento') {
+      await trx.rollback();
+      return res.status(400).json({ success: false, error: 'OS não está em deslocamento' });
+    }
+
+    // Atualizar para "em_execucao"
+    await trx('ordem_servico')
+      .where('id', id)
+      .update({
+        status: 'em_execucao',
+        latitude_execucao: latitude,
+        longitude_execucao: longitude,
+        data_inicio: db.fn.now(),
+        data_atualizacao: db.fn.now()
+      });
+
+    // Sincronizar com IXC
+    if (os.origem === 'IXC' && os.id_externo) {
+      try {
+        await this.sincronizarExecucaoComIXC(trx, os, { latitude, longitude });
+      } catch (error) {
+        console.error('⚠️ Erro ao sincronizar execução com IXC:', error.message);
+      }
+    }
+
+    await trx.commit();
+
+    console.log(`✅ OS ${os.numero_os} em execução`);
+
+    return res.json({
+      success: true,
+      message: 'Execução iniciada com sucesso'
+    });
+  } catch (error) {
+    await trx.rollback();
+    console.error('❌ Erro ao iniciar execução:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao iniciar execução' });
+  }
+}
+
+/**
+ * Sincronizar execução com IXC
+ */
+async sincronizarExecucaoComIXC(trx, os, dados) {
+  console.log(`🔄 Sincronizando execução da OS ${os.numero_os} com IXC...`);
+
+  const integracao = await trx('integracao_ixc')
+    .where('tenant_id', os.tenant_id)
+    .where('ativo', true)
+    .first();
+
+  if (!integracao) {
+    throw new Error('Integração IXC não configurada');
+  }
+
+  const mapeamento = await trx('mapeamento_tecnicos_ixc')
+    .where('usuario_id', os.tecnico_id)
+    .where('tenant_id', os.tenant_id)
+    .first();
+
+  const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+  await ixc.executarOS(parseInt(os.id_externo), {
+    id_tecnico_ixc: mapeamento?.tecnico_ixc_id,
+    mensagem: 'Iniciando execução do serviço',
+    data_inicio: os.data_inicio_deslocamento || new Date().toISOString(),
+    latitude: dados.latitude,
+    longitude: dados.longitude
+  });
+
+  console.log(`✅ OS ${os.numero_os} - Status "EX" (Execução) no IXC`);
+}
 
   /**
    * Finalizar execução de uma OS
@@ -474,6 +612,7 @@ class OrdensServicoController {
       data_inicio: os.data_inicio,  // Usar data de início real da OS
       data_final: new Date().toISOString()
     });
+
 
     console.log(`✅ OS ${os.numero_os} sincronizada com IXC (Finalizada)`);
   }

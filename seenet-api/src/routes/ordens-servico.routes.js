@@ -7,38 +7,21 @@ const authMiddleware = require('../middleware/auth');
 router.use(authMiddleware);
 
 // Buscar OSs do técnico logado (pendentes e em execução)
-router.get('/minhas', OrdensServicoController.buscarMinhasOSs.bind(OrdensServicoController));
+router.get('/minhas', OrdensServicoController.buscarMinhasOSs);
 
-// ✅ NOVO: Buscar OSs concluídas
-router.get('/concluidas', OrdensServicoController.buscarOSsConcluidas.bind(OrdensServicoController));
+// Buscar OSs concluídas
+router.get('/concluidas', OrdensServicoController.buscarOSsConcluidas);
 
 // Buscar detalhes de uma OS
-router.get('/:id/detalhes', OrdensServicoController.buscarDetalhesOS.bind(OrdensServicoController));
+router.get('/:id/detalhes', OrdensServicoController.buscarDetalhesOS);
 
-// Iniciar execução
-router.post('/:id/iniciar', OrdensServicoController.iniciarOS.bind(OrdensServicoController));
+// 1️⃣ Deslocamento (técnico saindo)
+router.post('/:id/deslocar', OrdensServicoController.deslocarParaOS);
 
-// Finalizar OS
-router.post('/:id/finalizar', OrdensServicoController.finalizarOS.bind(OrdensServicoController));
+// 2️⃣ Chegada ao local (técnico chegou)
+router.post('/:id/chegar-local', OrdensServicoController.chegarAoLocal);
 
-// Deslocamento
-router.post(
-  '/:id/deslocar',
-  authMiddleware,
-  ordensServicoController.deslocarParaOS
-);
+// 3️⃣ Finalizar OS (serviço concluído)
+router.post('/:id/finalizar', OrdensServicoController.finalizarOS);
 
-// Chegada ao local
-router.post(
-  '/:id/chegar-local',
-  authMiddleware,
-  ordensServicoController.chegarAoLocal
-);
-
-// Finalizar (já existe, mas confirme que está assim)
-router.post(
-  '/:id/finalizar',
-  authMiddleware,
-  ordensServicoController.finalizarOS
-);
 module.exports = router;

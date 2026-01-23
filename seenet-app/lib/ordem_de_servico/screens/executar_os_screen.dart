@@ -129,11 +129,7 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
                             ),
                           ),
                           Text(
-                            os.status == 'pendente'
-                                ? 'Pendente'
-                                : os.status == 'em_deslocamento'
-                                ? 'Em Deslocamento'
-                                : 'Em Execução',
+                            os.status == 'em_execucao' ? 'Em Execução' : 'Pendente',
                             style: const TextStyle(
                               fontSize: 14,
                               color: Colors.white70,

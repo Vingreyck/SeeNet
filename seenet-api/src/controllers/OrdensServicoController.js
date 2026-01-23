@@ -454,6 +454,14 @@ async sincronizarExecucaoComIXC(trx, os, dados) {
         });
       }
 
+      if (os.status !== 'em_execucao') {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: `OS não pode ser finalizada no status "${os.status}". Primeiro inicie a execução.`
+            });
+          }
+
       if (os.status === 'concluida') {
         await trx.rollback();
         return res.status(400).json({

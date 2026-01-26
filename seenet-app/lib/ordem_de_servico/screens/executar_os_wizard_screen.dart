@@ -40,6 +40,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   List<String> fotosAnexadas = [];
   Uint8List? assinaturaBytes;
   bool osIniciada = false;
+  String statusAtual = 'pendente';
 
   @override
   void initState() {
@@ -720,7 +721,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
             child: ElevatedButton(
               onPressed: _proximaEtapa,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _etapaAtual == 0 && os.status == 'em_deslocamento'
+                backgroundColor: _etapaAtual == 0 && statusAtual == 'em_deslocamento'
                     ? Colors.orange
                     : const Color(0xFF00FF88),
                 foregroundColor: Colors.black,
@@ -730,11 +731,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
                 ),
               ),
               child: Text(
-                // Texto dinâmico baseado no status
                 _etapaAtual == 0
-                    ? (os.status == 'pendente'
+                    ? (statusAtual == 'pendente'
                     ? '🚗 Iniciar Deslocamento'
-                    : os.status == 'em_deslocamento'
+                    : statusAtual == 'em_deslocamento'
                     ? '📍 Cheguei ao Local'
                     : 'Próximo')
                     : (_etapaAtual == _totalEtapas - 1 ? 'Finalizar OS' : 'Próximo'),
@@ -827,16 +827,15 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
 
   Future<void> _iniciarOS() async {
     // ESTADO 1: Pendente → Iniciar Deslocamento
-    if (os.status == 'pendente') {
+    if (statusAtual == 'pendente') {
       print('🚗 Iniciando deslocamento...');
 
       final sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!);
 
       if (sucesso) {
         setState(() {
-          os.status = 'em_deslocamento'; // Atualizar status local
-          osIniciada = false; // Ainda não pode preencher
-          // Permanecer na etapa 0 - não avançar!
+          statusAtual = 'em_deslocamento'; // ✅ CORRETO
+          osIniciada = false;
         });
 
         if (mounted) {
@@ -858,20 +857,20 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           );
         }
       }
-      return; // Importante: não avançar etapa
+      return;
     }
 
     // ESTADO 2: Em Deslocamento → Chegar ao Local
-    if (os.status == 'em_deslocamento') {
+    if (statusAtual == 'em_deslocamento') {
       print('📍 Informando chegada ao local...');
 
       final sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
 
       if (sucesso) {
         setState(() {
-          os.status = 'em_execucao'; // Atualizar status
-          osIniciada = true; // Agora pode preencher formulário
-          _etapaAtual = 1; // Avançar para próxima etapa
+          statusAtual = 'em_execucao'; // ✅ CORRETO
+          osIniciada = true;
+          _etapaAtual = 1;
         });
 
         if (mounted) {
@@ -897,10 +896,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     }
 
     // ESTADO 3: Já está em execução - só avançar
-    if (os.status == 'em_execucao') {
+    if (statusAtual == 'em_execucao') {
       setState(() {
         osIniciada = true;
-        _etapaAtual = 1; // Avançar para anexos
+        _etapaAtual = 1;
       });
 
       if (mounted) {

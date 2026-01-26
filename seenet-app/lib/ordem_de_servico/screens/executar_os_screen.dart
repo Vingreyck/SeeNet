@@ -45,19 +45,15 @@ class _ExecutarOSScreenState extends State<ExecutarOSScreen> {
 
     // ✅ Inicializar status local
     statusAtual = os.status;
+    osIniciada = (statusAtual == 'em_execucao');
 
-    // Determinar estado inicial baseado no status
-    if (statusAtual == 'em_execucao') {
-      osIniciada = true;
-      _etapaAtual = 1;
-    } else if (statusAtual == 'em_deslocamento') {
-      osIniciada = false;
-      _etapaAtual = 0;
-    } else {
-      osIniciada = false;
-      _etapaAtual = 0;
-    }
-
+    // Preencher dados existentes se houver
+    if (os.onuModelo != null) onuModeloController.text = os.onuModelo!;
+    if (os.onuSerial != null) onuSerialController.text = os.onuSerial!;
+    if (os.onuStatus != null) onuStatusController.text = os.onuStatus!;
+    if (os.onuSinalOptico != null) onuSinalController.text = os.onuSinalOptico.toString();
+    if (os.materiaisUtilizados != null) materiaisController.text = os.materiaisUtilizados!;
+    if (os.observacoes != null) observacoesController.text = os.observacoes!;
     if (os.latitude != null && os.longitude != null) {
       latitude = os.latitude;
       longitude = os.longitude;

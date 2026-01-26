@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/ordem_servico_model.dart';
 import 'package:get/get.dart';
@@ -170,26 +172,55 @@ class OrdemServicoService {
     }
   }
 
-  // Finalizar OS
   Future<bool> finalizarOS(String osId, Map<String, dynamic> dados) async {
     try {
-      final token = _authService.token;
-      final tenantCode = _authService.tenantCode;
+      print('🏁 Finalizando OS $osId');
 
-      if (token == null) throw Exception('Token não encontrado');
-      if (tenantCode == null) throw Exception('Código da empresa não encontrado');
+      // ✅ CONVERTER FOTOS PARA BASE64
+      if (dados['fotos'] != null && (dados['fotos'] as List).isNotEmpty) {
+        List<String> fotosBase64 = [];
+        List<String> fotosPaths = List<String>.from(dados['fotos']);
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/ordens-servico/$osId/finalizar'),
-        headers: _headers,
-        body: json.encode(dados),
+        print('📸 Convertendo ${fotosPaths.length} foto(s) para base64...');
+
+        for (String fotoPath in fotosPaths) {
+          try {
+            // Ler arquivo
+            final File file = File(fotoPath);
+
+            // Verificar se arquivo existe
+            if (!await file.exists()) {
+              print('⚠️ Arquivo não encontrado: $fotoPath');
+              continue;
+            }
+
+            // Ler bytes
+            final Uint8List bytes = await file.readAsBytes();
+
+            // Converter para base64
+            final String base64Image = base64Encode(bytes);
+            fotosBase64.add(base64Image);
+
+            print('✅ Foto convertida: ${fotoPath.split('/').last} (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
+          } catch (e) {
+            print('❌ Erro ao converter foto $fotoPath: $e');
+          }
+        }
+
+        // Substituir paths por base64
+        dados['fotos'] = fotosBase64;
+        print('📤 ${fotosBase64.length} foto(s) prontas para envio');
+      }
+
+      final response = await _dio.post(
+        '$baseUrl/ordens-servico/$osId/finalizar',
+        data: dados,
       );
 
-      print('📥 finalizarOS - Status: ${response.statusCode}');
-
+      print('✅ Resposta: ${response.statusCode}');
       return response.statusCode == 200;
     } catch (e) {
-      print('❌ Erro em finalizarOS: $e');
+      print('❌ Erro ao finalizar OS: $e');
       return false;
     }
   }

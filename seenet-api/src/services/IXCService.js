@@ -321,30 +321,32 @@ async executarOS(osId, dados) {
 
 /**
  * Upload de foto para a OS
- * POST /su_oss_arquivos
+ * POST /su_oss_chamado_arquivos
  */
 async uploadFotoOS(osId, clienteId, fotoData) {
   try {
-    console.log(`📸 Uploading foto para OS ${osId}...`);
+    console.log(`📸 Enviando foto para OS ${osId}...`);
 
     const payload = {
       descricao: fotoData.descricao || 'Foto do atendimento',
       local_arquivo: fotoData.base64, // Base64 da imagem
       id_cliente: clienteId.toString(),
       id_oss_chamado: osId.toString(),
-      classificacao_arquivo: 'P'
+      classificacao_arquivo: 'P' // P = Privado
     };
 
-    const response = await this.clientAlterar.post('/su_oss_arquivos', payload);
+    // ✅ ENDPOINT CORRETO
+    const response = await this.clientAlterar.post('/su_oss_chamado_arquivos', payload);
 
     if (response.data?.type === 'error') {
+      console.error(`❌ Erro IXC ao enviar foto:`, response.data.message);
       throw new Error(response.data.message || 'Erro ao enviar foto');
     }
 
     console.log(`✅ Foto enviada para OS ${osId}`);
     return response.data;
   } catch (error) {
-    console.error(`❌ Erro ao enviar foto:`, error.message);
+    console.error(`❌ Erro ao enviar foto para OS ${osId}:`, error.message);
     throw error;
   }
 }

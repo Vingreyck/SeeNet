@@ -210,32 +210,7 @@ async deslocarParaOS(req, res) {
     return res.status(500).json({ success: false, error: 'Erro ao iniciar deslocamento' });
   }
 }
-    }
-  }
-}
-        }
-      }
-    }
-  } catch (error) {
-    console.error('⚠️ Erro ao sincronizar com IXC:', error.message);
-    // Não bloqueia a finalização se IXC falhar
-  }
-}
 
-    await trx.commit();
-
-    console.log(`✅ OS ${os.numero_os} - Técnico em deslocamento`);
-
-    return res.json({
-      success: true,
-      message: 'Deslocamento iniciado com sucesso'
-    });
-  } catch (error) {
-    await trx.rollback();
-    console.error('❌ Erro ao iniciar deslocamento:', error);
-    return res.status(500).json({ success: false, error: 'Erro ao iniciar deslocamento' });
-  }
-}
 
 /**
  * Sincronizar deslocamento com IXC

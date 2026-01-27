@@ -9,6 +9,7 @@ import '../widgets/anexos_widget.dart';
 import '../widgets/assinatura_widget.dart';
 import 'package:intl/intl.dart';
 
+
 class ExecutarOSWizardScreen extends StatefulWidget {
   const ExecutarOSWizardScreen({super.key});
 
@@ -37,7 +38,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   // Dados coletados
   double? latitude;
   double? longitude;
-  List<String> fotosAnexadas = [];
+  List<AnexoComDescricao> fotosAnexadas = [];
   Uint8List? assinaturaBytes;
   bool osIniciada = false;
   String statusAtual = 'pendente';
@@ -263,8 +264,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
             child: AnexosWidget(
               onAnexosAlterados: (anexos) {
                 setState(() {
-                  // Extrair apenas os caminhos das fotos
-                  fotosAnexadas = anexos.map((a) => a.foto.path).toList();
+                  fotosAnexadas = anexos; // ✅ ARMAZENAR OBJETOS COMPLETOS
                 });
               },
             ),
@@ -963,7 +963,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       'relato_solucao': relatoSolucaoController.text.trim(),
       'materiais_utilizados': materiaisController.text.trim(),
       'observacoes': observacoesController.text.trim(),
-      'fotos': fotosAnexadas,
+      'fotos': fotosAnexadas.map((anexo) => {
+        'tipo': anexo.tipo,
+        'descricao': anexo.descricao,
+        'path': anexo.foto.path,
+      }).toList(),
       'assinatura': base64Encode(assinaturaBytes!),
     };
 

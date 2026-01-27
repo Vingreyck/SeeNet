@@ -176,19 +176,19 @@ class OrdemServicoService {
     try {
       print('🏁 Finalizando OS $osId');
 
-      // ✅ CONVERTER FOTOS PARA BASE64
+      // ✅ CONVERTER FOTOS PARA BASE64 COM METADADOS
       if (dados['fotos'] != null && (dados['fotos'] as List).isNotEmpty) {
         List<Map<String, String>> fotosComMetadados = [];
-        List<AnexoFoto> anexos = List<AnexoFoto>.from(dados['fotos']);
+        List<Map<String, dynamic>> anexos = List<Map<String, dynamic>>.from(dados['fotos']);
 
         print('📸 Convertendo ${anexos.length} foto(s) para base64...');
 
-        for (AnexoFoto anexo in anexos) {
+        for (var anexo in anexos) {
           try {
-            final File file = File(anexo.foto.path);
+            final File file = File(anexo['path']);
 
             if (!await file.exists()) {
-              print('⚠️ Arquivo não encontrado: ${anexo.foto.path}');
+              print('⚠️ Arquivo não encontrado: ${anexo['path']}');
               continue;
             }
 
@@ -197,11 +197,11 @@ class OrdemServicoService {
 
             fotosComMetadados.add({
               'base64': base64Image,
-              'tipo': anexo.tipo,
-              'descricao': anexo.descricao ?? '',
+              'tipo': anexo['tipo'] ?? 'outro',
+              'descricao': anexo['descricao'] ?? '',
             });
 
-            print('✅ Foto convertida: ${anexo.tipo} (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
+            print('✅ Foto ${anexo['tipo']} convertida (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
           } catch (e) {
             print('❌ Erro ao converter foto: $e');
           }

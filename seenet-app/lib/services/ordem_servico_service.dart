@@ -178,38 +178,37 @@ class OrdemServicoService {
 
       // ✅ CONVERTER FOTOS PARA BASE64
       if (dados['fotos'] != null && (dados['fotos'] as List).isNotEmpty) {
-        List<String> fotosBase64 = [];
-        List<String> fotosPaths = List<String>.from(dados['fotos']);
+        List<Map<String, String>> fotosComMetadados = [];
+        List<AnexoFoto> anexos = List<AnexoFoto>.from(dados['fotos']);
 
-        print('📸 Convertendo ${fotosPaths.length} foto(s) para base64...');
+        print('📸 Convertendo ${anexos.length} foto(s) para base64...');
 
-        for (String fotoPath in fotosPaths) {
+        for (AnexoFoto anexo in anexos) {
           try {
-            // Ler arquivo
-            final File file = File(fotoPath);
+            final File file = File(anexo.foto.path);
 
-            // Verificar se arquivo existe
             if (!await file.exists()) {
-              print('⚠️ Arquivo não encontrado: $fotoPath');
+              print('⚠️ Arquivo não encontrado: ${anexo.foto.path}');
               continue;
             }
 
-            // Ler bytes
             final Uint8List bytes = await file.readAsBytes();
-
-            // Converter para base64
             final String base64Image = base64Encode(bytes);
-            fotosBase64.add(base64Image);
 
-            print('✅ Foto convertida: ${fotoPath.split('/').last} (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
+            fotosComMetadados.add({
+              'base64': base64Image,
+              'tipo': anexo.tipo,
+              'descricao': anexo.descricao ?? '',
+            });
+
+            print('✅ Foto convertida: ${anexo.tipo} (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
           } catch (e) {
-            print('❌ Erro ao converter foto $fotoPath: $e');
+            print('❌ Erro ao converter foto: $e');
           }
         }
 
-        // Substituir paths por base64
-        dados['fotos'] = fotosBase64;
-        print('📤 ${fotosBase64.length} foto(s) prontas para envio');
+        dados['fotos'] = fotosComMetadados;
+        print('📤 ${fotosComMetadados.length} foto(s) prontas para envio');
       }
 
       final response = await http.post(

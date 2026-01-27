@@ -227,26 +227,18 @@ async deslocarParaOS(osId, dados) {
     const payload = {
       id_chamado: osId.toString(),
       mensagem: dados.mensagem || 'Técnico a caminho do local',
-      status: 'D', // Deslocamento
-      id_tecnico: dados.id_tecnico_ixc?.toString() || '',
-      latitude: dados.latitude || '',
-      longitude: dados.longitude || '',
-      gps_time: (dados.latitude && dados.longitude)
-        ? this.formatarDataIXC(new Date())
-        : '',
-
-      // Campos vazios obrigatórios
-      data: '',
-      id_evento: '',
-      id_resposta: '',
-      data_inicio: '',
-      data_final: '',
-      tipo_cobranca: '',
-      id_evento_status: '',
-      id_equipe: '',
-      id_proxima_tarefa: '',
-      finaliza_processo: ''
+      status: 'D',
+      id_tecnico: dados.id_tecnico_ixc?.toString() || ''
     };
+
+    // ✅ Adicionar GPS se disponível
+    if (dados.latitude && dados.longitude) {
+      payload.latitude = dados.latitude.toString();
+      payload.longitude = dados.longitude.toString();
+      payload.gps_time = this.formatarDataIXC(new Date());
+    }
+
+    console.log('📤 POST /su_oss_chamado_mensagem - Deslocamento');
 
     const response = await this.clientAlterar.post('/su_oss_chamado_mensagem', payload);
 
@@ -261,6 +253,7 @@ async deslocarParaOS(osId, dados) {
     throw error;
   }
 }
+
 /**
  * Iniciar execução da OS (status EX - técnico chegou ao local)
  * POST /su_oss_chamado_executar

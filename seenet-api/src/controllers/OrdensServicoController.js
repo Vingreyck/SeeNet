@@ -440,18 +440,23 @@ async sincronizarExecucaoComIXC(trx, os, dados) {
         });
 
       // Processar anexos (fotos)
-      if (fotos && fotos.length > 0) {
-        for (const fotoPath of fotos) {
-          await trx('os_anexos').insert({
-            ordem_servico_id: id,
-            tipo: 'local',
-            url_arquivo: fotoPath,
-            nome_arquivo: fotoPath.split('/').pop(),
-            data_upload: db.fn.now()
-          });
-        }
-        console.log(`📸 ${fotos.length} foto(s) anexada(s)`);
+    if (fotos && fotos.length > 0) {
+      console.log(`📸 Processando ${fotos.length} foto(s)...`);
+
+      for (const fotoData of fotos) {
+        // Fotos agora vêm como objetos: { base64, tipo, descricao }
+        await trx('os_anexos').insert({
+          ordem_servico_id: id,
+          tipo: fotoData.tipo || 'outro',
+          descricao: fotoData.descricao || '',
+          url_arquivo: '', // Base64 não é salvo no banco local
+          nome_arquivo: `foto_${fotoData.tipo}_${Date.now()}.jpg`,
+          data_upload: db.fn.now()
+        });
       }
+
+      console.log(`📸 ${fotos.length} foto(s) anexada(s)`);
+    }
 
       // ✅ Sincronizar finalização com IXC
       if (os.origem === 'IXC' && os.id_externo) {
@@ -574,30 +579,44 @@ async sincronizarFinalizacaoComIXC(trx, os, dados) {
 
   console.log(`✅ OS ${os.numero_os} sincronizada com IXC (Finalizada)`);
 
-  // 2️⃣ Enviar fotos para IXC (se houver)
-  if (dados.fotos && dados.fotos.length > 0) {
-    console.log(`📸 Enviando ${dados.fotos.length} foto(s) para IXC...`);
+// 2️⃣ Enviar fotos para IXC (se houver)
+if (dados.fotos && dados.fotos.length > 0) {
+  console.log(`📸 Enviando ${dados.fotos.length} foto(s) para IXC...`);
 
-    for (let i = 0; i < dados.fotos.length; i++) {
-      const fotoBase64 = dados.fotos[i];
+  for (let i = 0; i < dados.fotos.length; i++) {
+    const fotoData = dados.fotos[i];
 
-      try {
-        await ixc.uploadFotoOS(
-          parseInt(os.id_externo),
-          parseInt(os.cliente_id),
-          {
-            descricao: `Foto ${i + 1} - Atendimento`,
-            base64: fotoBase64
-          }
-        );
+    try {
+      // Montar descrição completa
+      const labelTipo = {
+        'roteador': '📡 Roteador',
+        'onu': '📦 ONU',
+        'local': '🏠 Local',
+        'antes': '📷 Antes',
+        'depois': '✅ Depois',
+        'problema': '⚠️ Problema',
+        'outro': '📎 Outro'
+      };
 
-        console.log(`✅ Foto ${i + 1}/${dados.fotos.length} enviada para IXC`);
-      } catch (fotoError) {
-        console.error(`❌ Erro ao enviar foto ${i + 1}:`, fotoError.message);
-        // Não bloqueia se falhar
-      }
+      const descricaoCompleta = fotoData.descricao
+        ? `Foto ${i + 1} - ${labelTipo[fotoData.tipo] || fotoData.tipo}: ${fotoData.descricao}`
+        : `Foto ${i + 1} - ${labelTipo[fotoData.tipo] || fotoData.tipo}`;
+
+      await ixc.uploadFotoOS(
+        parseInt(os.id_externo),
+        parseInt(os.cliente_id),
+        {
+          descricao: descricaoCompleta,
+          base64: fotoData.base64
+        }
+      );
+
+      console.log(`✅ Foto ${i + 1}/${dados.fotos.length} enviada: ${descricaoCompleta}`);
+    } catch (fotoError) {
+      console.error(`❌ Erro ao enviar foto ${i + 1}:`, fotoError.message);
     }
   }
+}
 }
 }
 

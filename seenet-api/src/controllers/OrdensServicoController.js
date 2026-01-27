@@ -187,53 +187,29 @@ async deslocarParaOS(req, res) {
         data_atualizacao: db.fn.now()
       });
 
-// ✅ Sincronizar finalização com IXC
-if (os.origem === 'IXC' && os.id_externo) {
-  try {
-    // 1. Finalizar OS no IXC
-    await this.sincronizarFinalizacaoComIXC(trx, os, {
-      onu_modelo,
-      onu_serial,
-      onu_status,
-      onu_sinal_optico,
-      relato_problema,
-      relato_solucao,
-      materiais_utilizados,
-      observacoes,
-      userId
-    });
-
-// 2️⃣ Enviar fotos para IXC (se houver)
-if (fotos && fotos.length > 0) {
-  console.log(`📸 Enviando ${fotos.length} foto(s) para IXC...`);
-
-  // Buscar integração IXC
-  const integracao = await trx('integracao_ixc')
-    .where('tenant_id', os.tenant_id)
-    .where('ativo', true)
-    .first();
-
-  if (integracao) {
-    const ixc = new IXCService(integracao.url_api, integracao.token_api);
-
-    for (let i = 0; i < fotos.length; i++) {
-      const fotoBase64 = fotos[i]; // ✅ Já vem em base64 do Flutter
-
+    // Sincronizar deslocamento com IXC
+    if (os.origem === 'IXC' && os.id_externo) {
       try {
-        await ixc.uploadFotoOS(
-          parseInt(os.id_externo),
-          parseInt(os.cliente_id),
-          {
-            descricao: `Foto ${i + 1} - Atendimento`,
-            base64: fotoBase64
-          }
-        );
-
-        console.log(`✅ Foto ${i + 1}/${fotos.length} enviada para IXC`);
-      } catch (fotoError) {
-        console.error(`❌ Erro ao enviar foto ${i + 1}:`, fotoError.message);
-        // Não bloqueia se falhar
+        await this.sincronizarDeslocamentoComIXC(trx, os, { latitude, longitude });
+      } catch (error) {
+        console.error('⚠️ Erro ao sincronizar com IXC:', error.message);
       }
+    }
+
+    await trx.commit();
+
+    console.log(`✅ OS ${os.numero_os} - Técnico em deslocamento`);
+
+    return res.json({
+      success: true,
+      message: 'Deslocamento iniciado com sucesso'
+    });
+  } catch (error) {
+    await trx.rollback();
+    console.error('❌ Erro ao iniciar deslocamento:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao iniciar deslocamento' });
+  }
+}
     }
   }
 }

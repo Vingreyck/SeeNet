@@ -465,7 +465,8 @@ async sincronizarExecucaoComIXC(trx, os, dados) {
             relato_solucao,
             materiais_utilizados,
             observacoes,
-            userId
+            userId,
+            fotos
           });
         } catch (error) {
           console.error('⚠️ Erro ao sincronizar finalização com IXC:', error.message);
@@ -495,84 +496,109 @@ async sincronizarExecucaoComIXC(trx, os, dados) {
   /**
    * Sincronizar finalização com IXC
    */
-  async sincronizarFinalizacaoComIXC(trx, os, dados) {
-    console.log(`🔄 Sincronizando finalização da OS ${os.numero_os} com IXC...`);
+async sincronizarFinalizacaoComIXC(trx, os, dados) {
+  console.log(`🔄 Sincronizando finalização da OS ${os.numero_os} com IXC...`);
 
-    // Buscar configuração IXC
-    const integracao = await trx('integracao_ixc')
-      .where('tenant_id', os.tenant_id)
-      .where('ativo', true)
-      .first();
+  // Buscar configuração IXC
+  const integracao = await trx('integracao_ixc')
+    .where('tenant_id', os.tenant_id)
+    .where('ativo', true)
+    .first();
 
-    if (!integracao) {
-      throw new Error('Integração IXC não configurada');
-    }
-
-    // Buscar mapeamento do técnico
-    const mapeamento = await trx('mapeamento_tecnicos_ixc')
-      .where('usuario_id', dados.userId)
-      .where('tenant_id', os.tenant_id)
-      .first();
-
-    if (!mapeamento) {
-      throw new Error('Técnico não mapeado no IXC');
-    }
-
-    // Montar mensagem completa
-    let mensagemResposta = '';
-
-    mensagemResposta += '═══════════════════════════════════\n';
-    mensagemResposta += '  RELATÓRIO DE ATENDIMENTO TÉCNICO\n';
-    mensagemResposta += '═══════════════════════════════════\n\n';
-
-    if (dados.relato_problema) {
-      mensagemResposta += '📋 PROBLEMA IDENTIFICADO:\n';
-      mensagemResposta += `${dados.relato_problema}\n\n`;
-    }
-
-    if (dados.relato_solucao) {
-      mensagemResposta += '✅ SOLUÇÃO APLICADA:\n';
-      mensagemResposta += `${dados.relato_solucao}\n\n`;
-    }
-
-    if (dados.onu_modelo || dados.onu_serial || dados.onu_status) {
-      mensagemResposta += '🔧 DADOS TÉCNICOS DA ONU:\n';
-      if (dados.onu_modelo) mensagemResposta += `• Modelo: ${dados.onu_modelo}\n`;
-      if (dados.onu_serial) mensagemResposta += `• Serial: ${dados.onu_serial}\n`;
-      if (dados.onu_status) mensagemResposta += `• Status: ${dados.onu_status}\n`;
-      if (dados.onu_sinal_optico) mensagemResposta += `• Sinal Óptico: ${dados.onu_sinal_optico} dBm\n`;
-      mensagemResposta += '\n';
-    }
-
-    if (dados.materiais_utilizados) {
-      mensagemResposta += '🛠️ MATERIAIS UTILIZADOS:\n';
-      mensagemResposta += `${dados.materiais_utilizados}\n\n`;
-    }
-
-    if (dados.observacoes) {
-      mensagemResposta += '💬 OBSERVAÇÕES ADICIONAIS:\n';
-      mensagemResposta += `${dados.observacoes}\n\n`;
-    }
-
-    mensagemResposta += '═══════════════════════════════════\n';
-    mensagemResposta += `📱 Atendimento via SeeNet\n`;
-    mensagemResposta += '═══════════════════════════════════';
-
-    // Criar cliente IXC e finalizar
-    const ixc = new IXCService(integracao.url_api, integracao.token_api);
-
-    await ixc.finalizarOS(parseInt(os.id_externo), {
-      id_tecnico_ixc: mapeamento.tecnico_ixc_id,  // ✅ CORRETO
-      mensagem_resposta: mensagemResposta,
-      latitude: os.latitude || '',
-      longitude: os.longitude || '',
-      data_inicio: os.data_inicio,  // Usar data de início real da OS
-      data_final: new Date().toISOString()
-    });
-
-
-    console.log(`✅ OS ${os.numero_os} sincronizada com IXC (Finalizada)`);
+  if (!integracao) {
+    throw new Error('Integração IXC não configurada');
   }
+
+  // Buscar mapeamento do técnico
+  const mapeamento = await trx('mapeamento_tecnicos_ixc')
+    .where('usuario_id', dados.userId)
+    .where('tenant_id', os.tenant_id)
+    .first();
+
+  if (!mapeamento) {
+    throw new Error('Técnico não mapeado no IXC');
+  }
+
+  // Montar mensagem completa
+  let mensagemResposta = '';
+
+  mensagemResposta += '═══════════════════════════════════\n';
+  mensagemResposta += '  RELATÓRIO DE ATENDIMENTO TÉCNICO\n';
+  mensagemResposta += '═══════════════════════════════════\n\n';
+
+  if (dados.relato_problema) {
+    mensagemResposta += '📋 PROBLEMA IDENTIFICADO:\n';
+    mensagemResposta += `${dados.relato_problema}\n\n`;
+  }
+
+  if (dados.relato_solucao) {
+    mensagemResposta += '✅ SOLUÇÃO APLICADA:\n';
+    mensagemResposta += `${dados.relato_solucao}\n\n`;
+  }
+
+  if (dados.onu_modelo || dados.onu_serial || dados.onu_status) {
+    mensagemResposta += '🔧 DADOS TÉCNICOS DA ONU:\n';
+    if (dados.onu_modelo) mensagemResposta += `• Modelo: ${dados.onu_modelo}\n`;
+    if (dados.onu_serial) mensagemResposta += `• Serial: ${dados.onu_serial}\n`;
+    if (dados.onu_status) mensagemResposta += `• Status: ${dados.onu_status}\n`;
+    if (dados.onu_sinal_optico) mensagemResposta += `• Sinal Óptico: ${dados.onu_sinal_optico} dBm\n`;
+    mensagemResposta += '\n';
+  }
+
+  if (dados.materiais_utilizados) {
+    mensagemResposta += '🛠️ MATERIAIS UTILIZADOS:\n';
+    mensagemResposta += `${dados.materiais_utilizados}\n\n`;
+  }
+
+  if (dados.observacoes) {
+    mensagemResposta += '💬 OBSERVAÇÕES ADICIONAIS:\n';
+    mensagemResposta += `${dados.observacoes}\n\n`;
+  }
+
+  mensagemResposta += '═══════════════════════════════════\n';
+  mensagemResposta += `📱 Atendimento via SeeNet\n`;
+  mensagemResposta += '═══════════════════════════════════';
+
+  // Criar cliente IXC
+  const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+  // 1️⃣ Finalizar OS no IXC
+  await ixc.finalizarOS(parseInt(os.id_externo), {
+    id_tecnico_ixc: mapeamento.tecnico_ixc_id,
+    mensagem_resposta: mensagemResposta,
+    latitude: os.latitude || '',
+    longitude: os.longitude || '',
+    data_inicio: os.data_inicio,
+    data_final: new Date().toISOString()
+  });
+
+  console.log(`✅ OS ${os.numero_os} sincronizada com IXC (Finalizada)`);
+
+  // 2️⃣ Enviar fotos para IXC (se houver)
+  if (dados.fotos && dados.fotos.length > 0) {
+    console.log(`📸 Enviando ${dados.fotos.length} foto(s) para IXC...`);
+
+    for (let i = 0; i < dados.fotos.length; i++) {
+      const fotoBase64 = dados.fotos[i];
+
+      try {
+        await ixc.uploadFotoOS(
+          parseInt(os.id_externo),
+          parseInt(os.cliente_id),
+          {
+            descricao: `Foto ${i + 1} - Atendimento`,
+            base64: fotoBase64
+          }
+        );
+
+        console.log(`✅ Foto ${i + 1}/${dados.fotos.length} enviada para IXC`);
+      } catch (fotoError) {
+        console.error(`❌ Erro ao enviar foto ${i + 1}:`, fotoError.message);
+        // Não bloqueia se falhar
+      }
+    }
+  }
+}
 }
 
 module.exports = new OrdensServicoController();

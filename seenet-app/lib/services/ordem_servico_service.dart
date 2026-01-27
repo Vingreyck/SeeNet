@@ -212,9 +212,10 @@ class OrdemServicoService {
         print('📤 ${fotosBase64.length} foto(s) prontas para envio');
       }
 
-      final response = await _dio.post(
-        '$baseUrl/ordens-servico/$osId/finalizar',
-        data: dados,
+      final response = await http.post(
+        Uri.parse('$baseUrl/ordens-servico/$osId/finalizar'),
+        headers: _headers,
+        body: json.encode(dados),
       );
 
       print('✅ Resposta: ${response.statusCode}');

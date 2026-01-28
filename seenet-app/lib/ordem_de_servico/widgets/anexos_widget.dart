@@ -5,12 +5,12 @@ import 'dart:io';
 class AnexoComDescricao {
   final XFile foto;
   String descricao;
-  final String tipo; // 'roteador', 'local', 'onu', 'antes', 'depois'
+  final String tipo; // sempre 'foto'
 
   AnexoComDescricao({
     required this.foto,
     this.descricao = '',
-    required this.tipo,
+    this.tipo = 'foto',
   });
 }
 
@@ -33,66 +33,74 @@ class _AnexosWidgetState extends State<AnexosWidget> {
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Botões para adicionar fotos
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildBotaoFoto('📡 Roteador', Icons.router, 'roteador'),
-            _buildBotaoFoto('🏠 Local', Icons.location_on, 'local'),
-            _buildBotaoFoto('📦 ONU', Icons.device_hub, 'onu'),
-            _buildBotaoFoto('📷 Antes', Icons.photo_camera, 'antes'),
-            _buildBotaoFoto('✅ Depois', Icons.check_circle, 'depois'),
-          ],
+        // Botão principal para adicionar foto
+        ElevatedButton.icon(
+          onPressed: _mostrarOpcoesCaptura,
+          icon: const Icon(Icons.add_a_photo, size: 24),
+          label: Text(
+            _anexos.isEmpty ? 'Adicionar Primeira Foto' : 'Adicionar Mais Fotos',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00FF88),
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            minimumSize: const Size(double.infinity, 56),
+          ),
         ),
 
         const SizedBox(height: 16),
 
-        // Lista de fotos anexadas
-        if (_anexos.isNotEmpty) ...[
-          Text(
-            '${_anexos.length} foto(s) anexada(s)',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+        // Contador de fotos
+        if (_anexos.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00FF88).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF00FF88)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.photo_library, color: Color(0xFF00FF88), size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  '${_anexos.length} foto(s) anexada(s)',
+                  style: const TextStyle(
+                    color: Color(0xFF00FF88),
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _anexos.length,
-            itemBuilder: (context, index) {
-              return _buildFotoCard(_anexos[index], index);
-            },
-          ),
-        ],
+
+        if (_anexos.isNotEmpty) const SizedBox(height: 16),
+
+        // Lista de fotos
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _anexos.length,
+          itemBuilder: (context, index) {
+            return _buildFotoCard(_anexos[index], index);
+          },
+        ),
       ],
     );
   }
 
-  Widget _buildBotaoFoto(String label, IconData icon, String tipo) {
-    return ElevatedButton.icon(
-      onPressed: () => _mostrarOpcoesCaptura(tipo),
-      icon: Icon(icon, size: 20),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF00FF88),
-        foregroundColor: Colors.black,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-    );
-  }
-
   Widget _buildFotoCard(AnexoComDescricao anexo, int index) {
+    final descricaoController = TextEditingController(text: anexo.descricao);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(12),
@@ -101,89 +109,154 @@ class _AnexosWidgetState extends State<AnexosWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header com tipo e botão remover
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00FF88).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      _getIconeTipo(anexo.tipo),
-                      color: const Color(0xFF00FF88),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _getLabelTipo(anexo.tipo),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
+          // Header
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              color: Color(0xFF232323),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(11),
+                topRight: Radius.circular(11),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () => _removerFoto(index),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Preview da foto
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.file(
-              File(anexo.foto.path),
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00FF88).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.photo_camera,
+                        color: Color(0xFF00FF88),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Foto ${index + 1}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: () => _confirmarRemocao(index),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 12),
+          // Preview da foto
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                File(anexo.foto.path),
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
 
-          // Campo de descrição
-          TextField(
-            onChanged: (value) {
-              setState(() {
-                anexo.descricao = value;
-              });
-              widget.onAnexosAlterados(_anexos);
-            },
-            controller: TextEditingController(text: anexo.descricao),
-            maxLines: 2,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Descrição da foto (opcional)',
-              hintText: _getPlaceholderDescricao(anexo.tipo),
-              labelStyle: const TextStyle(color: Colors.white70),
-              hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
-              filled: true,
-              fillColor: const Color(0xFF232323),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Colors.white12),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Colors.white12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF00FF88), width: 2),
-              ),
+          // Campo de descrição OBRIGATÓRIO
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Descrição',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.red),
+                      ),
+                      child: const Text(
+                        'OBRIGATÓRIO',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: descricaoController,
+                  onChanged: (value) {
+                    anexo.descricao = value;
+                    widget.onAnexosAlterados(_anexos);
+                  },
+                  maxLines: 3,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Ex: Roteador instalado na parede da sala\nCabo organizado e equipamento funcionando',
+                    hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
+                    filled: true,
+                    fillColor: const Color(0xFF232323),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: anexo.descricao.trim().isEmpty
+                            ? Colors.red
+                            : Colors.white12,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: anexo.descricao.trim().isEmpty
+                            ? Colors.red
+                            : Colors.white12,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF00FF88),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                if (anexo.descricao.trim().isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      '⚠️ A descrição é obrigatória',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -191,81 +264,113 @@ class _AnexosWidgetState extends State<AnexosWidget> {
     );
   }
 
-  // ✅ NOVA FUNÇÃO: Mostrar opções de captura
-  Future<void> _mostrarOpcoesCaptura(String tipo) async {
+  Future<void> _mostrarOpcoesCaptura() async {
     final opcao = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF232323),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Como adicionar ${_getLabelTipo(tipo)}?',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: const Text(
+          'Adicionar Foto',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00FF88).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.camera_alt, color: Color(0xFF00FF88)),
-              ),
-              title: const Text(
-                'Tirar Foto',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              subtitle: const Text(
-                'Usar câmera do celular',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-              onTap: () => Navigator.pop(context, 'camera'),
+            const Text(
+              'Como você deseja adicionar a foto?',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
             ),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00FF88).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.photo_library, color: Color(0xFF00FF88)),
-              ),
-              title: const Text(
-                'Escolher da Galeria',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              subtitle: const Text(
-                'Selecionar foto existente',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-              onTap: () => Navigator.pop(context, 'galeria'),
+            const SizedBox(height: 20),
+            _buildOpcaoCaptura(
+              Icons.camera_alt,
+              'Tirar Foto',
+              'Usar câmera do celular',
+              'camera',
+            ),
+            const SizedBox(height: 12),
+            _buildOpcaoCaptura(
+              Icons.photo_library,
+              'Escolher da Galeria',
+              'Selecionar foto existente',
+              'galeria',
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.white54),
+            ),
           ),
         ],
       ),
     );
 
-    if (opcao == null) return;
-
     if (opcao == 'camera') {
-      await _capturarFoto(ImageSource.camera, tipo);
+      await _capturarFoto(ImageSource.camera);
     } else if (opcao == 'galeria') {
-      await _capturarFoto(ImageSource.gallery, tipo);
+      await _capturarFoto(ImageSource.gallery);
     }
   }
 
-  // ✅ FUNÇÃO UNIFICADA: Capturar foto (câmera ou galeria)
-  Future<void> _capturarFoto(ImageSource source, String tipo) async {
+  Widget _buildOpcaoCaptura(IconData icon, String titulo, String subtitulo, String valor) {
+    return InkWell(
+      onTap: () => Navigator.pop(context, valor),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF00FF88)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00FF88).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: const Color(0xFF00FF88), size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    titulo,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitulo,
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _capturarFoto(ImageSource source) async {
     try {
       final XFile? foto = await _picker.pickImage(
         source: source,
@@ -275,24 +380,17 @@ class _AnexosWidgetState extends State<AnexosWidget> {
       );
 
       if (foto != null) {
-        // Gerar descrição sugerida automaticamente
-        final descricaoSugerida = _getDescricaoSugerida(tipo);
-
         setState(() {
-          _anexos.add(AnexoComDescricao(
-            foto: foto,
-            tipo: tipo,
-            descricao: descricaoSugerida,
-          ));
+          _anexos.add(AnexoComDescricao(foto: foto));
         });
         widget.onAnexosAlterados(_anexos);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Foto "${_getLabelTipo(tipo)}" adicionada'),
-              backgroundColor: const Color(0xFF00FF88),
-              duration: const Duration(seconds: 1),
+            const SnackBar(
+              content: Text('📸 Foto adicionada! Não esqueça de adicionar a descrição.'),
+              backgroundColor: Color(0xFF00FF88),
+              duration: Duration(seconds: 2),
             ),
           );
         }
@@ -301,7 +399,7 @@ class _AnexosWidgetState extends State<AnexosWidget> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao capturar foto: $e'),
+            content: Text('❌ Erro ao capturar foto: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
@@ -310,78 +408,49 @@ class _AnexosWidgetState extends State<AnexosWidget> {
     }
   }
 
-  void _removerFoto(int index) {
-    setState(() {
-      _anexos.removeAt(index);
-    });
-    widget.onAnexosAlterados(_anexos);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Foto removida'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 1),
+  Future<void> _confirmarRemocao(int index) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF232323),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Remover Foto?',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-      );
-    }
-  }
+        content: const Text(
+          'Tem certeza que deseja remover esta foto?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Remover', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
 
-  IconData _getIconeTipo(String tipo) {
-    switch (tipo) {
-      case 'roteador': return Icons.router;
-      case 'local': return Icons.location_on;
-      case 'onu': return Icons.device_hub;
-      case 'antes': return Icons.photo_camera;
-      case 'depois': return Icons.check_circle;
-      default: return Icons.photo;
-    }
-  }
+    if (confirmar == true) {
+      setState(() {
+        _anexos.removeAt(index);
+      });
+      widget.onAnexosAlterados(_anexos);
 
-  String _getLabelTipo(String tipo) {
-    switch (tipo) {
-      case 'roteador': return '📡 Roteador';
-      case 'local': return '🏠 Local';
-      case 'onu': return '📦 ONU';
-      case 'antes': return '📷 Antes';
-      case 'depois': return '✅ Depois';
-      default: return 'Foto';
-    }
-  }
-
-  // ✅ NOVA FUNÇÃO: Descrição sugerida automaticamente
-  String _getDescricaoSugerida(String tipo) {
-    switch (tipo) {
-      case 'roteador':
-        return 'Roteador instalado e funcionando';
-      case 'local':
-        return 'Local do atendimento';
-      case 'onu':
-        return 'ONU conectada e operacional';
-      case 'antes':
-        return 'Situação antes do atendimento';
-      case 'depois':
-        return 'Situação após o atendimento';
-      default:
-        return '';
-    }
-  }
-
-  // ✅ NOVA FUNÇÃO: Placeholder para o campo de descrição
-  String _getPlaceholderDescricao(String tipo) {
-    switch (tipo) {
-      case 'roteador':
-        return 'Ex: Roteador na parede da sala, cabo organizado';
-      case 'local':
-        return 'Ex: Cômodo onde foi feito o atendimento';
-      case 'onu':
-        return 'Ex: ONU com LED verde aceso, sinal OK';
-      case 'antes':
-        return 'Ex: Cabo solto, equipamento desligado';
-      case 'depois':
-        return 'Ex: Tudo organizado e funcionando';
-      default:
-        return 'Descreva o que aparece na foto...';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🗑️ Foto removida'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
     }
   }
 }

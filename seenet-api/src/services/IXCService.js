@@ -317,7 +317,7 @@ async deslocarParaOS(osId, dados) {
       mensagem: dados.mensagem || 'Técnico a caminho do local',
       latitude: dados.latitude || '',
       longitude: dados.longitude || '',
-      id_evento: dados.id_evento || '' // Vazio por enquanto
+      id_evento: '2' // Vazio por enquanto
     });
 
   } catch (error) {

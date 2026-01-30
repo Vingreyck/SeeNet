@@ -155,6 +155,92 @@ class IXCService {
     }
   }
 
+  /**
+   * ✅ NOVO: Método genérico para atualizar status da OS
+   * PUT /su_oss_chamado/:id
+   */
+  async atualizarStatusOS(osId, dados) {
+    try {
+      console.log(`🔄 Atualizando OS ${osId} para status "${dados.status}"...`);
+
+      // Buscar dados completos da OS primeiro (campos obrigatórios)
+      const osDetalhes = await this.buscarDetalhesOS(osId);
+
+      if (!osDetalhes) {
+        throw new Error(`OS ${osId} não encontrada no IXC`);
+      }
+
+      // Preparar payload com TODOS os campos obrigatórios
+      const payload = {
+        // Campos obrigatórios da OS (preservar valores)
+        tipo: osDetalhes.tipo || 'C',
+        id_cliente: osDetalhes.id_cliente || '',
+        id_filial: osDetalhes.id_filial || '',
+        id_assunto: osDetalhes.id_assunto || '',
+
+        // Status e técnico (o que queremos atualizar)
+        status: dados.status,
+        id_tecnico: dados.id_tecnico || osDetalhes.id_tecnico || '',
+
+        // Data/hora do evento
+        data_hora_execucao: dados.data_hora_execucao || this.formatarDataIXC(new Date()),
+
+        // GPS (se disponível)
+        latitude: dados.latitude || '',
+        longitude: dados.longitude || '',
+        gps_time: (dados.latitude && dados.longitude)
+          ? this.formatarDataIXC(new Date())
+          : '',
+
+        // Mensagem (opcional)
+        mensagem: dados.mensagem || '',
+
+        // id_evento - testando VAZIO primeiro
+        id_evento: dados.id_evento || '',
+
+        // Outros campos que podem ser obrigatórios
+        prioridade: osDetalhes.prioridade || 'N',
+        origem_endereco: osDetalhes.origem_endereco || 'C',
+        setor: osDetalhes.setor || osDetalhes.id_setor || ''
+      };
+
+      console.log('📤 PUT /su_oss_chamado/' + osId + ' - Status: ' + dados.status);
+      console.log('📦 Payload enviado:', JSON.stringify(payload, null, 2));
+
+      // Fazer PUT no endpoint correto
+      const response = await this.clientAlterar.put(`/su_oss_chamado/${osId}`, payload);
+
+      // ✅ LOG DETALHADO DA RESPOSTA
+      console.log('📥 Resposta completa do IXC:');
+      console.log('   Status HTTP:', response.status);
+      console.log('   Headers:', JSON.stringify(response.headers, null, 2));
+      console.log('   Body:', JSON.stringify(response.data, null, 2));
+
+      // Verificar resposta
+      if (response.data?.type === 'error') {
+        console.error(`❌ Erro IXC:`, response.data.message);
+        throw new Error(response.data.message || 'Erro ao atualizar OS no IXC');
+      }
+
+      // Verificar se tem mensagem de sucesso
+      if (response.data?.type === 'success') {
+        console.log(`✅ OS ${osId} atualizada com sucesso - Status: ${dados.status}`);
+      } else {
+        console.log(`⚠️ OS ${osId} - Resposta sem confirmação explícita`);
+      }
+
+      return response.data;
+
+    } catch (error) {
+      console.error(`❌ Erro ao atualizar OS ${osId}:`, error.message);
+      if (error.response) {
+        console.error('   Response status:', error.response.status);
+        console.error('   Response data:', JSON.stringify(error.response.data, null, 2));
+      }
+      throw error;
+    }
+  }
+
 /**
  * ✅ Finalizar OS no IXC usando endpoint correto
  * POST /su_oss_chamado_fechar
@@ -216,74 +302,7 @@ async finalizarOS(osId, dados) {
     throw error;
   }
 }
-/**
- * ✅ NOVO: Método genérico para atualizar status da OS
- * PUT /su_oss_chamado/:id
- */
-async atualizarStatusOS(osId, dados) {
-  try {
-    console.log(`🔄 Atualizando OS ${osId} para status "${dados.status}"...`);
 
-    // Buscar dados completos da OS primeiro (campos obrigatórios)
-    const osDetalhes = await this.buscarDetalhesOS(osId);
-
-    if (!osDetalhes) {
-      throw new Error(`OS ${osId} não encontrada no IXC`);
-    }
-
-    // Preparar payload com TODOS os campos obrigatórios
-    const payload = {
-      // Campos obrigatórios da OS (preservar valores)
-      tipo: osDetalhes.tipo || 'C',
-      id_cliente: osDetalhes.id_cliente || '',
-      id_filial: osDetalhes.id_filial || '',
-      id_assunto: osDetalhes.id_assunto || '',
-
-      // Status e técnico (o que queremos atualizar)
-      status: dados.status,
-      id_tecnico: dados.id_tecnico || osDetalhes.id_tecnico || '',
-
-      // Data/hora do evento
-      data_hora_execucao: dados.data_hora_execucao || this.formatarDataIXC(new Date()),
-
-      // GPS (se disponível)
-      latitude: dados.latitude || '',
-      longitude: dados.longitude || '',
-      gps_time: (dados.latitude && dados.longitude)
-        ? this.formatarDataIXC(new Date())
-        : '',
-
-      // Mensagem (opcional)
-      mensagem: dados.mensagem || '',
-
-      // id_evento - vamos testar VAZIO primeiro
-      id_evento: dados.id_evento || '',
-
-      // Outros campos que podem ser obrigatórios
-      prioridade: osDetalhes.prioridade || 'N',
-      origem_endereco: osDetalhes.origem_endereco || 'C',
-      setor: osDetalhes.setor || osDetalhes.id_setor || ''
-    };
-
-    console.log(`📤 PUT /su_oss_chamado/${osId} - Status: ${dados.status}`);
-
-    // Fazer PUT no endpoint correto
-    const response = await this.clientAlterar.put(`/su_oss_chamado/${osId}`, payload);
-
-    // Verificar resposta
-    if (response.data?.type === 'error') {
-      console.error(`❌ Erro IXC:`, response.data.message);
-      throw new Error(response.data.message || 'Erro ao atualizar OS no IXC');
-    }
-
-    console.log(`✅ OS ${osId} atualizada - Status: ${dados.status}`);
-    return response.data;
-
-  } catch (error) {
-    console.error(`❌ Erro ao atualizar OS ${osId}:`, error.message);
-    throw error;
-  }
-}
 /**
  * Iniciar deslocamento para OS (status DS)
  * PUT /su_oss_chamado/:id

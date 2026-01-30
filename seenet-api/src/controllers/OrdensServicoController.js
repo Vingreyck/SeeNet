@@ -186,7 +186,7 @@ async deslocarParaOS(req, res) {
         data_inicio_deslocamento: db.fn.now(),
         data_atualizacao: db.fn.now()
       });
-/*
+
     // Sincronizar deslocamento com IXC
     if (os.origem === 'IXC' && os.id_externo) {
       try {
@@ -195,7 +195,7 @@ async deslocarParaOS(req, res) {
         console.error('⚠️ Erro ao sincronizar com IXC:', error.message);
       }
     }
-*/
+
     await trx.commit();
 
     console.log(`✅ OS ${os.numero_os} - Técnico em deslocamento`);

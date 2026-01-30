@@ -217,37 +217,90 @@ async finalizarOS(osId, dados) {
   }
 }
 /**
- * Iniciar deslocamento para OS (status D)
- * POST /su_oss_chamado_mensagem
+ * ✅ NOVO: Método genérico para atualizar status da OS
+ * PUT /su_oss_chamado/:id
+ */
+async atualizarStatusOS(osId, dados) {
+  try {
+    console.log(`🔄 Atualizando OS ${osId} para status "${dados.status}"...`);
+
+    // Buscar dados completos da OS primeiro (campos obrigatórios)
+    const osDetalhes = await this.buscarDetalhesOS(osId);
+
+    if (!osDetalhes) {
+      throw new Error(`OS ${osId} não encontrada no IXC`);
+    }
+
+    // Preparar payload com TODOS os campos obrigatórios
+    const payload = {
+      // Campos obrigatórios da OS (preservar valores)
+      tipo: osDetalhes.tipo || 'C',
+      id_cliente: osDetalhes.id_cliente || '',
+      id_filial: osDetalhes.id_filial || '',
+      id_assunto: osDetalhes.id_assunto || '',
+
+      // Status e técnico (o que queremos atualizar)
+      status: dados.status,
+      id_tecnico: dados.id_tecnico || osDetalhes.id_tecnico || '',
+
+      // Data/hora do evento
+      data_hora_execucao: dados.data_hora_execucao || this.formatarDataIXC(new Date()),
+
+      // GPS (se disponível)
+      latitude: dados.latitude || '',
+      longitude: dados.longitude || '',
+      gps_time: (dados.latitude && dados.longitude)
+        ? this.formatarDataIXC(new Date())
+        : '',
+
+      // Mensagem (opcional)
+      mensagem: dados.mensagem || '',
+
+      // id_evento - vamos testar VAZIO primeiro
+      id_evento: dados.id_evento || '',
+
+      // Outros campos que podem ser obrigatórios
+      prioridade: osDetalhes.prioridade || 'N',
+      origem_endereco: osDetalhes.origem_endereco || 'C',
+      setor: osDetalhes.setor || osDetalhes.id_setor || ''
+    };
+
+    console.log(`📤 PUT /su_oss_chamado/${osId} - Status: ${dados.status}`);
+
+    // Fazer PUT no endpoint correto
+    const response = await this.clientAlterar.put(`/su_oss_chamado/${osId}`, payload);
+
+    // Verificar resposta
+    if (response.data?.type === 'error') {
+      console.error(`❌ Erro IXC:`, response.data.message);
+      throw new Error(response.data.message || 'Erro ao atualizar OS no IXC');
+    }
+
+    console.log(`✅ OS ${osId} atualizada - Status: ${dados.status}`);
+    return response.data;
+
+  } catch (error) {
+    console.error(`❌ Erro ao atualizar OS ${osId}:`, error.message);
+    throw error;
+  }
+}
+/**
+ * Iniciar deslocamento para OS (status DS)
+ * PUT /su_oss_chamado/:id
  */
 async deslocarParaOS(osId, dados) {
   try {
     console.log(`🚗 Técnico deslocando para OS ${osId}...`);
 
-    const payload = {
-      id_chamado: osId.toString(),
+    return await this.atualizarStatusOS(osId, {
+      status: 'DS', // ← Correto: DS (não D)
+      id_tecnico: dados.id_tecnico_ixc?.toString() || '',
       mensagem: dados.mensagem || 'Técnico a caminho do local',
-      status: 'D',
-      id_tecnico: dados.id_tecnico_ixc?.toString() || ''
-    };
+      latitude: dados.latitude || '',
+      longitude: dados.longitude || '',
+      id_evento: dados.id_evento || '' // Vazio por enquanto
+    });
 
-    // ✅ Adicionar GPS se disponível
-    if (dados.latitude && dados.longitude) {
-      payload.latitude = dados.latitude.toString();
-      payload.longitude = dados.longitude.toString();
-      payload.gps_time = this.formatarDataIXC(new Date());
-    }
-
-    console.log('📤 POST /su_oss_chamado_mensagem - Deslocamento');
-
-    const response = await this.clientAlterar.post('/su_oss_chamado_mensagem', payload);
-
-    if (response.data?.type === 'error') {
-      throw new Error(response.data.message || 'Erro ao iniciar deslocamento');
-    }
-
-    console.log(`✅ OS ${osId} - Técnico em deslocamento (status: D)`);
-    return response.data;
   } catch (error) {
     console.error(`❌ Erro ao iniciar deslocamento para OS ${osId}:`, error.message);
     throw error;

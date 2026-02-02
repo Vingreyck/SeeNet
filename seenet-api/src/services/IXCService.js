@@ -304,24 +304,74 @@ async finalizarOS(osId, dados) {
 }
 
 /**
- * Iniciar deslocamento para OS (status DS)
- * PUT /su_oss_chamado/:id
+ * ✅ Adicionar mensagem/interação em uma OS
+ * POST /su_oss_chamado_mensagem
+ *
+ * IMPORTANTE: Este endpoint NÃO muda o status, apenas adiciona uma mensagem
+ * ao histórico da OS. Útil para registrar eventos que a API não suporta.
+ */
+async adicionarMensagemOS(osId, dados) {
+  try {
+    console.log(`💬 Adicionando mensagem na OS ${osId}...`);
+
+    const payload = {
+      id_chamado: osId.toString(),
+      mensagem: dados.mensagem || 'Atualização via API',
+      id_tecnico: dados.id_tecnico || '',
+      id_evento: dados.id_evento || '2', // 2 = Alteração
+
+      // GPS (opcional)
+      latitude: dados.latitude?.toString() || '',
+      longitude: dados.longitude?.toString() || '',
+      gps_time: (dados.latitude && dados.longitude)
+        ? this.formatarDataIXC(new Date())
+        : ''
+    };
+
+    console.log('📤 POST /su_oss_chamado_mensagem (apenas mensagem)');
+
+    const response = await this.clientAlterar.post('/su_oss_chamado_mensagem', payload);
+
+    if (response.data?.type === 'error') {
+      throw new Error(response.data.message || 'Erro ao adicionar mensagem');
+    }
+
+    console.log(`✅ Mensagem adicionada na OS ${osId}`);
+    return response.data;
+
+  } catch (error) {
+    console.error(`❌ Erro ao adicionar mensagem na OS ${osId}:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * ⚠️ DESCONTINUADO: Iniciar deslocamento para OS (status DS)
+ *
+ * LIMITAÇÃO DA API IXC:
+ * O status "DS" (Deslocamento) só pode ser alterado pelo aplicativo "Inmap Service".
+ * A API REST pública NÃO tem endpoint para mudar para este status.
+ *
+ * SOLUÇÃO ADOTADA:
+ * Usamos adicionarMensagemOS() para registrar o deslocamento como mensagem/interação.
+ * O status continua "Aberta" no IXC, mas fica registrado no histórico.
  */
 async deslocarParaOS(osId, dados) {
   try {
-    console.log(`🚗 Técnico deslocando para OS ${osId}...`);
+    console.log(`🚗 Registrando deslocamento para OS ${osId}...`);
 
-    return await this.atualizarStatusOS(osId, {
-      status: 'DS', // ← Correto: DS (não D)
-      id_tecnico: dados.id_tecnico_ixc?.toString() || '',
+    // ⚠️ Não é possível mudar status para DS via API
+    // Registramos como mensagem no histórico
+    return await this.adicionarMensagemOS(osId, {
       mensagem: dados.mensagem || 'Técnico a caminho do local',
+      id_tecnico: dados.id_tecnico_ixc?.toString() || '',
       latitude: dados.latitude || '',
       longitude: dados.longitude || '',
-      id_evento: '2' // Vazio por enquanto
+      id_evento: '2' // Alteração
     });
 
   } catch (error) {
-    console.error(`❌ Erro ao iniciar deslocamento para OS ${osId}:`, error.message);
+    console.error(`❌ Erro ao registrar deslocamento para OS ${osId}:`, error.message);
     throw error;
   }
 }
@@ -415,6 +465,127 @@ async uploadFotoOS(osId, clienteId, fotoData) {
     throw error;
   }
 }
+  /**
+   * ✅ Listar arquivos de uma OS
+   * GET /su_oss_chamado_arquivos
+   */
+  async listarArquivosOS(osId) {
+    try {
+      console.log(`📂 Listando arquivos da OS ${osId}...`);
+
+      const payload = {
+        qtype: 'su_oss_chamado_arquivos.id_oss_chamado',
+        query: osId.toString(),
+        oper: '=',
+        page: '1',
+        rp: '1000',
+        sortname: 'su_oss_chamado_arquivos.id',
+        sortorder: 'desc'
+      };
+
+      const response = await this.clientListar.post(
+        '/su_oss_chamado_arquivos',
+        JSON.stringify(payload)
+      );
+
+      if (response.data?.type === 'error') {
+        throw new Error(response.data.message || 'Erro ao listar arquivos');
+      }
+
+      const arquivos = response.data?.registros || [];
+      console.log(`✅ ${arquivos.length} arquivo(s) encontrado(s) na OS ${osId}`);
+
+      return arquivos;
+    } catch (error) {
+      console.error(`❌ Erro ao listar arquivos da OS ${osId}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Baixar/Visualizar arquivo específico
+   * GET /visualizar_arquivo_os
+   *
+   * IMPORTANTE: Retorna o arquivo em BINÁRIO (não base64)
+   */
+  async baixarArquivo(arquivoId) {
+    try {
+      console.log(`📥 Baixando arquivo ID ${arquivoId}...`);
+
+      const payload = {
+        id: arquivoId.toString()
+      };
+
+      // IMPORTANTE: responseType 'arraybuffer' para receber binário
+      const response = await this.clientListar.post(
+        '/visualizar_arquivo_os',
+        JSON.stringify(payload),
+        {
+          responseType: 'arraybuffer'
+        }
+      );
+
+      console.log(`✅ Arquivo ${arquivoId} baixado (${response.data.byteLength} bytes)`);
+
+      return Buffer.from(response.data);
+    } catch (error) {
+      console.error(`❌ Erro ao baixar arquivo ${arquivoId}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Buscar e baixar relatório de uma OS
+   * Combina listarArquivosOS + baixarArquivo
+   */
+  async buscarRelatorioPDF(osId) {
+    try {
+      console.log(`📄 Buscando relatório da OS ${osId}...`);
+
+      // 1️⃣ Listar todos arquivos da OS
+      const arquivos = await this.listarArquivosOS(osId);
+
+      if (arquivos.length === 0) {
+        throw new Error('Nenhum arquivo encontrado para esta OS');
+      }
+
+      // 2️⃣ Procurar o relatório
+      // Pode ser identificado por:
+      // - descricao contém "relatorio" ou "relatório"
+      // - tipo específico
+      // - nome do arquivo .pdf
+      const relatorio = arquivos.find(arquivo => {
+        const desc = (arquivo.descricao || '').toLowerCase();
+        const nome = (arquivo.nome_arquivo || '').toLowerCase();
+
+        return desc.includes('relatorio') ||
+               desc.includes('relatório') ||
+               nome.includes('relatorio') ||
+               nome.includes('relatório');
+      });
+
+      if (!relatorio) {
+        console.log('⚠️ Relatório não encontrado. Arquivos disponíveis:');
+        arquivos.forEach(a => console.log(`   - ID: ${a.id}, Desc: ${a.descricao}, Nome: ${a.nome_arquivo}`));
+        throw new Error('Relatório não encontrado nos arquivos da OS');
+      }
+
+      console.log(`📄 Relatório encontrado: ${relatorio.descricao || relatorio.nome_arquivo} (ID: ${relatorio.id})`);
+
+      // 3️⃣ Baixar o relatório
+      const pdfBuffer = await this.baixarArquivo(relatorio.id);
+
+      return {
+        buffer: pdfBuffer,
+        nome: relatorio.nome_arquivo || `relatorio_os_${osId}.pdf`,
+        descricao: relatorio.descricao || 'Relatório de Atendimento'
+      };
+    } catch (error) {
+      console.error(`❌ Erro ao buscar relatório da OS ${osId}:`, error.message);
+      throw error;
+    }
+  }
+
   /**
    * Testar conexão com IXC
    */

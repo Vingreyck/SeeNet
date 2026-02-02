@@ -187,12 +187,13 @@ async deslocarParaOS(req, res) {
         data_atualizacao: db.fn.now()
       });
 
-    // Sincronizar deslocamento com IXC
+    // ✅ Sincronizar deslocamento com IXC (apenas como mensagem)
     if (os.origem === 'IXC' && os.id_externo) {
       try {
         await this.sincronizarDeslocamentoComIXC(trx, os, { latitude, longitude });
       } catch (error) {
         console.error('⚠️ Erro ao sincronizar com IXC:', error.message);
+        // Não bloqueia o deslocamento local se IXC falhar
       }
     }
 
@@ -213,10 +214,17 @@ async deslocarParaOS(req, res) {
 
 
 /**
- * Sincronizar deslocamento com IXC
+ * Sincronizar deslocamento com IXC (apenas como mensagem)
+ *
+ * LIMITAÇÃO DA API IXC:
+ * O status "DS" (Deslocamento) só pode ser alterado pelo app "Inmap Service".
+ * Não há endpoint público da API REST para mudar para este status.
+ *
+ * SOLUÇÃO:
+ * Registramos o deslocamento como mensagem/interação no histórico da OS.
  */
 async sincronizarDeslocamentoComIXC(trx, os, dados) {
-  console.log(`🔄 Sincronizando deslocamento da OS ${os.numero_os} com IXC...`);
+  console.log(`🔄 Registrando deslocamento da OS ${os.numero_os} no IXC (como mensagem)...`);
 
   const integracao = await trx('integracao_ixc')
     .where('tenant_id', os.tenant_id)
@@ -232,16 +240,40 @@ async sincronizarDeslocamentoComIXC(trx, os, dados) {
     .where('tenant_id', os.tenant_id)
     .first();
 
+  const tecnico = await trx('usuarios')
+    .where('id', os.tecnico_id)
+    .first();
+
   const ixc = new IXCService(integracao.url_api, integracao.token_api);
 
-  await ixc.deslocarParaOS(parseInt(os.id_externo), {
-    id_tecnico_ixc: mapeamento?.tecnico_ixc_id,
-    mensagem: 'Técnico a caminho do local',
-    latitude: dados.latitude,
-    longitude: dados.longitude
+  // Formatar data/hora
+  const agora = new Date();
+  const dataHora = agora.toLocaleString('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short'
   });
 
-  console.log(`✅ OS ${os.numero_os} - Status "D" (Deslocamento) no IXC`);
+  // Montar mensagem completa
+  const mensagem = `🚗 DESLOCAMENTO INICIADO
+
+Técnico: ${tecnico.nome}
+Data/Hora: ${dataHora}
+${dados.latitude && dados.longitude ? `Coordenadas: ${dados.latitude}, ${dados.longitude}` : ''}
+
+Status: Técnico a caminho do local de atendimento.
+
+📱 Registrado via SeeNet`;
+
+  // ⚠️ Não mudamos o status (IXC não permite via API)
+  // Apenas registramos como mensagem no histórico
+  await ixc.adicionarMensagemOS(parseInt(os.id_externo), {
+    mensagem: mensagem,
+    id_tecnico: mapeamento?.tecnico_ixc_id || '',
+    latitude: dados.latitude || '',
+    longitude: dados.longitude || ''
+  });
+
+  console.log(`✅ OS ${os.numero_os} - Deslocamento registrado como mensagem no IXC`);
 }
 
 /**
@@ -483,6 +515,14 @@ async sincronizarExecucaoComIXC(trx, os, dados) {
 
       console.log(`✅ OS ${os.numero_os} finalizada com sucesso`);
 
+      // ✅ Baixar relatório PDF do IXC (após commit)
+      if (os.origem === 'IXC' && os.id_externo) {
+        // Executar em background (não bloqueia resposta)
+        this.baixarRelatorioPDFBackground(id, os.id_externo, tenantId).catch(error => {
+          console.error('⚠️ Erro ao baixar relatório em background:', error.message);
+        });
+      }
+
       return res.json({
         success: true,
         message: 'OS finalizada com sucesso'
@@ -618,6 +658,50 @@ if (dados.fotos && dados.fotos.length > 0) {
   }
 }
 }
+}
+
+  /**
+   * ✅ Baixar relatório PDF do IXC em background
+   * Executa após finalizar a OS sem bloquear a resposta
+   */
+  async baixarRelatorioPDFBackground(osId, osIdExterno, tenantId) {
+    try {
+      console.log(`📄 Iniciando download do relatório da OS ${osIdExterno} em background...`);
+
+      // Aguardar 5 segundos para IXC processar/gerar o relatório
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      // Buscar integração IXC
+      const integracao = await db('integracao_ixc')
+        .where('tenant_id', tenantId)
+        .where('ativo', true)
+        .first();
+
+      if (!integracao) {
+        throw new Error('Integração IXC não configurada');
+      }
+
+      const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+      // Buscar e baixar relatório
+      const relatorio = await ixc.buscarRelatorioPDF(osIdExterno);
+
+      // Salvar no banco
+      await db('os_anexos').insert({
+        ordem_servico_id: osId,
+        tipo: 'relatorio',
+        descricao: relatorio.descricao,
+        url_arquivo: relatorio.buffer.toString('base64'),
+        nome_arquivo: relatorio.nome,
+        data_upload: db.fn.now()
+      });
+
+      console.log(`✅ Relatório PDF baixado e salvo: ${relatorio.nome}`);
+    } catch (error) {
+      console.error(`❌ Erro ao baixar relatório da OS ${osIdExterno}:`, error.message);
+      // Não propaga erro - execução em background
+    }
+  }
 }
 
 module.exports = new OrdensServicoController();

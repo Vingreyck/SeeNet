@@ -658,9 +658,7 @@ if (dados.fotos && dados.fotos.length > 0) {
   }
 }
 }
-}
-
-  /**
+/**
    * ✅ Baixar relatório PDF do IXC em background
    * Executa após finalizar a OS sem bloquear a resposta
    */

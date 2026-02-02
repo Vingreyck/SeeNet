@@ -465,7 +465,8 @@ async uploadFotoOS(osId, clienteId, fotoData) {
     throw error;
   }
 }
-  /**
+
+/**
    * ✅ Listar arquivos de uma OS
    * GET /su_oss_chamado_arquivos
    */
@@ -550,10 +551,6 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       }
 
       // 2️⃣ Procurar o relatório
-      // Pode ser identificado por:
-      // - descricao contém "relatorio" ou "relatório"
-      // - tipo específico
-      // - nome do arquivo .pdf
       const relatorio = arquivos.find(arquivo => {
         const desc = (arquivo.descricao || '').toLowerCase();
         const nome = (arquivo.nome_arquivo || '').toLowerCase();

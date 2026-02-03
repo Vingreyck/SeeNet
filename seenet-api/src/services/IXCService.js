@@ -13,7 +13,7 @@ class IXCService {
         'Content-Type': 'application/x-www-form-urlencoded',
         'ixcsoft': 'listar'
       },
-      timeout: 50000,
+      timeout: 120000,
     });
 
     // Cliente para requisições de ALTERAÇÃO (PUT com JSON)
@@ -23,7 +23,7 @@ class IXCService {
         'Authorization': `Basic ${Buffer.from(this.token).toString('base64')}`,
         'Content-Type': 'application/json'
       },
-      timeout: 50000,
+      timeout: 120000,
     });
   }
 

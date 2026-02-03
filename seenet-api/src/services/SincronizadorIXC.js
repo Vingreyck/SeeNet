@@ -7,7 +7,7 @@ class SincronizadorIXC {
     this.sincronizacaoAtiva = false;
     this.intervalId = null;
     this.cacheClientes = new Map();
-    this.maxOSsPorSync = 50;
+    this.maxOSsPorSync = 10;
   }
 
   iniciar() {
@@ -77,103 +77,103 @@ class SincronizadorIXC {
     }
   }
 
-  async sincronizarEmpresa(integracao) {
-    const trx = await db.transaction();
+async sincronizarEmpresa(integracao) {
+  const trx = await db.transaction();
 
-    try {
-      console.log(`\n📡 Sincronizando: ${integracao.empresa_nome}`);
+  try {
+    console.log(`\n📡 Sincronizando: ${integracao.empresa_nome}`);
 
-      // Criar cliente IXC
-      const ixc = new IXCService(integracao.url_api, integracao.token_api);
+    // Criar cliente IXC
+    const ixc = new IXCService(integracao.url_api, integracao.token_api);
 
-      // 1. Buscar mapeamento de técnicos
-      const mapeamentos = await trx('mapeamento_tecnicos_ixc as m')
-        .join('usuarios as u', 'u.id', 'm.usuario_id')
-        .where('m.tenant_id', integracao.tenant_id)
-        .where('m.ativo', true)
-        .select(
-          'm.usuario_id',
-          'm.tecnico_ixc_id',
-          'm.tecnico_ixc_nome',
-          'u.nome as tecnico_seenet_nome'
-        );
+    // 1. Buscar mapeamento de técnicos
+    const mapeamentos = await trx('mapeamento_tecnicos_ixc as m')
+      .join('usuarios as u', 'u.id', 'm.usuario_id')
+      .where('m.tenant_id', integracao.tenant_id)
+      .where('m.ativo', true)
+      .select(
+        'm.usuario_id',
+        'm.tecnico_ixc_id',
+        'm.tecnico_ixc_nome',
+        'u.nome as tecnico_seenet_nome'
+      );
 
-      console.log(`👷 ${mapeamentos.length} técnico(s) mapeado(s)`);
+    console.log(`👷 ${mapeamentos.length} técnico(s) mapeado(s)`);
 
-      if (mapeamentos.length === 0) {
-        console.log('⚠️ Nenhum técnico mapeado, pulando sincronização');
-        await trx.commit();
-        return;
-      }
+    if (mapeamentos.length === 0) {
+      console.log('⚠️ Nenhum técnico mapeado, pulando sincronização');
+      await trx.commit();
+      return;
+    }
 
-      let totalOSsSincronizadas = 0;
+    let totalOSsSincronizadas = 0;
 
-      // 2. Para cada técnico mapeado, buscar suas OSs no IXC
-      for (const mapeamento of mapeamentos) {
-        try {
-          console.log(`   🔍 Buscando OSs do técnico: ${mapeamento.tecnico_seenet_nome}`);
+    // 2. Para cada técnico mapeado, buscar suas OSs no IXC
+    for (const mapeamento of mapeamentos) {
+      try {
+        console.log(`   🔍 Buscando OSs do técnico: ${mapeamento.tecnico_seenet_nome}`);
 
-          // Buscar OSs abertas (A) ou em atendimento (EA) do técnico no IXC
-          const ossIXC = await ixc.buscarOSs({
-            tecnicoId: mapeamento.tecnico_ixc_id,
+        // Buscar OSs abertas (A) ou em atendimento (EA) do técnico no IXC
+        const ossIXC = await ixc.buscarOSs({
+          tecnicoId: mapeamento.tecnico_ixc_id,
+        });
+
+        console.log(`   📋 ${ossIXC.length} OS(s) abertas no IXC`);
+
+        // Limitar OSs por ciclo
+        const ossParaProcessar = ossIXC.slice(0, this.maxOSsPorSync);
+
+        if (ossIXC.length > this.maxOSsPorSync) {
+          console.log(`   ⚠️ Limitando a ${this.maxOSsPorSync} OSs`);
+        }
+
+        // Coletar IDs externos para verificar cancelamentos
+        const idsExternosIXC = ossIXC.map(os => os.id.toString());
+
+        // 3. Sincronizar cada OS
+        for (const osIXC of ossParaProcessar) {
+          await this.sincronizarOS(trx, integracao.tenant_id, mapeamento.usuario_id, osIXC, ixc);
+          totalOSsSincronizadas++;
+        }
+
+        // 4. Marcar OSs que não existem mais no IXC como canceladas
+        // (apenas as que ainda estão pendentes ou em execução no SeeNet)
+        const ossCanceladas = await trx('ordem_servico')
+          .where('tenant_id', integracao.tenant_id)
+          .where('tecnico_id', mapeamento.usuario_id)
+          .where('origem', 'IXC')
+          .whereIn('status', ['pendente']) // Não cancelar as que estão em execução
+          .where(function() {
+            if (idsExternosIXC.length > 0) {
+              this.whereNotIn('id_externo', idsExternosIXC);
+            }
+          })
+          .update({
+            status: 'cancelada',
+            data_atualizacao: db.fn.now()
           });
 
-          console.log(`   📋 ${ossIXC.length} OS(s) abertas no IXC`);
-
-          // Limitar OSs por ciclo
-          const ossParaProcessar = ossIXC.slice(0, this.maxOSsPorSync);
-
-          if (ossIXC.length > this.maxOSsPorSync) {
-            console.log(`   ⚠️ Limitando a ${this.maxOSsPorSync} OSs`);
-          }
-
-          // Coletar IDs externos para verificar cancelamentos
-          const idsExternosIXC = ossIXC.map(os => os.id.toString());
-
-          // 3. Sincronizar cada OS
-          for (const osIXC of ossParaProcessar) {
-            await this.sincronizarOS(trx, integracao.tenant_id, mapeamento.usuario_id, osIXC, ixc);
-            totalOSsSincronizadas++;
-          }
-
-          // 4. Marcar OSs que não existem mais no IXC como canceladas
-          // (apenas as que ainda estão pendentes ou em execução no SeeNet)
-          const ossCanceladas = await trx('ordem_servico')
-            .where('tenant_id', integracao.tenant_id)
-            .where('tecnico_id', mapeamento.usuario_id)
-            .where('origem', 'IXC')
-            .whereIn('status', ['pendente']) // Não cancelar as que estão em execução
-            .where(function() {
-              if (idsExternosIXC.length > 0) {
-                this.whereNotIn('id_externo', idsExternosIXC);
-              }
-            })
-            .update({
-              status: 'cancelada',
-              data_atualizacao: db.fn.now()
-            });
-
-          if (ossCanceladas > 0) {
-            console.log(`   🗑️ ${ossCanceladas} OS(s) cancelada(s) (não encontradas no IXC)`);
-          }
-
-        } catch (error) {
-          console.error(`   ❌ Erro ao sincronizar técnico ${mapeamento.tecnico_seenet_nome}:`, error.message);
+        if (ossCanceladas > 0) {
+          console.log(`   🗑️ ${ossCanceladas} OS(s) cancelada(s) (não encontradas no IXC)`);
         }
+
+      } catch (error) {
+        console.error(`   ❌ Erro ao sincronizar técnico ${mapeamento.tecnico_seenet_nome}:`, error.message);
       }
-
-      // 5. Atualizar timestamp da última sincronização
-      await trx('integracao_ixc')
-        .where('id', integracao.id)
-        .update({ ultima_sincronizacao: db.fn.now() });
-
-      await trx.commit();
-      console.log(`✅ Total: ${totalOSsSincronizadas} OS(s) sincronizada(s)`);
-    } catch (error) {
-      await trx.rollback();
-      console.error(`❌ Erro ao sincronizar empresa ${integracao.empresa_nome}:`, error.message);
     }
+
+    // 5. Atualizar timestamp da última sincronização
+    await trx('integracao_ixc')
+      .where('id', integracao.id)
+      .update({ ultima_sincronizacao: db.fn.now() });
+
+    await trx.commit();
+    console.log(`✅ Total: ${totalOSsSincronizadas} OS(s) sincronizada(s)`);
+  } catch (error) {
+    await trx.rollback();
+    console.error(`❌ Erro ao sincronizar empresa ${integracao.empresa_nome}:`, error.message);
   }
+}
 
   async sincronizarOS(trx, tenantId, tecnicoId, osIXC, ixcService) {
     try {

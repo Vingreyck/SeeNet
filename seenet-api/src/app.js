@@ -347,6 +347,10 @@ app._router.stack.forEach(function(r){
 // Transcrições
 app.use('/api/transcriptions', require('./routes/transcriptions'));
 
+// APR
+const aprRoutes = require('./routes/apr_routes');
+app.use('/api/apr', aprRoutes);
+
 // Admin
 app.use('/api/admin', require('./routes/admin.routes'));
 

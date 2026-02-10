@@ -1,3 +1,4 @@
+// lib/ordem_de_servico/screens/executar_os_wizard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:typed_data';
@@ -7,6 +8,7 @@ import '../../models/ordem_servico_model.dart';
 import '../widgets/localizacao_widget.dart';
 import '../widgets/anexos_widget.dart';
 import '../widgets/assinatura_widget.dart';
+import 'apr_screen.dart'; // ✅ IMPORT DO APR
 import 'package:intl/intl.dart';
 
 
@@ -21,11 +23,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   final OrdemServicoController controller = Get.find<OrdemServicoController>();
   late OrdemServico os;
 
-  // Controle de etapas
   int _etapaAtual = 0;
   final int _totalEtapas = 8;
 
-  // Controllers
   final TextEditingController onuModeloController = TextEditingController();
   final TextEditingController onuSerialController = TextEditingController();
   final TextEditingController onuStatusController = TextEditingController();
@@ -35,7 +35,6 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   final TextEditingController materiaisController = TextEditingController();
   final TextEditingController observacoesController = TextEditingController();
 
-  // Dados coletados
   double? latitude;
   double? longitude;
   List<AnexoComDescricao> fotosAnexadas = [];
@@ -48,19 +47,17 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     super.initState();
     os = Get.arguments as OrdemServico;
 
-    // Determinar estado inicial baseado no status
     if (os.status == 'em_execucao') {
       osIniciada = true;
-      _etapaAtual = 1; // Já pode preencher formulário
+      _etapaAtual = 1;
     } else if (os.status == 'em_deslocamento') {
       osIniciada = false;
-      _etapaAtual = 0; // Precisa informar chegada
+      _etapaAtual = 0;
     } else {
       osIniciada = false;
-      _etapaAtual = 0; // Precisa iniciar deslocamento
+      _etapaAtual = 0;
     }
 
-    // Se já tem GPS salvo, usar
     if (os.latitude != null && os.longitude != null) {
       latitude = os.latitude;
       longitude = os.longitude;
@@ -79,6 +76,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     observacoesController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -137,10 +135,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
                   ),
                   Text(
                     _getNomeEtapa(_etapaAtual),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.white70,
-                    ),
+                    style: const TextStyle(fontSize: 14, color: Colors.white70),
                   ),
                 ],
               ),
@@ -156,19 +151,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
                     value: (_etapaAtual + 1) / _totalEtapas,
                     minHeight: 8,
                     backgroundColor: Colors.white24,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFF00FF88),
-                    ),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00FF88)),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Text(
                 '${_etapaAtual + 1}/$_totalEtapas',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -190,6 +180,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       default: return '';
     }
   }
+
   Widget _buildEtapaAtual() {
     switch (_etapaAtual) {
       case 0: return _buildEtapaLocalizacao();
@@ -222,10 +213,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildInfoRow('Cliente', os.clienteNome),
-                if (os.clienteEndereco != null)
-                  _buildInfoRow('Endereço', os.clienteEndereco!),
-                if (os.clienteTelefone != null)
-                  _buildInfoRow('Telefone', os.clienteTelefone!),
+                if (os.clienteEndereco != null) _buildInfoRow('Endereço', os.clienteEndereco!),
+                if (os.clienteTelefone != null) _buildInfoRow('Telefone', os.clienteTelefone!),
               ],
             ),
           ),
@@ -233,10 +222,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           _buildCard(
             child: LocalizacaoWidget(
               onLocalizacaoCapturada: (lat, lng) {
-                setState(() {
-                  latitude = lat;
-                  longitude = lng;
-                });
+                setState(() { latitude = lat; longitude = lng; });
               },
               latitudeInicial: latitude,
               longitudeInicial: longitude,
@@ -263,9 +249,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           _buildCard(
             child: AnexosWidget(
               onAnexosAlterados: (anexos) {
-                setState(() {
-                  fotosAnexadas = anexos; // ✅ ARMAZENAR OBJETOS COMPLETOS
-                });
+                setState(() { fotosAnexadas = anexos; });
               },
             ),
           ),
@@ -290,23 +274,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           _buildCard(
             child: Column(
               children: [
-                _buildTextField(
-                  controller: onuModeloController,
-                  label: 'Modelo da ONU',
-                  hint: 'Ex: AN5506-04-F',
-                ),
+                _buildTextField(controller: onuModeloController, label: 'Modelo da ONU', hint: 'Ex: AN5506-04-F'),
                 const SizedBox(height: 16),
-                _buildTextField(
-                  controller: onuSerialController,
-                  label: 'Serial da ONU',
-                  hint: 'Ex: HWTC12345678',
-                ),
+                _buildTextField(controller: onuSerialController, label: 'Serial da ONU', hint: 'Ex: HWTC12345678'),
                 const SizedBox(height: 16),
-                _buildTextField(
-                  controller: onuStatusController,
-                  label: 'Status',
-                  hint: 'Ex: Online',
-                ),
+                _buildTextField(controller: onuStatusController, label: 'Status', hint: 'Ex: Online'),
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: onuSinalController,
@@ -427,9 +399,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           _buildCard(
             child: AssinaturaWidget(
               onAssinaturaSalva: (assinatura) {
-                setState(() {
-                  assinaturaBytes = assinatura;
-                });
+                setState(() { assinaturaBytes = assinatura; });
               },
             ),
           ),
@@ -451,71 +421,28 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
             descricao: 'Confira todas as informações antes de finalizar',
           ),
           const SizedBox(height: 24),
-
-          // Localização
-          _buildResumoCard(
-            titulo: 'Localização',
-            icone: Icons.location_on,
-            conteudo: latitude != null && longitude != null
-                ? 'Lat: ${latitude!.toStringAsFixed(6)}\nLng: ${longitude!.toStringAsFixed(6)}'
-                : 'Não capturada',
-            editarEtapa: 0,
-          ),
-
-          // Fotos
-          _buildResumoCard(
-            titulo: 'Fotos',
-            icone: Icons.camera_alt,
-            conteudo: '${fotosAnexadas.length} foto(s) anexada(s)',
-            editarEtapa: 1,
-          ),
-
-          // Dados ONU
+          _buildResumoCard(titulo: 'Localização', icone: Icons.location_on, conteudo: latitude != null ? 'Lat: ${latitude!.toStringAsFixed(6)}\nLng: ${longitude!.toStringAsFixed(6)}' : 'Não capturada', editarEtapa: 0),
+          _buildResumoCard(titulo: 'Fotos', icone: Icons.camera_alt, conteudo: '${fotosAnexadas.length} foto(s) anexada(s)', editarEtapa: 1),
           if (onuModeloController.text.isNotEmpty)
-            _buildResumoCard(
-              titulo: 'Dados da ONU',
-              icone: Icons.router,
-              conteudo: 'Modelo: ${onuModeloController.text}',
-              editarEtapa: 2,
-            ),
-
-          // Relatos
+            _buildResumoCard(titulo: 'Dados da ONU', icone: Icons.router, conteudo: 'Modelo: ${onuModeloController.text}', editarEtapa: 2),
           _buildResumoCard(
-            titulo: 'Relatos',
-            icone: Icons.description,
-            conteudo: relatoProblemaController.text.length > 50
-                ? '${relatoProblemaController.text.substring(0, 50)}...'
-                : relatoProblemaController.text,
+            titulo: 'Relatos', icone: Icons.description,
+            conteudo: relatoProblemaController.text.length > 50 ? '${relatoProblemaController.text.substring(0, 50)}...' : relatoProblemaController.text,
             editarEtapa: 3,
           ),
-
-          // Materiais
           if (materiaisController.text.isNotEmpty)
-            _buildResumoCard(
-              titulo: 'Materiais',
-              icone: Icons.build,
-              conteudo: materiaisController.text.length > 50
-                  ? '${materiaisController.text.substring(0, 50)}...'
-                  : materiaisController.text,
-              editarEtapa: 4,
-            ),
-
-          // Assinatura
-          _buildResumoCard(
-            titulo: 'Assinatura',
-            icone: Icons.draw,
-            conteudo: assinaturaBytes != null ? '✓ Confirmada' : '✗ Não assinada',
-            editarEtapa: 6,
-          ),
+            _buildResumoCard(titulo: 'Materiais', icone: Icons.build, conteudo: materiaisController.text.length > 50 ? '${materiaisController.text.substring(0, 50)}...' : materiaisController.text, editarEtapa: 4),
+          _buildResumoCard(titulo: 'Assinatura', icone: Icons.draw, conteudo: assinaturaBytes != null ? '✓ Confirmada' : '✗ Não assinada', editarEtapa: 6),
         ],
       ),
     );
   }
-  Widget _buildTituloEtapa({
-    required IconData icone,
-    required String titulo,
-    required String descricao,
-  }) {
+
+  // ──────────────────────────────────────────────
+  // WIDGETS REUTILIZÁVEIS
+  // ──────────────────────────────────────────────
+
+  Widget _buildTituloEtapa({required IconData icone, required String titulo, required String descricao}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -523,26 +450,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           children: [
             Icon(icone, color: const Color(0xFF00FF88), size: 32),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                titulo,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+            Expanded(child: Text(titulo, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold))),
           ],
         ),
         const SizedBox(height: 8),
-        Text(
-          descricao,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
-          ),
-        ),
+        Text(descricao, style: const TextStyle(color: Colors.white70, fontSize: 14)),
       ],
     );
   }
@@ -559,12 +471,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     );
   }
 
-  Widget _buildResumoCard({
-    required String titulo,
-    required IconData icone,
-    required String conteudo,
-    required int editarEtapa,
-  }) {
+  Widget _buildResumoCard({required String titulo, required IconData icone, required String conteudo, required int editarEtapa}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -581,30 +488,15 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  titulo,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(titulo, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(
-                  conteudo,
-                  style: const TextStyle(color: Colors.white70),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(conteudo, style: const TextStyle(color: Colors.white70), maxLines: 2, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
           IconButton(
             icon: const Icon(Icons.edit, color: Color(0xFF00FF88)),
-            onPressed: () {
-              setState(() {
-                _etapaAtual = editarEtapa;
-              });
-            },
+            onPressed: () => setState(() => _etapaAtual = editarEtapa),
           ),
         ],
       ),
@@ -630,18 +522,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
         hintStyle: const TextStyle(color: Colors.white30),
         filled: true,
         fillColor: const Color(0xFF1A1A1A),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.white12),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.white12),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF00FF88), width: 2),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00FF88), width: 2)),
       ),
     );
   }
@@ -652,72 +535,41 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 90,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              valor,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
+          SizedBox(width: 90, child: Text('$label:', style: const TextStyle(color: Colors.white70, fontSize: 14))),
+          Expanded(child: Text(valor, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500))),
         ],
       ),
     );
   }
+
+  // ──────────────────────────────────────────────
+  // BOTÕES DE NAVEGAÇÃO
+  // ──────────────────────────────────────────────
+
   Widget _buildBotoesNavegacao() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, -5))],
       ),
       child: Row(
         children: [
           if (_etapaAtual > 0)
             Expanded(
               child: OutlinedButton(
-                onPressed: () {
-                  setState(() {
-                    _etapaAtual--;
-                  });
-                },
+                onPressed: () => setState(() => _etapaAtual--),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
                   side: const BorderSide(color: Colors.white54),
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                 ),
-                child: const Text(
-                  'Anterior',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: const Text('Anterior', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
-
           if (_etapaAtual > 0) const SizedBox(width: 12),
-
           Expanded(
-            flex: _etapaAtual == 0 ? 1 : 1,
             child: ElevatedButton(
               onPressed: _proximaEtapa,
               style: ElevatedButton.styleFrom(
@@ -726,9 +578,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
                     : const Color(0xFF00FF88),
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
               ),
               child: Text(
                 _etapaAtual == 0
@@ -748,11 +598,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   }
 
   void _proximaEtapa() {
-    if (!_validarEtapaAtual()) {
-      return;
-    }
+    if (!_validarEtapaAtual()) return;
 
-    // Última etapa = iniciar execução ou finalizar
     if (_etapaAtual == 0 && !osIniciada) {
       _iniciarOS();
       return;
@@ -763,156 +610,116 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       return;
     }
 
-    setState(() {
-      _etapaAtual++;
-    });
+    setState(() => _etapaAtual++);
   }
 
   bool _validarEtapaAtual() {
     switch (_etapaAtual) {
-      case 0: // Localização
+      case 0:
         if (latitude == null || longitude == null) {
           _mostrarErro('Capture a localização antes de prosseguir');
           return false;
         }
         return true;
-
-      case 1: // Anexos (opcional)
+      case 3:
+        if (relatoProblemaController.text.trim().isEmpty) { _mostrarErro('Descreva o problema identificado'); return false; }
+        if (relatoSolucaoController.text.trim().isEmpty) { _mostrarErro('Descreva a solução aplicada'); return false; }
         return true;
-
-      case 2: // Dados ONU (opcional)
+      case 6:
+        if (assinaturaBytes == null) { _mostrarErro('Solicite a assinatura do cliente'); return false; }
         return true;
-
-      case 3: // Relatos
-        if (relatoProblemaController.text.trim().isEmpty) {
-          _mostrarErro('Descreva o problema identificado');
-          return false;
-        }
-        if (relatoSolucaoController.text.trim().isEmpty) {
-          _mostrarErro('Descreva a solução aplicada');
-          return false;
-        }
-        return true;
-
-      case 4: // Materiais (opcional)
-        return true;
-
-      case 5: // Observações (opcional)
-        return true;
-
-      case 6: // Assinatura
-        if (assinaturaBytes == null) {
-          _mostrarErro('Solicite a assinatura do cliente');
-          return false;
-        }
-        return true;
-
-      case 7: // Revisão
-        return true;
-
       default:
         return true;
     }
   }
 
   void _mostrarErro(String mensagem) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(mensagem),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(mensagem),
+      backgroundColor: Colors.orange,
+      duration: const Duration(seconds: 3),
+    ));
   }
+
+  // ──────────────────────────────────────────────
+  // LÓGICA DE INÍCIO / APR
+  // ──────────────────────────────────────────────
 
   Future<void> _iniciarOS() async {
     // ESTADO 1: Pendente → Iniciar Deslocamento
     if (statusAtual == 'pendente') {
-      print('🚗 Iniciando deslocamento...');
-
       final sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!);
 
       if (sucesso) {
-        setState(() {
-          statusAtual = 'em_deslocamento'; // ✅ CORRETO
-          osIniciada = false;
-        });
-
+        setState(() { statusAtual = 'em_deslocamento'; osIniciada = false; });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('🚗 Deslocamento iniciado! Dirija com segurança.'),
-              backgroundColor: Color(0xFF00FF88),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('🚗 Deslocamento iniciado! Dirija com segurança.'),
+            backgroundColor: Color(0xFF00FF88),
+            duration: Duration(seconds: 2),
+          ));
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Erro ao iniciar deslocamento'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        if (mounted) _mostrarErro('Erro ao iniciar deslocamento');
       }
       return;
     }
 
-    // ESTADO 2: Em Deslocamento → Chegar ao Local
+    // ESTADO 2: Em Deslocamento → Chegar ao Local → ABRIR APR
     if (statusAtual == 'em_deslocamento') {
-      print('📍 Informando chegada ao local...');
-
       final sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
 
-      if (sucesso) {
+      if (!sucesso) {
+        if (mounted) _mostrarErro('Erro ao informar chegada');
+        return;
+      }
+
+      // ✅ ABRE O APR OBRIGATÓRIO
+      if (!mounted) return;
+      final aprConcluido = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const AprScreen(),
+          settings: RouteSettings(arguments: os),
+        ),
+      );
+
+      if (aprConcluido == true) {
+        // APR preenchido → avança para o formulário de execução
         setState(() {
-          statusAtual = 'em_execucao'; // ✅ CORRETO
+          statusAtual = 'em_execucao';
           osIniciada = true;
           _etapaAtual = 1;
         });
-
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('📍 Chegou ao local! Preencha os dados do atendimento.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ APR concluído! Preencha os dados do atendimento.'),
+            backgroundColor: Color(0xFF00FF88),
+            duration: Duration(seconds: 2),
+          ));
         }
       } else {
+        // Técnico voltou sem preencher o APR — fica na etapa de localização
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Erro ao informar chegada'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('⚠️ O APR é obrigatório para continuar o atendimento.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ));
         }
       }
       return;
     }
 
-    // ESTADO 3: Já está em execução - só avançar
+    // ESTADO 3: Já está em execução
     if (statusAtual == 'em_execucao') {
-      setState(() {
-        osIniciada = true;
-        _etapaAtual = 1;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✓ Execução já iniciada!'),
-            backgroundColor: Color(0xFF00FF88),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      setState(() { osIniciada = true; _etapaAtual = 1; });
     }
   }
+
+  // ──────────────────────────────────────────────
+  // FINALIZAR OS
+  // ──────────────────────────────────────────────
 
   Future<void> _finalizarOS() async {
     final confirmar = await showDialog<bool>(
@@ -920,29 +727,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF232323),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Finalizar OS?',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          'Os dados serão enviados para o IXC. Confirma?',
-          style: TextStyle(color: Colors.white70),
-        ),
+        title: const Text('Finalizar OS?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text('Os dados serão enviados para o IXC. Confirma?', style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF88),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text(
-              'Confirmar',
-              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF88), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            child: const Text('Confirmar', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -956,38 +748,28 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       'onu_modelo': onuModeloController.text.trim(),
       'onu_serial': onuSerialController.text.trim(),
       'onu_status': onuStatusController.text.trim(),
-      'onu_sinal_optico': onuSinalController.text.trim().isNotEmpty
-          ? double.tryParse(onuSinalController.text.trim())
-          : null,
+      'onu_sinal_optico': onuSinalController.text.trim().isNotEmpty ? double.tryParse(onuSinalController.text.trim()) : null,
       'relato_problema': relatoProblemaController.text.trim(),
       'relato_solucao': relatoSolucaoController.text.trim(),
       'materiais_utilizados': materiaisController.text.trim(),
       'observacoes': observacoesController.text.trim(),
-      'fotos': fotosAnexadas.map((anexo) => {
-        'tipo': anexo.tipo,
-        'descricao': anexo.descricao,
-        'path': anexo.foto.path,
-      }).toList(),
+      'fotos': fotosAnexadas.map((anexo) => {'tipo': anexo.tipo, 'descricao': anexo.descricao, 'path': anexo.foto.path}).toList(),
       'assinatura': base64Encode(assinaturaBytes!),
     };
 
     final sucesso = await controller.finalizarExecucao(os.id, dados);
 
     if (sucesso && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✓ OS finalizada com sucesso!'),
-          backgroundColor: Color(0xFF00FF88),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('✓ OS finalizada com sucesso!'),
+        backgroundColor: Color(0xFF00FF88),
+      ));
       Navigator.pop(context, true);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro ao finalizar OS'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Erro ao finalizar OS'),
+        backgroundColor: Colors.red,
+      ));
     }
   }
 }

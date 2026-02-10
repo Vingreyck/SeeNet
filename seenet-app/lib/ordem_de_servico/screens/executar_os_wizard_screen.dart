@@ -679,8 +679,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       final aprConcluido = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (_) => const AprScreen(),
-          settings: RouteSettings(arguments: os),
+          builder: (_) => AprScreen(os: os),
         ),
       );
 

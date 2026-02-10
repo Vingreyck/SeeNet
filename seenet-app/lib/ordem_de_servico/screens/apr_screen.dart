@@ -66,7 +66,8 @@ class OpcaoApr {
 // ──────────────────────────────────────────────
 
 class AprScreen extends StatefulWidget {
-  const AprScreen({super.key});
+  final OrdemServico os;
+  const AprScreen({super.key, required this.os});
 
   @override
   State<AprScreen> createState() => _AprScreenState();
@@ -90,7 +91,7 @@ class _AprScreenState extends State<AprScreen> {
   @override
   void initState() {
     super.initState();
-    os = Get.arguments as OrdemServico;
+    os = widget.os;
     _carregarChecklist();
   }
 

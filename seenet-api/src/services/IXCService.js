@@ -319,7 +319,7 @@ async adicionarMensagemOS(osId, dados) {
       mensagem: dados.mensagem || 'Atualização via API',
       id_tecnico: dados.id_tecnico || '',
       id_evento: dados.id_evento || '2', // 2 = Alteração
-
+      status: 'A',
       // GPS (opcional)
       latitude: dados.latitude?.toString() || '',
       longitude: dados.longitude?.toString() || '',

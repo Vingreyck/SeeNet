@@ -579,7 +579,31 @@ const response = await axios.post(`${integracao.url_api}/${endpoint}`,
     res.status(500).json({ error: error.message });
   }
 });
+// ========== DEBUG: TESTAR PDF APR (TEMPORÁRIO - REMOVER DEPOIS) ==========
+app.get('/api/debug/test-apr-pdf/:osId', async (req, res) => {
+  try {
+    const { osId } = req.params;
+    console.log(`📄 Teste: Gerando PDF APR para OS ${osId}`);
 
+    const AprPdfService = require('./services/AprPdfService');
+    const pdfBuffer = await AprPdfService.gerarPdfApr(osId, 5); // tenant 5 = BBnet Up
+
+    console.log(`✅ PDF gerado: ${pdfBuffer.length} bytes`);
+
+    res.json({
+      success: true,
+      size_bytes: pdfBuffer.length,
+      filename: `APR_OS_${osId}.pdf`,
+      pdf_base64: pdfBuffer.toString('base64')
+    });
+  } catch (error) {
+    console.error('❌ Erro:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 // ✅ ROTA TEMPORÁRIA PARA DESCOBRIR IP
 app.get('/debug-ip', async (req, res) => {

@@ -1,6 +1,7 @@
 // src/routes/apr_routes.js
 const express = require('express');
 const router = express.Router();
+console.log('✅ APR routes carregadas!');
 const AprController = require('../controllers/AprController');
 const authMiddleware = require('../middleware/auth'); // ajuste o caminho se necessário
 

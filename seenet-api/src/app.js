@@ -348,8 +348,14 @@ app._router.stack.forEach(function(r){
 app.use('/api/transcriptions', require('./routes/transcriptions'));
 
 // APR
-const aprRoutes = require('./routes/apr_routes');
-app.use('/api/apr', aprRoutes);
+try {
+  const aprRoutes = require('./routes/apr_routes');
+  app.use('/api/apr', aprRoutes);
+  console.log('✅ Rotas APR registradas com sucesso');
+} catch (error) {
+  console.error('❌ ERRO ao carregar rotas APR:', error.message);
+  console.error('Stack:', error.stack);
+}
 
 // Admin
 app.use('/api/admin', require('./routes/admin.routes'));

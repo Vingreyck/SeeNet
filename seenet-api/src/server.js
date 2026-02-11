@@ -470,6 +470,17 @@ try {
   console.error('❌ Erro ao carregar rotas integracoes:', error.message);
 }
 
+// ========== APR (ANÁLISE PRELIMINAR DE RISCO) ==========
+try {
+  console.log('=== CARREGANDO ROTAS APR ===');
+  const aprRoutes = require('./routes/apr_routes');
+  app.use('/api/apr', aprRoutes);
+  console.log('✅ Rotas /api/apr registradas');
+} catch (error) {
+  console.error('❌ Erro ao carregar rotas APR:', error.message);
+  console.error('Stack:', error.stack);
+}
+
 // ============================================
 // ROTA DE DEBUG: TESTAR ENDPOINTS IXC
 // ============================================

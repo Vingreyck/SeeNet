@@ -605,6 +605,58 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       return false;
     }
   }
+  async baixarPdfOS(osIdIxc) {
+    try {
+      console.log(`📥 Baixando PDF da OS ${osIdIxc} do IXC...`);
+
+      const endpoint = `/get_pdf_chamado`;
+
+      const response = await this.apiClient.get(endpoint, {
+        params: {
+          id: osIdIxc
+        },
+        responseType: 'arraybuffer', // Importante para receber o PDF
+        headers: {
+          'ixcsoft': 'listar'
+        }
+      });
+
+      if (!response.data) {
+        throw new Error('IXC não retornou PDF');
+      }
+
+      console.log(`✅ PDF baixado com sucesso (${response.data.length} bytes)`);
+      return Buffer.from(response.data);
+
+    } catch (error) {
+      console.error(`❌ Erro ao baixar PDF do IXC:`, error.message);
+
+      // Se o endpoint não existir, tentar alternativa
+      if (error.response?.status === 404) {
+        console.log('⚠️ Tentando endpoint alternativo...');
+        try {
+          const responseAlt = await this.apiClient.post('/su_oss_chamado_relatorio',
+            this.criarPayload({
+              id: osIdIxc,
+              gerar_pdf: 'true'
+            }),
+            {
+              responseType: 'arraybuffer',
+              headers: {
+                'ixcsoft': 'listar'
+              }
+            }
+          );
+
+          return Buffer.from(responseAlt.data);
+        } catch (altError) {
+          throw new Error('Não foi possível baixar PDF do IXC por nenhum endpoint');
+        }
+      }
+
+      throw error;
+    }
+  }
 }
 
 module.exports = IXCService;

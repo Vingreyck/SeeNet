@@ -274,7 +274,9 @@ class _AprScreenState extends State<AprScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () {
+              Navigator.of(context).popUntil((route) => route.settings.name == '/');
+            },
           ),
           const SizedBox(width: 8),
           Expanded(

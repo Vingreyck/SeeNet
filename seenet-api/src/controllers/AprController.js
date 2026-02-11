@@ -218,6 +218,40 @@ class AprController {
       return res.status(500).json({ success: false, error: 'Erro interno' });
     }
   }
+
+  // =====================================================
+  // GET /api/apr/pdf/:osId
+  // Gera PDF do APR
+  // =====================================================
+  static async gerarPdf(req, res) {
+    const { osId } = req.params;
+    const tenantId = req.user?.tenant_id;
+
+    try {
+      console.log(`📄 Gerando PDF APR para OS ${osId}`);
+
+      const AprPdfService = require('../services/AprPdfService');
+      const pdfBuffer = await AprPdfService.gerarPdfApr(osId, tenantId);
+
+      console.log(`✅ PDF gerado com sucesso (${pdfBuffer.length} bytes)`);
+
+      // Retornar como Base64 para o Flutter
+      return res.json({
+        success: true,
+        data: {
+          pdf_base64: pdfBuffer.toString('base64'),
+          filename: `APR_OS_${osId}_${Date.now()}.pdf`
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao gerar PDF APR:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || 'Erro ao gerar PDF'
+      });
+    }
+  }
 }
 
 module.exports = AprController;

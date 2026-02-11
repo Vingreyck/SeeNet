@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 console.log('✅ APR routes carregadas!');
 const AprController = require('../controllers/AprController');
-const authMiddleware = require('../middleware/auth'); // ajuste o caminho se necessário
+const authMiddleware = require('../middleware/auth');
 
 // Todas as rotas precisam de autenticação
 router.use(authMiddleware);
@@ -19,5 +19,8 @@ router.get('/respostas/:osId', AprController.getRespostas);
 
 // POST /api/apr/respostas - salvar respostas
 router.post('/respostas', AprController.salvarRespostas);
+
+// GET /api/apr/pdf/:osId - gerar PDF do APR
+router.get('/pdf/:osId', AprController.gerarPdf);
 
 module.exports = router;

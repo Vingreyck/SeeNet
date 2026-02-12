@@ -552,6 +552,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.0"
+  pdfkit:
+    dependency: "direct main"
+    description:
+      name: pdfkit
+      sha256: "83b308f4abb7570977287592fa2d37cfd43872ea7d35f9b951885dac819578d5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.1"
   pedantic:
     dependency: transitive
     description:

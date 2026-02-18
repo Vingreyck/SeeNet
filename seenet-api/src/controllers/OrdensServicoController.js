@@ -426,6 +426,20 @@ await db('ordem_servico')
     data_atualizacao: new Date()  // ← CORRETO
   });
 
+    // 4. Buscar mapeamento do técnico IXC
+    let tecnicoIdIxc = null;
+    try {
+      const mapeamentoTecnico = await db('mapeamento_tecnicos_ixc')
+        .where('usuario_id', os.tecnico_id)
+        .where('tenant_id', tenantId)
+        .first();
+
+      tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
+      console.log(`👤 Técnico IXC ID: ${tecnicoIdIxc || 'não mapeado'}`);
+    } catch (error) {
+      console.error('⚠️ Erro ao buscar mapeamento:', error.message);
+    }
+
     // 3. Processar fotos se houver
     let fotosBase64 = [];
     if (dados.fotos && dados.fotos.length > 0) {
@@ -451,20 +465,6 @@ let pdfIxcBase64 = null;
     } catch (aprError) {
       console.error('⚠️ Erro ao gerar PDF APR:', aprError.message);
       // Continua sem o PDF do APR
-    }
-
-    // 4. Buscar mapeamento do técnico IXC
-    let tecnicoIdIxc = null;
-    try {
-      const mapeamentoTecnico = await db('mapeamento_tecnicos_ixc')
-        .where('usuario_id', os.tecnico_id)
-        .where('tenant_id', tenantId)
-        .first();
-
-      tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
-      console.log(`👤 Técnico IXC ID: ${tecnicoIdIxc || 'não mapeado'}`);
-    } catch (error) {
-      console.error('⚠️ Erro ao buscar mapeamento:', error.message);
     }
 
 // 5. Buscar configuração IXC e criar instância única
@@ -558,21 +558,6 @@ if (ixcService && os.id_externo) {
         console.log('   ✅ PDF APR enviado ao IXC');
       } catch (pdfError) {
         console.error('   ❌ Erro ao enviar PDF APR:', pdfError.message);
-      }
-    }
-
-    // 10. Enviar PDF do IXC de volta (para backup)
-    if (pdfIxcBase64) {
-      console.log('📤 Enviando PDF do IXC de volta...');
-      try {
-        await ixcService.enviarArquivoOS(os.id_externo, {
-          arquivo_base64: pdfIxcBase64,
-          nome_arquivo: `Relatorio_OS_${os.numero_os}_${Date.now()}.pdf`,
-          descricao: 'Relatório Completo da OS'
-        });
-        console.log('   ✅ PDF IXC enviado');
-      } catch (pdfError) {
-        console.error('   ❌ Erro ao enviar PDF IXC:', pdfError.message);
       }
     }
 

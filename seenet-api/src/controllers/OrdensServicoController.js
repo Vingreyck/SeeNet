@@ -476,7 +476,7 @@ if (os.id_externo) {
     console.error('⚠️ Erro ao conectar com IXC:', error.message);
   }
 }
-
+/*
 // 6. Baixar PDF do IXC
 console.log('📥 Baixando PDF do IXC...');
 let pdfIxcBase64 = null;
@@ -492,7 +492,7 @@ if (ixcService && os.id_externo) {
     // Continua sem o PDF do IXC
   }
 }
-
+*/
 // 7. Sincronizar com IXC
 if (ixcService && os.id_externo) {
   try {
@@ -507,7 +507,7 @@ if (ixcService && os.id_externo) {
 
     await ixcService.finalizarOS(os.id_externo, {
       mensagem: mensagemFinal,
-      id_tecnico: os.tecnico_id_ixc
+      id_tecnico: tecnicoIdIxc
     });
 
     console.log('✅ OS finalizada no IXC');
@@ -607,11 +607,13 @@ async sincronizarFinalizacaoComIXC(trx, os, dados) {
     throw new Error('Integração IXC não configurada');
   }
 
-  // Buscar mapeamento do técnico
-  const mapeamento = await trx('mapeamento_tecnicos_ixc')
-    .where('usuario_id', dados.userId)
-    .where('tenant_id', os.tenant_id)
-    .first();
+// Buscar mapeamento do técnico
+const mapeamentoTecnico = await db('mapeamento_tecnicos_ixc')
+  .where('usuario_id', os.tecnico_id)
+  .where('tenant_id', tenantId)
+  .first();
+
+const tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
 
   if (!mapeamento) {
     throw new Error('Técnico não mapeado no IXC');

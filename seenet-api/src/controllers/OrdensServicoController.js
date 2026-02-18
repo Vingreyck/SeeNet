@@ -439,6 +439,7 @@ await db('ordem_servico')
       }));
     }
 
+let pdfIxcBase64 = null;
     // 4. Gerar PDF do APR
     console.log('📄 Gerando PDF do APR...');
     let pdfAprBase64 = null;
@@ -450,6 +451,20 @@ await db('ordem_servico')
     } catch (aprError) {
       console.error('⚠️ Erro ao gerar PDF APR:', aprError.message);
       // Continua sem o PDF do APR
+    }
+
+    // 4. Buscar mapeamento do técnico IXC
+    let tecnicoIdIxc = null;
+    try {
+      const mapeamentoTecnico = await db('mapeamento_tecnicos_ixc')
+        .where('usuario_id', os.tecnico_id)
+        .where('tenant_id', tenantId)
+        .first();
+
+      tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
+      console.log(`👤 Técnico IXC ID: ${tecnicoIdIxc || 'não mapeado'}`);
+    } catch (error) {
+      console.error('⚠️ Erro ao buscar mapeamento:', error.message);
     }
 
 // 5. Buscar configuração IXC e criar instância única
@@ -476,6 +491,7 @@ if (os.id_externo) {
     console.error('⚠️ Erro ao conectar com IXC:', error.message);
   }
 }
+
 /*
 // 6. Baixar PDF do IXC
 console.log('📥 Baixando PDF do IXC...');
@@ -576,7 +592,7 @@ if (ixcService && os.id_externo) {
         numero_os: os.numero_os,
         status: 'finalizada',
         pdf_apr_gerado: pdfAprBase64 !== null,
-        pdf_ixc_baixado: pdfIxcBase64 !== null,
+        pdf_ixc_baixado: false,
         fotos_enviadas: fotosBase64.length
       }
     });

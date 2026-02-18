@@ -452,96 +452,119 @@ await db('ordem_servico')
       // Continua sem o PDF do APR
     }
 
-    // 5. Baixar PDF do IXC
-    console.log('📥 Baixando PDF do IXC...');
-    let pdfIxcBase64 = null;
-    if (os.id_externo) {
-      try {
-        const ixcService = new IXCService(tenantId);
-        const pdfBuffer = await ixcService.baixarPdfOS(os.id_externo);
-        if (pdfBuffer) {
-          pdfIxcBase64 = pdfBuffer.toString('base64');
-          console.log(`✅ PDF IXC baixado (${pdfBuffer.length} bytes)`);
+// 5. Buscar configuração IXC e criar instância única
+console.log('🔄 Preparando sincronização com IXC...');
+let ixcService = null;
+let integracao = null;
+
+if (os.id_externo) {
+  try {
+    // Buscar configuração IXC
+    integracao = await db('integracao_ixc')
+      .where('tenant_id', tenantId)
+      .where('ativo', true)
+      .first();
+
+    if (!integracao) {
+      throw new Error('Integração IXC não configurada');
+    }
+
+    // Criar instância do IXCService
+    ixcService = new IXCService(integracao.url_api, integracao.token_api);
+    console.log('✅ Conexão IXC estabelecida');
+  } catch (error) {
+    console.error('⚠️ Erro ao conectar com IXC:', error.message);
+  }
+}
+
+// 6. Baixar PDF do IXC
+console.log('📥 Baixando PDF do IXC...');
+let pdfIxcBase64 = null;
+if (ixcService && os.id_externo) {
+  try {
+    const pdfBuffer = await ixcService.baixarPdfOS(os.id_externo);
+    if (pdfBuffer) {
+      pdfIxcBase64 = pdfBuffer.toString('base64');
+      console.log(`✅ PDF IXC baixado (${pdfBuffer.length} bytes)`);
+    }
+  } catch (ixcError) {
+    console.error('⚠️ Erro ao baixar PDF IXC:', ixcError.message);
+    // Continua sem o PDF do IXC
+  }
+}
+
+// 7. Sincronizar com IXC
+if (ixcService && os.id_externo) {
+  try {
+    console.log('🔄 Sincronizando com IXC...');
+
+    // Finalizar OS no IXC
+    const mensagemFinal = `Serviço finalizado via SeeNet\n\n` +
+      `PROBLEMA: ${dados.relato_problema || 'N/A'}\n` +
+      `SOLUÇÃO: ${dados.relato_solucao || 'N/A'}\n` +
+      `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
+      `OBS: ${dados.observacoes || 'Nenhuma'}`;
+
+    await ixcService.finalizarOS(os.id_externo, {
+      mensagem: mensagemFinal,
+      id_tecnico: os.tecnico_id_ixc
+    });
+
+    console.log('✅ OS finalizada no IXC');
+
+    // 8. Enviar fotos para o IXC
+    if (fotosBase64.length > 0) {
+      console.log(`📤 Enviando ${fotosBase64.length} foto(s) para o IXC...`);
+
+      for (const foto of fotosBase64) {
+        try {
+          await ixcService.enviarArquivoOS(os.id_externo, {
+            arquivo_base64: foto.base64,
+            nome_arquivo: `${foto.tipo}_${Date.now()}.jpg`,
+            descricao: foto.descricao
+          });
+          console.log(`   ✅ ${foto.descricao} enviada`);
+        } catch (fotoError) {
+          console.error(`   ❌ Erro ao enviar ${foto.descricao}:`, fotoError.message);
         }
-      } catch (ixcError) {
-        console.error('⚠️ Erro ao baixar PDF IXC:', ixcError.message);
-        // Continua sem o PDF do IXC
       }
     }
 
-    // 6. Sincronizar com IXC
-    if (os.id_externo) {
+    // 9. Enviar PDF do APR para o IXC
+    if (pdfAprBase64) {
+      console.log('📤 Enviando PDF do APR para o IXC...');
       try {
-        console.log('🔄 Sincronizando com IXC...');
-        const ixcService = new IXCService(tenantId);
-
-        // Finalizar OS no IXC
-        const mensagemFinal = `Serviço finalizado via SeeNet\n\n` +
-          `PROBLEMA: ${dados.relato_problema || 'N/A'}\n` +
-          `SOLUÇÃO: ${dados.relato_solucao || 'N/A'}\n` +
-          `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
-          `OBS: ${dados.observacoes || 'Nenhuma'}`;
-
-        await ixcService.finalizarOS(os.id_externo, {
-          mensagem: mensagemFinal,
-          id_tecnico: os.tecnico_id_ixc
+        await ixcService.enviarArquivoOS(os.id_externo, {
+          arquivo_base64: pdfAprBase64,
+          nome_arquivo: `APR_OS_${os.numero_os}_${Date.now()}.pdf`,
+          descricao: 'Análise Preliminar de Risco (APR)'
         });
-
-        console.log('✅ OS finalizada no IXC');
-
-        // 7. Enviar fotos para o IXC
-        if (fotosBase64.length > 0) {
-          console.log(`📤 Enviando ${fotosBase64.length} foto(s) para o IXC...`);
-
-          for (const foto of fotosBase64) {
-            try {
-              await ixcService.enviarArquivoOS(os.id_externo, {
-                arquivo_base64: foto.base64,
-                nome_arquivo: `${foto.tipo}_${Date.now()}.jpg`,
-                descricao: foto.descricao
-              });
-              console.log(`   ✅ ${foto.descricao} enviada`);
-            } catch (fotoError) {
-              console.error(`   ❌ Erro ao enviar ${foto.descricao}:`, fotoError.message);
-            }
-          }
-        }
-
-        // 8. Enviar PDF do APR para o IXC
-        if (pdfAprBase64) {
-          console.log('📤 Enviando PDF do APR para o IXC...');
-          try {
-            await ixcService.enviarArquivoOS(os.id_externo, {
-              arquivo_base64: pdfAprBase64,
-              nome_arquivo: `APR_OS_${os.numero_os}_${Date.now()}.pdf`,
-              descricao: 'Análise Preliminar de Risco (APR)'
-            });
-            console.log('   ✅ PDF APR enviado ao IXC');
-          } catch (pdfError) {
-            console.error('   ❌ Erro ao enviar PDF APR:', pdfError.message);
-          }
-        }
-
-        // 9. Enviar PDF do IXC de volta (para backup)
-        if (pdfIxcBase64) {
-          console.log('📤 Enviando PDF do IXC de volta...');
-          try {
-            await ixcService.enviarArquivoOS(os.id_externo, {
-              arquivo_base64: pdfIxcBase64,
-              nome_arquivo: `Relatorio_OS_${os.numero_os}_${Date.now()}.pdf`,
-              descricao: 'Relatório Completo da OS'
-            });
-            console.log('   ✅ PDF IXC enviado');
-          } catch (pdfError) {
-            console.error('   ❌ Erro ao enviar PDF IXC:', pdfError.message);
-          }
-        }
-
-      } catch (ixcError) {
-        console.error('❌ Erro ao sincronizar com IXC:', ixcError.message);
-        // Não retorna erro - OS foi finalizada no SeeNet
+        console.log('   ✅ PDF APR enviado ao IXC');
+      } catch (pdfError) {
+        console.error('   ❌ Erro ao enviar PDF APR:', pdfError.message);
       }
     }
+
+    // 10. Enviar PDF do IXC de volta (para backup)
+    if (pdfIxcBase64) {
+      console.log('📤 Enviando PDF do IXC de volta...');
+      try {
+        await ixcService.enviarArquivoOS(os.id_externo, {
+          arquivo_base64: pdfIxcBase64,
+          nome_arquivo: `Relatorio_OS_${os.numero_os}_${Date.now()}.pdf`,
+          descricao: 'Relatório Completo da OS'
+        });
+        console.log('   ✅ PDF IXC enviado');
+      } catch (pdfError) {
+        console.error('   ❌ Erro ao enviar PDF IXC:', pdfError.message);
+      }
+    }
+
+  } catch (ixcError) {
+    console.error('❌ Erro ao sincronizar com IXC:', ixcError.message);
+    // Não retorna erro - OS foi finalizada no SeeNet
+  }
+}
 
     console.log(`✅ OS ${id} finalizada com sucesso`);
 

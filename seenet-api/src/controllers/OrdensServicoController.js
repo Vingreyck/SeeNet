@@ -375,168 +375,198 @@ async sincronizarExecucaoComIXC(trx, os, dados) {
   console.log(`✅ OS ${os.numero_os} - Status "EX" (Execução) no IXC`);
 }
 
-  /**
-   * Finalizar execução de uma OS
-   * POST /api/ordens-servico/:id/finalizar
-   */
-  async finalizarOS(req, res) {
-    const trx = await db.transaction();
+/**
+ * Finalizar execução de OS
+ * POST /api/ordens-servico/:id/finalizar
+ */
+async finalizarExecucao(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const tenantId = req.tenantId;
+    const dados = req.body;
 
-    try {
-      const { id } = req.params;
-      const {
-        latitude,
-        longitude,
-        onu_modelo,
-        onu_serial,
-        onu_status,
-        onu_sinal_optico,
-        relato_problema,
-        relato_solucao,
-        materiais_utilizados,
-        observacoes,
-        fotos,
-        assinatura
-      } = req.body;
-      const userId = req.user.id;
-      const tenantId = req.tenantId;
+    console.log(`🏁 Finalizando execução da OS ${id}`);
 
-      console.log(`🏁 Finalizando OS ${id}`);
+    // 1. Buscar OS
+    const os = await db('ordem_servico')
+      .where('id', id)
+      .where('tenant_id', tenantId)
+      .first();
 
-      // Validações obrigatórias
-      if (!relato_problema || !relato_solucao) {
-        await trx.rollback();
-        return res.status(400).json({
-          success: false,
-          error: 'Relato do problema e solução são obrigatórios'
-        });
-      }
-
-      if (!assinatura) {
-        await trx.rollback();
-        return res.status(400).json({
-          success: false,
-          error: 'Assinatura do cliente é obrigatória'
-        });
-      }
-
-      // Verificar se a OS existe e pertence ao técnico
-      const os = await trx('ordem_servico')
-        .where('id', id)
-        .where('tenant_id', tenantId)
-        .where('tecnico_id', userId)
-        .first();
-
-      if (!os) {
-        await trx.rollback();
-        return res.status(404).json({
-          success: false,
-          error: 'OS não encontrada'
-        });
-      }
-
-      if (os.status !== 'em_execucao') {
-            await trx.rollback();
-            return res.status(400).json({
-              success: false,
-              error: `OS não pode ser finalizada no status "${os.status}". Primeiro inicie a execução.`
-            });
-          }
-
-      if (os.status === 'concluida') {
-        await trx.rollback();
-        return res.status(400).json({
-          success: false,
-          error: 'OS já está concluída'
-        });
-      }
-
-      // Atualizar OS no banco local
-      await trx('ordem_servico')
-        .where('id', id)
-        .update({
-          status: 'concluida',
-          data_conclusao: db.fn.now(),
-          latitude: latitude || os.latitude,
-          longitude: longitude || os.longitude,
-          onu_modelo,
-          onu_serial,
-          onu_status,
-          onu_sinal_optico,
-          relato_problema,
-          relato_solucao,
-          materiais_utilizados,
-          observacoes,
-          assinatura_cliente: assinatura,
-          data_atualizacao: db.fn.now()
-        });
-
-      // Processar anexos (fotos)
-    if (fotos && fotos.length > 0) {
-      console.log(`📸 Processando ${fotos.length} foto(s)...`);
-
-      for (const fotoData of fotos) {
-        // Fotos agora vêm como objetos: { base64, tipo, descricao }
-        await trx('os_anexos').insert({
-          ordem_servico_id: id,
-          tipo: fotoData.tipo || 'outro',
-          descricao: fotoData.descricao || '',
-          url_arquivo: '', // Base64 não é salvo no banco local
-          nome_arquivo: `foto_${fotoData.tipo}_${Date.now()}.jpg`,
-          data_upload: db.fn.now()
-        });
-      }
-
-      console.log(`📸 ${fotos.length} foto(s) anexada(s)`);
-    }
-
-      // ✅ Sincronizar finalização com IXC
-      if (os.origem === 'IXC' && os.id_externo) {
-        try {
-          await this.sincronizarFinalizacaoComIXC(trx, os, {
-            onu_modelo,
-            onu_serial,
-            onu_status,
-            onu_sinal_optico,
-            relato_problema,
-            relato_solucao,
-            materiais_utilizados,
-            observacoes,
-            userId,
-            fotos
-          });
-        } catch (error) {
-          console.error('⚠️ Erro ao sincronizar finalização com IXC:', error.message);
-          // Não bloqueia a finalização se IXC falhar
-        }
-      }
-
-      await trx.commit();
-
-      console.log(`✅ OS ${os.numero_os} finalizada com sucesso`);
-
-      // ✅ Baixar relatório PDF do IXC (após commit)
-      if (os.origem === 'IXC' && os.id_externo) {
-        // Executar em background (não bloqueia resposta)
-        this.baixarRelatorioPDFBackground(id, os.id_externo, tenantId).catch(error => {
-          console.error('⚠️ Erro ao baixar relatório em background:', error.message);
-        });
-      }
-
-      return res.json({
-        success: true,
-        message: 'OS finalizada com sucesso'
-      });
-    } catch (error) {
-      await trx.rollback();
-      console.error('❌ Erro ao finalizar OS:', error);
-      return res.status(500).json({
+    if (!os) {
+      return res.status(404).json({
         success: false,
-        error: 'Erro ao finalizar OS',
-        details: error.message
+        error: 'OS não encontrada'
       });
     }
+
+    if (os.status !== 'em_execucao') {
+      return res.status(400).json({
+        success: false,
+        error: 'OS não está em execução'
+      });
+    }
+
+    // 2. Atualizar dados da OS no banco
+    await db('ordem_servico')
+      .where('id', id)
+      .update({
+        status: 'finalizada',
+        data_finalizacao: new Date(),
+        onu_modelo: dados.onu_modelo,
+        onu_serial: dados.onu_serial,
+        onu_status: dados.onu_status,
+        onu_sinal_optico: dados.onu_sinal_optico,
+        relato_problema: dados.relato_problema,
+        relato_solucao: dados.relato_solucao,
+        materiais_utilizados: dados.materiais_utilizados,
+        observacoes: dados.observacoes,
+        assinatura_cliente: dados.assinatura,
+        updated_at: new Date()
+      });
+
+    // 3. Processar fotos se houver
+    let fotosBase64 = [];
+    if (dados.fotos && dados.fotos.length > 0) {
+      console.log(`📸 Processando ${dados.fotos.length} foto(s)...`);
+
+      // Converter fotos para base64 (se necessário)
+      fotosBase64 = dados.fotos.map((foto, index) => ({
+        tipo: foto.tipo || 'Foto',
+        descricao: foto.descricao || `Foto ${index + 1}`,
+        base64: foto.base64 || foto.data // Suporte para ambos formatos
+      }));
+    }
+
+    // 4. Gerar PDF do APR
+    console.log('📄 Gerando PDF do APR...');
+    let pdfAprBase64 = null;
+    try {
+      const AprPdfService = require('../services/AprPdfService');
+      const pdfBuffer = await AprPdfService.gerarPdfApr(id, tenantId);
+      pdfAprBase64 = pdfBuffer.toString('base64');
+      console.log(`✅ PDF APR gerado (${pdfBuffer.length} bytes)`);
+    } catch (aprError) {
+      console.error('⚠️ Erro ao gerar PDF APR:', aprError.message);
+      // Continua sem o PDF do APR
+    }
+
+    // 5. Baixar PDF do IXC
+    console.log('📥 Baixando PDF do IXC...');
+    let pdfIxcBase64 = null;
+    if (os.os_id_ixc) {
+      try {
+        const ixcService = new IXCService(tenantId);
+        const pdfBuffer = await ixcService.baixarPdfOS(os.os_id_ixc);
+        if (pdfBuffer) {
+          pdfIxcBase64 = pdfBuffer.toString('base64');
+          console.log(`✅ PDF IXC baixado (${pdfBuffer.length} bytes)`);
+        }
+      } catch (ixcError) {
+        console.error('⚠️ Erro ao baixar PDF IXC:', ixcError.message);
+        // Continua sem o PDF do IXC
+      }
+    }
+
+    // 6. Sincronizar com IXC
+    if (os.os_id_ixc) {
+      try {
+        console.log('🔄 Sincronizando com IXC...');
+        const ixcService = new IXCService(tenantId);
+
+        // Finalizar OS no IXC
+        const mensagemFinal = `Serviço finalizado via SeeNet\n\n` +
+          `PROBLEMA: ${dados.relato_problema || 'N/A'}\n` +
+          `SOLUÇÃO: ${dados.relato_solucao || 'N/A'}\n` +
+          `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
+          `OBS: ${dados.observacoes || 'Nenhuma'}`;
+
+        await ixcService.finalizarOS(os.os_id_ixc, {
+          mensagem: mensagemFinal,
+          id_tecnico: os.tecnico_id_ixc
+        });
+
+        console.log('✅ OS finalizada no IXC');
+
+        // 7. Enviar fotos para o IXC
+        if (fotosBase64.length > 0) {
+          console.log(`📤 Enviando ${fotosBase64.length} foto(s) para o IXC...`);
+
+          for (const foto of fotosBase64) {
+            try {
+              await ixcService.enviarArquivoOS(os.os_id_ixc, {
+                arquivo_base64: foto.base64,
+                nome_arquivo: `${foto.tipo}_${Date.now()}.jpg`,
+                descricao: foto.descricao
+              });
+              console.log(`   ✅ ${foto.descricao} enviada`);
+            } catch (fotoError) {
+              console.error(`   ❌ Erro ao enviar ${foto.descricao}:`, fotoError.message);
+            }
+          }
+        }
+
+        // 8. Enviar PDF do APR para o IXC
+        if (pdfAprBase64) {
+          console.log('📤 Enviando PDF do APR para o IXC...');
+          try {
+            await ixcService.enviarArquivoOS(os.os_id_ixc, {
+              arquivo_base64: pdfAprBase64,
+              nome_arquivo: `APR_OS_${os.numero_os}_${Date.now()}.pdf`,
+              descricao: 'Análise Preliminar de Risco (APR)'
+            });
+            console.log('   ✅ PDF APR enviado ao IXC');
+          } catch (pdfError) {
+            console.error('   ❌ Erro ao enviar PDF APR:', pdfError.message);
+          }
+        }
+
+        // 9. Enviar PDF do IXC de volta (para backup)
+        if (pdfIxcBase64) {
+          console.log('📤 Enviando PDF do IXC de volta...');
+          try {
+            await ixcService.enviarArquivoOS(os.os_id_ixc, {
+              arquivo_base64: pdfIxcBase64,
+              nome_arquivo: `Relatorio_OS_${os.numero_os}_${Date.now()}.pdf`,
+              descricao: 'Relatório Completo da OS'
+            });
+            console.log('   ✅ PDF IXC enviado');
+          } catch (pdfError) {
+            console.error('   ❌ Erro ao enviar PDF IXC:', pdfError.message);
+          }
+        }
+
+      } catch (ixcError) {
+        console.error('❌ Erro ao sincronizar com IXC:', ixcError.message);
+        // Não retorna erro - OS foi finalizada no SeeNet
+      }
+    }
+
+    console.log(`✅ OS ${id} finalizada com sucesso`);
+
+    return res.json({
+      success: true,
+      message: 'OS finalizada com sucesso',
+      data: {
+        os_id: id,
+        numero_os: os.numero_os,
+        status: 'finalizada',
+        pdf_apr_gerado: pdfAprBase64 !== null,
+        pdf_ixc_baixado: pdfIxcBase64 !== null,
+        fotos_enviadas: fotosBase64.length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao finalizar OS:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao finalizar OS',
+      details: error.message
+    });
   }
+}
 
   /**
    * Sincronizar finalização com IXC

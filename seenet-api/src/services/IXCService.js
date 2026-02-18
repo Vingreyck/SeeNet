@@ -605,56 +605,44 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       return false;
     }
   }
+/**
+   * Baixa o PDF padrão da OS do IXC
+   * @param {number} osIdIxc - ID da OS no IXC
+   * @returns {Promise<Buffer>} Buffer do PDF
+   */
   async baixarPdfOS(osIdIxc) {
     try {
       console.log(`📥 Baixando PDF da OS ${osIdIxc} do IXC...`);
 
-      const endpoint = `/get_pdf_chamado`;
+      const endpoint = `/get_relatorio_chamado`;
 
-      const response = await this.apiClient.get(endpoint, {
-        params: {
-          id: osIdIxc
-        },
-        responseType: 'arraybuffer', // Importante para receber o PDF
-        headers: {
-          'ixcsoft': 'listar'
+      const response = await this.apiClient.post(
+        endpoint,
+        this.criarPayload({
+          id: osIdIxc,
+          tipo_relatorio: 'pdf'
+        }),
+        {
+          responseType: 'arraybuffer',
+          headers: {
+            'ixcsoft': 'listar'
+          }
         }
-      });
+      );
 
-      if (!response.data) {
+      if (!response.data || response.data.length === 0) {
         throw new Error('IXC não retornou PDF');
       }
 
-      console.log(`✅ PDF baixado com sucesso (${response.data.length} bytes)`);
+      console.log(`✅ PDF do IXC baixado (${response.data.length} bytes)`);
       return Buffer.from(response.data);
 
     } catch (error) {
       console.error(`❌ Erro ao baixar PDF do IXC:`, error.message);
 
-      // Se o endpoint não existir, tentar alternativa
-      if (error.response?.status === 404) {
-        console.log('⚠️ Tentando endpoint alternativo...');
-        try {
-          const responseAlt = await this.apiClient.post('/su_oss_chamado_relatorio',
-            this.criarPayload({
-              id: osIdIxc,
-              gerar_pdf: 'true'
-            }),
-            {
-              responseType: 'arraybuffer',
-              headers: {
-                'ixcsoft': 'listar'
-              }
-            }
-          );
-
-          return Buffer.from(responseAlt.data);
-        } catch (altError) {
-          throw new Error('Não foi possível baixar PDF do IXC por nenhum endpoint');
-        }
-      }
-
-      throw error;
+      // Retornar null em vez de erro para não quebrar o fluxo
+      console.log('⚠️ PDF do IXC não disponível, continuando sem ele');
+      return null;
     }
   }
 }

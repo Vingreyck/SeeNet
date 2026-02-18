@@ -22,6 +22,6 @@ router.post('/:id/deslocar', OrdensServicoController.deslocarParaOS.bind(OrdensS
 router.post('/:id/chegar-local', OrdensServicoController.chegarAoLocal.bind(OrdensServicoController));
 
 // 3️⃣ Finalizar OS (serviço concluído)
-router.post('/:id/finalizar', OrdensServicoController.finalizarOS.bind(OrdensServicoController));
+router.post('/:id/finalizar', OrdensServicoController.finalizarExecucao.bind(OrdensServicoController));
 
 module.exports = router;

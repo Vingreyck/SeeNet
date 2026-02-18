@@ -1268,7 +1268,7 @@ app._router.stack.forEach((middleware) => {
   }
 
   // ========== DEBUG: TESTAR UPLOAD PDF NO IXC ==========
-  app.post('/api/debug/test-upload-pdf', async (req, res) => {
+  app.get('/api/debug/test-upload-pdf', async (req, res) => {
     try {
       console.log('🧪 Testando upload de PDF no IXC...');
 

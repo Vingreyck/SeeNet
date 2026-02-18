@@ -455,10 +455,10 @@ await db('ordem_servico')
     // 5. Baixar PDF do IXC
     console.log('📥 Baixando PDF do IXC...');
     let pdfIxcBase64 = null;
-    if (os.os_id_ixc) {
+    if (os.id_externo) {
       try {
         const ixcService = new IXCService(tenantId);
-        const pdfBuffer = await ixcService.baixarPdfOS(os.os_id_ixc);
+        const pdfBuffer = await ixcService.baixarPdfOS(os.id_externo);
         if (pdfBuffer) {
           pdfIxcBase64 = pdfBuffer.toString('base64');
           console.log(`✅ PDF IXC baixado (${pdfBuffer.length} bytes)`);
@@ -470,7 +470,7 @@ await db('ordem_servico')
     }
 
     // 6. Sincronizar com IXC
-    if (os.os_id_ixc) {
+    if (os.id_externo) {
       try {
         console.log('🔄 Sincronizando com IXC...');
         const ixcService = new IXCService(tenantId);
@@ -482,7 +482,7 @@ await db('ordem_servico')
           `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
           `OBS: ${dados.observacoes || 'Nenhuma'}`;
 
-        await ixcService.finalizarOS(os.os_id_ixc, {
+        await ixcService.finalizarOS(os.id_externo, {
           mensagem: mensagemFinal,
           id_tecnico: os.tecnico_id_ixc
         });
@@ -495,7 +495,7 @@ await db('ordem_servico')
 
           for (const foto of fotosBase64) {
             try {
-              await ixcService.enviarArquivoOS(os.os_id_ixc, {
+              await ixcService.enviarArquivoOS(os.id_externo, {
                 arquivo_base64: foto.base64,
                 nome_arquivo: `${foto.tipo}_${Date.now()}.jpg`,
                 descricao: foto.descricao
@@ -511,7 +511,7 @@ await db('ordem_servico')
         if (pdfAprBase64) {
           console.log('📤 Enviando PDF do APR para o IXC...');
           try {
-            await ixcService.enviarArquivoOS(os.os_id_ixc, {
+            await ixcService.enviarArquivoOS(os.id_externo, {
               arquivo_base64: pdfAprBase64,
               nome_arquivo: `APR_OS_${os.numero_os}_${Date.now()}.pdf`,
               descricao: 'Análise Preliminar de Risco (APR)'
@@ -526,7 +526,7 @@ await db('ordem_servico')
         if (pdfIxcBase64) {
           console.log('📤 Enviando PDF do IXC de volta...');
           try {
-            await ixcService.enviarArquivoOS(os.os_id_ixc, {
+            await ixcService.enviarArquivoOS(os.id_externo, {
               arquivo_base64: pdfIxcBase64,
               nome_arquivo: `Relatorio_OS_${os.numero_os}_${Date.now()}.pdf`,
               descricao: 'Relatório Completo da OS'

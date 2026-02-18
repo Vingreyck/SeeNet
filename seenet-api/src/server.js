@@ -1266,6 +1266,95 @@ app._router.stack.forEach((middleware) => {
     });
     process.exit(1);
   }
+
+  // ========== DEBUG: TESTAR UPLOAD PDF NO IXC ==========
+  app.post('/api/debug/test-upload-pdf', async (req, res) => {
+    try {
+      console.log('🧪 Testando upload de PDF no IXC...');
+
+      const IXCService = require('./services/IXCService');
+
+      // Buscar integração
+      const integracao = await db('integracao_ixc')
+        .where('tenant_id', 5)
+        .where('ativo', true)
+        .first();
+
+      if (!integracao) {
+        return res.status(400).json({ error: 'Integração não configurada' });
+      }
+
+      // PDF mínimo em base64
+      const pdfBase64 = 'JVBERi0xLjQKJeTs/N6DMA0KNCAwIG9iaiA8PC9UeXBlIC9QYWdlIC9QYXJlbnQgMiAwIFIgL1Jlc291cmNlcyA8PC9Gb250IDw8IC9GMSA0IDAgUj4+Pj4gL01lZGlhQm94IFswIDAgNjEyIDc5Ml0gL0NvbnRlbnRzIDUgMCBSPj4gZW5kb2JqCjUgMCBvYmo8PC9MZW5ndGggNDQ+PnN0cmVhbQpCVAovRjEgMTIgVGYKMTAwIDcwMCBUZAooVGVzdGUgUERGIEFQUikgVGoKRVQKZW5kc3RyZWFtCmVuZG9iaiAKOCAwIG9iaiA8PC9UeXBlIC9DYXRhbG9nIC9QYWdlcyAyIDAgUj4+IGVuZG9iaiAKeHJlZgowIDkKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAowMDAwMDAwMjczIDAwMDAwIG4gCjAwMDAwMDA0MzAgMDAwMDAgbiAKMDAwMDAwMDA1MjQgMDAwMDAgbiAKMDAwMDAwMDA1OTcgMDAwMDAgbiAKMDAwMDAwMDA2NjcgMDAwMDAgbiAKdHJhaWxlciA8PC9TaXplIDkgL1Jvb3QgOCAwIFI+PgpzdGFydHhyZWYKMTQ0CiVlb2YK';
+
+      const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+      console.log('\n=====================================');
+      console.log('📤 Teste 1: SEM campos extras');
+      console.log('=====================================');
+      try {
+        const res1 = await ixc.uploadFotoOS('273025', '43902', {
+          base64: pdfBase64,
+          descricao: 'Teste 1 - PDF sem extras'
+        });
+        console.log('✅ SUCESSO Teste 1:');
+        console.log(JSON.stringify(res1, null, 2));
+      } catch (e) {
+        console.log('❌ ERRO Teste 1:');
+        console.log(e.message);
+        if (e.response?.data) {
+          console.log('Resposta IXC:', JSON.stringify(e.response.data, null, 2));
+        }
+      }
+
+      console.log('\n=====================================');
+      console.log('📤 Teste 2: COM nome_arquivo');
+      console.log('=====================================');
+      try {
+        const res2 = await ixc.uploadFotoOS('273025', '43902', {
+          base64: pdfBase64,
+          descricao: 'Teste 2 - PDF COM nome_arquivo',
+          nome_arquivo: 'APR_TESTE_273025.pdf'
+        });
+        console.log('✅ SUCESSO Teste 2:');
+        console.log(JSON.stringify(res2, null, 2));
+      } catch (e) {
+        console.log('❌ ERRO Teste 2:');
+        console.log(e.message);
+        if (e.response?.data) {
+          console.log('Resposta IXC:', JSON.stringify(e.response.data, null, 2));
+        }
+      }
+
+      console.log('\n=====================================');
+      console.log('📤 Teste 3: COM extensao + nome_arquivo');
+      console.log('=====================================');
+      try {
+        const res3 = await ixc.uploadFotoOS('273025', '43902', {
+          base64: pdfBase64,
+          descricao: 'Teste 3 - PDF COM extensao',
+          nome_arquivo: 'APR_TESTE_273025.pdf',
+          extensao: 'pdf'
+        });
+        console.log('✅ SUCESSO Teste 3:');
+        console.log(JSON.stringify(res3, null, 2));
+      } catch (e) {
+        console.log('❌ ERRO Teste 3:');
+        console.log(e.message);
+        if (e.response?.data) {
+          console.log('Resposta IXC:', JSON.stringify(e.response.data, null, 2));
+        }
+      }
+
+      return res.json({
+        message: '🧪 Testes executados - verifique os LOGS DO RAILWAY'
+      });
+
+    } catch (error) {
+      console.error('❌ Erro geral:', error);
+      return res.status(500).json({ error: error.message });
+    }
+  });
 }
 
 startServer();

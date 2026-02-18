@@ -522,10 +522,9 @@ if (ixcService && os.id_externo) {
       `OBS: ${dados.observacoes || 'Nenhuma'}`;
 
     await ixcService.finalizarOS(os.id_externo, {
-      mensagem: mensagemFinal,
-      id_tecnico: tecnicoIdIxc
+      mensagem_resposta: mensagemFinal,  // ← mensagem_resposta (conforme método espera)
+      id_tecnico_ixc: tecnicoIdIxc  // ← CORRETO
     });
-
     console.log('✅ OS finalizada no IXC');
 
     // 8. Enviar fotos para o IXC

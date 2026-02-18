@@ -409,22 +409,22 @@ async finalizarExecucao(req, res) {
     }
 
     // 2. Atualizar dados da OS no banco
-    await db('ordem_servico')
-      .where('id', id)
-      .update({
-        status: 'finalizada',
-        data_finalizacao: new Date(),
-        onu_modelo: dados.onu_modelo,
-        onu_serial: dados.onu_serial,
-        onu_status: dados.onu_status,
-        onu_sinal_optico: dados.onu_sinal_optico,
-        relato_problema: dados.relato_problema,
-        relato_solucao: dados.relato_solucao,
-        materiais_utilizados: dados.materiais_utilizados,
-        observacoes: dados.observacoes,
-        assinatura_cliente: dados.assinatura,
-        updated_at: new Date()
-      });
+await db('ordem_servico')
+  .where('id', id)
+  .update({
+    status: 'finalizada',
+    data_conclusao: new Date(),  // ← CORRETO
+    onu_modelo: dados.onu_modelo,
+    onu_serial: dados.onu_serial,
+    onu_status: dados.onu_status,
+    onu_sinal_optico: dados.onu_sinal_optico,
+    relato_problema: dados.relato_problema,
+    relato_solucao: dados.relato_solucao,
+    materiais_utilizados: dados.materiais_utilizados,
+    observacoes: dados.observacoes,
+    assinatura_cliente: dados.assinatura,
+    data_atualizacao: new Date()  // ← CORRETO
+  });
 
     // 3. Processar fotos se houver
     let fotosBase64 = [];

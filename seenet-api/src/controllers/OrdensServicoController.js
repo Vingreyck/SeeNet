@@ -533,11 +533,10 @@ if (ixcService && os.id_externo) {
 
       for (const foto of fotosBase64) {
         try {
-          await ixcService.enviarArquivoOS(os.id_externo, {
-            arquivo_base64: foto.base64,
-            nome_arquivo: `${foto.tipo}_${Date.now()}.jpg`,
-            descricao: foto.descricao
-          });
+            await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+              base64: foto.base64,
+              descricao: foto.descricao
+            });
           console.log(`   ✅ ${foto.descricao} enviada`);
         } catch (fotoError) {
           console.error(`   ❌ Erro ao enviar ${foto.descricao}:`, fotoError.message);
@@ -549,10 +548,9 @@ if (ixcService && os.id_externo) {
     if (pdfAprBase64) {
       console.log('📤 Enviando PDF do APR para o IXC...');
       try {
-        await ixcService.enviarArquivoOS(os.id_externo, {
-          arquivo_base64: pdfAprBase64,
-          nome_arquivo: `APR_OS_${os.numero_os}_${Date.now()}.pdf`,
-          descricao: 'Análise Preliminar de Risco (APR)'
+        await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+          base64: pdfAprBase64,
+          descricao: `APR - Análise Preliminar de Risco - OS ${os.numero_os}`
         });
         console.log('   ✅ PDF APR enviado ao IXC');
       } catch (pdfError) {

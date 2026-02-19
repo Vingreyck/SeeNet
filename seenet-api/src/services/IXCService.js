@@ -440,28 +440,53 @@ async executarOS(osId, dados) {
  */
 async uploadFotoOS(osId, clienteId, fotoData) {
   try {
-    console.log(`📸 Enviando foto para OS ${osId}...`);
+    console.log(`📸 Enviando arquivo para OS ${osId}...`);
 
-    const payload = {
-      descricao: fotoData.descricao || 'Foto do atendimento',
-      local_arquivo: fotoData.base64, // Base64 da imagem
-      id_cliente: clienteId.toString(),
-      id_oss_chamado: osId.toString(),
-      classificacao_arquivo: 'P' // P = Privado
-    };
+    const FormData = require('form-data');
+    const form = new FormData();
 
-    // ✅ ENDPOINT CORRETO
-    const response = await this.clientAlterar.post('/su_oss_chamado_arquivos', payload);
+    form.append('descricao', fotoData.descricao || 'Foto do atendimento');
+    form.append('id_oss_chamado', osId.toString());
+    form.append('classificacao_arquivo', 'P');
 
-    if (response.data?.type === 'error') {
-      console.error(`❌ Erro IXC ao enviar foto:`, response.data.message);
-      throw new Error(response.data.message || 'Erro ao enviar foto');
+    // Se for buffer (PDF), usa buffer. Se for base64, converte.
+    if (fotoData.buffer) {
+      const ext = fotoData.ext || 'pdf';
+      form.append('local_arquivo', fotoData.buffer, {
+        filename: fotoData.nome || `arquivo_${Date.now()}.${ext}`,
+        contentType: ext === 'pdf' ? 'application/pdf' : 'image/jpeg'
+      });
+    } else if (fotoData.base64) {
+      const buffer = Buffer.from(fotoData.base64, 'base64');
+      const ext = fotoData.ext || 'jpg';
+      form.append('local_arquivo', buffer, {
+        filename: fotoData.nome || `arquivo_${Date.now()}.${ext}`,
+        contentType: ext === 'pdf' ? 'application/pdf' : 'image/jpeg'
+      });
     }
 
-    console.log(`✅ Foto enviada para OS ${osId}`);
+    const authBase64 = Buffer.from(this.token).toString('base64');
+    const response = await axios.post(
+      `${this.baseUrl}/su_oss_chamado_arquivos`,
+      form,
+      {
+        headers: {
+          'Authorization': `Basic ${authBase64}`,
+          ...form.getHeaders()
+        },
+        timeout: 60000
+      }
+    );
+
+    if (response.data?.type === 'error') {
+      throw new Error(response.data.message || 'Erro ao enviar arquivo');
+    }
+
+    console.log(`✅ Arquivo enviado para OS ${osId} - ID: ${response.data?.id}`);
     return response.data;
+
   } catch (error) {
-    console.error(`❌ Erro ao enviar foto para OS ${osId}:`, error.message);
+    console.error(`❌ Erro ao enviar arquivo para OS ${osId}:`, error.message);
     throw error;
   }
 }

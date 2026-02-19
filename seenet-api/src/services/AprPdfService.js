@@ -1,8 +1,6 @@
 // src/services/AprPdfService.js
 const PDFDocument = require('pdfkit');
 const { db } = require('../config/database');
-const fs = require('fs');
-const path = require('path');
 
 class AprPdfService {
 
@@ -14,10 +12,12 @@ class AprPdfService {
    */
   static async gerarPdfApr(osId, tenantId) {
     try {
-      // 1. Buscar dados da OS
-      const os = await db('ordem_servico')
-        .where('id', osId)
-        .where('tenant_id', tenantId)
+      // 1. Buscar dados da OS + técnico
+      const os = await db('ordem_servico as o')
+        .join('usuarios as u', 'u.id', 'o.tecnico_id')
+        .where('o.id', osId)
+        .where('o.tenant_id', tenantId)
+        .select('o.*', 'u.nome as tecnico_nome')
         .first();
 
       if (!os) {
@@ -57,7 +57,13 @@ class AprPdfService {
         ORDER BY o.ordem
       `, [osId]);
 
-      // 4. Organizar respostas por categoria
+      // 4. Buscar assinatura do técnico
+      const assinaturaObj = await db('ordem_servico')
+        .where('id', osId)
+        .select('assinatura_cliente')
+        .first();
+
+      // 5. Organizar respostas por categoria
       const categorias = {};
       respostas.rows.forEach(r => {
         if (!categorias[r.categoria_id]) {
@@ -75,8 +81,8 @@ class AprPdfService {
         });
       });
 
-      // 5. Gerar PDF
-      return await this._criarPdf(os, categorias, epis.rows);
+      // 6. Gerar PDF
+      return await this._criarPdf(os, categorias, epis.rows, assinaturaObj?.assinatura_cliente);
 
     } catch (error) {
       console.error('❌ Erro ao gerar PDF APR:', error);
@@ -87,7 +93,7 @@ class AprPdfService {
   /**
    * Cria o PDF usando pdfkit
    */
-  static async _criarPdf(os, categorias, epis) {
+  static async _criarPdf(os, categorias, epis, assinaturaBase64 = null) {
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -139,7 +145,7 @@ class AprPdfService {
 
         categoriasOrdenadas.forEach((cat, catIndex) => {
           // Título da categoria
-          doc.fontSize(12).font('Helvetica-Bold').fillColor('#00FF88')
+          doc.fontSize(12).font('Helvetica-Bold').fillColor('#007700')
              .text(`${cat.ordem}. ${cat.nome.toUpperCase()}`);
           doc.moveDown(0.3);
 
@@ -186,7 +192,7 @@ class AprPdfService {
           doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke('#CCCCCC');
           doc.moveDown(0.5);
 
-          doc.fontSize(12).font('Helvetica-Bold').fillColor('#00FF88')
+          doc.fontSize(12).font('Helvetica-Bold').fillColor('#007700')
              .text('EQUIPAMENTOS DE PROTEÇÃO UTILIZADOS');
           doc.moveDown(0.3);
 
@@ -199,7 +205,7 @@ class AprPdfService {
         }
 
         // === TERMO DE RESPONSABILIDADE ===
-        if (doc.y > 650) doc.addPage();
+        if (doc.y > 620) doc.addPage();
 
         doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke('#CCCCCC');
         doc.moveDown(0.5);
@@ -218,15 +224,29 @@ class AprPdfService {
         doc.moveDown(2);
 
         // === RODAPÉ COM ASSINATURAS ===
-        const finalY = doc.y + 50;
+        const finalY = doc.y + 20;
 
+        // Assinatura do técnico (imagem se houver)
+        if (assinaturaBase64) {
+          try {
+            const assinaturaBuffer = Buffer.from(assinaturaBase64, 'base64');
+            doc.image(assinaturaBuffer, 55, finalY - 45, { width: 150, height: 40 });
+          } catch (e) {
+            console.error('⚠️ Erro ao inserir assinatura:', e.message);
+          }
+        }
+
+        // Linha + nome do técnico
         doc.fontSize(8).fillColor('#666666')
            .text('_____________________________', 50, finalY, { width: 200, align: 'center' })
-           .text('Colaborador Responsável', 50, finalY + 15, { width: 200, align: 'center' });
+           .text(`${os.tecnico_nome || 'Colaborador Responsável'}`, 50, finalY + 12, { width: 200, align: 'center' })
+           .text('Colaborador Responsável', 50, finalY + 22, { width: 200, align: 'center' });
 
+        // Linha + cliente
         doc.fontSize(8).fillColor('#666666')
            .text('_____________________________', 345, finalY, { width: 200, align: 'center' })
-           .text('Cliente', 345, finalY + 15, { width: 200, align: 'center' });
+           .text(`${os.cliente_nome || 'Cliente'}`, 345, finalY + 12, { width: 200, align: 'center' })
+           .text('Cliente', 345, finalY + 22, { width: 200, align: 'center' });
 
         // Footer
         doc.fontSize(8).fillColor('#999999')

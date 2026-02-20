@@ -332,12 +332,13 @@ if (user.tipo_usuario === 'tecnico') {
       if (integracao) {
         const axios = require('axios');
         const removerAcentos = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        // Busca TODOS os funcionários e filtra localmente
         const params = new URLSearchParams({
-          qtype: 'nome',
-          query: user.nome,
-          oper: 'like',
+          qtype: 'id',
+          query: '',
+          oper: '!=',
           page: '1',
-          rp: '10'
+          rp: '200'  // busca em massa
         });
 
         const resp = await axios.post(
@@ -349,12 +350,16 @@ if (user.tipo_usuario === 'tecnico') {
               'Content-Type': 'application/x-www-form-urlencoded',
               'ixcsoft': 'listar'
             },
-            timeout: 5000
+            timeout: 10000
           }
         );
 
         const funcionarios = resp.data.registros || [];
+        console.log(`🔍 ${funcionarios.length} funcionários carregados do IXC`);
+
+        const removerAcentos = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const nomeNormalizado = removerAcentos(user.nome).toLowerCase().trim();
+
         const match = funcionarios.find(f =>
           removerAcentos(f.nome).toLowerCase().trim() === nomeNormalizado
         );

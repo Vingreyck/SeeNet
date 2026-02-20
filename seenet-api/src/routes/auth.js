@@ -363,6 +363,7 @@ if (user.tipo_usuario === 'tecnico') {
           removerAcentos(f.nome).toLowerCase().trim() === nomeNormalizado
         );
 
+
         if (match) {
           await db('mapeamento_tecnicos_ixc').insert({
             usuario_id: user.id,

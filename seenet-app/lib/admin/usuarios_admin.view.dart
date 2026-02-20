@@ -451,6 +451,7 @@ Future<void> carregarUsuarios() async {
             ),
             ElevatedButton(
               onPressed: () async {
+                Navigator.pop(context);
                 await _salvarEdicaoUsuario(
                   usuario.id!,
                   nomeController.text.trim(),
@@ -472,38 +473,40 @@ Future<void> carregarUsuarios() async {
     );
   }
 
-Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String tipo, bool ativo) async {
-  try {
-    Map<String, dynamic> dadosAtualizacao = {
-      'nome': nome,
-      'email': email.toLowerCase(),
-      'tipo_usuario': tipo,
-      'ativo': ativo,
-    };
-    
-    final response = await _api.put('/auth/usuarios/$id', dadosAtualizacao);
-    
-    if (response['success']) {
-      Get.snackbar(
-        'Sucesso', 
-        'Usuário atualizado com sucesso!',
-        backgroundColor: Colors.green, 
-        colorText: Colors.white
-      );
-      await carregarUsuarios();
-    } else {
-      throw Exception(response['error']);
+  Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String tipo, bool ativo) async {
+    try {
+      final response = await _api.put('/auth/usuarios/$id', {
+        'nome': nome,
+        'email': email.toLowerCase(),
+        'tipo_usuario': tipo,
+        'ativo': ativo,
+      });
+
+      if (response['success'] == true) {
+        await carregarUsuarios();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Usuário atualizado com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception(response['error'] ?? 'Erro desconhecido');
+      }
+    } catch (e) {
+      print('❌ Erro ao editar usuário: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
-  } catch (e) {
-    print('❌ Erro ao editar usuário: $e');
-    Get.snackbar(
-      'Erro', 
-      'Erro ao atualizar usuário',
-      backgroundColor: Colors.red, 
-      colorText: Colors.white
-    );
   }
-}
 
   void _resetarSenhaUsuario(Usuario usuario) {
     final TextEditingController novaSenhaController = TextEditingController();

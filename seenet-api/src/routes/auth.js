@@ -175,6 +175,7 @@ router.post('/register', [
     logger.error('Erro no registro:', error);
     res.status(500).json({ 
       error: 'Erro interno do servidor',
+      details: error.message
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

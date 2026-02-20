@@ -318,6 +318,61 @@ router.post('/login', loginLimiter, [
       }
     );
 
+    // Auto-mapeamento IXC para técnicos
+    if (user.tipo_usuario === 'tecnico') {
+      try {
+        const jaExiste = await db('mapeamento_tecnicos_ixc')
+          .where({ usuario_id: user.id, tenant_id: user.tenant_id })
+          .first();
+
+        if (!jaExiste) {
+          const integracao = await db('integracao_ixc')
+            .where({ tenant_id: user.tenant_id, ativo: true })
+            .first();
+
+          if (integracao) {
+            const axios = require('axios');
+            const params = new URLSearchParams({
+              qtype: 'nome',
+              query: user.nome,
+              oper: 'like',
+              page: '1',
+              rp: '5'
+            });
+
+            const resp = await axios.post(
+              `${integracao.url_api}/funcionario`,
+              params.toString(),
+              {
+                headers: {
+                  'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                  'ixcsoft': 'listar'
+                },
+                timeout: 5000
+              }
+            );
+
+            const funcionarios = resp.data.registros || [];
+            if (funcionarios.length === 1) {
+              // Match único = mapeia automaticamente
+              await db('mapeamento_tecnicos_ixc').insert({
+                usuario_id: user.id,
+                tecnico_ixc_id: funcionarios[0].id,
+                tenant_id: user.tenant_id
+              });
+              console.log(`✅ Auto-mapeamento: ${user.nome} → IXC ID ${funcionarios[0].id}`);
+            } else {
+              console.log(`⚠️ Auto-mapeamento falhou para ${user.nome}: ${funcionarios.length} resultados`);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('⚠️ Erro no auto-mapeamento:', e.message);
+        // Não bloqueia o login
+      }
+    }
+
     // Log de auditoria
     await auditService.log({
       action: 'LOGIN_SUCCESS',

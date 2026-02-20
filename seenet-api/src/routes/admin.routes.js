@@ -284,7 +284,7 @@ router.get('/users', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const users = await db('usuarios')
       .where('tenant_id', req.user.tenant_id)
-      .select('id', 'nome', 'email', 'tipo_usuario', 'ativo', 'data_criacao', 'updated_at') // ✅ ADICIONADO 'ativo'
+      .select('id', 'nome', 'email', 'tipo_usuario', 'ativo', 'data_criacao', 'data_atualizacao') // ✅ ADICIONADO 'ativo'
       .orderBy('nome');
     
     res.json(users);
@@ -331,7 +331,7 @@ router.put('/users/:id', authMiddleware, requireAdmin, async (req, res) => {
       nome,
       email,
       tipo_usuario,
-      updated_at: db.fn.now() // ✅ CORRIGIDO
+      data_atualizacao: db.fn.now() // ✅ CORRIGIDO
     };
     
     if (senha) {

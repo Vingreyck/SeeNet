@@ -318,60 +318,65 @@ router.post('/login', loginLimiter, [
       }
     );
 
-    // Auto-mapeamento IXC para técnicos
-    if (user.tipo_usuario === 'tecnico') {
-      try {
-        const jaExiste = await db('mapeamento_tecnicos_ixc')
-          .where({ usuario_id: user.id, tenant_id: user.tenant_id })
-          .first();
+if (user.tipo_usuario === 'tecnico') {
+  try {
+    const jaExiste = await db('mapeamento_tecnicos_ixc')
+      .where({ usuario_id: user.id, tenant_id: user.tenant_id })
+      .first();
 
-        if (!jaExiste) {
-          const integracao = await db('integracao_ixc')
-            .where({ tenant_id: user.tenant_id, ativo: true })
-            .first();
+    if (!jaExiste) {
+      const integracao = await db('integracao_ixc')
+        .where({ tenant_id: user.tenant_id, ativo: true })
+        .first();
 
-          if (integracao) {
-            const axios = require('axios');
-            const params = new URLSearchParams({
-              qtype: 'nome',
-              query: user.nome,
-              oper: 'like',
-              page: '1',
-              rp: '5'
-            });
+      if (integracao) {
+        const axios = require('axios');
+        const removerAcentos = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const nomeParaBusca = removerAcentos(user.nome);
 
-            const resp = await axios.post(
-              `${integracao.url_api}/funcionario`,
-              params.toString(),
-              {
-                headers: {
-                  'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-                  'Content-Type': 'application/x-www-form-urlencoded',
-                  'ixcsoft': 'listar'
-                },
-                timeout: 5000
-              }
-            );
+        const params = new URLSearchParams({
+          qtype: 'nome',
+          query: nomeParaBusca,
+          oper: 'like',
+          page: '1',
+          rp: '10'
+        });
 
-            const funcionarios = resp.data.registros || [];
-            if (funcionarios.length === 1) {
-              // Match único = mapeia automaticamente
-              await db('mapeamento_tecnicos_ixc').insert({
-                usuario_id: user.id,
-                tecnico_ixc_id: funcionarios[0].id,
-                tenant_id: user.tenant_id
-              });
-              console.log(`✅ Auto-mapeamento: ${user.nome} → IXC ID ${funcionarios[0].id}`);
-            } else {
-              console.log(`⚠️ Auto-mapeamento falhou para ${user.nome}: ${funcionarios.length} resultados`);
-            }
+        const resp = await axios.post(
+          `${integracao.url_api}/funcionario`,
+          params.toString(),
+          {
+            headers: {
+              'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'ixcsoft': 'listar'
+            },
+            timeout: 5000
           }
+        );
+
+        const funcionarios = resp.data.registros || [];
+        const nomeNormalizado = removerAcentos(user.nome).toLowerCase().trim();
+        const match = funcionarios.find(f =>
+          removerAcentos(f.nome).toLowerCase().trim() === nomeNormalizado
+        );
+
+        if (match) {
+          await db('mapeamento_tecnicos_ixc').insert({
+            usuario_id: user.id,
+            tecnico_ixc_id: match.id,
+            tenant_id: user.tenant_id
+          });
+          console.log(`✅ Auto-mapeamento: ${user.nome} → IXC ID ${match.id}`);
+        } else {
+          console.log(`⚠️ Auto-mapeamento falhou: nenhum match para "${user.nome}"`);
         }
-      } catch (e) {
-        console.error('⚠️ Erro no auto-mapeamento:', e.message);
-        // Não bloqueia o login
       }
     }
+  } catch (e) {
+    console.error('⚠️ Erro no auto-mapeamento:', e.message);
+  }
+}
 
     // Log de auditoria
     await auditService.log({

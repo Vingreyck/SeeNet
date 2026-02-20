@@ -167,7 +167,8 @@ try {
       app.use('/api/auth', require('./routes/auth'));
       console.log('✅ Rotas auth carregadas');
     } catch (error) {
-      console.error('⚠️ Rotas auth não encontradas');
+      console.error('❌ Erro ao carregar rotas auth:', error.message);
+      console.error('Stack:', error.stack);
     }
 
     // ========== PLAY INTEGRITY API ==========

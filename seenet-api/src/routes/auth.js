@@ -480,7 +480,7 @@ router.put('/usuarios/:id', [
 
     // Preparar dados para atualização
     const updateData = {
-      updated_at: new Date().toISOString()
+      data_atualizacao: new Date().toISOString()
     };
 
     if (nome) updateData.nome = nome;
@@ -534,7 +534,7 @@ router.put('/usuarios/:id/resetar-senha', [
     
     await db('usuarios').where('id', id).update({
       senha: senhaHash,
-      updated_at: new Date().toISOString()
+      data_atualizacao: new Date().toISOString()
     });
 
     await auditService.log({
@@ -574,7 +574,7 @@ router.put('/usuarios/:id/status', [
 
     await db('usuarios').where('id', id).update({
       ativo,
-      updated_at: new Date().toISOString()
+      data_atualizacao: new Date().toISOString()
     });
 
     await auditService.log({
@@ -663,7 +663,7 @@ router.post('/debug/update-user-type', async (req, res) => {
       .where('email', email.toLowerCase())
       .update({ 
         tipo_usuario: tipo,
-        updated_at: new Date().toISOString()
+        data_atualizacao: new Date().toISOString()
       });
 
     if (updated === 0) {

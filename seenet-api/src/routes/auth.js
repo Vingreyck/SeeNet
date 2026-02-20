@@ -335,8 +335,8 @@ if (user.tipo_usuario === 'tecnico') {
         // Busca TODOS os funcionários e filtra localmente
         const params = new URLSearchParams({
           qtype: 'id',
-          query: '',
-          oper: '!=',
+          query: '0',
+          oper: '>',
           page: '1',
           rp: '200'  // busca em massa
         });

@@ -332,11 +332,9 @@ if (user.tipo_usuario === 'tecnico') {
       if (integracao) {
         const axios = require('axios');
         const removerAcentos = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const nomeParaBusca = removerAcentos(user.nome);
-
         const params = new URLSearchParams({
           qtype: 'nome',
-          query: nomeParaBusca,
+          query: user.nome,
           oper: 'like',
           page: '1',
           rp: '10'

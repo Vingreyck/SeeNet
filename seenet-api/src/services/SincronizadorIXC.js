@@ -199,7 +199,9 @@ async sincronizarEmpresa(integracao) {
               this.cacheClientes.set(osIXC.id_cliente, clienteIXC);
             }
           } catch (error) {
-            // Falha silenciosa
+            console.error(`   ❌ Erro ao sincronizar OS ${osIXC.id}:`, error.message);
+            console.error(`   ❌ Stack:`, error.stack); // ← adicionar isso
+            console.error(`   ❌ Detail:`, error.detail); // ← e isso (erro de DB)
           }
         }
 

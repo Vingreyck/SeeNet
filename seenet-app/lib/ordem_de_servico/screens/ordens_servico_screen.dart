@@ -87,7 +87,7 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen> with SingleTi
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-                        onPressed: () => Get.back(),
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
                       const SizedBox(width: 8),
                       const Text(

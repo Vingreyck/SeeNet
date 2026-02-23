@@ -373,7 +373,7 @@ if (user.tipo_usuario === 'tecnico') {
 
           const nomeIXC = removerAcentos(nomeFuncionario).toLowerCase().trim();
 
-          return nomeIXC === nomeNormalizado; // ← usa a variável já declarada
+          return nomeIXC === nomeNormalizado;
         });
 
         if (match) {

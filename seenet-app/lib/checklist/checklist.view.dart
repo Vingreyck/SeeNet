@@ -247,64 +247,65 @@ Positioned(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Header do usuário
+              // Substituir APENAS o Container do header dentro de _mostrarMenuUsuario
+// (o Container que tem padding: EdgeInsets.all(16) com Row > CircleAvatar + Column)
+
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Row(
+                child: Column(                          // ← era Row, agora é Column
                   children: [
                     CircleAvatar(
-                      radius: 30,
-                      backgroundColor: usuarioController.isAdmin 
-                          ? Colors.orange 
+                      radius: 38,                       // ← era 30, agora maior
+                      backgroundColor: usuarioController.isAdmin
+                          ? Colors.orange
                           : const Color(0xFF00FF88),
                       child: Icon(
-                        usuarioController.isAdmin 
-                            ? Icons.admin_panel_settings 
+                        usuarioController.isAdmin
+                            ? Icons.admin_panel_settings
                             : Icons.person,
                         color: Colors.black,
-                        size: 30,
+                        size: 36,                       // ← era 30, agora maior
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            usuarioController.nomeUsuario,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            usuarioController.emailUsuario,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                          Container(
-                            margin: const EdgeInsets.only(top: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: usuarioController.isAdmin ? Colors.orange : Colors.blue,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              usuarioController.isAdmin ? 'ADMINISTRADOR' : 'TÉCNICO',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 12),        // ← era SizedBox(width: 16)
+                    Text(
+                      usuarioController.nomeUsuario,
+                      textAlign: TextAlign.center,     // ← centralizado
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,                  // ← era 18, agora maior
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // Email só exibe se não for o padrão .seenet.local
+                    if (!usuarioController.emailUsuario.endsWith('@seenet.local'))
+                      Text(
+                        usuarioController.emailUsuario,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: usuarioController.isAdmin ? Colors.orange : Colors.blue,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        usuarioController.isAdmin ? 'ADMINISTRADOR' : 'TÉCNICO',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],

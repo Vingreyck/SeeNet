@@ -13,9 +13,13 @@ class UsuariosAdminView extends StatefulWidget {
 
 class _UsuariosAdminViewState extends State<UsuariosAdminView> {
   final ApiService _api = ApiService.instance;
-  
+
   List<Usuario> usuarios = [];
   bool isLoading = true;
+
+  // Helper: retorna true se o email for real (não o placeholder gerado automaticamente)
+  bool _emailReal(String email) =>
+      email.isNotEmpty && !email.endsWith('@seenet.local');
 
   @override
   void initState() {
@@ -23,61 +27,59 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     carregarUsuarios();
   }
 
-Future<void> carregarUsuarios() async {
-  try {
-    setState(() => isLoading = true);
+  Future<void> carregarUsuarios() async {
+    try {
+      setState(() => isLoading = true);
 
-    final response = await _api.get('admin/users');
-    
-    List<dynamic> usuariosData;
-    
-    // ✅ CORREÇÃO: Tratar todos os casos
-    if (response is List) {
-      usuariosData = response;
-    } else if (response is Map) {
-      if (response.containsKey('data')) {
-        var data = response['data'];
-        usuariosData = data is List ? data : [data];
+      final response = await _api.get('admin/users');
+
+      List<dynamic> usuariosData;
+
+      if (response is List) {
+        usuariosData = response;
+      } else if (response is Map) {
+        if (response.containsKey('data')) {
+          var data = response['data'];
+          usuariosData = data is List ? data : [data];
+        } else {
+          throw Exception('Resposta não contém dados');
+        }
       } else {
-        throw Exception('Resposta não contém dados');
+        throw Exception('Formato inválido: ${response.runtimeType}');
       }
-    } else {
-      throw Exception('Formato inválido: ${response.runtimeType}');
-    }
-    
-    // ✅ ADICIONAR try-catch no map
-    usuarios = [];
-    for (var userData in usuariosData) {
-      try {
-        usuarios.add(Usuario(
-          id: userData['id'] as int?,
-          nome: userData['nome'] as String? ?? '',
-          email: userData['email'] as String? ?? '',
-          senha: '',
-          tipoUsuario: userData['tipo_usuario'] as String? ?? 'tecnico',
-          ativo: userData['ativo'] == 1 || userData['ativo'] == true,
-          dataCriacao: DateTime.tryParse(userData['data_criacao'] as String? ?? ''),
-        ));
-      } catch (e) {
-        print('⚠️ Erro ao processar usuário: $e');
-        print('   Dados: $userData');
+
+      usuarios = [];
+      for (var userData in usuariosData) {
+        try {
+          usuarios.add(Usuario(
+            id: userData['id'] as int?,
+            nome: userData['nome'] as String? ?? '',
+            email: userData['email'] as String? ?? '',
+            senha: '',
+            tipoUsuario: userData['tipo_usuario'] as String? ?? 'tecnico',
+            ativo: userData['ativo'] == 1 || userData['ativo'] == true,
+            dataCriacao: DateTime.tryParse(userData['data_criacao'] as String? ?? ''),
+          ));
+        } catch (e) {
+          print('⚠️ Erro ao processar usuário: $e');
+          print('   Dados: $userData');
+        }
       }
+
+      print('📊 ${usuarios.length} usuários carregados da API');
+
+    } catch (e) {
+      print('❌ Erro ao carregar usuários: $e');
+      Get.snackbar(
+        'Erro',
+        'Erro ao conectar com servidor',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      setState(() => isLoading = false);
     }
-    
-    print('📊 ${usuarios.length} usuários carregados da API');
-    
-  } catch (e) {
-    print('❌ Erro ao carregar usuários: $e');
-    Get.snackbar(
-      'Erro',
-      'Erro ao conectar com servidor',
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
-  } finally {
-    setState(() => isLoading = false);
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -97,53 +99,51 @@ Future<void> carregarUsuarios() async {
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF00FF88)))
           : usuarios.isEmpty
-              ? const Center(
-                  child: Text(
-                    'Nenhum usuário encontrado',
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                )
-              : Column(
-                  children: [
-                    // Header com estatísticas
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      color: const Color(0xFF2A2A2A),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildStatCard('Total', usuarios.length.toString(), Colors.blue),
-                          _buildStatCard(
-                            'Técnicos',
-                            usuarios.where((u) => u.tipoUsuario == 'tecnico').length.toString(),
-                            Colors.green,
-                          ),
-                          _buildStatCard(
-                            'Admins',
-                            usuarios.where((u) => u.tipoUsuario == 'administrador').length.toString(),
-                            Colors.orange,
-                          ),
-                          _buildStatCard(
-                            'Ativos',
-                            usuarios.where((u) => u.ativo).length.toString(),
-                            const Color(0xFF00FF88),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Lista de usuários
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: usuarios.length,
-                        itemBuilder: (context, index) {
-                          final usuario = usuarios[index];
-                          return _buildUserCard(usuario);
-                        },
-                      ),
-                    ),
-                  ],
+          ? const Center(
+        child: Text(
+          'Nenhum usuário encontrado',
+          style: TextStyle(color: Colors.white, fontSize: 18),
+        ),
+      )
+          : Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: const Color(0xFF2A2A2A),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatCard('Total', usuarios.length.toString(), Colors.blue),
+                _buildStatCard(
+                  'Técnicos',
+                  usuarios.where((u) => u.tipoUsuario == 'tecnico').length.toString(),
+                  Colors.green,
                 ),
+                _buildStatCard(
+                  'Admins',
+                  usuarios.where((u) => u.tipoUsuario == 'administrador').length.toString(),
+                  Colors.orange,
+                ),
+                _buildStatCard(
+                  'Ativos',
+                  usuarios.where((u) => u.ativo).length.toString(),
+                  const Color(0xFF00FF88),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: usuarios.length,
+              itemBuilder: (context, index) {
+                final usuario = usuarios[index];
+                return _buildUserCard(usuario);
+              },
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: carregarUsuarios,
         backgroundColor: const Color(0xFF00FF88),
@@ -157,16 +157,9 @@ Future<void> carregarUsuarios() async {
       children: [
         Text(
           value,
-          style: TextStyle(
-            color: color,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold),
         ),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
-        ),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
       ],
     );
   }
@@ -190,7 +183,9 @@ Future<void> carregarUsuarios() async {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(usuario.email, style: const TextStyle(color: Colors.white70)),
+            // ← só exibe email se for real
+            if (_emailReal(usuario.email))
+              Text(usuario.email, style: const TextStyle(color: Colors.white70)),
             const SizedBox(height: 4),
             Row(
               children: [
@@ -203,10 +198,7 @@ Future<void> carregarUsuarios() async {
                   child: Text(
                     usuario.tipoUsuario.toUpperCase(),
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -219,10 +211,7 @@ Future<void> carregarUsuarios() async {
                   child: Text(
                     usuario.ativo ? 'ATIVO' : 'INATIVO',
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -254,59 +243,47 @@ Future<void> carregarUsuarios() async {
           itemBuilder: (context) => [
             const PopupMenuItem(
               value: 'detalhes',
-              child: Row(
-                children: [
-                  Icon(Icons.info, color: Colors.blue),
-                  SizedBox(width: 8),
-                  Text('Ver Detalhes', style: TextStyle(color: Colors.white)),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.info, color: Colors.blue),
+                SizedBox(width: 8),
+                Text('Ver Detalhes', style: TextStyle(color: Colors.white)),
+              ]),
             ),
             const PopupMenuItem(
               value: 'editar',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, color: Colors.orange),
-                  SizedBox(width: 8),
-                  Text('Editar', style: TextStyle(color: Colors.white)),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.edit, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Editar', style: TextStyle(color: Colors.white)),
+              ]),
             ),
             const PopupMenuItem(
               value: 'resetar_senha',
-              child: Row(
-                children: [
-                  Icon(Icons.lock_reset, color: Colors.purple),
-                  SizedBox(width: 8),
-                  Text('Resetar Senha', style: TextStyle(color: Colors.white)),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.lock_reset, color: Colors.purple),
+                SizedBox(width: 8),
+                Text('Resetar Senha', style: TextStyle(color: Colors.white)),
+              ]),
             ),
             PopupMenuItem(
               value: 'ativar_desativar',
-              child: Row(
-                children: [
-                  Icon(
-                    usuario.ativo ? Icons.block : Icons.check_circle,
-                    color: usuario.ativo ? Colors.red : Colors.green,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    usuario.ativo ? 'Desativar' : 'Ativar',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ],
-              ),
+              child: Row(children: [
+                Icon(
+                  usuario.ativo ? Icons.block : Icons.check_circle,
+                  color: usuario.ativo ? Colors.red : Colors.green,
+                ),
+                const SizedBox(width: 8),
+                Text(usuario.ativo ? 'Desativar' : 'Ativar',
+                    style: const TextStyle(color: Colors.white)),
+              ]),
             ),
             const PopupMenuItem(
               value: 'remover',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Remover', style: TextStyle(color: Colors.white)),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.delete, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Remover', style: TextStyle(color: Colors.white)),
+              ]),
             ),
           ],
         ),
@@ -327,7 +304,9 @@ Future<void> carregarUsuarios() async {
           children: [
             _buildDetailRow('ID', usuario.id.toString()),
             _buildDetailRow('Nome', usuario.nome),
-            _buildDetailRow('Email', usuario.email),
+            // ← só exibe email se for real
+            if (_emailReal(usuario.email))
+              _buildDetailRow('Email', usuario.email),
             _buildDetailRow('Tipo', usuario.tipoUsuario),
             _buildDetailRow('Status', usuario.ativo ? 'Ativo' : 'Inativo'),
             if (usuario.dataCriacao != null)
@@ -352,14 +331,11 @@ Future<void> carregarUsuarios() async {
         children: [
           SizedBox(
             width: 80,
-            child: Text(
-              '$label:',
-              style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
-            ),
+            child: Text('$label:',
+                style: const TextStyle(
+                    color: Colors.white70, fontWeight: FontWeight.bold)),
           ),
-          Expanded(
-            child: Text(value, style: const TextStyle(color: Colors.white)),
-          ),
+          Expanded(child: Text(value, style: const TextStyle(color: Colors.white))),
         ],
       ),
     );
@@ -369,11 +345,13 @@ Future<void> carregarUsuarios() async {
     return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year} às ${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
   }
 
-  // ========== MÉTODOS COM API ==========
-
   void _editarUsuario(Usuario usuario) {
-    final TextEditingController nomeController = TextEditingController(text: usuario.nome);
-    final TextEditingController emailController = TextEditingController(text: usuario.email);
+    final TextEditingController nomeController =
+    TextEditingController(text: usuario.nome);
+    // só pré-preenche email se for real
+    final TextEditingController emailController = TextEditingController(
+      text: _emailReal(usuario.email) ? usuario.email : '',
+    );
     String tipoSelecionado = usuario.tipoUsuario;
     bool ativoSelecionado = usuario.ativo;
 
@@ -393,19 +371,27 @@ Future<void> carregarUsuarios() async {
                   decoration: const InputDecoration(
                     labelText: 'Nome',
                     labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
+                    enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white54)),
+                    focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Color(0xFF00FF88))),
                   ),
                 ),
                 const SizedBox(height: 16),
+                // campo email mantido mas opcional
                 TextField(
                   controller: emailController,
                   style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
-                    labelText: 'Email',
+                    labelText: 'Email (opcional)',
                     labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
+                    hintText: 'Deixe vazio se não tiver',
+                    hintStyle: TextStyle(color: Colors.white30),
+                    enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white54)),
+                    focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Color(0xFF00FF88))),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -416,12 +402,15 @@ Future<void> carregarUsuarios() async {
                   decoration: const InputDecoration(
                     labelText: 'Tipo de Usuário',
                     labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
+                    enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white54)),
+                    focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Color(0xFF00FF88))),
                   ),
                   items: const [
                     DropdownMenuItem(value: 'tecnico', child: Text('Técnico')),
-                    DropdownMenuItem(value: 'administrador', child: Text('Administrador')),
+                    DropdownMenuItem(
+                        value: 'administrador', child: Text('Administrador')),
                   ],
                   onChanged: (value) {
                     setStateDialog(() => tipoSelecionado = value!);
@@ -431,7 +420,8 @@ Future<void> carregarUsuarios() async {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Usuário Ativo', style: TextStyle(color: Colors.white, fontSize: 16)),
+                    const Text('Usuário Ativo',
+                        style: TextStyle(color: Colors.white, fontSize: 16)),
                     Switch(
                       value: ativoSelecionado,
                       activeColor: const Color(0xFF00FF88),
@@ -459,7 +449,6 @@ Future<void> carregarUsuarios() async {
                   tipoSelecionado,
                   ativoSelecionado,
                 );
-                Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00FF88),
@@ -473,14 +462,20 @@ Future<void> carregarUsuarios() async {
     );
   }
 
-  Future<void> _salvarEdicaoUsuario(int id, String nome, String email, String tipo, bool ativo) async {
+  Future<void> _salvarEdicaoUsuario(
+      int id, String nome, String email, String tipo, bool ativo) async {
     try {
-      final response = await _api.put('/auth/usuarios/$id', {
+      final Map<String, dynamic> payload = {
         'nome': nome,
-        'email': email.toLowerCase(),
         'tipo_usuario': tipo,
         'ativo': ativo,
-      });
+      };
+      // só envia email se o admin preencheu algo real
+      if (email.isNotEmpty) {
+        payload['email'] = email.toLowerCase();
+      }
+
+      final response = await _api.put('/auth/usuarios/$id', payload);
 
       if (response['success'] == true) {
         await carregarUsuarios();
@@ -499,10 +494,7 @@ Future<void> carregarUsuarios() async {
       print('❌ Erro ao editar usuário: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -516,12 +508,16 @@ Future<void> carregarUsuarios() async {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF2A2A2A),
-        title: Text('Resetar Senha - ${usuario.nome}', style: const TextStyle(color: Colors.white)),
+        title: Text('Resetar Senha - ${usuario.nome}',
+            style: const TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // ← exibe email só se real, senão exibe nome
             Text(
-              'Definir nova senha para:\n📧 ${usuario.email}',
+              _emailReal(usuario.email)
+                  ? 'Definir nova senha para:\n📧 ${usuario.email}'
+                  : 'Definir nova senha para:\n👤 ${usuario.nome}',
               style: const TextStyle(color: Colors.white70),
               textAlign: TextAlign.center,
             ),
@@ -533,8 +529,10 @@ Future<void> carregarUsuarios() async {
               decoration: const InputDecoration(
                 labelText: 'Nova Senha',
                 labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
+                enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white54)),
+                focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF00FF88))),
                 prefixIcon: Icon(Icons.lock, color: Colors.white54),
               ),
             ),
@@ -546,8 +544,10 @@ Future<void> carregarUsuarios() async {
               decoration: const InputDecoration(
                 labelText: 'Confirmar Nova Senha',
                 labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
+                enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white54)),
+                focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF00FF88))),
                 prefixIcon: Icon(Icons.lock_outline, color: Colors.white54),
               ),
             ),
@@ -562,29 +562,24 @@ Future<void> carregarUsuarios() async {
             onPressed: () async {
               if (novaSenhaController.text.isEmpty) {
                 Get.snackbar('Erro', 'Nova senha não pode ser vazia',
-                  backgroundColor: Colors.red, colorText: Colors.white);
+                    backgroundColor: Colors.red, colorText: Colors.white);
                 return;
               }
-
               if (novaSenhaController.text.length < 6) {
                 Get.snackbar('Erro', 'Nova senha deve ter pelo menos 6 caracteres',
-                  backgroundColor: Colors.red, colorText: Colors.white);
+                    backgroundColor: Colors.red, colorText: Colors.white);
                 return;
               }
-
               if (novaSenhaController.text != confirmarSenhaController.text) {
                 Get.snackbar('Erro', 'Senhas não coincidem',
-                  backgroundColor: Colors.red, colorText: Colors.white);
+                    backgroundColor: Colors.red, colorText: Colors.white);
                 return;
               }
-
               await _confirmarResetarSenha(usuario.id!, novaSenhaController.text);
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purple,
-              foregroundColor: Colors.white,
-            ),
+                backgroundColor: Colors.purple, foregroundColor: Colors.white),
             child: const Text('Resetar Senha'),
           ),
         ],
@@ -594,10 +589,9 @@ Future<void> carregarUsuarios() async {
 
   Future<void> _confirmarResetarSenha(int userId, String novaSenha) async {
     try {
-        final response = await _api.put('/auth/usuarios/$userId/resetar-senha', {
-          'nova_senha': novaSenha,
-        });
-      
+      final response = await _api.put('/auth/usuarios/$userId/resetar-senha', {
+        'nova_senha': novaSenha,
+      });
       if (response['success']) {
         Get.snackbar(
           'Sucesso',
@@ -612,23 +606,20 @@ Future<void> carregarUsuarios() async {
     } catch (e) {
       print('❌ Erro ao resetar senha: $e');
       Get.snackbar('Erro', 'Erro ao resetar senha',
-        backgroundColor: Colors.red, colorText: Colors.white);
+          backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 
   Future<void> _alternarStatusUsuario(Usuario usuario) async {
     bool novoStatus = !usuario.ativo;
-    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF2A2A2A),
-        title: Text(
-          '${novoStatus ? 'Ativar' : 'Desativar'} Usuário',
-          style: const TextStyle(color: Colors.white),
-        ),
+        title: Text('${novoStatus ? 'Ativar' : 'Desativar'} Usuário',
+            style: const TextStyle(color: Colors.white)),
         content: Text(
-          novoStatus 
+          novoStatus
               ? 'Deseja ativar o usuário ${usuario.nome}?'
               : 'Deseja desativar o usuário ${usuario.nome}?\n\nUsuários desativados não conseguem fazer login.',
           style: const TextStyle(color: Colors.white70),
@@ -656,10 +647,8 @@ Future<void> carregarUsuarios() async {
 
   Future<void> _atualizarStatusUsuario(int id, bool ativo) async {
     try {
-      final response = await _api.put('/auth/usuarios/$id/status', {
-        'ativo': ativo,
-      });
-      
+      final response =
+      await _api.put('/auth/usuarios/$id/status', {'ativo': ativo});
       if (response['success']) {
         Get.snackbar(
           'Sucesso',
@@ -674,7 +663,7 @@ Future<void> carregarUsuarios() async {
     } catch (e) {
       print('❌ Erro ao atualizar status: $e');
       Get.snackbar('Erro', 'Erro ao atualizar status do usuário',
-        backgroundColor: Colors.red, colorText: Colors.white);
+          backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 
@@ -688,10 +677,8 @@ Future<void> carregarUsuarios() async {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Tem certeza que deseja remover o usuário?',
-              style: TextStyle(color: Colors.white70),
-            ),
+            const Text('Tem certeza que deseja remover o usuário?',
+                style: TextStyle(color: Colors.white70)),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
@@ -703,17 +690,21 @@ Future<void> carregarUsuarios() async {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('👤 ${usuario.nome}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  Text('📧 ${usuario.email}', style: const TextStyle(color: Colors.white70)),
-                  Text('👔 ${usuario.tipoUsuario}', style: const TextStyle(color: Colors.white70)),
+                  Text('👤 ${usuario.nome}',
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                  // ← só exibe email se for real
+                  if (_emailReal(usuario.email))
+                    Text('📧 ${usuario.email}',
+                        style: const TextStyle(color: Colors.white70)),
+                  Text('👔 ${usuario.tipoUsuario}',
+                      style: const TextStyle(color: Colors.white70)),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              '⚠️ Esta ação não pode ser desfeita!',
-              style: TextStyle(color: Colors.red, fontSize: 12),
-            ),
+            const Text('⚠️ Esta ação não pode ser desfeita!',
+                style: TextStyle(color: Colors.red, fontSize: 12)),
           ],
         ),
         actions: [
@@ -727,24 +718,20 @@ Future<void> carregarUsuarios() async {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
             child: const Text('Remover'),
           ),
         ],
       ),
     );
   }
-  
 
   Future<void> _confirmarRemocaoUsuario(int id) async {
     try {
       final response = await _api.delete('/auth/usuarios/$id');
-      
       if (response['success']) {
         Get.snackbar('Sucesso', 'Usuário removido com sucesso!',
-          backgroundColor: Colors.green, colorText: Colors.white);
+            backgroundColor: Colors.green, colorText: Colors.white);
         await carregarUsuarios();
       } else {
         throw Exception(response['error']);
@@ -752,7 +739,7 @@ Future<void> carregarUsuarios() async {
     } catch (e) {
       print('❌ Erro ao remover usuário: $e');
       Get.snackbar('Erro', 'Erro ao remover usuário',
-        backgroundColor: Colors.red, colorText: Colors.white);
+          backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 }

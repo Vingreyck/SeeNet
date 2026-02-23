@@ -43,7 +43,6 @@ class RegistrarView extends GetView<RegistroController> {
           child: SafeArea(
             child: Column(
               children: [
-                // Header com botão voltar e título
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Row(
@@ -72,7 +71,6 @@ class RegistrarView extends GetView<RegistroController> {
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       children: [
-                        // Logo
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -95,7 +93,6 @@ class RegistrarView extends GetView<RegistroController> {
 
                         const SizedBox(height: 30),
 
-                        // Formulário
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
@@ -119,7 +116,6 @@ class RegistrarView extends GetView<RegistroController> {
 
                               const SizedBox(height: 30),
 
-                              // Nome Completo
                               _buildTextField(
                                 controller: controller.nomeInput,
                                 label: 'Nome Completo',
@@ -130,7 +126,6 @@ class RegistrarView extends GetView<RegistroController> {
 
                               const SizedBox(height: 20),
 
-                              // Senha
                               _buildPasswordField(
                                 controller: controller.senhaInput,
                                 label: 'Senha',
@@ -141,7 +136,6 @@ class RegistrarView extends GetView<RegistroController> {
 
                               const SizedBox(height: 20),
 
-                              // Confirmar Senha
                               _buildPasswordField(
                                 controller: controller.confirmarSenhaInput,
                                 label: 'Confirmar Senha',
@@ -152,7 +146,6 @@ class RegistrarView extends GetView<RegistroController> {
 
                               const SizedBox(height: 20),
 
-                              // Token da Empresa
                               _buildTokenField(),
 
                               const SizedBox(height: 20),
@@ -168,7 +161,6 @@ class RegistrarView extends GetView<RegistroController> {
 
                         const SizedBox(height: 30),
 
-                        // Link para login
                         const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -281,7 +273,6 @@ class RegistrarView extends GetView<RegistroController> {
     );
   }
 
-  // Campo de senha reutilizável (senha + confirmar senha)
   Widget _buildPasswordField({
     required TextEditingController controller,
     required String label,
@@ -406,6 +397,9 @@ class RegistrarView extends GetView<RegistroController> {
         TextFormField(
           controller: controller.tokenEmpresaController,
           textCapitalization: TextCapitalization.characters,
+          inputFormatters: [
+            UpperCaseTextFormatter(), // ← força maiúsculas
+          ],
           style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
@@ -590,5 +584,19 @@ class RegistrarView extends GetView<RegistroController> {
     if (controller.tokenEmpresaController.text.trim().isEmpty) return 'Digite o token';
     if (!controller.tokenValido.value) return 'Token inválido';
     return 'CRIAR CONTA';
+  }
+}
+
+// ✅ Fora da classe — força maiúsculas no campo de token
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue,
+      TextEditingValue newValue,
+      ) {
+    return newValue.copyWith(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
   }
 }

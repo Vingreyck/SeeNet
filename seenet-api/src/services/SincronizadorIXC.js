@@ -260,6 +260,7 @@ async sincronizarEmpresa(integracao) {
           await trx('ordem_servico')
             .where('id', osExistente.id)
             .update({
+              tecnico_id: tecnicoId,
               status: dadosOS.status,
               prioridade: dadosOS.prioridade,
               observacoes: dadosOS.observacoes,

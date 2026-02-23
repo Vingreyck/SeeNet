@@ -368,13 +368,12 @@ if (user.tipo_usuario === 'tecnico') {
         const nomeNormalizado = removerAcentos(user.nome).toLowerCase().trim();
 
         const match = funcionarios.find(f => {
-          const nomeFuncionario = f.funcionario; // ← campo correto
+          const nomeFuncionario = f.funcionario;
           if (!nomeFuncionario) return false;
 
-          const nomeIXC = removerAcentos(nomeFuncionario.toLowerCase());
-          const nomeUsuario = removerAcentos(usuario.nome.toLowerCase());
+          const nomeIXC = removerAcentos(nomeFuncionario).toLowerCase().trim();
 
-          return nomeIXC === nomeUsuario;
+          return nomeIXC === nomeNormalizado; // ← usa a variável já declarada
         });
 
         if (match) {

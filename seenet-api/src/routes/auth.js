@@ -365,7 +365,6 @@ if (user.tipo_usuario === 'tecnico') {
         const funcionarios = resp.data.registros || [];
         console.log(`🔍 ${funcionarios.length} funcionários carregados do IXC`);
 
-        const removerAcentos = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const nomeNormalizado = removerAcentos(user.nome).toLowerCase().trim();
 
         const match = funcionarios.find(f =>

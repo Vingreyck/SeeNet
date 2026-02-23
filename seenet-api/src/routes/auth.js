@@ -366,11 +366,16 @@ if (user.tipo_usuario === 'tecnico') {
         console.log(`🔍 ${funcionarios.length} funcionários carregados do IXC`);
 
         const nomeNormalizado = removerAcentos(user.nome).toLowerCase().trim();
-        console.log('🔍 Exemplo de funcionário IXC:', JSON.stringify(funcionarios[0], null, 2));
 
-        const match = funcionarios.find(f =>
-          removerAcentos(f.nome).toLowerCase().trim() === nomeNormalizado
-        );
+        const match = funcionarios.find(f => {
+          const nomeFuncionario = f.funcionario; // ← campo correto
+          if (!nomeFuncionario) return false;
+
+          const nomeIXC = removerAcentos(nomeFuncionario.toLowerCase());
+          const nomeUsuario = removerAcentos(usuario.nome.toLowerCase());
+
+          return nomeIXC === nomeUsuario;
+        });
 
         if (match) {
           await db('mapeamento_tecnicos_ixc').insert({

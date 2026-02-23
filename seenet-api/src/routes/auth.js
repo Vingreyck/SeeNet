@@ -366,6 +366,7 @@ if (user.tipo_usuario === 'tecnico') {
         console.log(`🔍 ${funcionarios.length} funcionários carregados do IXC`);
 
         const nomeNormalizado = removerAcentos(user.nome).toLowerCase().trim();
+        console.log('🔍 Exemplo de funcionário IXC:', JSON.stringify(funcionarios[0], null, 2));
 
         const match = funcionarios.find(f =>
           removerAcentos(f.nome).toLowerCase().trim() === nomeNormalizado

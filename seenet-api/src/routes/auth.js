@@ -341,14 +341,22 @@ if (user.tipo_usuario === 'tecnico') {
           rp: '200'  // busca em massa
         });
 
-        const resp = await axios.post(
-          `${integracao.url_api}/funcionario`,
-          params.toString(),
+        const resp = await axios.get(
+          `${integracao.url_api}/funcionarios`,
           {
             headers: {
               'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
+              'Content-Type': 'application/json',
               'ixcsoft': 'listar'
+            },
+            data: {
+              qtype: 'funcionarios.id',
+              query: '1',
+              oper: '>=',
+              page: '1',
+              rp: '1000',
+              sortname: 'funcionarios.id',
+              sortorder: 'desc'
             },
             timeout: 10000
           }
@@ -357,17 +365,17 @@ if (user.tipo_usuario === 'tecnico') {
         const funcionarios = resp.data.registros || [];
         console.log(`🔍 ${funcionarios.length} funcionários carregados do IXC`);
 
+        const removerAcentos = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const nomeNormalizado = removerAcentos(user.nome).toLowerCase().trim();
 
         const match = funcionarios.find(f =>
           removerAcentos(f.nome).toLowerCase().trim() === nomeNormalizado
         );
 
-
         if (match) {
           await db('mapeamento_tecnicos_ixc').insert({
             usuario_id: user.id,
-            tecnico_ixc_id: match.id,
+            tecnico_ixc_id: match.id,  // ✅ id_tecnico no IXC
             tenant_id: user.tenant_id
           });
           console.log(`✅ Auto-mapeamento: ${user.nome} → IXC ID ${match.id}`);

@@ -1,188 +1,200 @@
-// lib/registro/registro.view.dart - VERSÃO SIMPLIFICADA E SEGURA
+// lib/registro/registro.view.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'widgets/loginbutton.widget.dart';
-import 'package:flutter/services.dart'; // ✅ ADICIONAR
+import 'package:flutter/services.dart';
 import 'registroview.controller.dart';
 
 class RegistrarView extends GetView<RegistroController> {
   RegistrarView({super.key}) {
     _obscurePassword = true.obs;
+    _obscureConfirmPassword = true.obs;
   }
-@override
-Widget build(BuildContext context) {
-  return AnnotatedRegion<SystemUiOverlayStyle>(
-    value: const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      statusBarBrightness: Brightness.dark,
-    ),
-    child: Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF6B7280),
-              Color(0xFF4B5563),
-              Color(0xFF374151),
-              Color(0xFF1F2937),
-              Color(0xFF111827),
-              Color(0xFF0F0F0F),
-            ],
-            stops: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+
+  late final RxBool _obscurePassword;
+  late final RxBool _obscureConfirmPassword;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF6B7280),
+                Color(0xFF4B5563),
+                Color(0xFF374151),
+                Color(0xFF1F2937),
+                Color(0xFF111827),
+                Color(0xFF0F0F0F),
+              ],
+              stops: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header com botão voltar e título
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Get.back(),
-                    ),
-                    const Expanded(
-                      child: Text(
-                        'Criar Conta',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 48), // Espaço para balancear
-                  ],
-                ),
-              ),
-              // Conteúdo existente
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Header com botão voltar e título
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Row(
                     children: [
-                      // Logo e título
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SvgPicture.asset(
-                            'assets/images/logo.svg',
-                            width: 60,
-                            height: 60,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'SeeNet',
-                            style: TextStyle(
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF00FF99),
-                            ),
-                          ),
-                        ],
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Get.back(),
                       ),
-
-                      const SizedBox(height: 30),
-
-                      // Formulário principal (SEU CÓDIGO EXISTENTE)
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: const Color(0xFF00FF99).withOpacity(0.2),
-                            width: 1,
+                      const Expanded(
+                        child: Text(
+                          'Criar Conta',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        child: Column(
-                          children: [
-                            const Text(
-                              '📝 Dados do Novo Usuário',
-                              style: TextStyle(
-                                color: Color(0xFF00FF99),
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-
-                            const SizedBox(height: 30),
-
-                            // SEU CÓDIGO DOS CAMPOS (NÃO MEXER)
-                            _buildTextField(
-                              controller: controller.nomeInput,
-                              label: 'Nome Completo',
-                              hint: 'Digite seu nome completo',
-                              icon: Icons.person,
-                              textCapitalization: TextCapitalization.words,
-                            ),
-
-                            const SizedBox(height: 20),
-
-                            _buildTextField(
-                              controller: controller.emailInput,
-                              label: 'Email',
-                              hint: 'Digite seu email',
-                              icon: Icons.email,
-                              keyboardType: TextInputType.emailAddress,
-                            ),
-
-                            const SizedBox(height: 20),
-
-                            _buildPasswordField(),
-
-                            const SizedBox(height: 20),
-
-                            _buildTokenField(),
-
-                            const SizedBox(height: 20),
-
-                            _buildTokenStatus(),
-
-                            const SizedBox(height: 30),
-
-                            _buildRegisterButton(),
-                          ],
-                        ),
                       ),
-
-                      const SizedBox(height: 30),
-
-                      // Link para login
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Já tem uma conta?',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          LoginButton(),
-                        ],
-                      ),
+                      const SizedBox(width: 48),
                     ],
                   ),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        // Logo
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SvgPicture.asset(
+                              'assets/images/logo.svg',
+                              width: 60,
+                              height: 60,
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'SeeNet',
+                              style: TextStyle(
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF00FF99),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 30),
+
+                        // Formulário
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFF00FF99).withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text(
+                                '📝 Dados do Novo Usuário',
+                                style: TextStyle(
+                                  color: Color(0xFF00FF99),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+
+                              const SizedBox(height: 30),
+
+                              // Nome Completo
+                              _buildTextField(
+                                controller: controller.nomeInput,
+                                label: 'Nome Completo',
+                                hint: 'Digite seu nome completo',
+                                icon: Icons.person,
+                                textCapitalization: TextCapitalization.words,
+                              ),
+
+                              const SizedBox(height: 20),
+
+                              // Senha
+                              _buildPasswordField(
+                                controller: controller.senhaInput,
+                                label: 'Senha',
+                                hint: 'Mínimo 6 caracteres',
+                                obscureObs: _obscurePassword,
+                                onToggle: () => _obscurePassword.toggle(),
+                              ),
+
+                              const SizedBox(height: 20),
+
+                              // Confirmar Senha
+                              _buildPasswordField(
+                                controller: controller.confirmarSenhaInput,
+                                label: 'Confirmar Senha',
+                                hint: 'Repita a senha',
+                                obscureObs: _obscureConfirmPassword,
+                                onToggle: () => _obscureConfirmPassword.toggle(),
+                              ),
+
+                              const SizedBox(height: 20),
+
+                              // Token da Empresa
+                              _buildTokenField(),
+
+                              const SizedBox(height: 20),
+
+                              _buildTokenStatus(),
+
+                              const SizedBox(height: 30),
+
+                              _buildRegisterButton(),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 30),
+
+                        // Link para login
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Já tem uma conta?',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 16,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            LoginButton(),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-  // Widget para campos de texto padrão
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -269,26 +281,32 @@ Widget build(BuildContext context) {
     );
   }
 
-  // Campo de senha com toggle de visibilidade
-  Widget _buildPasswordField() {
+  // Campo de senha reutilizável (senha + confirmar senha)
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required RxBool obscureObs,
+    required VoidCallback onToggle,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Row(
             children: [
-              Icon(Icons.lock, color: Color(0xFF00FF99), size: 16),
-              SizedBox(width: 6),
+              const Icon(Icons.lock, color: Color(0xFF00FF99), size: 16),
+              const SizedBox(width: 6),
               Text(
-                'Senha',
-                style: TextStyle(
+                label,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              Text(
+              const Text(
                 ' *',
                 style: TextStyle(
                   color: Colors.red,
@@ -299,17 +317,16 @@ Widget build(BuildContext context) {
             ],
           ),
         ),
-        // ← MOVIDO O Obx PARA CÁ
         Obx(() => TextFormField(
-          controller: controller.senhaInput,
-          obscureText: _obscurePassword.value,
+          controller: controller,
+          obscureText: obscureObs.value,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.w500,
           ),
           decoration: InputDecoration(
-            hintText: 'Mínimo 6 caracteres',
+            hintText: hint,
             hintStyle: TextStyle(
               color: Colors.white.withOpacity(0.5),
               fontSize: 16,
@@ -321,11 +338,11 @@ Widget build(BuildContext context) {
             ),
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePassword.value ? Icons.visibility_off : Icons.visibility,
+                obscureObs.value ? Icons.visibility_off : Icons.visibility,
                 color: Colors.white.withOpacity(0.7),
                 size: 24,
               ),
-              onPressed: () => _obscurePassword.toggle(),
+              onPressed: onToggle,
             ),
             filled: true,
             fillColor: Colors.white.withOpacity(0.1),
@@ -357,7 +374,6 @@ Widget build(BuildContext context) {
     );
   }
 
-  // Campo do token da empresa
   Widget _buildTokenField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -437,7 +453,6 @@ Widget build(BuildContext context) {
     );
   }
 
-  // Status do token
   Widget _buildTokenStatus() {
     return Obx(() {
       if (controller.verificandoToken.value) {
@@ -513,15 +528,9 @@ Widget build(BuildContext context) {
     });
   }
 
-  // Botão de registro
   Widget _buildRegisterButton() {
     return Obx(() {
-      bool podeRegistrar= controller.nomeInput.text.trim().isNotEmpty &&
-          controller.emailInput.text.trim().isNotEmpty &&
-          controller.senhaInput.text.length >= 6 &&
-          controller.tokenEmpresaController.text.trim().isNotEmpty &&
-          controller.tokenValido.value &&
-          !controller.isLoading.value;
+      final bool podeRegistrar = controller.podeRegistrar;
 
       return SizedBox(
         width: double.infinity,
@@ -529,13 +538,10 @@ Widget build(BuildContext context) {
         child: ElevatedButton(
           onPressed: podeRegistrar ? controller.tryToRegister : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: controller.podeRegistrar
+            backgroundColor: podeRegistrar
                 ? const Color(0xFF00FF99)
-                : const Color(0xFF4B5563), // ← MAIS VISÍVEL
-
-            foregroundColor: controller.podeRegistrar
-                ? Colors.black
-                : Colors.white70, // ← MAIS VISÍVEL
+                : const Color(0xFF4B5563),
+            foregroundColor: podeRegistrar ? Colors.black : Colors.white70,
             elevation: podeRegistrar ? 4 : 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -560,7 +566,7 @@ Widget build(BuildContext context) {
               ),
               const SizedBox(width: 8),
               Text(
-                _getButtonText(podeRegistrar),
+                _getButtonText(),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -574,211 +580,15 @@ Widget build(BuildContext context) {
     });
   }
 
-  String _getButtonText(bool canRegister) {
+  String _getButtonText() {
     if (controller.nomeInput.text.trim().isEmpty) return 'Digite seu nome';
-    if (controller.emailInput.text.trim().isEmpty) return 'Digite seu email';
     if (controller.senhaInput.text.length < 6) return 'Senha muito curta';
+    if (controller.confirmarSenhaInput.text.isEmpty) return 'Confirme a senha';
+    if (controller.senhaInput.text != controller.confirmarSenhaInput.text) {
+      return 'Senhas não coincidem';
+    }
     if (controller.tokenEmpresaController.text.trim().isEmpty) return 'Digite o token';
     if (!controller.tokenValido.value) return 'Token inválido';
     return 'CRIAR CONTA';
-  }
-
-  // Observable para controlar visibilidade da senha
-  late final RxBool _obscurePassword;
-
-  // ← NOVA: Seção de sucesso após registro
-  Widget _buildSuccessSection() {
-    return Column(
-      children: [
-        // Ícone de sucesso
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: const Color(0xFF00FF99).withOpacity(0.2),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: const Color(0xFF00FF99),
-              width: 2,
-            ),
-          ),
-          child: const Icon(
-            Icons.check_circle_outline,
-            color: Color(0xFF00FF99),
-            size: 40,
-          ),
-        ),
-
-        const SizedBox(height: 20),
-
-        // Título de sucesso
-        const Text(
-          '🎉 Conta Criada!',
-          style: TextStyle(
-            color: Color(0xFF00FF99),
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // Informações da empresa
-        Obx(() {
-          final empresa = controller.empresaInfo.value;
-          if (empresa != null) {
-            return Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF00FF99).withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.business,
-                        color: Color(0xFF00FF99),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        empresa['nome'] ?? 'Empresa',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sua conta foi criada com sucesso!\nAgora você pode fazer login.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-          return const SizedBox.shrink();
-        }),
-
-        const SizedBox(height: 24),
-
-        // Botão ENTRAR (usando LoginButton existente)
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton(
-            onPressed: controller.irParaLogin,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF99),
-              foregroundColor: Colors.black,
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.login, size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'ENTRAR AGORA',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Botão secundário para criar outra conta
-        TextButton(
-          onPressed: controller.criarNovaConta,
-          child: Text(
-            'Criar outra conta',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ← NOVA: Link para login (versão original)
-  Widget _buildLoginLink() {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'Já tem uma conta?',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 16,
-          ),
-        ),
-        SizedBox(width: 8),
-        LoginButton(),
-      ],
-    );
-  }
-
-  // ← NOVA: Ações após sucesso
-  Widget _buildSuccessActions() {
-    return Column(
-      children: [
-        // Dica
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF374151).withOpacity(0.6),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.1),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: const Color(0xFF00FF99).withOpacity(0.8),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Utilize suas credenciais para acessar o sistema',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 }

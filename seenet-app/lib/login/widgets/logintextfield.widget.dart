@@ -1,3 +1,4 @@
+// lib/login/widgets/logintextfield.widget.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:seenet/login/loginview.controller.dart';
@@ -9,42 +10,35 @@ class LoginTextField extends GetView<LoginController> {
   Widget build(BuildContext context) {
     return Obx(() => TextField(
       controller: controller.loginInput,
-      keyboardType: TextInputType.emailAddress,
+      keyboardType: TextInputType.name,
+      textCapitalization: TextCapitalization.words,
       decoration: InputDecoration(
-        hintText: 'Usuário ou Email',
-        
-        // ✅ BORDA PADRÃO
-        border: OutlineInputBorder( 
+        hintText: 'Nome Completo',
+        border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(100),
           borderSide: const BorderSide(
             color: Colors.white70,
             width: 1.0,
           ),
         ),
-        
-        // ✅ BORDA QUANDO TEM ERRO
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(100),
           borderSide: BorderSide(
-            color: controller.emailError.value.isEmpty 
-                ? Colors.white70 
+            color: controller.emailError.value.isEmpty
+                ? Colors.white70
                 : Colors.red,
             width: controller.emailError.value.isEmpty ? 1.0 : 2.0,
           ),
         ),
-        
-        // ✅ BORDA QUANDO FOCADO
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(100),
           borderSide: BorderSide(
-            color: controller.emailError.value.isEmpty 
-                ? const Color(0xFF00FF99) 
+            color: controller.emailError.value.isEmpty
+                ? const Color(0xFF00FF99)
                 : Colors.red,
             width: 2.0,
           ),
         ),
-        
-        // ✅ BORDAS DE ERRO
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(100),
           borderSide: const BorderSide(color: Colors.red, width: 2.0),
@@ -53,14 +47,11 @@ class LoginTextField extends GetView<LoginController> {
           borderRadius: BorderRadius.circular(100),
           borderSide: const BorderSide(color: Colors.red, width: 2.0),
         ),
-        
         prefixIcon: const Icon(Icons.person),
         filled: true,
         fillColor: Colors.white70,
-        
-        // ✅ MOSTRAR ERRO EMBAIXO DO CAMPO
-        errorText: controller.emailError.value.isEmpty 
-            ? null 
+        errorText: controller.emailError.value.isEmpty
+            ? null
             : controller.emailError.value,
         errorStyle: const TextStyle(
           color: Colors.red,
@@ -70,7 +61,6 @@ class LoginTextField extends GetView<LoginController> {
         errorMaxLines: 2,
       ),
       onChanged: (value) {
-        // ✅ LIMPAR ERRO AO DIGITAR
         if (controller.emailError.value.isNotEmpty) {
           controller.emailError.value = '';
         }

@@ -1,3 +1,4 @@
+// lib/services/auth_service.dart
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'api_service.dart';
@@ -9,15 +10,15 @@ class AuthService extends GetxService {
   final ApiService _api = ApiService.instance;
 
   UsuarioController get _usuarioController => Get.find<UsuarioController>();
-  
 
- Future<bool> login(String email, String senha, String codigoEmpresa) async {
+  // ========== LOGIN (por nome agora) ==========
+  Future<bool> login(String nome, String senha, String codigoEmpresa) async {
     try {
       _usuarioController.isLoading.value = true;
       clearSession();
-      
+
       final response = await _api.post('/auth/login', {
-        'email': email,
+        'nome': nome,          // ← era 'email': email
         'senha': senha,
         'codigoEmpresa': codigoEmpresa.toUpperCase(),
       }, requireAuth: false);
@@ -32,7 +33,7 @@ class AuthService extends GetxService {
         Usuario usuario = Usuario(
           id: userData['id'],
           nome: userData['nome'],
-          email: userData['email'],
+          email: userData['email'] ?? '',
           senha: '',
           tipoUsuario: userData['tipo_usuario'],
           ativo: true,
@@ -42,25 +43,24 @@ class AuthService extends GetxService {
         _usuarioController.usuarioLogado.value = usuario;
 
         print('✅ Login bem-sucedido: ${userData['nome']}');
-
         return true;
       } else {
-        // ✅ DETECTAR TIPO DE ERRO E SETAR NO CAMPO CORRETO
         String errorType = response['type']?.toString() ?? '';
         String errorText = response['error']?.toString().toLowerCase() ?? '';
         int statusCode = response['statusCode'] ?? 0;
-        
+
         try {
           final loginController = Get.find<LoginController>();
-          
+
           if (statusCode == 401) {
             if (errorType == 'INVALID_PASSWORD' || errorText.contains('senha')) {
               loginController.senhaError.value = 'Senha incorreta';
-            } 
-            else if (errorType == 'USER_NOT_FOUND' || errorText.contains('usuário') || errorText.contains('usuario')) {
+            } else if (errorType == 'USER_NOT_FOUND' ||
+                errorText.contains('usuário') ||
+                errorText.contains('usuario') ||
+                errorText.contains('nome')) {
               loginController.emailError.value = 'Usuário não encontrado';
-            }
-            else {
+            } else {
               loginController.emailError.value = 'Credenciais inválidas';
               loginController.senhaError.value = 'Credenciais inválidas';
             }
@@ -70,44 +70,34 @@ class AuthService extends GetxService {
         } catch (e) {
           print('⚠️ Erro ao setar mensagem no campo: $e');
         }
-        
+
         return false;
       }
     } catch (e) {
       print('❌ Erro no login: $e');
-      
       try {
         final loginController = Get.find<LoginController>();
         loginController.emailError.value = 'Erro de conexão';
       } catch (_) {}
-      
       return false;
     } finally {
       _usuarioController.isLoading.value = false;
     }
   }
 
-  Future<bool> register(String nome, String email, String senha, String codigoEmpresa) async {
+  // ========== REGISTRO (sem email) ==========
+  Future<bool> register(String nome, String senha, String codigoEmpresa) async {
     try {
       _usuarioController.isLoading.value = true;
 
       final response = await _api.post('/auth/register', {
         'nome': nome,
-        'email': email,
+        // ← REMOVIDO: 'email'
         'senha': senha,
         'codigoEmpresa': codigoEmpresa.toUpperCase(),
       }, requireAuth: false);
 
       if (response['success']) {
-        String empresaNome = response['data']?['tenantName'] ?? codigoEmpresa;
-
-        Get.snackbar(
-          'Sucesso',
-          'Conta criada! Faça login para continuar.',
-          backgroundColor: const Color(0xFF00FF99),
-          colorText: Colors.black,
-          snackPosition: SnackPosition.BOTTOM,
-        );
         return true;
       } else {
         Get.snackbar(
@@ -137,7 +127,6 @@ class AuthService extends GetxService {
   Future<Map<String, dynamic>?> verificarCodigoEmpresa(String codigo) async {
     try {
       final response = await _api.get('/tenant/verify/$codigo', requireAuth: false);
-
       if (response['success']) {
         return response['data']['empresa'];
       }
@@ -163,9 +152,7 @@ class AuthService extends GetxService {
     _usuarioController.usuarioLogado.value = null;
   }
 
-  void _clearSession() {
-    clearSession();
-  }
+  void _clearSession() => clearSession();
 
   Future<bool> verifyToken() async {
     try {
@@ -178,7 +165,6 @@ class AuthService extends GetxService {
 
   bool get isLoggedIn => _usuarioController.isLoggedIn;
   Usuario? get currentUser => _usuarioController.usuarioLogado.value;
-
-  String? get token => _api.token; // Pega o token do ApiService
-  String? get tenantCode => _api.tenantCode; // Código da empresa também pode ser útil
+  String? get token => _api.token;
+  String? get tenantCode => _api.tenantCode;
 }

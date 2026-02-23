@@ -66,18 +66,12 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
 }
 
   // ========== REGISTRO VIA API ==========
-  Future<bool> registrar(String nome, String email, String senha, String codigoEmpresa) async {
+  Future<bool> registrar(String nome, String senha, String codigoEmpresa) async {
     try {
       isLoading.value = true;
-      
-      // Validações
+
       if (nome.trim().length < 2) {
         ErrorHandler.handleValidationError('Nome muito curto');
-        return false;
-      }
-      
-      if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
-        ErrorHandler.handleValidationError('Email inválido');
         return false;
       }
 
@@ -86,14 +80,13 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
         return false;
       }
 
-      // Registro via AuthService (que usa API)
-      bool sucesso = await _authService.register(nome, email, senha, codigoEmpresa);
-      
+      bool sucesso = await _authService.register(nome, senha, codigoEmpresa);
+
       if (sucesso) {
         print('✅ Registro bem-sucedido via API');
         return true;
       }
-      
+
       return false;
     } catch (e) {
       print('❌ Erro no registro: $e');
@@ -104,61 +97,44 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
     }
   }
 
-
+// 2. registrarComAutoLogin() — remover parâmetro email
   Future<bool> registrarComAutoLogin(
-  String nome,
-  String email,
-  String senha,
-  String codigoEmpresa,
-) async {
-  try {
-    isLoading.value = true;
+      String nome,
+      String senha,
+      String codigoEmpresa,
+      ) async {
+    try {
+      isLoading.value = true;
 
-    print('📝 Tentando registrar: $email');
+      bool registroSucesso = await _authService.register(nome, senha, codigoEmpresa);
 
-    // 1. Registrar usuário
-    bool registroSucesso = await _authService.register(
-      nome,
-      email,
-      senha,
-      codigoEmpresa,
-    );
+      if (!registroSucesso) {
+        print('❌ Falha no registro');
+        return false;
+      }
 
-    if (!registroSucesso) {
-      print('❌ Falha no registro');
+      print('✅ Registro bem-sucedido, iniciando auto-login...');
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Login agora usa nome em vez de email
+      bool loginSucesso = await login(nome, senha, codigoEmpresa);
+
+      if (loginSucesso) {
+        print('✅ Auto-login bem-sucedido');
+        return true;
+      } else {
+        print('❌ Auto-login falhou');
+        ErrorHandler.showSuccess('Sua conta foi criada. Por favor, faça login.');
+        return false;
+      }
+    } catch (e, stackTrace) {
+      print('❌ Erro em registrarComAutoLogin: $e');
+      ErrorHandler.handle(e, context: 'registrarComAutoLogin');
       return false;
+    } finally {
+      isLoading.value = false;
     }
-
-    print('✅ Registro bem-sucedido, iniciando auto-login...');
-
-    // 2. Aguardar um pouco antes do login
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // 3. Fazer login automaticamente
-    bool loginSucesso = await login(email, senha, codigoEmpresa);
-
-    if (loginSucesso) {
-      print('✅ Auto-login bem-sucedido');
-      return true;
-    } else {
-      print('❌ Auto-login falhou');
-      
-      // Mesmo que o login falhe, o registro foi feito
-      ErrorHandler.showSuccess('Sua conta foi criada. Por favor, faça login.');
-      
-      return false;
-    }
-  } catch (e, stackTrace) {
-    print('❌ Erro em registrarComAutoLogin: $e');
-    print('Stack trace: $stackTrace');
-    
-    ErrorHandler.handle(e, context: 'registrarComAutoLogin');
-    
-    return false;
-  } finally {
-    isLoading.value = false;
   }
-}
 
   // ========== ATUALIZAR PERFIL ==========
   Future<bool> atualizarPerfil({

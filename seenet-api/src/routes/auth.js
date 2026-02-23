@@ -23,7 +23,6 @@ const loginLimiter = rateLimit({
 // ========== REGISTRO DE USUÁRIO ========== (VERSÃO CORRIGIDA)
 router.post('/register', [
   body('nome').trim().isLength({ min: 2, max: 100 }).withMessage('Nome deve ter entre 2 e 100 caracteres'),
-  body('email').isEmail().normalizeEmail().withMessage('Email inválido'),
   body('senha').isLength({ min: 6, max: 128 }).withMessage('Senha deve ter entre 6 e 128 caracteres'),
   body().custom((value, { req }) => {
     const codigo = req.body.codigoEmpresa || req.body.tenantCode;
@@ -36,7 +35,7 @@ router.post('/register', [
   const requestContext = {
     ip: req.ip,
     userAgent: req.headers['user-agent'],
-    email: req.body.email,
+    email: req.body.nome,
     tenantCode: req.body.codigoEmpresa || req.body.tenantCode,
     timestamp: new Date().toISOString()
   };
@@ -50,18 +49,17 @@ router.post('/register', [
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       console.log('❌ Erros de validação:', errors.array());
-      return res.status(400).json({ 
-        error: 'Dados inválidos', 
-        details: errors.array() 
+      return res.status(400).json({
+        error: 'Dados inválidos',
+        details: errors.array()
       });
     }
 
-    const { nome, email, senha } = req.body;
+    const { nome, senha } = req.body;
     const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode;
 
     console.log('✅ Validação OK');
     console.log('👤 Nome:', nome);
-    console.log('📧 Email:', email);
     console.log('🏢 Código Empresa:', codigoEmpresa);
 
     // Verificar se o tenant existe e está ativo
@@ -72,27 +70,26 @@ router.post('/register', [
 
     if (!tenant) {
       console.log('❌ Tenant não encontrado:', codigoEmpresa);
-      return res.status(400).json({ 
-        error: 'Código da empresa inválido ou empresa inativa' 
+      return res.status(400).json({
+        error: 'Código da empresa inválido ou empresa inativa'
       });
     }
 
     console.log('✅ Tenant encontrado:', tenant.nome, '- ID:', tenant.id);
 
-    // Verificar se email já existe no tenant
     const existingUser = await db('usuarios')
-      .where('email', email.toLowerCase())
+      .where('nome', nome)
       .where('tenant_id', tenant.id)
       .first();
 
     if (existingUser) {
-      console.log('❌ Email já existe:', email);
-      return res.status(400).json({ 
-        error: 'Este email já está cadastrado nesta empresa' 
+      console.log('❌ Nome já existe:', nome);
+      return res.status(400).json({
+        error: 'Este nome já está cadastrado nesta empresa'
       });
     }
 
-    console.log('✅ Email disponível');
+    console.log('✅ Nome disponível');
 
     // Verificar limite de usuários do plano
     const userCount = await db('usuarios')
@@ -111,8 +108,8 @@ router.post('/register', [
     const maxUsers = limits[tenant.plano] || 5;
     if (maxUsers !== -1 && userCount.total >= maxUsers) {
       console.log('❌ Limite de usuários atingido:', userCount.total, '/', maxUsers);
-      return res.status(400).json({ 
-        error: `Limite de usuários atingido para o plano ${tenant.plano}. Máximo: ${maxUsers}` 
+      return res.status(400).json({
+        error: `Limite de usuários atingido para o plano ${tenant.plano}. Máximo: ${maxUsers}`
       });
     }
 
@@ -125,12 +122,10 @@ router.post('/register', [
     // ✅ CORREÇÃO: Remover data_criacao (usar default do banco)
     const novoUsuario = {
       nome,
-      email: email.toLowerCase(),
       senha: senhaHash,
       tenant_id: tenant.id,
       tipo_usuario: 'tecnico',
       ativo: true,
-      // ❌ REMOVIDO: data_criacao (deixar o banco usar o default)
     };
 
     console.log('📝 Objeto para inserir:', {
@@ -152,11 +147,11 @@ router.post('/register', [
       action: 'USER_REGISTERED',
       usuario_id: userId,
       tenant_id: tenant.id,
-      details: `Usuário registrado: ${email}`,
+      details: `Usuário registrado: ${nome}`,
       ip_address: req.ip
     });
 
-    logger.info(`✅ Usuário registrado: ${email} - Tenant: ${tenant.nome}`);
+    logger.info(`✅ Usuário registrado: ${nome} - Tenant: ${tenant.nome}`);
 
     res.status(201).json({
       message: 'Usuário criado com sucesso',
@@ -183,7 +178,6 @@ router.post('/register', [
 
 // ========== LOGIN ==========
 router.post('/login', loginLimiter, [
-  body('email').isEmail().normalizeEmail().withMessage('Email inválido'),
   body('senha').notEmpty().withMessage('Senha é obrigatória'),
   body().custom((value, { req }) => {
     const codigo = req.body.codigoEmpresa || req.body.tenantCode;
@@ -196,12 +190,12 @@ router.post('/login', loginLimiter, [
   const requestContext = {
     ip: req.ip,
     userAgent: req.headers['user-agent'],
-    email: req.body.email?.toLowerCase(),
+    nome: req.body.nome,
     tenantCode: (req.body.codigoEmpresa || req.body.tenantCode)?.toUpperCase(),
     timestamp: new Date().toISOString()
   };
 
-  try {    
+  try {
     // Log inicial da tentativa de login
     logger.info('Iniciando tentativa de login', {
       ...requestContext,
@@ -214,22 +208,22 @@ router.post('/login', loginLimiter, [
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       console.log('❌ Erros de validação:', errors.array()); // ✅ ADICIONAR
-      return res.status(400).json({ 
-        error: 'Dados inválidos', 
-        details: errors.array() 
+      return res.status(400).json({
+        error: 'Dados inválidos',
+        details: errors.array()
       });
     }
 
-    const { email, senha } = req.body;
+    const { nome, senha } = req.body;
     const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode;
 
-    console.log('✅ Validação OK - Buscando usuário:', email, codigoEmpresa); // ✅ ADICIONAR
+    console.log('✅ Validação OK - Buscando usuário:', nome, codigoEmpresa);
 
 
     // Buscar usuário com tenant
     const user = await db('usuarios')
       .join('tenants', 'usuarios.tenant_id', 'tenants.id')
-      .where('usuarios.email', email.toLowerCase())
+      .where('usuarios.nome', nome)
       .where('tenants.codigo', codigoEmpresa.toUpperCase())
       .whereRaw('usuarios.ativo = ?', [true])
       .whereRaw('tenants.ativo = ?', [true])
@@ -251,7 +245,7 @@ router.post('/login', loginLimiter, [
 
       await auditService.log({
         action: 'LOGIN_FAILED',
-        details: `Tentativa de login falhou: ${email} - Tenant: ${codigoEmpresa}`,
+        details: `Tentativa de login falhou: ${nome} - Tenant: ${codigoEmpresa}`,
         ip_address: req.ip,
         reason: 'USER_NOT_FOUND'
       });
@@ -278,7 +272,7 @@ router.post('/login', loginLimiter, [
         action: 'LOGIN_FAILED',
         usuario_id: user.id,
         tenant_id: user.tenant_id,
-        details: `Senha incorreta: ${email}`,
+        details: `Senha incorreta: ${nome}`,
         ip_address: req.ip,
         reason: 'INVALID_PASSWORD'
       });
@@ -398,7 +392,7 @@ if (user.tipo_usuario === 'tecnico') {
       action: 'LOGIN_SUCCESS',
       usuario_id: user.id,
       tenant_id: user.tenant_id,
-      details: `Login bem-sucedido: ${email}`,
+      details: `Login bem-sucedido: ${nome}`,
       ip_address: req.ip
     });
 

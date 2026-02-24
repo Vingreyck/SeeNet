@@ -172,16 +172,22 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
   }
 
   // ========== GETTERS ==========
-  
+
   bool get isLoggedIn => usuarioLogado.value != null;
-  
+
   bool get isAdmin {
     if (usuarioLogado.value == null) return false;
-    
+
     String tipo = usuarioLogado.value!.tipoUsuario.toLowerCase().trim();
     return tipo == 'administrador' || tipo == 'admin';
   }
-  
+
+  String get tipoUsuario =>
+      usuarioLogado.value?.tipoUsuario.toLowerCase().trim() ?? '';
+
+  bool get isGestorSeguranca =>
+      tipoUsuario == 'gestor_seguranca';
+
   String get nomeUsuario => usuarioLogado.value?.nome ?? '';
   String get emailUsuario => usuarioLogado.value?.email ?? '';
   int? get idUsuario => usuarioLogado.value?.id;

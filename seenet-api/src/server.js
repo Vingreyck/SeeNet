@@ -482,6 +482,16 @@ try {
   console.error('Stack:', error.stack);
 }
 
+// ========== SEGURANÇA DO TRABALHO ==========
+try {
+  console.log('=== CARREGANDO ROTAS SEGURANÇA ===');
+  const segurancaRoutes = require('./routes/requisicoes_epi');
+  app.use('/api/seguranca', segurancaRoutes);
+  console.log('✅ Rotas /api/seguranca registradas');
+} catch (error) {
+  console.error('❌ Erro ao carregar rotas segurança:', error.message);
+}
+
 // ============================================
 // ROTA DE DEBUG: TESTAR ENDPOINTS IXC
 // ============================================

@@ -66,6 +66,8 @@ void main() async {
   Get.put(CheckmarkController(), permanent: true);
   Get.lazyPut<DiagnosticoController>(() => DiagnosticoController(), fenix: true);
   Get.put(TranscricaoController(), permanent: true);
+  Get.put(SegurancaService(), permanent: true);
+  Get.put(SegurancaController(), permanent: true);
 
   print('✅ App inicializado - Modo 100% API');
   
@@ -216,6 +218,26 @@ class MyApp extends StatelessWidget {
           name: '/transcricao/historico',
           page: () => const HistoricoTranscricaoView(),
         )
+        GetPage(
+            name: '/seguranca',
+            page: () => const SegurancaHomeScreen()
+        ),
+        GetPage(
+            name: '/seguranca/requisicao',
+            page: () => const RequisicaoEpiScreen()
+        ),
+        GetPage(
+            name: '/seguranca/minhas',
+            page: () => const MinhasRequisicoesScreen()
+        ),
+        GetPage(
+            name: '/seguranca/gestao',
+            page: () => const GestaoRequisicoesScreen()
+        ),
+        GetPage(
+            name: '/seguranca/perfil',
+            page: () => const PerfilScreen()
+        ),
       ],
     );
   }

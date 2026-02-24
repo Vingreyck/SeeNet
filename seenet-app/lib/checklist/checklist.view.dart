@@ -296,11 +296,19 @@ Positioned(
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
-                        color: usuarioController.isAdmin ? Colors.orange : Colors.blue,
+                        color: usuarioController.isAdmin
+                            ? Colors.orange
+                            : usuarioController.isGestorSeguranca
+                            ? Colors.blue
+                            : Colors.blueGrey,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        usuarioController.isAdmin ? 'ADMINISTRADOR' : 'TÉCNICO',
+                        usuarioController.isAdmin
+                            ? 'ADMINISTRADOR'
+                            : usuarioController.isGestorSeguranca
+                            ? 'GESTOR DE SEGURANÇA'
+                            : 'TÉCNICO',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
@@ -384,6 +392,32 @@ Positioned(
                 },
                 color: Colors.purple,
               ),
+              const SizedBox(height: 12),
+              _buildMenuOption(
+                icon: Icons.health_and_safety,
+                title: 'Segurança do Trabalho',
+                subtitle: 'EPIs, requisições e perfil',
+                onTap: () {
+                  Navigator.pop(context);
+                  Get.toNamed('/seguranca');
+                },
+                color: const Color(0xFF00FF88),
+              ),
+              // Para gestor e admin:
+              if (usuarioController.isAdmin ||
+                  usuarioController.tipoUsuario == 'gestor_seguranca') ...[
+                const SizedBox(height: 12),
+                _buildMenuOption(
+                  icon: Icons.admin_panel_settings,
+                  title: 'Gestão de Requisições',
+                  subtitle: 'Aprovar ou recusar EPIs',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Get.toNamed('/seguranca/gestao');
+                  },
+                  color: Colors.blue,
+                ),
+              ],
               const SizedBox(height: 12),
               // Opção de sair (para todos os usuários)
               _buildMenuOption(

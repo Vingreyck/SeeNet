@@ -1,5 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'seguranca_service.dart';
+import '../services/seguranca_service.dart';
 
 class SegurancaController extends GetxController {
   final SegurancaService _service = Get.find<SegurancaService>();

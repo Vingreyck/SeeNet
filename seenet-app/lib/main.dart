@@ -28,6 +28,13 @@ import 'controllers/usuario_controller.dart';
 import 'admin/categorias_admin.view.dart';
 import 'controllers/checkmark_controller.dart';
 import 'controllers/diagnostico_controller.dart';
+import 'package:seenet/seguranca/services/seguranca_service.dart';
+import 'package:seenet/seguranca/controllers/seguranca_controller.dart';
+import 'package:seenet/seguranca/screens/seguranca_home_screen.dart';
+import 'package:seenet/seguranca/screens/requisicao_epi_screen.dart';
+import 'package:seenet/seguranca/screens/minhas_requisicoes_screen.dart';
+import 'package:seenet/seguranca/screens/gestao_requisicoes_screen.dart';
+import 'package:seenet/seguranca/screens/perfil_screen.dart';
 
 
 void main() async {
@@ -217,26 +224,26 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/transcricao/historico',
           page: () => const HistoricoTranscricaoView(),
-        )
+        ),
         GetPage(
             name: '/seguranca',
-            page: () => const SegurancaHomeScreen()
+            page: () => const SegurancaHomeScreen(),
         ),
         GetPage(
             name: '/seguranca/requisicao',
-            page: () => const RequisicaoEpiScreen()
+            page: () => const RequisicaoEpiScreen(),
         ),
         GetPage(
             name: '/seguranca/minhas',
-            page: () => const MinhasRequisicoesScreen()
+            page: () => const MinhasRequisicoesScreen(),
         ),
         GetPage(
             name: '/seguranca/gestao',
-            page: () => const GestaoRequisicoesScreen()
+            page: () => const GestaoRequisicoesScreen(),
         ),
         GetPage(
             name: '/seguranca/perfil',
-            page: () => const PerfilScreen()
+            page: () => const PerfilScreen(),
         ),
       ],
     );

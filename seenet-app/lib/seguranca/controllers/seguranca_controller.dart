@@ -4,7 +4,6 @@ import '../services/seguranca_service.dart';
 
 class SegurancaController extends GetxController {
   final SegurancaService _service = Get.find<SegurancaService>();
-
   
   final isLoading = false.obs;
   final isSending = false.obs;

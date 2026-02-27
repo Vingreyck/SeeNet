@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../widgets/botao_pdf.dart';
+import 'package:seenet/seguranca/screens/confirmar_recebimento_screen.dart';
 import '../controllers/seguranca_controller.dart';
 
 class MinhasRequisicoesScreen extends StatefulWidget {

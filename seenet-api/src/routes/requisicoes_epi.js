@@ -290,8 +290,8 @@ async function gerarPDF(requisicao, tecnico, gestor) {
       }
 
       // ── FOTO + ASSINATURA (lado a lado) ──────────────────────
-      const fotoBuffer = base64ToBuffer(requisicao.foto_base64);
-      const sigBuffer = base64ToBuffer(requisicao.assinatura_base64);
+    const fotoBuffer = base64ToBuffer(requisicao.foto_recebimento_base64);
+    const sigBuffer = base64ToBuffer(requisicao.assinatura_recebimento_base64);
       const secNum = requisicao.observacao_gestor ? 5 : 4;
 
       if (fotoBuffer || sigBuffer) {
@@ -424,8 +424,6 @@ router.post('/requisicoes', authMiddleware, async (req, res) => {
       tecnico_id: req.user.id,
       status: 'pendente',
       epis_solicitados: JSON.stringify(epis_solicitados),
-      assinatura_base64,
-      foto_base64,
       registro_manual: false,
     }).returning('id');
 
@@ -587,7 +585,7 @@ router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
     if (!requisicao) return res.status(404).json({ error: 'Não encontrada' });
 
     await db('requisicoes_epi').where('id', req.params.id).update({
-      status: 'aprovada',
+      status: 'aguardando_confirmacao',
       gestor_id: req.user.id,
       observacao_gestor: req.body.observacao || null,
       data_resposta: new Date(),
@@ -608,7 +606,7 @@ router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
       console.error('Erro ao gerar PDF:', e);
     }
 
-    res.json({ success: true, message: 'Requisição aprovada e PDF gerado!' });
+    res.json({ success: true, message: 'Requisição aprovada! Aguardando confirmação do técnico.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao aprovar' });
@@ -661,6 +659,56 @@ router.get('/requisicoes/:id/pdf', authMiddleware, async (req, res) => {
     res.json({ pdf_base64: pdfBase64 });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar PDF' });
+  }
+});
+
+// POST /api/seguranca/requisicoes/:id/confirmar-recebimento
+router.post('/requisicoes/:id/confirmar-recebimento', authMiddleware, async (req, res) => {
+  try {
+    const { assinatura_base64, foto_base64 } = req.body;
+
+    if (!assinatura_base64) return res.status(400).json({ error: 'Assinatura obrigatória' });
+    if (!foto_base64) return res.status(400).json({ error: 'Foto obrigatória' });
+
+    const requisicao = await db('requisicoes_epi').where('id', req.params.id).first();
+    if (!requisicao) return res.status(404).json({ error: 'Não encontrada' });
+
+    // Só o próprio técnico pode confirmar
+    if (requisicao.tecnico_id !== req.user.id) {
+      return res.status(403).json({ error: 'Sem permissão' });
+    }
+
+    if (requisicao.status !== 'aguardando_confirmacao') {
+      return res.status(400).json({ error: 'Requisição não está aguardando confirmação' });
+    }
+
+    await db('requisicoes_epi').where('id', req.params.id).update({
+      status: 'concluida',
+      assinatura_recebimento_base64: assinatura_base64,
+      foto_recebimento_base64: foto_base64,
+      data_confirmacao_recebimento: new Date(),
+    });
+
+    const updated = await db('requisicoes_epi').where('id', req.params.id).first();
+    const tecnico = await db('usuarios').where('id', req.user.id).first();
+    const gestor = updated.gestor_id
+      ? await db('usuarios').where('id', updated.gestor_id).first()
+      : null;
+
+    // Gera PDF agora com todos os dados
+    try {
+      const pdfBuffer = await gerarPDF(updated, tecnico, gestor);
+      await db('requisicoes_epi').where('id', req.params.id).update({
+        pdf_base64: `data:application/pdf;base64,${pdfBuffer.toString('base64')}`,
+      });
+    } catch (e) {
+      console.error('Erro ao gerar PDF na confirmação:', e);
+    }
+
+    res.json({ success: true, message: 'Recebimento confirmado! PDF gerado.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao confirmar recebimento' });
   }
 });
 

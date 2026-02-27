@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { db } = require('../config/database');
-const { authMiddleware } = require('../middleware/auth');
+const authMiddleware = require('../middleware/auth');
 const PDFDocument = require('pdfkit');
 const https = require('https');
 const http = require('http');

@@ -165,6 +165,25 @@ class _MinhasRequisicoesScreenState extends State<MinhasRequisicoesScreen> {
                 pdfBase64Cached: req['pdf_base64'],
               ),
             ],
+            if (status == 'aguardando_confirmacao') ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => Get.to(() => ConfirmarRecebimentoScreen(
+                    requisicaoId: req['id'] as int,
+                    epis: episLista,
+                  )),
+                  icon: const Icon(Icons.verified, color: Colors.black, size: 16),
+                  label: const Text('Confirmar Recebimento',
+                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF88),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

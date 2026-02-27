@@ -250,6 +250,15 @@ class MyApp extends StatelessWidget {
           name: '/seguranca/registro-manual',
           page: () => const RegistroManualEpiScreen(),
         ),
+        GetPage(
+            name: '/seguranca/confirmar-recebimento',
+            page: () {
+          final args = Get.arguments as Map<String, dynamic>;
+          return ConfirmarRecebimentoScreen(
+            requisicaoId: args['id'] as int,
+            epis: List<String>.from(args['epis']),
+          );
+        }),
       ],
     );
   }

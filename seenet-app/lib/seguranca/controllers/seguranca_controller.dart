@@ -39,10 +39,7 @@ class SegurancaController extends GetxController {
 
   void limparSelecao() => episSelecionados.clear();
 
-  Future<Map<String, dynamic>> enviarRequisicao({
-    required String assinaturaBase64,
-    required String fotoBase64,
-  }) async {
+  Future<Map<String, dynamic>> enviarRequisicao() async {
     if (episSelecionados.isEmpty) {
       return {'success': false, 'message': 'Selecione ao menos um EPI'};
     }
@@ -50,8 +47,6 @@ class SegurancaController extends GetxController {
     try {
       final result = await _service.criarRequisicao(
         episSolicitados: episSelecionados.toList(),
-        assinaturaBase64: assinaturaBase64,
-        fotoBase64: fotoBase64,
       );
       if (result['success'] == true) {
         episSelecionados.clear();

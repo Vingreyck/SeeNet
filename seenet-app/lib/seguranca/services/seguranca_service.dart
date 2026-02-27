@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
 import 'package:seenet/services/auth_service.dart';
-import 'dart:convert';
 
 class SegurancaService extends GetxService {
   final AuthService _authService = Get.find<AuthService>();
@@ -11,12 +10,14 @@ class SegurancaService extends GetxService {
     'X-Tenant-Code': _authService.tenantCode ?? '',
   };
 
-  String get _base => 'https://seenet-production.up.railway.app/api/seguranca';
+  String get _base =>
+      'https://seenet-production.up.railway.app/api/seguranca';
 
   // ========== EPIs disponíveis ==========
   Future<List<String>> buscarEpis() async {
     try {
-      final response = await GetConnect().get('$_base/epis', headers: _headers);
+      final response =
+      await GetConnect().get('$_base/epis', headers: _headers);
       if (response.statusCode == 200) {
         final List epis = response.body['epis'] ?? [];
         return epis.cast<String>();
@@ -42,22 +43,15 @@ class SegurancaService extends GetxService {
     'Fita e/ou Corrente Zebrada',
   ];
 
-  // ========== Criar requisição ==========
+  // ========== Criar requisição (só EPIs, sem foto/assinatura) ==========
   Future<Map<String, dynamic>> criarRequisicao({
     required List<String> episSolicitados,
-    required String assinaturaBase64,
-    required String fotoBase64,
   }) async {
     final response = await GetConnect().post(
       '$_base/requisicoes',
-      {
-        'epis_solicitados': episSolicitados,
-        'assinatura_base64': assinaturaBase64,
-        'foto_base64': fotoBase64,
-      },
+      {'epis_solicitados': episSolicitados},
       headers: _headers,
     );
-
     if (response.statusCode == 201) {
       return {'success': true, 'message': response.body['message']};
     }
@@ -67,11 +61,34 @@ class SegurancaService extends GetxService {
     };
   }
 
+  // ========== Confirmar recebimento (técnico assina e fotografa) ==========
+  Future<Map<String, dynamic>> confirmarRecebimento({
+    required int id,
+    required String assinaturaBase64,
+    required String fotoBase64,
+  }) async {
+    final response = await GetConnect().post(
+      '$_base/requisicoes/$id/confirmar-recebimento',
+      {
+        'assinatura_base64': assinaturaBase64,
+        'foto_base64': fotoBase64,
+      },
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      return {'success': true, 'message': response.body['message']};
+    }
+    return {
+      'success': false,
+      'message': response.body['error'] ?? 'Erro ao confirmar recebimento'
+    };
+  }
+
   // ========== Minhas requisições ==========
   Future<List<Map<String, dynamic>>> buscarMinhasRequisicoes() async {
     try {
-      final response =
-      await GetConnect().get('$_base/requisicoes/minhas', headers: _headers);
+      final response = await GetConnect()
+          .get('$_base/requisicoes/minhas', headers: _headers);
       if (response.statusCode == 200) {
         final List lista = response.body['requisicoes'] ?? [];
         return lista.cast<Map<String, dynamic>>();
@@ -118,7 +135,6 @@ class SegurancaService extends GetxService {
       },
       headers: _headers,
     );
-
     if (response.statusCode == 201) {
       return {'success': true, 'message': response.body['message']};
     }
@@ -160,8 +176,9 @@ class SegurancaService extends GetxService {
   // ========== Todas as requisições (gestor/admin) ==========
   Future<List<Map<String, dynamic>>> buscarTodas({String? status}) async {
     try {
-      final url =
-      status != null ? '$_base/requisicoes?status=$status' : '$_base/requisicoes';
+      final url = status != null
+          ? '$_base/requisicoes?status=$status'
+          : '$_base/requisicoes';
       final response = await GetConnect().get(url, headers: _headers);
       if (response.statusCode == 200) {
         final List lista = response.body['requisicoes'] ?? [];
@@ -176,8 +193,8 @@ class SegurancaService extends GetxService {
   // ========== Detalhe ==========
   Future<Map<String, dynamic>?> buscarDetalhe(int id) async {
     try {
-      final response =
-      await GetConnect().get('$_base/requisicoes/$id', headers: _headers);
+      final response = await GetConnect()
+          .get('$_base/requisicoes/$id', headers: _headers);
       if (response.statusCode == 200) {
         return response.body['requisicao'];
       }
@@ -204,7 +221,8 @@ class SegurancaService extends GetxService {
   }
 
   // ========== Recusar ==========
-  Future<Map<String, dynamic>> recusar(int id, {required String observacao}) async {
+  Future<Map<String, dynamic>> recusar(int id,
+      {required String observacao}) async {
     final response = await GetConnect().post(
       '$_base/requisicoes/$id/recusar',
       {'observacao': observacao},

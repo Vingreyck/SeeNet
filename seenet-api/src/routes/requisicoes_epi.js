@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 const PDFDocument = require('pdfkit');
 const https = require('https');
 const http = require('http');
@@ -407,12 +407,12 @@ const EPIS_PADRAO = [
 // ================================================================
 
 // GET /api/seguranca/epis
-router.get('/epis', authenticateToken, (req, res) => {
+router.get('/epis', authMiddleware, (req, res) => {
   res.json({ epis: EPIS_PADRAO });
 });
 
 // POST /api/seguranca/requisicoes — técnico cria
-router.post('/requisicoes', authenticateToken, async (req, res) => {
+router.post('/requisicoes', authMiddleware, async (req, res) => {
   try {
     const { epis_solicitados, assinatura_base64, foto_base64 } = req.body;
     if (!epis_solicitados?.length) return res.status(400).json({ error: 'Selecione ao menos um EPI' });
@@ -420,7 +420,7 @@ router.post('/requisicoes', authenticateToken, async (req, res) => {
     if (!foto_base64) return res.status(400).json({ error: 'Foto obrigatória' });
 
     const [id] = await db('requisicoes_epi').insert({
-      tenant_id: req.user.tenantId,
+      tenant_id: req.user.tenant_id,
       tecnico_id: req.user.id,
       status: 'pendente',
       epis_solicitados: JSON.stringify(epis_solicitados),
@@ -437,9 +437,9 @@ router.post('/requisicoes', authenticateToken, async (req, res) => {
 });
 
 // POST /api/seguranca/requisicoes/manual — gestor registra manualmente
-router.post('/requisicoes/manual', authenticateToken, async (req, res) => {
+router.post('/requisicoes/manual', authMiddleware, async (req, res) => {
   try {
-    if (!isGestorOuAdmin(req.user.tipoUsuario)) {
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) {
       return res.status(403).json({ error: 'Sem permissão' });
     }
 
@@ -463,7 +463,7 @@ router.post('/requisicoes/manual', authenticateToken, async (req, res) => {
 
     // Insere já como aprovada
     const [inserted] = await db('requisicoes_epi').insert({
-      tenant_id: req.user.tenantId,
+      tenant_id: req.user.tenant_id,
       tecnico_id,
       gestor_id: req.user.id,
       status: 'aprovada',
@@ -496,11 +496,11 @@ router.post('/requisicoes/manual', authenticateToken, async (req, res) => {
 });
 
 // GET /api/seguranca/requisicoes/minhas
-router.get('/requisicoes/minhas', authenticateToken, async (req, res) => {
+router.get('/requisicoes/minhas', authMiddleware, async (req, res) => {
   try {
     const lista = await db('requisicoes_epi as r')
       .leftJoin('usuarios as g', 'g.id', 'r.gestor_id')
-      .where('r.tenant_id', req.user.tenantId)
+      .where('r.tenant_id', req.user.tenant_id)
       .where('r.tecnico_id', req.user.id)
       .select(
         'r.*',
@@ -515,13 +515,13 @@ router.get('/requisicoes/minhas', authenticateToken, async (req, res) => {
 });
 
 // GET /api/seguranca/requisicoes/pendentes
-router.get('/requisicoes/pendentes', authenticateToken, async (req, res) => {
+router.get('/requisicoes/pendentes', authMiddleware, async (req, res) => {
   try {
-    if (!isGestorOuAdmin(req.user.tipoUsuario)) return res.status(403).json({ error: 'Sem permissão' });
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
 
     const lista = await db('requisicoes_epi as r')
       .join('usuarios as t', 't.id', 'r.tecnico_id')
-      .where('r.tenant_id', req.user.tenantId)
+      .where('r.tenant_id', req.user.tenant_id)
       .where('r.status', 'pendente')
       .select('r.*', 't.nome as tecnico_nome', 't.email as tecnico_email')
       .orderBy('r.data_criacao', 'asc');
@@ -533,14 +533,14 @@ router.get('/requisicoes/pendentes', authenticateToken, async (req, res) => {
 });
 
 // GET /api/seguranca/requisicoes
-router.get('/requisicoes', authenticateToken, async (req, res) => {
+router.get('/requisicoes', authMiddleware, async (req, res) => {
   try {
-    if (!isGestorOuAdmin(req.user.tipoUsuario)) return res.status(403).json({ error: 'Sem permissão' });
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
 
     let query = db('requisicoes_epi as r')
       .join('usuarios as t', 't.id', 'r.tecnico_id')
       .leftJoin('usuarios as g', 'g.id', 'r.gestor_id')
-      .where('r.tenant_id', req.user.tenantId)
+      .where('r.tenant_id', req.user.tenant_id)
       .select('r.*', 't.nome as tecnico_nome', 't.email as tecnico_email', 'g.nome as gestor_nome')
       .orderBy('r.data_criacao', 'desc');
 
@@ -555,20 +555,20 @@ router.get('/requisicoes', authenticateToken, async (req, res) => {
 });
 
 // GET /api/seguranca/requisicoes/:id
-router.get('/requisicoes/:id', authenticateToken, async (req, res) => {
+router.get('/requisicoes/:id', authMiddleware, async (req, res) => {
   try {
     const req_data = await db('requisicoes_epi as r')
       .join('usuarios as t', 't.id', 'r.tecnico_id')
       .leftJoin('usuarios as g', 'g.id', 'r.gestor_id')
       .where('r.id', req.params.id)
-      .where('r.tenant_id', req.user.tenantId)
+      .where('r.tenant_id', req.user.tenant_id)
       .select('r.*', 't.nome as tecnico_nome', 't.email as tecnico_email', 'g.nome as gestor_nome')
       .first();
 
     if (!req_data) return res.status(404).json({ error: 'Não encontrado' });
 
     // Verifica acesso
-    if (req_data.tecnico_id !== req.user.id && !isGestorOuAdmin(req.user.tipoUsuario)) {
+    if (req_data.tecnico_id !== req.user.id && !isGestorOuAdmin(req.user.tipo_usuario)) {
       return res.status(403).json({ error: 'Sem permissão' });
     }
 
@@ -579,9 +579,9 @@ router.get('/requisicoes/:id', authenticateToken, async (req, res) => {
 });
 
 // POST /api/seguranca/requisicoes/:id/aprovar
-router.post('/requisicoes/:id/aprovar', authenticateToken, async (req, res) => {
+router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
   try {
-    if (!isGestorOuAdmin(req.user.tipoUsuario)) return res.status(403).json({ error: 'Sem permissão' });
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
 
     const requisicao = await db('requisicoes_epi').where('id', req.params.id).first();
     if (!requisicao) return res.status(404).json({ error: 'Não encontrada' });
@@ -616,9 +616,9 @@ router.post('/requisicoes/:id/aprovar', authenticateToken, async (req, res) => {
 });
 
 // POST /api/seguranca/requisicoes/:id/recusar
-router.post('/requisicoes/:id/recusar', authenticateToken, async (req, res) => {
+router.post('/requisicoes/:id/recusar', authMiddleware, async (req, res) => {
   try {
-    if (!isGestorOuAdmin(req.user.tipoUsuario)) return res.status(403).json({ error: 'Sem permissão' });
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
     if (!req.body.observacao?.trim()) return res.status(400).json({ error: 'Motivo obrigatório' });
 
     await db('requisicoes_epi').where('id', req.params.id).update({
@@ -635,12 +635,12 @@ router.post('/requisicoes/:id/recusar', authenticateToken, async (req, res) => {
 });
 
 // GET /api/seguranca/requisicoes/:id/pdf — baixa o PDF
-router.get('/requisicoes/:id/pdf', authenticateToken, async (req, res) => {
+router.get('/requisicoes/:id/pdf', authMiddleware, async (req, res) => {
   try {
     const requisicao = await db('requisicoes_epi').where('id', req.params.id).first();
     if (!requisicao) return res.status(404).json({ error: 'Não encontrada' });
 
-    if (requisicao.tecnico_id !== req.user.id && !isGestorOuAdmin(req.user.tipoUsuario)) {
+    if (requisicao.tecnico_id !== req.user.id && !isGestorOuAdmin(req.user.tipo_usuario)) {
       return res.status(403).json({ error: 'Sem permissão' });
     }
 
@@ -665,12 +665,12 @@ router.get('/requisicoes/:id/pdf', authenticateToken, async (req, res) => {
 });
 
 // GET /api/seguranca/tecnicos — lista técnicos para o gestor
-router.get('/tecnicos', authenticateToken, async (req, res) => {
+router.get('/tecnicos', authMiddleware, async (req, res) => {
   try {
-    if (!isGestorOuAdmin(req.user.tipoUsuario)) return res.status(403).json({ error: 'Sem permissão' });
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
 
     const lista = await db('usuarios')
-      .where('tenant_id', req.user.tenantId)
+      .where('tenant_id', req.user.tenant_id)
       .where('ativo', true)
       .whereIn('tipo_usuario', ['tecnico', 'administrador'])
       .select('id', 'nome', 'email', 'tipo_usuario')
@@ -683,18 +683,18 @@ router.get('/tecnicos', authenticateToken, async (req, res) => {
 });
 
 // GET /api/seguranca/perfil
-router.get('/perfil', authenticateToken, async (req, res) => {
+router.get('/perfil', authMiddleware, async (req, res) => {
   try {
     const usuario = await db('usuarios')
       .where('id', req.user.id)
       .select('id', 'nome', 'email', 'tipo_usuario', 'foto_perfil', 'data_criacao', 'ultimo_login')
       .first();
 
-    const tenant = await db('tenants').where('id', req.user.tenantId).first();
+    const tenant = await db('tenants').where('id', req.user.tenant_id).first();
 
     const stats = await db('requisicoes_epi')
       .where('tecnico_id', req.user.id)
-      .where('tenant_id', req.user.tenantId)
+      .where('tenant_id', req.user.tenant_id)
       .select(
         db.raw('COUNT(*) as total'),
         db.raw("COUNT(*) FILTER (WHERE status = 'aprovada') as aprovadas"),
@@ -713,7 +713,7 @@ router.get('/perfil', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/seguranca/perfil/foto
-router.put('/perfil/foto', authenticateToken, async (req, res) => {
+router.put('/perfil/foto', authMiddleware, async (req, res) => {
   try {
     const { foto_base64 } = req.body;
     if (!foto_base64) return res.status(400).json({ error: 'Foto obrigatória' });

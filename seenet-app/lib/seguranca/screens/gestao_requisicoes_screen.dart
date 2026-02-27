@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:convert';
 import '../controllers/seguranca_controller.dart';
+import '../widgets/botao_pdf.dart'; // ← NOVO
 
 class GestaoRequisicoesScreen extends StatefulWidget {
   const GestaoRequisicoesScreen({super.key});
@@ -46,6 +47,21 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        // ← NOVO: botões no topo
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_box_outlined, color: Color(0xFF00FF88)),
+            tooltip: 'Registro Manual',
+            onPressed: () => Get.toNamed('/seguranca/registro-manual'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white70),
+            onPressed: () {
+              controller.carregarPendentes();
+              controller.carregarTodas();
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: const Color(0xFF00FF88),
@@ -126,7 +142,6 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
       ),
       child: Column(
         children: [
-          // Header
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -169,7 +184,6 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
             ),
           ),
 
-          // EPIs
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
@@ -203,7 +217,6 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
 
           const SizedBox(height: 12),
 
-          // Ver foto e assinatura
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -226,15 +239,13 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
 
           const SizedBox(height: 12),
 
-          // Botões aprovar/recusar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () =>
-                        _confirmarRecusa(req['id'] as int),
+                    onPressed: () => _confirmarRecusa(req['id'] as int),
                     icon: const Icon(Icons.close, size: 16, color: Colors.red),
                     label: const Text('Recusar',
                         style: TextStyle(color: Colors.red)),
@@ -291,6 +302,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
     );
   }
 
+  // ← ATUALIZADO: agora com botão PDF, tag de registro manual
   Widget _buildCardSimples(Map<String, dynamic> req) {
     final status = req['status'] as String? ?? 'pendente';
     final color = controller.statusColor(status);
@@ -311,25 +323,44 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
         children: [
           Row(
             children: [
-              Text(req['tecnico_nome'] ?? 'Técnico',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold)),
-              const Spacer(),
-              Text(_formatarData(req['data_resposta']),
-                  style: const TextStyle(color: Colors.white38, fontSize: 11)),
+              Expanded(
+                child: Text(req['tecnico_nome'] ?? 'Técnico',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold)),
+              ),
+              // ← NOVO: botão PDF
+              if (status == 'aprovada')
+                BotaoPDF(requisicaoId: req['id'] as int),
             ],
           ),
           const SizedBox(height: 6),
-          Text('${episLista.length} EPI(s)',
-              style: const TextStyle(color: Colors.white54, fontSize: 12)),
+          Text(
+            '${episLista.length} EPI(s)  •  ${_formatarData(req['data_resposta'])}',
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
           if (req['observacao_gestor'] != null) ...[
             const SizedBox(height: 6),
             Text(req['observacao_gestor'],
                 style: TextStyle(color: color, fontSize: 11),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis),
+          ],
+          // ← NOVO: tag de registro manual
+          if (req['registro_manual'] == true) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.blue.withOpacity(0.2)),
+              ),
+              child: const Text('📋 Registro manual',
+                  style: TextStyle(color: Colors.blue, fontSize: 10)),
+            ),
           ],
         ],
       ),

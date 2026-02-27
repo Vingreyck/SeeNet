@@ -3,6 +3,7 @@ import 'package:seenet/checklist/screen/ChecklistAppsScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistIptvScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistLentidaoScreen.dart';
 import 'package:flutter/services.dart';
+import 'package:seenet/seguranca/screens/registro_manual_epi_screen.dart';
 import 'package:seenet/login/widgets/login.binding.dart';
 import 'package:seenet/registro/registro.view.dart';
 import 'package:seenet/admin/usuarios_admin.view.dart'; 
@@ -244,6 +245,10 @@ class MyApp extends StatelessWidget {
         GetPage(
             name: '/seguranca/perfil',
             page: () => const PerfilScreen(),
+        ),
+        GetPage(
+          name: '/seguranca/registro-manual',
+          page: () => const RegistroManualEpiScreen(),
         ),
       ],
     );

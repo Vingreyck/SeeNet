@@ -170,9 +170,17 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       color: const Color(0xFF2A2A2A),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: usuario.isAdmin ? Colors.orange : const Color(0xFF00FF88),
+          backgroundColor: usuario.tipoUsuario == 'administrador'
+              ? Colors.orange
+              : usuario.tipoUsuario == 'gestor_seguranca'
+              ? Colors.blue
+              : const Color(0xFF00FF88),
           child: Icon(
-            usuario.isAdmin ? Icons.admin_panel_settings : Icons.person,
+            usuario.tipoUsuario == 'administrador'
+                ? Icons.admin_panel_settings
+                : usuario.tipoUsuario == 'gestor_seguranca'
+                ? Icons.security
+                : Icons.person,
             color: Colors.black,
           ),
         ),
@@ -192,7 +200,11 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: usuario.isAdmin ? Colors.orange : Colors.blue,
+                    color: usuario.tipoUsuario == 'administrador'
+                        ? Colors.orange
+                        : usuario.tipoUsuario == 'gestor_seguranca'
+                        ? Colors.blue
+                        : Colors.blueGrey,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -409,8 +421,8 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'tecnico', child: Text('Técnico')),
-                    DropdownMenuItem(
-                        value: 'administrador', child: Text('Administrador')),
+                    DropdownMenuItem(value: 'gestor_seguranca', child: Text('Gestor de Segurança')),
+                    DropdownMenuItem(value: 'administrador', child: Text('Administrador')),
                   ],
                   onChanged: (value) {
                     setStateDialog(() => tipoSelecionado = value!);

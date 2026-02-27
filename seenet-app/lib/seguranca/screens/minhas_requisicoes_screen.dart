@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../widgets/botao_pdf.dart';
 import '../controllers/seguranca_controller.dart';
 
 class MinhasRequisicoesScreen extends StatefulWidget {
@@ -157,17 +158,11 @@ class _MinhasRequisicoesScreenState extends State<MinhasRequisicoesScreen> {
                 ),
               ),
             ],
-            if (status == 'aprovada' && req['pdf_base64'] != null) ...[
+            if (status == 'aprovada') ...[
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(Icons.picture_as_pdf,
-                      color: Color(0xFF00FF88), size: 16),
-                  const SizedBox(width: 6),
-                  const Text('PDF disponível',
-                      style: TextStyle(
-                          color: Color(0xFF00FF88), fontSize: 12)),
-                ],
+              BotaoPDF(
+                requisicaoId: req['id'] as int,
+                pdfBase64Cached: req['pdf_base64'],
               ),
             ],
           ],

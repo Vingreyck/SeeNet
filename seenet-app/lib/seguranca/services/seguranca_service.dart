@@ -82,6 +82,66 @@ class SegurancaService extends GetxService {
     }
   }
 
+  // ========== Listar técnicos (para gestor) ==========
+  Future<List<Map<String, dynamic>>> buscarTecnicos() async {
+    try {
+      final response =
+      await GetConnect().get('$_base/tecnicos', headers: _headers);
+      if (response.statusCode == 200) {
+        final List lista = response.body['tecnicos'] ?? [];
+        return lista.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ========== Criar registro manual (gestor) ==========
+  Future<Map<String, dynamic>> criarRegistroManual({
+    required int tecnicoId,
+    required List<String> episSolicitados,
+    String? assinaturaBase64,
+    String? fotoBase64,
+    String? observacao,
+    DateTime? dataEntrega,
+  }) async {
+    final response = await GetConnect().post(
+      '$_base/requisicoes/manual',
+      {
+        'tecnico_id': tecnicoId,
+        'epis_solicitados': episSolicitados,
+        if (assinaturaBase64 != null) 'assinatura_base64': assinaturaBase64,
+        if (fotoBase64 != null) 'foto_base64': fotoBase64,
+        if (observacao != null) 'observacao_gestor': observacao,
+        'data_entrega': (dataEntrega ?? DateTime.now()).toIso8601String(),
+      },
+      headers: _headers,
+    );
+
+    if (response.statusCode == 201) {
+      return {'success': true, 'message': response.body['message']};
+    }
+    return {
+      'success': false,
+      'message': response.body['error'] ?? 'Erro ao criar registro'
+    };
+  }
+
+  // ========== Buscar PDF ==========
+  Future<String?> buscarPdf(int id) async {
+    try {
+      final response = await GetConnect()
+          .get('$_base/requisicoes/$id/pdf', headers: _headers);
+      if (response.statusCode == 200) {
+        return response.body['pdf_base64'] as String?;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ========== Requisições pendentes (gestor/admin) ==========
   Future<List<Map<String, dynamic>>> buscarPendentes() async {
     try {

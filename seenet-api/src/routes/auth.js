@@ -526,7 +526,7 @@ router.put('/usuarios/:id', [
   body('nome').optional().trim().isLength({ min: 2, max: 100 }),
   body('email').optional().isEmail().normalizeEmail(),
   body('senha').optional().isLength({ min: 6, max: 128 }),
-  body('tipo_usuario').optional().isIn(['tecnico', 'administrador']),
+  body('tipo_usuario').optional().isIn(['tecnico', 'administrador', 'gestor_seguranca']),
   body('ativo').optional().isBoolean(),
 ], async (req, res) => {
   try {

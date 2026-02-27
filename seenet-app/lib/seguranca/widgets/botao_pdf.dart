@@ -62,7 +62,7 @@ class _BotaoPDFState extends State<BotaoPDF> {
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/pdf')],
         subject:
-        'Ficha de EPI #${String.valueOf(widget.requisicaoId).padLeft(5, '0')} - BBnet Up',
+        'Ficha de EPI #${widget.requisicaoId.toString().padLeft(5, '0')} - BBnet Up',
       );
     } catch (e) {
       if (mounted) {

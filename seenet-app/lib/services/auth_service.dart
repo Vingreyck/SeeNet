@@ -126,9 +126,11 @@ class AuthService extends GetxService {
 
   Future<Map<String, dynamic>?> verificarCodigoEmpresa(String codigo) async {
     try {
+      print('🔍 Verificando empresa: $codigo');
       final response = await GetConnect().get(
         'https://seenet-production.up.railway.app/api/tenant/verify/$codigo',
       );
+      print('📦 Status: ${response.statusCode}, Body: ${response.body}');
       if (response.statusCode == 200 && response.body['success'] == true) {
         return response.body['data']['empresa'];
       }
@@ -138,6 +140,7 @@ class AuthService extends GetxService {
       return null;
     }
   }
+
 
   Future<void> logout() async {
     try {

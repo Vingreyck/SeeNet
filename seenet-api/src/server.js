@@ -1253,7 +1253,17 @@ app._router.stack.forEach((middleware) => {
   }
 });
 
+// Keep-alive para evitar cold start no Railway
+setInterval(() => {
+  const http = require('http');
+  http.get(`http://localhost:${PORT}/health`, () => {}).on('error', () => {});
+  console.log('💓 Keep-alive ping');
+}, 4 * 60 * 1000); // a cada 4 minutos
 
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, '0.0.0.0', () => {
+  
+  }
     if (process.env.VERCEL !== '1') {
       app.listen(PORT, '0.0.0.0', () => {
         logger.info('\n=== ✨ SERVIDOR INICIADO COM SUCESSO ===', {

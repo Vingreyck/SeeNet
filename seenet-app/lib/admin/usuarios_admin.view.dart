@@ -31,7 +31,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     try {
       setState(() => isLoading = true);
 
-      final response = await _api.get('admin/users');
+      final response = await _api.get('/admin/users');
 
       List<dynamic> usuariosData;
 

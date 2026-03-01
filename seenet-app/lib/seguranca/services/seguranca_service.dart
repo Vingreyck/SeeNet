@@ -47,19 +47,23 @@ class SegurancaService extends GetxService {
   Future<Map<String, dynamic>> criarRequisicao({
     required List<String> episSolicitados,
   }) async {
-    final response = await GetConnect().post(
-      '$_base/requisicoes',
-      {'epis_solicitados': episSolicitados},
-      headers: _headers,
-    );
-    if (response.statusCode == 201) {
-      return {'success': true, 'message': response.body['message']};
+    try {
+      final response = await GetConnect().post(
+        '$_base/requisicoes',
+        {'epis_solicitados': episSolicitados},
+        headers: _headers,
+      );
+      if (response.statusCode == 201) {
+        return {'success': true, 'message': response.body?['message'] ?? 'Enviado'};
+      }
+      return {
+        'success': false,
+        'message': response.body?['error'] ?? 'Erro ao enviar requisição (${response.statusCode})'
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
     }
-    return {
-      'success': false,
-      'message': response.body['error'] ?? 'Erro ao enviar requisição'
-    };
-  }
+  }3
 
   // ========== Confirmar recebimento (técnico assina e fotografa) ==========
   Future<Map<String, dynamic>> confirmarRecebimento({

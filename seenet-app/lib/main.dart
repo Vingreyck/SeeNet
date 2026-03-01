@@ -40,6 +40,7 @@ import 'package:seenet/seguranca/screens/perfil_screen.dart';
 
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   // ✅ CONFIGURAR TELA CHEIA (Edge-to-edge)
   SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.edgeToEdge,

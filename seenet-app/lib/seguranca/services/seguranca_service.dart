@@ -63,7 +63,7 @@ class SegurancaService extends GetxService {
     } catch (e) {
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
-  }3
+  }
 
   // ========== Confirmar recebimento (técnico assina e fotografa) ==========
   Future<Map<String, dynamic>> confirmarRecebimento({

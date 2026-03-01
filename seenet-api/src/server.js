@@ -1260,10 +1260,6 @@ setInterval(() => {
   console.log('💓 Keep-alive ping');
 }, 4 * 60 * 1000); // a cada 4 minutos
 
-if (process.env.VERCEL !== '1') {
-  app.listen(PORT, '0.0.0.0', () => {
-  
-  }
     if (process.env.VERCEL !== '1') {
       app.listen(PORT, '0.0.0.0', () => {
         logger.info('\n=== ✨ SERVIDOR INICIADO COM SUCESSO ===', {

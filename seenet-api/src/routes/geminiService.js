@@ -4,7 +4,7 @@ const logger = require('../config/logger');
 class GeminiService {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
-    this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
     this.maxRetries = 3;
     this.retryDelay = 2000; // 2 segundos
   }

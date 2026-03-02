@@ -125,18 +125,31 @@ class AuthService extends GetxService {
   }
 
   Future<Map<String, dynamic>?> verificarCodigoEmpresa(String codigo) async {
+    print('🏢 [AUTH] Iniciando verificação: $codigo');
     try {
-      print('🔍 Verificando empresa: $codigo');
-      final response = await GetConnect().get(
-        'https://seenet-production.up.railway.app/api/tenant/verify/$codigo',
-      );
-      print('📦 Status: ${response.statusCode}, Body: ${response.body}');
-      if (response.statusCode == 200 && response.body['success'] == true) {
+      final url = 'https://seenet-production.up.railway.app/api/tenant/verify/$codigo';
+      print('🌐 [AUTH] URL: $url');
+
+      final connect = GetConnect();
+      connect.timeout = const Duration(seconds: 15);
+
+      print('📤 [AUTH] Enviando request...');
+      final response = await connect.get(url);
+
+      print('📥 [AUTH] Status: ${response.statusCode}');
+      print('📥 [AUTH] Body: ${response.body}');
+      print('📥 [AUTH] HasError: ${response.hasError}');
+      print('📥 [AUTH] Error: ${response.statusText}');
+
+      if (response.statusCode == 200 && response.body?['success'] == true) {
+        print('✅ [AUTH] Empresa encontrada!');
         return response.body['data']['empresa'];
       }
+      print('❌ [AUTH] Empresa não encontrada. Status: ${response.statusCode}');
       return null;
-    } catch (e) {
-      print('❌ Erro ao verificar empresa: $e');
+    } catch (e, stack) {
+      print('💥 [AUTH] EXCEÇÃO: $e');
+      print('💥 [AUTH] Stack: $stack');
       return null;
     }
   }

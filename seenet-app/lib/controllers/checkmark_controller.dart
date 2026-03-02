@@ -25,7 +25,7 @@ Worker? _checkmarksWorker;
   @override
   void onInit() {
     super.onInit();
-    carregarCategorias();
+    //carregarCategorias();
   }
 
   // ========== CARREGAR CATEGORIAS DA API ==========

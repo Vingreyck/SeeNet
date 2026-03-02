@@ -4,7 +4,7 @@ const logger = require('../config/logger');
 class GeminiService {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
-    this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+    this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
     this.maxRetries = 3;
     this.retryDelay = 2000; // 2 segundos
   }
@@ -183,9 +183,9 @@ IMPORTANTE: Seja direto, prático e focado na solução imediata.`;
 
   getInfo() {
     return {
-      nome: 'Google Gemini 2.0 Flash',
+      nome: 'Google Gemini 2.5 Flash',
       configurado: !!this.apiKey,
-      modelo: 'gemini-1.5-flash',
+      modelo: 'gemini-2.5-flash',
       limite: '15 req/min (gratuito)',
       status: this.apiKey ? 'Configurado' : 'Não configurado'
     };

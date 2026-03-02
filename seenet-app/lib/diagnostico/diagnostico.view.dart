@@ -36,7 +36,12 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
 
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey =
       GlobalKey<RefreshIndicatorState>();
-  
+
+  final RxList<Map<String, String>> _historico = <Map<String, String>>[].obs;
+  final RxBool _chatLoading = false.obs;
+  int? _diagnosticoId;
+  late ScrollController _scrollController;
+
   @override
   void initState() {
     super.initState();
@@ -47,7 +52,7 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
 
   void _initializeControllers() {
     _perguntaController = TextEditingController();
-
+    _scrollController = ScrollController();
     if (Get.isRegistered<DiagnosticoController>()) {
       _diagnosticoController = Get.find<DiagnosticoController>();
     } else {
@@ -156,6 +161,9 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
         await _criarDiagnosticoDemo();
       } else {
         await HapticFeedback.heavyImpact();
+        if (_diagnosticoController.diagnosticos.isNotEmpty) {
+          _diagnosticoId = _diagnosticoController.diagnosticos.first.id;
+        }
       }
     } finally {
       // Parar animação de loading
@@ -355,26 +363,30 @@ Entre em contato com a operadora informando os testes realizados.
         color: const Color(0xFF00FF88),
         strokeWidth: 3,
         displacement: 60,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.only(top: 120),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _buildAnimatedLogo(),
-                  const SizedBox(height: 20),
-                  _buildStatusCard(),
-                  const SizedBox(height: 20),
-                  _buildDiagnosticContent(),
-                  const SizedBox(height: 100),
-                ]),
-              ),
+          // Troca CustomScrollView por ListView simples
+          child: ListView(
+            controller: _scrollController, // ← ADICIONA
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
             ),
-          ],
-        ),
+            padding: const EdgeInsets.only(top: 120, bottom: 20),
+            children: [
+              _buildAnimatedLogo(),
+              const SizedBox(height: 20),
+              _buildStatusCard(),
+              const SizedBox(height: 20),
+              _buildDiagnosticContent(),
+              const SizedBox(height: 20),
+              Obx(() {                          // ← ADICIONA
+                if (_diagnosticoController.diagnosticos.isEmpty ||
+                    _diagnosticoController.isLoading.value) {
+                  return const SizedBox.shrink();
+                }
+                return _buildChatSection();
+              }),
+              const SizedBox(height: 80),
+            ],
+          )
       ),
     );
   }
@@ -745,8 +757,6 @@ Entre em contato com a operadora informando os testes realizados.
           children: [
             Expanded(child: _buildInputField()),
             const SizedBox(width: 8),
-            _buildMicButton(),
-            const SizedBox(width: 8),
             _buildSendButton(),
           ],
         ),
@@ -760,6 +770,9 @@ Entre em contato com a operadora informando os testes realizados.
       child: TextField(
         controller: _perguntaController,
         style: const TextStyle(color: Colors.white, fontSize: 16),
+        textInputAction: TextInputAction.send,
+        onSubmitted: (_) => _enviarMensagem(), // ← ADICIONA
+        onChanged: (_) => setState(() {}),     // ← ADICIONA
         decoration: InputDecoration(
           hintText: 'Pergunte sobre o diagnóstico...',
           hintStyle: TextStyle(
@@ -797,47 +810,216 @@ Entre em contato com a operadora informando os testes realizados.
   }
 
   Widget _buildSendButton() {
-    return GestureDetector(
-      onTap: () async {
-        if (_perguntaController.text.isNotEmpty) {
-          await HapticFeedback.mediumImpact();
-          String pergunta = _perguntaController.text;
-          _perguntaController.clear();
+    return Obx(() {
+      final temTexto = _perguntaController.text.trim().isNotEmpty;
+      final carregando = _chatLoading.value;
 
-          _showSnackbar(
-            'Mensagem Enviada',
-            'Pergunta: "$pergunta" - Chat será implementado em breve',
-            SnackbarType.success,
-          );
-        }
-      },
-      child: Container(
-        width: 50,
-        height: 50,
-        margin: const EdgeInsets.only(right: 10),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: _perguntaController.text.isNotEmpty
-                ? [const Color(0xFF00FF88), const Color(0xFF00CC6A)]
-                : [const Color(0xFF2A2A2A), const Color(0xFF2A2A2A)],
+      return GestureDetector(
+        onTap: temTexto && !carregando ? _enviarMensagem : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 48,
+          height: 48,
+          margin: const EdgeInsets.only(right: 10),
+          decoration: BoxDecoration(
+            gradient: temTexto && !carregando
+                ? const LinearGradient(
+                colors: [Color(0xFF00FF88), Color(0xFF00CC6A)])
+                : const LinearGradient(
+                colors: [Color(0xFF2A2A2A), Color(0xFF2A2A2A)]),
+            shape: BoxShape.circle,
           ),
-          shape: BoxShape.circle,
+          child: carregando
+              ? const Padding(
+            padding: EdgeInsets.all(12),
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: Color(0xFF00FF88)),
+          )
+              : Icon(
+            Icons.send_rounded,
+            color: temTexto ? Colors.black : Colors.white38,
+            size: 22,
+          ),
         ),
-        child: Icon(
-          Icons.send,
-          color: _perguntaController.text.isNotEmpty
-              ? Colors.black
-              : Colors.white54,
-          size: 24,
+      );
+    });
+  }
+
+  // ========== CHAT ==========
+  Future<void> _enviarMensagem() async {
+    final texto = _perguntaController.text.trim();
+    if (texto.isEmpty || _chatLoading.value) return;
+
+    await HapticFeedback.lightImpact();
+    _perguntaController.clear();
+    setState(() {});
+
+    _historico.add({'role': 'user', 'content': texto});
+    _rolarParaBaixo();
+
+    if (_diagnosticoId == null) {
+      _historico.add({
+        'role': 'assistant',
+        'content': '⚠️ Nenhum diagnóstico ativo.',
+      });
+      return;
+    }
+
+    _chatLoading.value = true;
+
+    try {
+      final resposta = await _diagnosticoController.enviarMensagemChat(
+        diagnosticoId: _diagnosticoId!,
+        mensagem: texto,
+        historico: _historico
+            .map((m) => {'role': m['role']!, 'content': m['content']!})
+            .toList(),
+      );
+
+      _historico.add({
+        'role': 'assistant',
+        'content': resposta ?? '❌ Erro ao obter resposta.',
+      });
+    } catch (e) {
+      _historico.add({'role': 'assistant', 'content': '❌ Erro de conexão.'});
+    } finally {
+      _chatLoading.value = false;
+      _rolarParaBaixo();
+    }
+  }
+
+  void _rolarParaBaixo() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Widget _buildChatSection() {
+    return Obx(() {
+      if (_historico.isEmpty) return const SizedBox.shrink();
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                '💬 Conversa',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ..._historico.map((msg) => _buildMensagem(msg)).toList(),
+            Obx(() {
+              if (!_chatLoading.value) return const SizedBox.shrink();
+              return _buildTypingIndicator();
+            }),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildMensagem(Map<String, String> msg) {
+    final isUser = msg['role'] == 'user';
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.78,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isUser
+              ? const Color(0xFF00FF88).withOpacity(0.15)
+              : const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isUser ? 16 : 4),
+            bottomRight: Radius.circular(isUser ? 4 : 16),
+          ),
+          border: Border.all(
+            color: isUser
+                ? const Color(0xFF00FF88).withOpacity(0.3)
+                : Colors.white12,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          msg['content'] ?? '',
+          style: TextStyle(
+            color: isUser ? const Color(0xFF00FF88) : Colors.white,
+            fontSize: 14,
+            height: 1.5,
+          ),
         ),
       ),
     );
   }
 
+  Widget _buildTypingIndicator() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+            bottomLeft: Radius.circular(4),
+          ),
+          border: Border.all(color: Colors.white12, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) => Padding(
+            padding: EdgeInsets.only(right: i < 2 ? 4 : 0),
+            child: _buildDot(i),
+          )),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDot(int index) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 600 + index * 200),
+      builder: (context, value, _) {
+        return Transform.translate(
+          offset: Offset(0, -4 * (value < 0.5 ? value * 2 : (1 - value) * 2)),
+          child: Container(
+            width: 8, height: 8,
+            decoration: const BoxDecoration(
+              color: Color(0xFF00FF88),
+              shape: BoxShape.circle,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
+    _scrollController.dispose();
     _perguntaController.dispose();
-    _masterController.dispose(); // ✅ Apenas 1 dispose
+    _masterController.dispose();
     super.dispose();
   }
 }

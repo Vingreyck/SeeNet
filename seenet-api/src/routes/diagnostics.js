@@ -240,4 +240,55 @@ function gerarDiagnosticoFallback(checkmarks) {
 Para diagnósticos mais detalhados, aguarde o restabelecimento do serviço.`;
 }
 
+// ========== CHAT COM CONTEXTO DO DIAGNÓSTICO ==========
+router.post('/:diagnosticoId/chat', [
+  body('mensagem').notEmpty().withMessage('Mensagem não pode estar vazia'),
+  body('historico').optional().isArray(),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, error: 'Dados inválidos' });
+    }
+
+    const { diagnosticoId } = req.params;
+    const { mensagem, historico = [] } = req.body;
+
+    const diagnostico = await db('diagnosticos')
+      .where('id', diagnosticoId)
+      .where('tenant_id', req.tenantId)
+      .first();
+
+    if (!diagnostico) {
+      return res.status(404).json({ success: false, error: 'Diagnóstico não encontrado' });
+    }
+
+    let prompt = `Você é um técnico especialista em internet/IPTV. Responda de forma direta e prática.\n\n`;
+    prompt += `DIAGNÓSTICO ORIGINAL:\n${diagnostico.resposta_gemini}\n\n`;
+    prompt += `PROBLEMA IDENTIFICADO:\n${diagnostico.prompt_enviado}\n\n`;
+
+    if (historico.length > 0) {
+      prompt += `HISTÓRICO:\n`;
+      historico.forEach(m => {
+        prompt += `${m.role === 'user' ? 'Técnico' : 'IA'}: ${m.content}\n`;
+      });
+      prompt += `\n`;
+    }
+
+    prompt += `PERGUNTA: ${mensagem}\n\nResponda em no máximo 5 linhas, seja direto e use emojis.`;
+
+    const resposta = await geminiService.gerarDiagnostico(prompt);
+
+    if (!resposta) {
+      return res.status(500).json({ success: false, error: 'Falha ao gerar resposta' });
+    }
+
+    return res.json({ success: true, data: { resposta, diagnostico_id: parseInt(diagnosticoId) } });
+
+  } catch (error) {
+    logger.error('Erro no chat de diagnóstico:', error);
+    return res.status(500).json({ success: false, error: 'Erro interno do servidor' });
+  }
+});
+
 module.exports = router;

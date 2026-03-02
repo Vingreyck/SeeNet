@@ -198,218 +198,72 @@ try {
       console.error('❌ Erro ao carregar rotas avaliacoes:', error.message);
     }
 
-    // ========== DIAGNÓSTICOS (INLINE) ==========
-    const { body, validationResult } = require('express-validator');
-    const geminiService = require('./routes/geminiService');
-    const  authMiddleware  = require('./middleware/auth');
+// ========== CHAT DO DIAGNÓSTICO ==========
+app.post('/api/diagnostics/:diagnosticoId/chat',
+  authMiddleware,
+  [
+    body('mensagem').notEmpty().withMessage('Mensagem não pode estar vazia'),
+    body('historico').optional().isArray(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, error: 'Dados inválidos' });
+      }
 
-    app.post('/api/diagnostics/gerar', 
-      authMiddleware,
-      [
-        body('avaliacao_id').isInt({ min: 1 }),
-        body('categoria_id').isInt({ min: 1 }),
-        body('checkmarks_marcados').isArray({ min: 1 })
-      ], 
-      async (req, res) => {
-        try {
-          const errors = validationResult(req);
-          if (!errors.isEmpty()) {
-            console.log('❌ Validação falhou:', errors.array());
-            return res.status(400).json({ 
-              success: false, 
-              error: 'Dados inválidos', 
-              details: errors.array() 
-            });
-          }
+      const { diagnosticoId } = req.params;
+      const { mensagem, historico = [] } = req.body;
 
-          const { avaliacao_id, categoria_id, checkmarks_marcados } = req.body;
+      // Buscar diagnóstico original para contexto
+      const diagnostico = await db('diagnosticos')
+        .where('id', diagnosticoId)
+        .where('tenant_id', req.tenantId)
+        .first();
 
-          logger.info('Iniciando geração de diagnóstico', {
-            avaliacao_id,
-            categoria_id,
-            checkmarks_marcados,
-            tenant_id: req.tenantId,
-            usuario_id: req.user.id
-          });
+      if (!diagnostico) {
+        return res.status(404).json({ success: false, error: 'Diagnóstico não encontrado' });
+      }
 
-          // Verificar avaliação
-          const avaliacao = await db('avaliacoes')
-            .where('id', avaliacao_id)
-            .where('tenant_id', req.tenantId)
-            .first();
+      // Montar prompt com contexto
+      let prompt = `Você é um técnico especialista em internet/IPTV. Responda de forma direta e prática.\n\n`;
+      prompt += `DIAGNÓSTICO ORIGINAL:\n${diagnostico.resposta_gemini}\n\n`;
+      prompt += `PROBLEMA IDENTIFICADO:\n${diagnostico.prompt_enviado}\n\n`;
 
-          if (!avaliacao) {
-            logger.warn('Avaliação não encontrada', {
-              avaliacao_id,
-              tenant_id: req.tenantId,
-              usuario_id: req.user.id
-            });
-            return res.status(404).json({ 
-              success: false, 
-              error: 'Avaliação não encontrada' 
-            });
-          }
+      if (historico.length > 0) {
+        prompt += `HISTÓRICO DA CONVERSA:\n`;
+        historico.forEach(m => {
+          prompt += `${m.role === 'user' ? 'Técnico' : 'IA'}: ${m.content}\n`;
+        });
+        prompt += `\n`;
+      }
 
-          // Buscar checkmarks
-          const checkmarks = await db('checkmarks')
-            .whereIn('id', checkmarks_marcados)
-            .where('tenant_id', req.tenantId)
-            .select('id', 'titulo', 'descricao', 'prompt_gemini');
+      prompt += `PERGUNTA DO TÉCNICO: ${mensagem}\n\nResponda em no máximo 5 linhas, seja direto e use emojis.`;
 
-          if (checkmarks.length === 0) {
-            logger.warn('Checkmarks não encontrados', {
-              checkmarks_marcados,
-              tenant_id: req.tenantId,
-              usuario_id: req.user.id
-            });
-            return res.status(400).json({ 
-              success: false, 
-              error: 'Checkmarks não encontrados' 
-            });
-          }
+      const resposta = await geminiService.gerarDiagnostico(prompt);
 
-          console.log(`✅ ${checkmarks.length} checkmarks encontrados`);
+      if (!resposta) {
+        return res.status(500).json({ success: false, error: 'Falha ao gerar resposta' });
+      }
 
-          // Montar prompt
-          let prompt = "RELATÓRIO TÉCNICO DE PROBLEMAS IDENTIFICADOS:\n\n";
-          checkmarks.forEach((c, i) => {
-            prompt += `PROBLEMA ${i + 1}:\n`;
-            prompt += `• Título: ${c.titulo}\n`;
-            if (c.descricao) {
-              prompt += `• Descrição: ${c.descricao}\n`;
-            }
-            prompt += `• Contexto técnico: ${c.prompt_gemini}\n\n`;
-          });
-          prompt += "TAREFA:\n";
-          prompt += "Analise os problemas listados e forneça um diagnóstico técnico completo. ";
-          prompt += "Considere correlações entre os problemas. ";
-          prompt += "Forneça soluções práticas, começando pelas mais simples.";
+      console.log(`💬 Chat diagnóstico ${diagnosticoId} (Tenant: ${req.tenantCode})`);
 
-          console.log('📝 Prompt montado. Enviando para Gemini...');
-
-          // Gerar com Gemini
-          let resposta;
-          let statusApi = 'sucesso';
-          let modeloIa = 'gemini-1.5-flash';
-          
-          try {
-            resposta = await geminiService.gerarDiagnostico(prompt);
-            
-            if (!resposta) {
-              throw new Error('Gemini retornou resposta vazia');
-            }
-            
-            console.log('✅ Resposta recebida do Gemini');
-          } catch (geminiError) {
-            console.log('⚠️ Gemini falhou, usando fallback:', geminiError.message);
-            statusApi = 'erro';
-            modeloIa = 'fallback';
-            
-            const problemas = checkmarks.map(c => c.titulo).join(', ');
-            resposta = `🔧 DIAGNÓSTICO TÉCNICO (MODO FALLBACK)
-
-📊 PROBLEMAS IDENTIFICADOS: ${problemas}
-
-🛠️ AÇÕES RECOMENDADAS:
-1. Reinicie todos os equipamentos (modem, roteador, dispositivos)
-2. Verifique todas as conexões físicas e cabos
-3. Teste a conectividade em diferentes dispositivos
-4. Documente os resultados de cada teste
-
-📞 PRÓXIMOS PASSOS:
-- Execute as soluções na ordem apresentada
-- Anote o que funcionou ou não funcionou
-- Se problemas persistirem, entre em contato com suporte técnico
-
----
-⚠️ Este diagnóstico foi gerado em modo fallback devido à indisponibilidade da IA.`;
-          }
-
-          // Extrair resumo com validação
-          let resumo = '';
-          if (typeof resposta === 'string') {
-            const linhas = resposta.split('\n');
-            for (let linha of linhas) {
-              if (linha.includes('DIAGNÓSTICO') || linha.includes('ANÁLISE') || linha.includes('PROBLEMA')) {
-                resumo = linha.replace(/[🔍📊🎯*#]/g, '').trim();
-                break;
-              }
-            }
-            if (!resumo) {
-              resumo = resposta.substring(0, 120);
-            }
-          } else {
-            console.error('❌ Resposta não é uma string:', resposta);
-            resumo = 'Erro ao gerar diagnóstico';
-          }
-          if (resumo.length > 120) {
-            resumo = resumo.substring(0, 120) + '...';
-          }
-
-          const tokensUtilizados = Math.ceil((prompt + resposta).length / 4);
-
-          console.log('💾 Salvando diagnóstico no banco...');
-
-          // Salvar no banco
-          const result = await db('diagnosticos').insert({
-            tenant_id: req.tenantId,
-            avaliacao_id,
-            categoria_id,
-            prompt_enviado: prompt,
-            resposta_gemini: resposta,
-            resumo_diagnostico: resumo,
-            status_api: statusApi,
-            modelo_ia: modeloIa,
-            tokens_utilizados: tokensUtilizados,
-            data_criacao: new Date().toISOString()
-          }).returning(['id', 'resposta_gemini', 'resumo_diagnostico', 'tokens_utilizados']);
-          
-          const diagnostico = result[0];
-
-          console.log(`   Status: ${statusApi}`);
-          console.log(`   Modelo: ${modeloIa}`);
-          console.log(`   Tokens: ${tokensUtilizados}`);
-
-          // Log dos dados antes de enviar
-          console.log('📤 Enviando resposta:', {
-            id: diagnostico.id,
-            resposta: diagnostico.resposta_gemini ? diagnostico.resposta_gemini.substring(0, 50) + '...' : 'N/A',
-            resumo: diagnostico.resumo_diagnostico,
-            tokens: diagnostico.tokens_utilizados
-          });
-
-          return res.json({
-            success: true,
-            message: 'Diagnóstico gerado com sucesso',
-            data: {
-              id: diagnostico.id,
-              resposta: diagnostico.resposta_gemini,
-              resumo: diagnostico.resumo_diagnostico,
-              tokens_utilizados: diagnostico.tokens_utilizados,
-              status: statusApi,
-              modelo: modeloIa
-            }
-          });
-
-        } catch (error) {
-          console.error('❌ Erro ao gerar diagnóstico:', error);
-          return res.status(500).json({ 
-            success: false, 
-            error: 'Erro interno do servidor',
-            details: process.env.NODE_ENV === 'production' ? undefined : error.message
-          });
+      return res.json({
+        success: true,
+        data: {
+          resposta,
+          diagnostico_id: parseInt(diagnosticoId),
         }
-    });
+      });
 
-    console.log('✅ Rota POST /api/diagnostics/gerar registrada (inline)');
+    } catch (error) {
+      console.error('❌ Erro no chat de diagnóstico:', error);
+      return res.status(500).json({ success: false, error: 'Erro interno do servidor' });
+    }
+  }
+);
 
-    app.get('/api/admin/categorias/test', (req, res) => {
-  console.log('🧪 Rota de teste /api/admin/categorias/test chamada');
-  res.json({ 
-    message: 'Rota de teste funcionando!',
-    timestamp: new Date().toISOString()
-  });
-});
+console.log('✅ Rota POST /api/diagnostics/:id/chat registrada (inline)');
 
     // ========== ADMIN ==========
 try {

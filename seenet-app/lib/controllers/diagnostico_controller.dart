@@ -239,6 +239,31 @@ Future<bool> gerarDiagnostico(
     print('============================\n');
   }
 
+  // ========== CHAT ==========
+  Future<String?> enviarMensagemChat({
+    required int diagnosticoId,
+    required String mensagem,
+    required List<Map<String, String>> historico,
+  }) async {
+    try {
+      final response = await _api.post(
+        '/diagnostics/$diagnosticoId/chat',
+        {
+          'mensagem': mensagem,
+          'historico': historico,
+        },
+      );
+
+      if (response['success'] == true) {
+        return response['data']['resposta'] as String?;
+      }
+      return null;
+    } catch (e) {
+      print('❌ Erro no chat: $e');
+      return null;
+    }
+  }
+
     @override
   void onClose() {
     _diagnosticosWorker?.dispose();

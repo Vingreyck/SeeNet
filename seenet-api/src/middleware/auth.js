@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
-const { db } = require('../config/database');
 const logger = require('../config/logger');
 
 const authMiddleware = async (req, res, next) => {
+const { db } = require('../config/database');
   const requestContext = {
     method: req.method,
     path: req.path,

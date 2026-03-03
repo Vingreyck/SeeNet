@@ -85,8 +85,6 @@ app.get('/api/admin/backup-emergency', async (req, res) => {
   try {
     console.log('🚨 Backup emergência iniciado...');
     
-    const { db } = require('./config/database');
-    
     const tables = await db.raw(`
       SELECT tablename 
       FROM pg_tables 

@@ -7,6 +7,10 @@ const compression = require('compression');
 const logger = require('./config/logger');
 require('dotenv').config();
 
+const { body, validationResult } = require('express-validator');
+const authMiddleware = require('./middleware/auth');
+const geminiService = require('./services/geminiService');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -52,6 +56,7 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Code']
 };
 
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(formatResponse);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

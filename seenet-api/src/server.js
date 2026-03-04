@@ -129,6 +129,8 @@ app.get('/api/admin/backup-emergency', async (req, res) => {
   }
 });
 
+
+
 // ========== INICIALIZAR BANCO E ROTAS ==========
 async function startServer() {
   try {
@@ -1144,6 +1146,17 @@ setInterval(() => {
 
   
 }
+
+process.on('uncaughtException', (error) => {
+  console.error('💥 UNCAUGHT EXCEPTION:', error.message);
+  console.error(error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('💥 UNHANDLED REJECTION:', reason);
+  process.exit(1);
+});
 
 startServer();
 

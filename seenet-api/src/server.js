@@ -1093,6 +1093,7 @@ app.get('/api/debug/force-sync', async (req, res) => {
     })
 
 // Listar rotas
+/*
     try {
       console.log('\n=== ROTAS REGISTRADAS ===');
       app._router.stack.forEach((middleware) => {
@@ -1112,8 +1113,8 @@ app.get('/api/debug/force-sync', async (req, res) => {
       });
     } catch (routeListError) {
       console.error('⚠️ Erro ao listar rotas:', routeListError.message);
-    }
-
+    }*/
+console.log('🚀 CHEGOU NO APP.LISTEN - INICIANDO SERVIDOR...');
     app.listen(PORT, '0.0.0.0', () => {
       logger.info('✨ SERVIDOR INICIADO COM SUCESSO', {
         port: PORT,

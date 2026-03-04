@@ -1090,61 +1090,51 @@ app.get('/api/debug/force-sync', async (req, res) => {
       });
     })
 
-
-
-try {
-  console.log('\n=== ROTAS REGISTRADAS ===');
-  app._router.stack.forEach((middleware) => {
-    if (middleware.route) {
-      console.log(`${Object.keys(middleware.route.methods)[0].toUpperCase()} ${middleware.route.path}`);
-    } else if (middleware.name === 'router') {
-      middleware.handle.stack.forEach((handler) => {
-        if (handler.route) {
-          const path = middleware.regexp.source
-            .replace('\\/?', '')
-            .replace('(?=\\/|$)', '')
-            .replace(/\\/g, '');
-          console.log(`${Object.keys(handler.route.methods)[0].toUpperCase()} ${path}${handler.route.path}`);
+// Listar rotas
+    try {
+      console.log('\n=== ROTAS REGISTRADAS ===');
+      app._router.stack.forEach((middleware) => {
+        if (middleware.route) {
+          console.log(`${Object.keys(middleware.route.methods)[0].toUpperCase()} ${middleware.route.path}`);
+        } else if (middleware.name === 'router') {
+          middleware.handle.stack.forEach((handler) => {
+            if (handler.route) {
+              const path = middleware.regexp.source
+                .replace('\\/?', '')
+                .replace('(?=\\/|$)', '')
+                .replace(/\\/g, '');
+              console.log(`${Object.keys(handler.route.methods)[0].toUpperCase()} ${path}${handler.route.path}`);
+            }
+          });
         }
       });
+    } catch (routeListError) {
+      console.error('⚠️ Erro ao listar rotas:', routeListError.message);
     }
-  });
-} catch (routeListError) {
-  console.error('⚠️ Erro ao listar rotas:', routeListError.message);
-}
 
-// Keep-alive para evitar cold start no Railway
-setInterval(() => {
-  const http = require('http');
-  http.get(`http://localhost:${PORT}/health`, () => {}).on('error', () => {});
-  console.log('💓 Keep-alive ping');
-}, 4 * 60 * 1000); // a cada 4 minutos
-
-    if (process.env.VERCEL !== '1') {
-      app.listen(PORT, '0.0.0.0', () => {
-        logger.info('\n=== ✨ SERVIDOR INICIADO COM SUCESSO ===', {
-          port: PORT,
-          environment: process.env.NODE_ENV,
-          nodeVersion: process.version,
-          timestamp: new Date().toISOString()
-        });
+    app.listen(PORT, '0.0.0.0', () => {
+      logger.info('✨ SERVIDOR INICIADO COM SUCESSO', {
+        port: PORT,
+        environment: process.env.NODE_ENV,
+        nodeVersion: process.version,
+        timestamp: new Date().toISOString()
       });
-    }
+
+      // Keep-alive DENTRO do listen
+      setInterval(() => {
+        const http = require('http');
+        http.get(`http://localhost:${PORT}/health`, () => {}).on('error', () => {});
+        console.log('💓 Keep-alive ping');
+      }, 4 * 60 * 1000);
+    });
 
   } catch (error) {
     logger.error('Falha crítica ao iniciar servidor', {
-      error: {
-        type: error.constructor.name,
-        message: error.message,
-        stack: error.stack
-      },
-      environment: process.env.NODE_ENV,
+      error: { type: error.constructor.name, message: error.message, stack: error.stack },
       timestamp: new Date().toISOString()
     });
     process.exit(1);
   }
-
-  
 }
 
 process.on('uncaughtException', (error) => {

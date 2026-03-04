@@ -980,6 +980,7 @@ app.get('/api/debug/force-sync', async (req, res) => {
   }
 });
 */
+/*
 // Rota para forçar sincronização de todas as empresas
   app.get('/api/sync/force', authMiddleware, async (req, res) => {
   try {
@@ -1002,6 +1003,7 @@ app.get('/api/debug/force-sync', async (req, res) => {
     });
   }
 });
+*/
     // ========== ROTAS DE DEBUG ==========
     
     app.get('/api/health', (req, res) => {

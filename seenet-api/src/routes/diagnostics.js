@@ -12,8 +12,11 @@ const router = express.Router();
 router.post('/gerar', [
   body('avaliacao_id').isInt({ min: 1 }),
   body('categoria_id').isInt({ min: 1 }),
-  body('checkmarks_marcados').isArray({ min: 1 }).withMessage('Deve marcar pelo menos um checkmark')
+  body('checkmarks_marcados').isArray({ min: 1 })
 ], async (req, res) => {
+  console.log('🔴 ENTROU NA ROTA /gerar');
+  console.log('🔴 req.tenantId:', req.tenantId);
+  console.log('🔴 req.user:', req.user?.id);
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

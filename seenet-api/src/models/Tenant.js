@@ -96,6 +96,11 @@ class Tenant {
       return false;
     }
   }
+  static async checkLimits(tenantId, feature) {
+    // TODO: Implementar limites por plano
+    return true;
+  }
+
 }
 
 module.exports = Tenant;

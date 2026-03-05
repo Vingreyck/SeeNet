@@ -5,8 +5,8 @@ class GeminiService {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
     this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-    this.maxRetries = 3;
-    this.retryDelay = 2000; // 2 segundos
+    this.maxRetries = 1;
+    this.retryDelay = 1000;
   }
 
   
@@ -76,7 +76,7 @@ IMPORTANTE: Seja direto, prático e focado na solução imediata.`;
         
         const response = await axios.post(this.apiUrl, requestBody, {
           headers,
-          timeout: 30000 // 30 segundos
+          timeout: 60000 // 60 segundos
         });
 
         if (response.status === 200) {

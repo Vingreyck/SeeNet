@@ -995,6 +995,30 @@ app.get('/api/debug/force-sync', async (req, res) => {
       });
     });
 
+    // DEBUG: Testar Gemini direto
+    app.get('/api/debug/test-gemini', async (req, res) => {
+      try {
+        const geminiService = require('./services/geminiService');
+        console.log('🧪 Testando Gemini...');
+
+        const resposta = await geminiService.gerarDiagnostico('Responda apenas: OK FUNCIONANDO');
+
+        console.log('✅ Gemini respondeu:', resposta?.substring(0, 100));
+
+        res.json({
+          success: true,
+          resposta: resposta?.substring(0, 200)
+        });
+      } catch (error) {
+        console.error('❌ Erro Gemini:', error.message);
+        res.status(500).json({
+          success: false,
+          error: error.message,
+          details: error.originalError?.message || null
+        });
+      }
+    });
+
     // Handler de erros global
     app.use((error, req, res, next) => {
       // Estruturar informações do erro

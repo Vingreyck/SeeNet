@@ -73,7 +73,7 @@ router.post('/gerar', [
         resposta_gemini: resposta,
         resumo_diagnostico: extrairResumo(resposta),
         status_api: 'sucesso',
-        modelo_ia: 'gemini-1.5-flash',
+        modelo_ia: 'gemini-2.5-flash',
         tokens_utilizados: contarTokens(prompt + resposta),
         data_criacao: new Date().toISOString()
       }).returning('id');
@@ -102,7 +102,7 @@ router.post('/gerar', [
       console.error('🟡🟡🟡 ERRO GEMINI/FALLBACK:', apiError.message);
       console.error('🟡🟡🟡 STACK:', apiError.stack);
       // Salvar erro no banco
-      const [diagnosticoId] = await db('diagnosticos').insert({
+      const [{ id: diagnosticoId }] = await db('diagnosticos').insert({
         tenant_id: req.tenantId,
         avaliacao_id,
         categoria_id,

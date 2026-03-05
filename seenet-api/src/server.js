@@ -203,72 +203,14 @@ try {
       console.error('❌ Erro ao carregar rotas avaliacoes:', error.message);
     }
 
-// ========== CHAT DO DIAGNÓSTICO ==========
-app.post('/api/diagnostics/:diagnosticoId/chat',
-  authMiddleware,
-  [
-    body('mensagem').notEmpty().withMessage('Mensagem não pode estar vazia'),
-    body('historico').optional().isArray(),
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, error: 'Dados inválidos' });
-      }
-
-      const { diagnosticoId } = req.params;
-      const { mensagem, historico = [] } = req.body;
-
-      // Buscar diagnóstico original para contexto
-      const diagnostico = await db('diagnosticos')
-        .where('id', diagnosticoId)
-        .where('tenant_id', req.tenantId)
-        .first();
-
-      if (!diagnostico) {
-        return res.status(404).json({ success: false, error: 'Diagnóstico não encontrado' });
-      }
-
-      // Montar prompt com contexto
-      let prompt = `Você é um técnico especialista em internet/IPTV. Responda de forma direta e prática.\n\n`;
-      prompt += `DIAGNÓSTICO ORIGINAL:\n${diagnostico.resposta_gemini}\n\n`;
-      prompt += `PROBLEMA IDENTIFICADO:\n${diagnostico.prompt_enviado}\n\n`;
-
-      if (historico.length > 0) {
-        prompt += `HISTÓRICO DA CONVERSA:\n`;
-        historico.forEach(m => {
-          prompt += `${m.role === 'user' ? 'Técnico' : 'IA'}: ${m.content}\n`;
-        });
-        prompt += `\n`;
-      }
-
-      prompt += `PERGUNTA DO TÉCNICO: ${mensagem}\n\nResponda em no máximo 5 linhas, seja direto e use emojis.`;
-
-      const resposta = await geminiService.gerarDiagnostico(prompt);
-
-      if (!resposta) {
-        return res.status(500).json({ success: false, error: 'Falha ao gerar resposta' });
-      }
-
-      console.log(`💬 Chat diagnóstico ${diagnosticoId} (Tenant: ${req.tenantCode})`);
-
-      return res.json({
-        success: true,
-        data: {
-          resposta,
-          diagnostico_id: parseInt(diagnosticoId),
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ Erro no chat de diagnóstico:', error);
-      return res.status(500).json({ success: false, error: 'Erro interno do servidor' });
-    }
-  }
-);
-
-console.log('✅ Rota POST /api/diagnostics/:id/chat registrada (inline)');
+// ========== DIAGNÓSTICOS ==========
+try {
+  const diagnosticsRoutes = require('./routes/diagnostics');
+  app.use('/api/diagnostics', authMiddleware, diagnosticsRoutes);
+  console.log('✅ Rotas /api/diagnostics registradas');
+} catch (error) {
+  console.error('❌ Erro ao carregar rotas diagnostics:', error.message);
+}
 
     // ========== ADMIN ==========
 try {

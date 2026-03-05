@@ -99,6 +99,8 @@ router.post('/gerar', [
       });
 
     } catch (apiError) {
+      console.error('🟡🟡🟡 ERRO GEMINI/FALLBACK:', apiError.message);
+      console.error('🟡🟡🟡 STACK:', apiError.stack);
       // Salvar erro no banco
       const [diagnosticoId] = await db('diagnosticos').insert({
         tenant_id: req.tenantId,
@@ -122,10 +124,12 @@ router.post('/gerar', [
       });
     }
 
-  } catch (error) {
-    logger.error('Erro ao gerar diagnóstico:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
+    } catch (error) {
+      logger.error('Erro ao gerar diagnóstico:', error);
+      console.error('🔴🔴🔴 ERRO COMPLETO:', error.message);
+      console.error('🔴🔴🔴 STACK:', error.stack);
+      res.status(500).json({ error: 'Erro interno do servidor' });
+    }
 });
 
 // ========== LISTAR DIAGNÓSTICOS DE UMA AVALIAÇÃO ==========

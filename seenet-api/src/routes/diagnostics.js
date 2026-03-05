@@ -76,7 +76,7 @@ router.post('/gerar', [
         modelo_ia: 'gemini-1.5-flash',
         tokens_utilizados: contarTokens(prompt + resposta),
         data_criacao: new Date().toISOString()
-      });
+      }).returning('id');
 
       // Log de auditoria
       await auditService.log({
@@ -113,7 +113,7 @@ router.post('/gerar', [
         erro_api: apiError.message,
         modelo_ia: 'fallback',
         data_criacao: new Date().toISOString()
-      });
+      }).returning('id');
 
       logger.warn(`⚠️ Fallback de diagnóstico: ${diagnosticoId} (Tenant: ${req.tenantCode})`);
 

@@ -987,6 +987,12 @@ app.get('/api/debug/force-sync', async (req, res) => {
       }
     });
 
+app.get('/api/debug/requisicoes-epi', async (req, res) => {
+  const { db } = require('./config/database');
+  const lista = await db('requisicoes_epi').select('*').orderBy('id', 'desc').limit(10);
+  res.json({ total: lista.length, requisicoes: lista });
+});
+
     app.use('*', (req, res) => {
       res.status(404).json({ 
         error: 'Endpoint não encontrado',

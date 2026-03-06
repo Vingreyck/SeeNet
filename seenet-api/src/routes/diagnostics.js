@@ -94,6 +94,7 @@ router.post('/gerar', [
       res.json({
         message: 'Diagnóstico gerado com sucesso',
         id: diagnosticoId,
+        resposta: resposta,
         resumo: extrairResumo(resposta),
         tokens_utilizados: contarTokens(prompt + resposta)
       });

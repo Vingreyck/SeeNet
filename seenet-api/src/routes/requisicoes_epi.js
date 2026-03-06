@@ -414,12 +414,10 @@ router.get('/epis', authMiddleware, (req, res) => {
 // POST /api/seguranca/requisicoes — técnico cria
 router.post('/requisicoes', authMiddleware, async (req, res) => {
   try {
-    const { epis_solicitados, assinatura_base64, foto_base64 } = req.body;
+    const { epis_solicitados } = req.body;
     if (!epis_solicitados?.length) return res.status(400).json({ error: 'Selecione ao menos um EPI' });
-    if (!assinatura_base64) return res.status(400).json({ error: 'Assinatura obrigatória' });
-    if (!foto_base64) return res.status(400).json({ error: 'Foto obrigatória' });
 
-    const [id] = await db('requisicoes_epi').insert({
+    const [{ id }] = await db('requisicoes_epi').insert({
       tenant_id: req.user.tenant_id,
       tecnico_id: req.user.id,
       status: 'pendente',

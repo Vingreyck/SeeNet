@@ -99,6 +99,7 @@ router.post('/gerar', [
         tokens_utilizados: contarTokens(prompt + resposta)
       });
 
+
     } catch (apiError) {
       console.error('🟡🟡🟡 ERRO GEMINI/FALLBACK:', apiError.message);
       console.error('🟡🟡🟡 STACK:', apiError.stack);

@@ -65,7 +65,7 @@ router.post('/gerar', [
       }
 
       // Salvar diagnóstico
-      const [diagnosticoId] = await db('diagnosticos').insert({
+      const [{ id: diagnosticoId }] = await db('diagnosticos').insert({
         tenant_id: req.tenantId,
         avaliacao_id,
         categoria_id,

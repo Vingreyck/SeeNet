@@ -995,17 +995,15 @@ app.get('/api/debug/requisicoes-epi', async (req, res) => {
 
 
 // ============================================
-// DEBUG: DESCOBRIR ENDPOINTS DE ESTOQUE IXC
+// DEBUG: Testar endpoints de estoque REAIS do IXC
+// GET /api/debug/test-ixc-estoque-v3/:osIdIxc
+// Ex: /api/debug/test-ixc-estoque-v3/273025
 // ============================================
-// Cole este trecho no seu app.js (junto com as outras rotas de debug)
-// Depois acesse: GET /api/debug/test-ixc-estoque
-// ============================================
-
-app.get('/api/debug/test-ixc-estoque', async (req, res) => {
+app.get('/api/debug/test-ixc-estoque-v3/:osIdIxc', async (req, res) => {
   const axios = require('axios');
 
   try {
-    console.log('🔍 Testando endpoints de ESTOQUE do IXC...');
+    const { osIdIxc } = req.params;
 
     const integracao = await db('integracao_ixc')
       .where('tenant_id', 5)
@@ -1015,340 +1013,198 @@ app.get('/api/debug/test-ixc-estoque', async (req, res) => {
       return res.json({ error: 'Integração não configurada' });
     }
 
-    // Todos os endpoints possíveis de estoque/produto no IXC Provedor
-    const endpoints = [
-      // === PRODUTOS ===
-      'produto',
-      'produtos',
-      'produto_estoque',
-      'produtos_estoque',
-
-      // === ESTOQUE ===
-      'estoque',
-      'estoque_movimentacao',
-      'estoque_movimentacoes',
-      'estoque_produto',
-
-      // === PATRIMÔNIO ===
-      'patrimonio',
-      'patrimonios',
-      'radpop_patrimonio',
-
-      // === ALMOXARIFADO ===
-      'almoxarifado',
-      'almoxarifados',
-
-      // === OS PRODUTOS (vincular produto à OS) ===
-      'su_oss_chamado_produto',
-      'su_os_produto',
-      'os_produto',
-      'su_oss_produto',
-      'su_chamado_produto',
-
-      // === MOVIMENTAÇÃO ===
-      'movimentacao',
-      'movimentacoes',
-      'requisicao_material',
-      'requisicao_materiais',
-      'transferencia_estoque',
-
-      // === OUTROS POSSÍVEIS ===
-      'produto_almoxarifado',
-      'estoque_almoxarifado',
-      'su_oss_chamado_materiais',
-    ];
-
-    const resultados = [];
-
-    for (const endpoint of endpoints) {
-      try {
-        const params = new URLSearchParams({
-          qtype: 'id',
-          query: '',
-          oper: '!=',
-          page: '1',
-          rp: '3'
-        });
-
-        const response = await axios.post(
-          `${integracao.url_api}/${endpoint}`,
-          params.toString(),
-          {
-            headers: {
-              'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'ixcsoft': 'listar'
-            },
-            timeout: 5000
-          }
-        );
-
-        const total = response.data.total || 0;
-        const registros = response.data.registros || [];
-
-        resultados.push({
-          endpoint,
-          status: total > 0 ? '✅ COM_DADOS' : '⚠️ VAZIO',
-          total: total,
-          campos: registros.length > 0 ? Object.keys(registros[0]) : [],
-          exemplo: registros.length > 0 ? registros[0] : null
-        });
-
-        console.log(`   ${total > 0 ? '✅' : '⚠️'} ${endpoint}: ${total} registros`);
-
-      } catch (error) {
-        const statusCode = error.response?.status;
-        resultados.push({
-          endpoint,
-          status: statusCode === 404 ? '❌ NAO_EXISTE' : `❌ ERRO_${statusCode || 'NETWORK'}`,
-          erro: statusCode || error.message
-        });
-
-        // Só loga se não for 404 (404 é esperado)
-        if (statusCode !== 404) {
-          console.log(`   ❌ ${endpoint}: ${statusCode || error.message}`);
+    const makeRequest = async (endpoint, body) => {
+      return axios.post(
+        `${integracao.url_api}/${endpoint}`,
+        JSON.stringify(body),
+        {
+          headers: {
+            'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+            'Content-Type': 'application/json',
+            'ixcsoft': 'listar'
+          },
+          timeout: 10000
         }
-      }
+      );
+    };
 
-      // Pausa entre requests para não sobrecarregar
-      await new Promise(resolve => setTimeout(resolve, 200));
+    const resultados = {};
+
+    // ═══════════════════════════════════════
+    // 1. PRODUTOS DA OS 273025 (su_oss_mov_produto)
+    // ═══════════════════════════════════════
+    try {
+      const r = await makeRequest('su_oss_mov_produto', {
+        qtype: 'movimento_produtos.id_oss_chamado',
+        query: osIdIxc,
+        oper: '=',
+        page: '1',
+        rp: '50',
+        sortname: 'movimento_produtos.id',
+        sortorder: 'desc'
+      });
+
+      resultados.produtos_da_os = {
+        status: 'OK',
+        total: r.data.total || 0,
+        campos: r.data.registros?.[0] ? Object.keys(r.data.registros[0]) : [],
+        dados: r.data.registros || []
+      };
+    } catch (e) {
+      resultados.produtos_da_os = {
+        erro: e.response?.status || e.message,
+        dados: e.response?.data
+      };
     }
 
-    // Separar por status
-    const comDados = resultados.filter(r => r.status === '✅ COM_DADOS');
-    const vazios = resultados.filter(r => r.status === '⚠️ VAZIO');
-    const erros = resultados.filter(r => r.status.startsWith('❌'));
+    // ═══════════════════════════════════════
+    // 2. LISTAR TODOS os mov_produto (pra ver estrutura)
+    // ═══════════════════════════════════════
+    try {
+      const r = await makeRequest('su_oss_mov_produto', {
+        qtype: 'movimento_produtos.id',
+        query: '1',
+        oper: '>=',
+        page: '1',
+        rp: '5',
+        sortname: 'movimento_produtos.id',
+        sortorder: 'desc'
+      });
 
-    console.log(`\n📊 Resumo: ${comDados.length} com dados | ${vazios.length} vazios | ${erros.length} não existem`);
+      resultados.mov_produto_todos = {
+        status: 'OK',
+        total: r.data.total || 0,
+        campos: r.data.registros?.[0] ? Object.keys(r.data.registros[0]) : [],
+        exemplo: r.data.registros?.[0] || null
+      };
+    } catch (e) {
+      resultados.mov_produto_todos = {
+        erro: e.response?.status || e.message,
+        dados: e.response?.data
+      };
+    }
+
+    // ═══════════════════════════════════════
+    // 3. PRODUTO 401 (CONECTOR DE FIBRA)
+    // ═══════════════════════════════════════
+    try {
+      const r = await makeRequest('produtos', {
+        qtype: 'produtos.id',
+        query: '401',
+        oper: '=',
+        page: '1',
+        rp: '1'
+      });
+
+      const p = r.data.registros?.[0];
+      resultados.produto_401 = {
+        status: 'OK',
+        dados: p ? {
+          id: p.id,
+          descricao: p.descricao,
+          valor: p.valor,
+          unidade: p.unidade,
+          tipo: p.tipo,
+          saldo: p.saldo,
+          controla_estoque: p.controla_estoque,
+          ativo: p.ativo
+        } : null
+      };
+    } catch (e) {
+      resultados.produto_401 = { erro: e.response?.status || e.message };
+    }
+
+    // ═══════════════════════════════════════
+    // 4. ESTOQUE POR ALMOXARIFADO (estoque_produtos_almox_filial)
+    // ═══════════════════════════════════════
+    try {
+      const r = await makeRequest('estoque_produtos_almox_filial', {
+        qtype: 'estoque_produtos_almox_filial.id',
+        query: '1',
+        oper: '>=',
+        page: '1',
+        rp: '5',
+        sortname: 'estoque_produtos_almox_filial.id',
+        sortorder: 'desc'
+      });
+
+      resultados.estoque_almox = {
+        status: 'OK',
+        total: r.data.total || 0,
+        campos: r.data.registros?.[0] ? Object.keys(r.data.registros[0]) : [],
+        exemplo: r.data.registros?.[0] || null
+      };
+    } catch (e) {
+      resultados.estoque_almox = {
+        erro: e.response?.status || e.message,
+        dados: e.response?.data
+      };
+    }
+
+    // ═══════════════════════════════════════
+    // 5. ALMOXARIFADOS (almox)
+    // ═══════════════════════════════════════
+    try {
+      const r = await makeRequest('almox', {
+        qtype: 'almox.id',
+        query: '1',
+        oper: '>=',
+        page: '1',
+        rp: '50',
+        sortname: 'almox.id',
+        sortorder: 'asc'
+      });
+
+      resultados.almoxarifados = {
+        status: 'OK',
+        total: r.data.total || 0,
+        dados: r.data.registros?.map(a => ({
+          id: a.id,
+          descricao: a.descricao || a.nome,
+          id_filial: a.id_filial,
+          ativo: a.ativo
+        })) || []
+      };
+    } catch (e) {
+      resultados.almoxarifados = {
+        erro: e.response?.status || e.message
+      };
+    }
+
+    // ═══════════════════════════════════════
+    // 6. PATRIMÔNIO - buscar alguns pra ver estrutura
+    // ═══════════════════════════════════════
+    try {
+      const r = await makeRequest('patrimonio', {
+        qtype: 'patrimonio.id',
+        query: '1',
+        oper: '>=',
+        page: '1',
+        rp: '3',
+        sortname: 'patrimonio.id',
+        sortorder: 'desc'
+      });
+
+      resultados.patrimonios = {
+        status: 'OK',
+        total: r.data.total || 0,
+        campos: r.data.registros?.[0] ? Object.keys(r.data.registros[0]) : [],
+        exemplo: r.data.registros?.[0] || null
+      };
+    } catch (e) {
+      resultados.patrimonios = {
+        erro: e.response?.status || e.message
+      };
+    }
 
     return res.json({
+      os_ixc_id: osIdIxc,
       url_api: integracao.url_api,
-      resumo: {
-        com_dados: comDados.length,
-        vazios: vazios.length,
-        nao_existem: erros.length,
-        total_testados: endpoints.length
-      },
-      // Endpoints com dados primeiro (mais úteis)
-      endpoints_com_dados: comDados,
-      endpoints_vazios: vazios,
-      endpoints_erro: erros
+      resultados
     });
 
   } catch (error) {
-    console.error('❌ Erro geral:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================
-// DEBUG 2: Testar busca de produto específico
-// Ex: GET /api/debug/test-ixc-produto/401
-// ============================================
-app.get('/api/debug/test-ixc-produto/:produtoId', async (req, res) => {
-  const axios = require('axios');
-
-  try {
-    const { produtoId } = req.params;
-
-    const integracao = await db('integracao_ixc')
-      .where('tenant_id', 5)
-      .first();
-
-    if (!integracao) {
-      return res.json({ error: 'Integração não configurada' });
-    }
-
-    console.log(`🔍 Buscando produto ID ${produtoId} no IXC...`);
-
-    // Testar nos endpoints que existirem
-    const endpointsTentar = ['produto', 'produto_estoque', 'estoque'];
-    const resultados = [];
-
-    for (const endpoint of endpointsTentar) {
-      try {
-        const params = new URLSearchParams({
-          qtype: 'id',
-          query: produtoId,
-          oper: '=',
-          page: '1',
-          rp: '1'
-        });
-
-        const response = await axios.post(
-          `${integracao.url_api}/${endpoint}`,
-          params.toString(),
-          {
-            headers: {
-              'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'ixcsoft': 'listar'
-            },
-            timeout: 5000
-          }
-        );
-
-        resultados.push({
-          endpoint,
-          total: response.data.total || 0,
-          dados: response.data.registros?.[0] || null
-        });
-      } catch (error) {
-        resultados.push({
-          endpoint,
-          erro: error.response?.status || error.message
-        });
-      }
-    }
-
-    return res.json({ produto_id: produtoId, resultados });
-
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================
-// DEBUG 3: Testar busca de patrimônio
-// Ex: GET /api/debug/test-ixc-patrimonio?serial=HWTC12345
-// ============================================
-app.get('/api/debug/test-ixc-patrimonio', async (req, res) => {
-  const axios = require('axios');
-
-  try {
-    const { serial, id } = req.query;
-
-    const integracao = await db('integracao_ixc')
-      .where('tenant_id', 5)
-      .first();
-
-    if (!integracao) {
-      return res.json({ error: 'Integração não configurada' });
-    }
-
-    const endpointsTentar = ['patrimonio', 'radpop_patrimonio'];
-    const resultados = [];
-
-    for (const endpoint of endpointsTentar) {
-      try {
-        const params = new URLSearchParams({
-          qtype: serial ? 'numero_serie' : 'id',
-          query: serial || id || '',
-          oper: serial ? 'LIKE' : '!=',
-          page: '1',
-          rp: '10'
-        });
-
-        const response = await axios.post(
-          `${integracao.url_api}/${endpoint}`,
-          params.toString(),
-          {
-            headers: {
-              'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'ixcsoft': 'listar'
-            },
-            timeout: 5000
-          }
-        );
-
-        resultados.push({
-          endpoint,
-          total: response.data.total || 0,
-          campos: response.data.registros?.[0] ? Object.keys(response.data.registros[0]) : [],
-          dados: response.data.registros || []
-        });
-      } catch (error) {
-        resultados.push({
-          endpoint,
-          erro: error.response?.status || error.message
-        });
-      }
-    }
-
-    return res.json({ busca: { serial, id }, resultados });
-
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================
-// DEBUG 4: Ver produtos já vinculados a uma OS
-// Ex: GET /api/debug/test-ixc-os-produtos/12345
-// ============================================
-app.get('/api/debug/test-ixc-os-produtos/:osId', async (req, res) => {
-  const axios = require('axios');
-
-  try {
-    const { osId } = req.params;
-
-    const integracao = await db('integracao_ixc')
-      .where('tenant_id', 5)
-      .first();
-
-    if (!integracao) {
-      return res.json({ error: 'Integração não configurada' });
-    }
-
-    console.log(`🔍 Buscando produtos da OS ${osId} no IXC...`);
-
-    // Testar endpoints de produtos da OS
-    const endpointsTentar = [
-      'su_oss_chamado_produto',
-      'su_os_produto',
-      'os_produto',
-      'su_oss_produto',
-      'su_chamado_produto'
-    ];
-
-    const resultados = [];
-
-    for (const endpoint of endpointsTentar) {
-      try {
-        // Buscar por id_chamado (referência à OS)
-        const params = new URLSearchParams({
-          qtype: 'id_chamado',
-          query: osId,
-          oper: '=',
-          page: '1',
-          rp: '50'
-        });
-
-        const response = await axios.post(
-          `${integracao.url_api}/${endpoint}`,
-          params.toString(),
-          {
-            headers: {
-              'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'ixcsoft': 'listar'
-            },
-            timeout: 5000
-          }
-        );
-
-        resultados.push({
-          endpoint,
-          status: 'OK',
-          total: response.data.total || 0,
-          campos: response.data.registros?.[0] ? Object.keys(response.data.registros[0]) : [],
-          dados: response.data.registros || []
-        });
-      } catch (error) {
-        resultados.push({
-          endpoint,
-          status: error.response?.status === 404 ? 'NAO_EXISTE' : 'ERRO',
-          erro: error.response?.status || error.message
-        });
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-
-    return res.json({ os_id: osId, resultados });
-
-  } catch (error) {
+    console.error('❌ Erro:', error);
     return res.status(500).json({ error: error.message });
   }
 });

@@ -993,76 +993,6 @@ app.get('/api/debug/requisicoes-epi', async (req, res) => {
   res.json({ total: lista.length, requisicoes: lista });
 });
 
-    app.use('*', (req, res) => {
-      res.status(404).json({ 
-        error: 'Endpoint não encontrado',
-        path: req.originalUrl,
-        method: req.method
-      });
-    });
-
-    // DEBUG: Testar Gemini direto
-    app.get('/api/debug/test-gemini', async (req, res) => {
-      try {
-        const geminiService = require('./services/geminiService');
-        console.log('🧪 Testando Gemini...');
-
-        const resposta = await geminiService.gerarDiagnostico('Responda apenas: OK FUNCIONANDO');
-
-        console.log('✅ Gemini respondeu:', resposta?.substring(0, 100));
-
-        res.json({
-          success: true,
-          resposta: resposta?.substring(0, 200)
-        });
-      } catch (error) {
-        console.error('❌ Erro Gemini:', error.message);
-        res.status(500).json({
-          success: false,
-          error: error.message,
-          details: error.originalError?.message || null
-        });
-      }
-    });
-
-    // Handler de erros global
-    app.use((error, req, res, next) => {
-      // Estruturar informações do erro
-      const errorInfo = {
-        type: error.constructor.name,
-        message: error.message,
-        path: req.path,
-        method: req.method,
-        userId: req.user?.id,
-        tenantId: req.tenantId,
-        timestamp: new Date().toISOString()
-      };
-
-      // Log detalhado para erros não tratados
-      logger.error('Erro não tratado na aplicação', {
-        ...errorInfo,
-        stack: error.stack,
-        body: req.body,
-        query: req.query,
-        headers: req.headers
-      });
-
-      // Determinar status HTTP apropriado
-      const status = error.status || 
-        (error.name === 'ValidationError' ? 400 : 
-         error.name === 'UnauthorizedError' ? 401 : 500);
-
-      // Resposta ao cliente
-      res.status(status).json({
-        error: status === 500 ? 'Erro interno do servidor' : error.message,
-        type: error.name,
-        path: req.path,
-        ...(process.env.NODE_ENV === 'development' && {
-          details: error.message,
-          stack: error.stack
-        })
-      });
-    })
 
 // ============================================
 // DEBUG: DESCOBRIR ENDPOINTS DE ESTOQUE IXC
@@ -1422,6 +1352,78 @@ app.get('/api/debug/test-ixc-os-produtos/:osId', async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
+
+    app.use('*', (req, res) => {
+      res.status(404).json({ 
+        error: 'Endpoint não encontrado',
+        path: req.originalUrl,
+        method: req.method
+      });
+    });
+
+    // DEBUG: Testar Gemini direto
+    app.get('/api/debug/test-gemini', async (req, res) => {
+      try {
+        const geminiService = require('./services/geminiService');
+        console.log('🧪 Testando Gemini...');
+
+        const resposta = await geminiService.gerarDiagnostico('Responda apenas: OK FUNCIONANDO');
+
+        console.log('✅ Gemini respondeu:', resposta?.substring(0, 100));
+
+        res.json({
+          success: true,
+          resposta: resposta?.substring(0, 200)
+        });
+      } catch (error) {
+        console.error('❌ Erro Gemini:', error.message);
+        res.status(500).json({
+          success: false,
+          error: error.message,
+          details: error.originalError?.message || null
+        });
+      }
+    });
+
+    // Handler de erros global
+    app.use((error, req, res, next) => {
+      // Estruturar informações do erro
+      const errorInfo = {
+        type: error.constructor.name,
+        message: error.message,
+        path: req.path,
+        method: req.method,
+        userId: req.user?.id,
+        tenantId: req.tenantId,
+        timestamp: new Date().toISOString()
+      };
+
+      // Log detalhado para erros não tratados
+      logger.error('Erro não tratado na aplicação', {
+        ...errorInfo,
+        stack: error.stack,
+        body: req.body,
+        query: req.query,
+        headers: req.headers
+      });
+
+      // Determinar status HTTP apropriado
+      const status = error.status || 
+        (error.name === 'ValidationError' ? 400 : 
+         error.name === 'UnauthorizedError' ? 401 : 500);
+
+      // Resposta ao cliente
+      res.status(status).json({
+        error: status === 500 ? 'Erro interno do servidor' : error.message,
+        type: error.name,
+        path: req.path,
+        ...(process.env.NODE_ENV === 'development' && {
+          details: error.message,
+          stack: error.stack
+        })
+      });
+    })
+
 
 // Listar rotas
 /*

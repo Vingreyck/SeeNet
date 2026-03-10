@@ -328,15 +328,19 @@ class EstoqueController {
         id_patrimonio: id_patrimonio.toString(),
         numero_serie: numero_serie,
         numero_patrimonial: numero_patrimonial,
-        tipo: 'S', // Saída
-        tipo_produto: id_patrimonio > 0 ? 'P' : 'O', // P = Patrimônio, O = Outro (consumo)
-        origem_movimento: 'S', // Suporte
+        tipo: 'S',
+        tipo_produto: id_patrimonio > 0 ? 'P' : 'O',
+        origem_movimento: 'S',
         estoque: 'N',
         garantia_oss: 'N',
         fator_conversao: '1.000000000',
         pdesconto: '0.00000',
         vdesconto: '0.00',
-        pcomissao: '0.00'
+        pcomissao: '0.00',
+        id_unidade: req.body.id_unidade || '1',
+        unidade_sigla: req.body.unidade_sigla || 'UND',
+        data: new Date().toISOString().split('T')[0],
+        id_classificacao_tributaria: req.body.id_classificacao_tributaria || '1'
       };
 
       // Inserir no IXC via su_oss_mov_produto

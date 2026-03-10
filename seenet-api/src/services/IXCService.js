@@ -670,6 +670,206 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       return null;
     }
   }
+
+  async listarProdutos(filtros = {}) {
+    try {
+      const { busca = '', page = 1, rp = 30 } = filtros;
+
+      const body = {
+        qtype: busca ? 'produtos.descricao' : 'produtos.id',
+        query: busca || '1',
+        oper: busca ? 'like' : '>=',
+        page: page.toString(),
+        rp: rp.toString(),
+        sortname: 'produtos.descricao',
+        sortorder: 'asc'
+      };
+
+      if (!busca) {
+        body.grid_param = JSON.stringify([
+          { TB: 'produtos.ativo', OP: '=', P: 'S' },
+          { TB: 'produtos.controla_estoque', OP: '=', P: 'S' }
+        ]);
+      } else {
+        body.grid_param = JSON.stringify([
+          { TB: 'produtos.ativo', OP: '=', P: 'S' }
+        ]);
+      }
+
+      const response = await this.clientListar.post('/produtos', JSON.stringify(body));
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao listar produtos IXC:', error.message);
+      throw error;
+    }
+  }
+
+  async buscarProdutoPorId(produtoId) {
+    try {
+      const body = {
+        qtype: 'produtos.id',
+        query: produtoId.toString(),
+        oper: '=',
+        page: '1',
+        rp: '1'
+      };
+
+      const response = await this.clientListar.post('/produtos', JSON.stringify(body));
+      return response.data.registros?.[0] || null;
+    } catch (error) {
+      console.error(`❌ Erro ao buscar produto ${produtoId}:`, error.message);
+      throw error;
+    }
+  }
+
+  async listarPatrimonios(filtros = {}) {
+    try {
+      const { busca = '', tipo = 'todos', almoxarifadoId, page = 1, rp = 20 } = filtros;
+
+      let qtype = 'patrimonio.id';
+      let oper = '>=';
+      let query = '1';
+
+      if (busca) {
+        switch (tipo) {
+          case 'serial':
+            qtype = 'patrimonio.serial'; oper = 'like'; query = busca; break;
+          case 'mac':
+            qtype = 'patrimonio.id_mac'; oper = 'like'; query = busca; break;
+          case 'patrimonial':
+            qtype = 'patrimonio.id'; oper = '='; query = busca; break;
+          default:
+            qtype = 'patrimonio.serial'; oper = 'like'; query = busca; break;
+        }
+      }
+
+      const body = {
+        qtype, query, oper,
+        page: page.toString(),
+        rp: rp.toString(),
+        sortname: 'patrimonio.id',
+        sortorder: 'desc'
+      };
+
+      const gridParams = [{ TB: 'patrimonio.situacao', OP: '=', P: '1' }];
+      if (almoxarifadoId) {
+        gridParams.push({ TB: 'patrimonio.id_almoxarifado', OP: '=', P: almoxarifadoId.toString() });
+      }
+      body.grid_param = JSON.stringify(gridParams);
+
+      const response = await this.clientListar.post('/patrimonio', JSON.stringify(body));
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao listar patrimônios IXC:', error.message);
+      throw error;
+    }
+  }
+
+  async buscarSaldoAlmoxarifado(almoxarifadoId) {
+    try {
+      const body = {
+        qtype: 'estoque_produtos_almox_filial.id_almox',
+        query: almoxarifadoId.toString(),
+        oper: '=',
+        page: '1',
+        rp: '1000',
+        sortname: 'estoque_produtos_almox_filial.id',
+        sortorder: 'desc'
+      };
+
+      const response = await this.clientListar.post('/estoque_produtos_almox_filial', JSON.stringify(body));
+      return response.data.registros || [];
+    } catch (error) {
+      console.error(`❌ Erro ao buscar saldo almoxarifado ${almoxarifadoId}:`, error.message);
+      return [];
+    }
+  }
+
+  async buscarEstoquePorAlmoxarifado(filtros = {}) {
+    try {
+      const { almoxarifadoId, busca = '', page = 1, rp = 50 } = filtros;
+
+      const body = {
+        qtype: busca ? 'estoque_produtos_almox_filial.produto_descricao' : 'estoque_produtos_almox_filial.id',
+        query: busca || '1',
+        oper: busca ? 'like' : '>=',
+        page: page.toString(),
+        rp: rp.toString(),
+        sortname: 'estoque_produtos_almox_filial.produto_descricao',
+        sortorder: 'asc',
+        grid_param: JSON.stringify([
+          { TB: 'estoque_produtos_almox_filial.id_almox', OP: '=', P: almoxarifadoId.toString() },
+          { TB: 'estoque_produtos_almox_filial.saldo', OP: '>', P: '0' },
+          { TB: 'estoque_produtos_almox_filial.produto_ativo', OP: '=', P: 'S' }
+        ])
+      };
+
+      const response = await this.clientListar.post('/estoque_produtos_almox_filial', JSON.stringify(body));
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao buscar estoque por almoxarifado:', error.message);
+      throw error;
+    }
+  }
+
+  async adicionarProdutoOS(dados) {
+    try {
+      console.log(`📦 Adicionando produto à OS ${dados.id_oss_chamado} no IXC...`);
+
+      const response = await this.clientAlterar.post('/su_oss_mov_produto', dados);
+
+      if (response.data?.type === 'error') {
+        throw new Error(response.data.message || 'Erro ao adicionar produto');
+      }
+
+      console.log(`✅ Produto adicionado com sucesso`);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao adicionar produto à OS no IXC:', error.message);
+      throw error;
+    }
+  }
+
+  async listarProdutosOS(osIdExterno) {
+    try {
+      const body = {
+        qtype: 'movimento_produtos.id_oss_chamado',
+        query: osIdExterno.toString(),
+        oper: '=',
+        page: '1',
+        rp: '100',
+        sortname: 'movimento_produtos.id',
+        sortorder: 'desc'
+      };
+
+      const response = await this.clientListar.post('/su_oss_mov_produto', JSON.stringify(body));
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Erro ao listar produtos da OS ${osIdExterno}:`, error.message);
+      throw error;
+    }
+  }
+
+  async removerProdutoOS(movimentoId) {
+    try {
+      console.log(`🗑️ Removendo movimento ${movimentoId} do IXC...`);
+
+      const response = await this.clientAlterar.delete(`/su_oss_mov_produto/${movimentoId}`);
+
+      if (response.data?.type === 'error') {
+        throw new Error(response.data.message || 'Erro ao remover produto');
+      }
+
+      console.log(`✅ Movimento ${movimentoId} removido`);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Erro ao remover produto ${movimentoId}:`, error.message);
+      throw error;
+    }
+  }
+
+
+
 }
 
 module.exports = IXCService;

@@ -272,6 +272,17 @@ try {
   console.error('❌ Erro ao carregar rotas integracoes:', error.message);
 }
 
+// ========== ESTOQUE (INTEGRAÇÃO IXC) ==========
+try {
+  console.log('=== CARREGANDO ROTAS ESTOQUE ===');
+  const estoqueRoutes = require('./routes/estoque.routes');
+  app.use('/api/estoque', estoqueRoutes);
+  console.log('✅ Rotas /api/estoque registradas');
+} catch (error) {
+  console.error('❌ Erro ao carregar rotas estoque:', error.message);
+  console.error('Stack:', error.stack);
+}
+
 // ========== APR (ANÁLISE PRELIMINAR DE RISCO) ==========
 try {
   console.log('=== CARREGANDO ROTAS APR ===');
@@ -1343,3 +1354,9 @@ process.on('unhandledRejection', (reason) => {
 startServer();
 
 module.exports = app;
+
+try {
+  const resultado = JSON.parse("texto invalido");
+} catch (error) {
+  console.log("erro: " + error.message);
+}

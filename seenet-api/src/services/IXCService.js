@@ -677,7 +677,7 @@ async uploadFotoOS(osId, clienteId, fotoData) {
 
       const body = {
         qtype: busca ? 'produtos.descricao' : 'produtos.id',
-        query: busca ? `%${busca}%` : '1',
+        query: busca || '1',
         oper: busca ? 'like' : '>=',
         page: page.toString(),
         rp: rp.toString(),
@@ -737,13 +737,13 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       if (busca) {
         switch (tipo) {
           case 'serial':
-            qtype = 'patrimonio.serial'; oper = 'like'; query = `%${busca}%`; break;
+            qtype = 'patrimonio.serial'; oper = 'like'; query = busca; break;
           case 'mac':
-            qtype = 'patrimonio.id_mac'; oper = 'like'; query = `%${busca}%`; break;
+            qtype = 'patrimonio.id_mac'; oper = 'like'; query = busca; break;
           case 'patrimonial':
             qtype = 'patrimonio.id'; oper = '='; query = busca; break;
           default:
-            qtype = 'patrimonio.serial'; oper = 'like'; query = `%${busca}%`; break;
+            qtype = 'patrimonio.serial'; oper = 'like'; query = busca; break;
         }
       }
 
@@ -793,7 +793,7 @@ async uploadFotoOS(osId, clienteId, fotoData) {
 
       const body = {
         qtype: busca ? 'estoque_produtos_almox_filial.produto_descricao' : 'estoque_produtos_almox_filial.id',
-        query: busca ? `%${busca}%` : '1',
+        query: busca || '1',
         oper: busca ? 'like' : '>=',
         page: page.toString(),
         rp: rp.toString(),

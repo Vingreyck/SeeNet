@@ -696,8 +696,9 @@ async uploadFotoOS(osId, clienteId, fotoData) {
         ]);
       }
 
-    const params = new URLSearchParams(body);
-    const response = await this.clientListar.post('/produtos', params.toString());
+    const response = await this.clientAlterar.post('/produtos', body, {
+      headers: { 'ixcsoft': 'listar' }
+    });
     return response.data;
     } catch (error) {
       console.error('❌ Erro ao listar produtos IXC:', error.message);
@@ -715,8 +716,9 @@ async uploadFotoOS(osId, clienteId, fotoData) {
         rp: '1'
       };
 
-      const params = new URLSearchParams(body);
-      const response = await this.clientListar.post('/produtos', params.toString());
+      const response = await this.clientAlterar.post('/produtos', body, {
+        headers: { 'ixcsoft': 'listar' }
+      });
       return response.data.registros?.[0] || null;
     } catch (error) {
       console.error(`❌ Erro ao buscar produto ${produtoId}:`, error.message);
@@ -753,8 +755,9 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       }
       body.grid_param = JSON.stringify(gridParams);
 
-      const params = new URLSearchParams(body);
-      const response = await this.clientListar.post('/patrimonio', params.toString());
+      const response = await this.clientAlterar.post('/patrimonio', body, {
+        headers: { 'ixcsoft': 'listar' }
+      });
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao listar patrimônios IXC:', error.message);
@@ -774,8 +777,9 @@ async uploadFotoOS(osId, clienteId, fotoData) {
         sortorder: 'desc'
       };
 
-      const params = new URLSearchParams(body);
-      const response = await this.clientListar.post('/estoque_produtos_almox_filial', params.toString());
+      const response = await this.clientAlterar.post('/estoque_produtos_almox_filial', body, {
+        headers: { 'ixcsoft': 'listar' }
+      });
       return response.data.registros || [];
     } catch (error) {
       console.error(`❌ Erro ao buscar saldo almoxarifado ${almoxarifadoId}:`, error.message);
@@ -802,8 +806,9 @@ async uploadFotoOS(osId, clienteId, fotoData) {
         ])
       };
 
-      const params = new URLSearchParams(body);
-      const response = await this.clientListar.post('/estoque_produtos_almox_filial', params.toString());
+      const response = await this.clientAlterar.post('/estoque_produtos_almox_filial', body, {
+        headers: { 'ixcsoft': 'listar' }
+      });
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao buscar estoque por almoxarifado:', error.message);
@@ -841,8 +846,9 @@ async uploadFotoOS(osId, clienteId, fotoData) {
         sortorder: 'desc'
       };
 
-      const params = new URLSearchParams(body);
-      const response = await this.clientListar.post('/su_oss_mov_produto', params.toString());
+      const response = await this.clientAlterar.post('/su_oss_mov_produto', body, {
+        headers: { 'ixcsoft': 'listar' }
+      });
       return response.data;
     } catch (error) {
       console.error(`❌ Erro ao listar produtos da OS ${osIdExterno}:`, error.message);

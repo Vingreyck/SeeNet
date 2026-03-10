@@ -7,8 +7,10 @@ import '../../controllers/ordem_servico_controller.dart';
 import '../../models/ordem_servico_model.dart';
 import '../widgets/localizacao_widget.dart';
 import '../widgets/anexos_widget.dart';
+import '../../services/estoque_service.dart';
+import '../widgets/materiais_estoque_widget.dart';
 import '../widgets/assinatura_widget.dart';
-import 'apr_screen.dart'; // ✅ IMPORT DO APR
+import 'apr_screen.dart';
 import 'package:intl/intl.dart';
 
 
@@ -33,6 +35,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   final TextEditingController relatoProblemaController = TextEditingController();
   final TextEditingController relatoSolucaoController = TextEditingController();
   final TextEditingController materiaisController = TextEditingController();
+  List<ItemOS> itensEstoque = [];
   final TextEditingController observacoesController = TextEditingController();
 
   double? latitude;
@@ -341,15 +344,21 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           _buildTituloEtapa(
             icone: Icons.build,
             titulo: 'Materiais Utilizados',
-            descricao: 'Liste os materiais e equipamentos utilizados',
+            descricao: 'Selecione os materiais e equipamentos do estoque',
           ),
           const SizedBox(height: 24),
           _buildCard(
-            child: _buildTextField(
-              controller: materiaisController,
-              label: 'Materiais',
-              hint: 'Ex: 20m de cabo de rede, 2 conectores RJ45...',
-              maxLines: 5,
+            child: MateriaisEstoqueWidget(
+              osIdExterno: os.idExterno ?? '',
+              onItensAlterados: (itens) {
+                setState(() {
+                  itensEstoque = itens;
+                  // Atualizar o controller de texto para compatibilidade com finalização
+                  materiaisController.text = itens.map((i) =>
+                    '${i.produto.descricao} x${i.quantidade.toStringAsFixed(0)} (R\$${i.valorTotal.toStringAsFixed(2)})'
+                  ).join('\n');
+                });
+              },
             ),
           ),
         ],
@@ -430,8 +439,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
             conteudo: relatoProblemaController.text.length > 50 ? '${relatoProblemaController.text.substring(0, 50)}...' : relatoProblemaController.text,
             editarEtapa: 3,
           ),
-          if (materiaisController.text.isNotEmpty)
-            _buildResumoCard(titulo: 'Materiais', icone: Icons.build, conteudo: materiaisController.text.length > 50 ? '${materiaisController.text.substring(0, 50)}...' : materiaisController.text, editarEtapa: 4),
+          _buildResumoCard(
+           titulo: 'Materiais',
+           icone: Icons.build,
+           conteudo: itensEstoque.isNotEmpty
+             ? '${itensEstoque.length} item(ns) - R\$ ${itensEstoque.fold<double>(0, (s, i) => s + i.valorTotal).toStringAsFixed(2)}'
+             : 'Nenhum material adicionado',
+           editarEtapa: 4,
+          ),
           _buildResumoCard(titulo: 'Assinatura', icone: Icons.draw, conteudo: assinaturaBytes != null ? '✓ Confirmada' : '✗ Não assinada', editarEtapa: 6),
         ],
       ),
@@ -751,6 +766,16 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       'relato_problema': relatoProblemaController.text.trim(),
       'relato_solucao': relatoSolucaoController.text.trim(),
       'materiais_utilizados': materiaisController.text.trim(),
+      'itens_estoque': itensEstoque.map((item) => {
+      'id_produto': item.produto.id,
+      'descricao': item.produto.descricao,
+      'quantidade': item.quantidade,
+      'valor_unitario': item.valorUnitario,
+      'valor_total': item.valorTotal,
+      'id_patrimonio': item.patrimonio?.id ?? '0',
+      'numero_serie': item.patrimonio?.serial ?? '',
+      'tipo_produto': item.isPatrimonio ? 'P' : 'O',
+    }).toList(),
       'observacoes': observacoesController.text.trim(),
       'fotos': fotosAnexadas.map((anexo) => {'tipo': anexo.tipo, 'descricao': anexo.descricao, 'path': anexo.foto.path}).toList(),
       'assinatura': base64Encode(assinaturaBytes!),

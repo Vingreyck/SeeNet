@@ -735,23 +735,17 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       if (busca) {
         switch (tipo) {
           case 'serial':
-            qtype = 'patrimonio.serial'; oper = 'like'; query = busca; break;
+            qtype = 'patrimonio.serial'; oper = 'like'; query = `%${busca}%`; break;
           case 'mac':
-            qtype = 'patrimonio.id_mac'; oper = 'like'; query = busca; break;
+            qtype = 'patrimonio.id_mac'; oper = 'like'; query = `%${busca}%`; break;
           case 'patrimonial':
             qtype = 'patrimonio.id'; oper = '='; query = busca; break;
           default:
-            qtype = 'patrimonio.serial'; oper = 'like'; query = busca; break;
+            qtype = 'patrimonio.serial'; oper = 'like'; query = `%${busca}%`; break;
         }
       }
 
-      const body = {
-        qtype, query, oper,
-        page: page.toString(),
-        rp: rp.toString(),
-        sortname: 'patrimonio.id',
-        sortorder: 'desc'
-      };
+      const body = { qtype, query, oper, page: page.toString(), rp: rp.toString(), sortname: 'patrimonio.id', sortorder: 'desc' };
 
       const gridParams = [{ TB: 'patrimonio.situacao', OP: '=', P: '1' }];
       if (almoxarifadoId) {

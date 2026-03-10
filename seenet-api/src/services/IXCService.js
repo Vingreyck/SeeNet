@@ -677,7 +677,7 @@ async uploadFotoOS(osId, clienteId, fotoData) {
 
       const body = {
         qtype: busca ? 'produtos.descricao' : 'produtos.id',
-        query: busca || '1',
+        query: busca ? `%${busca}%` : '1',
         oper: busca ? 'like' : '>=',
         page: page.toString(),
         rp: rp.toString(),
@@ -793,7 +793,7 @@ async uploadFotoOS(osId, clienteId, fotoData) {
 
       const body = {
         qtype: busca ? 'estoque_produtos_almox_filial.produto_descricao' : 'estoque_produtos_almox_filial.id',
-        query: busca || '1',
+        query: busca ? `%${busca}%` : '1',
         oper: busca ? 'like' : '>=',
         page: page.toString(),
         rp: rp.toString(),

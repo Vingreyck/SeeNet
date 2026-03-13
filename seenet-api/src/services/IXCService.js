@@ -728,7 +728,7 @@ async uploadFotoOS(osId, clienteId, fotoData) {
 
   async listarPatrimonios(filtros = {}) {
     try {
-      const { busca = '', tipo = 'todos', almoxarifadoId, page = 1, rp = 20 } = filtros;
+      const { busca = '', tipo = 'todos', almoxarifadoId, page = 1, rp = 500 } = filtros;
 
       let qtype = 'patrimonio.id';
       let oper = '>=';
@@ -749,7 +749,7 @@ async uploadFotoOS(osId, clienteId, fotoData) {
 
       const body = { qtype, query, oper, page: page.toString(), rp: rp.toString(), sortname: 'patrimonio.id', sortorder: 'desc' };
 
-      const gridParams = [{ TB: 'patrimonio.situacao', OP: '=', P: '1' }];
+      const gridParams = [];
       if (almoxarifadoId) {
         gridParams.push({ TB: 'patrimonio.id_almoxarifado', OP: '=', P: almoxarifadoId.toString() });
       }

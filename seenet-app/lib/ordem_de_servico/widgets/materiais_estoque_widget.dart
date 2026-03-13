@@ -310,8 +310,10 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                         children: [
                           _buildQtdButton(Icons.remove, () {
                             if (item.quantidade > 1) {
-                              setState(() => item.quantidade--);
-                              widget.onItensAlterados(_itensAdicionados);
+                              setState(() {
+                                _itensAdicionados[index].quantidade--;
+                              });
+                              widget.onItensAlterados(List.from(_itensAdicionados));
                             }
                           }),
                           Container(
@@ -324,8 +326,10 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                             ),
                           ),
                           _buildQtdButton(Icons.add, () {
-                            setState(() => item.quantidade++);
-                            widget.onItensAlterados(_itensAdicionados);
+                            setState(() {
+                              _itensAdicionados[index].quantidade++;
+                            });
+                            widget.onItensAlterados(List.from(_itensAdicionados));
                           }),
                         ],
                       ),

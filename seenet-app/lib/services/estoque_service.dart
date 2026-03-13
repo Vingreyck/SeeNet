@@ -224,7 +224,7 @@ class EstoqueService {
   Future<List<PatrimonioEstoque>> buscarPatrimonios() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/estoque/patrimonios'),
+        Uri.parse('$baseUrl/estoque/patrimonios?rp=500'),
         headers: _headers,
       );
 

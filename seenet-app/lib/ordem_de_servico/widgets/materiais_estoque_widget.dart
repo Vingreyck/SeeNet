@@ -258,6 +258,7 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
+                  flex: 2,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -292,6 +293,7 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
               children: [
                 // Quantidade
                 Expanded(
+                  flex: 1,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -307,40 +309,63 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                         child: const Text('1', style: TextStyle(color: Colors.white70, fontSize: 16)),
                       )
                           : Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildQtdButton(Icons.remove, () {
-                            if (item.quantidade > 1) {
-                              setState(() {
-                                _itensAdicionados[index].quantidade--;
-                              });
-                              widget.onItensAlterados(List.from(_itensAdicionados));
-                            }
-                          }),
-                          Container(
-                            width: 50,
-                            alignment: Alignment.center,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              item.quantidade.toStringAsFixed(item.quantidade == item.quantidade.truncateToDouble() ? 0 : 1),
-                              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          GestureDetector(
+                            onTap: () {
+                              if (_itensAdicionados[index].quantidade > 1) {
+                                setState(() {
+                                  _itensAdicionados[index].quantidade--;
+                                });
+                                widget.onItensAlterados(List.from(_itensAdicionados));
+                              }
+                            },
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00FF88).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.remove, color: Color(0xFF00FF88), size: 18),
                             ),
                           ),
-                          _buildQtdButton(Icons.add, () {
-                            setState(() {
-                              _itensAdicionados[index].quantidade++;
-                            });
-                            widget.onItensAlterados(List.from(_itensAdicionados));
-                          }),
+                          SizedBox(
+                            width: 36,
+                            child: Text(
+                              item.quantidade.toStringAsFixed(0),
+                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _itensAdicionados[index].quantidade++;
+                              });
+                              widget.onItensAlterados(List.from(_itensAdicionados));
+                            },
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00FF88).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.add, color: Color(0xFF00FF88), size: 18),
+                            ),
+                          ),
                         ],
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
 
                 // Valor unitário
                 Expanded(
+                  flex: 1,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -372,21 +397,6 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildQtdButton(IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF00FF88).withOpacity(0.2),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: const Color(0xFF00FF88), size: 20),
       ),
     );
   }

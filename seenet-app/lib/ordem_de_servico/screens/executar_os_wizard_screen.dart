@@ -562,8 +562,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   // ──────────────────────────────────────────────
 
   Widget _buildBotoesNavegacao() {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomPadding),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, -5))],

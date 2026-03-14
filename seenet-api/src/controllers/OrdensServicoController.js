@@ -539,15 +539,21 @@ if (ixcService && os.id_externo) {
 
       for (const item of dados.itens_estoque) {
         try {
-          await ixcService.adicionarProdutoOS(os.id_externo, {
+          await ixcService.adicionarProdutoOS({
+            id_oss_chamado: os.id_externo,
             id_produto: item.id_produto,
-            quantidade: item.quantidade,
-            valor_unitario: item.valor_unitario,
-            valor_total: item.valor_total,
-            id_almox: idAlmox,
+            qtde_saida: item.quantidade.toString(),
+            valor_unitario: item.valor_unitario.toFixed(2),
+            valor_total: item.valor_total.toFixed(2),
+            id_almox: idAlmox.toString(),
             data: dataFormatada,
-            tipo_produto: item.tipo_produto || 'O',
-            id_patrimonio: item.id_patrimonio || '0',
+            id_unidade: '1',
+            id_classificacao_tributaria: '1',
+            tipo: 'C',
+            estoque: 'S',
+            unidade_sigla: 'UND',
+            fator_conversao: '1.000000000',
+            id_patrimonio: item.id_patrimonio !== '0' ? item.id_patrimonio : '',
           });
           console.log(`   ✅ Item enviado: ${item.descricao} x${item.quantidade}`);
         } catch (estoqueError) {

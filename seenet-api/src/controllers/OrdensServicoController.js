@@ -506,24 +506,6 @@ if (ixcService && os.id_externo) {
   }
 }
 */
-// 7. Sincronizar com IXC
-if (ixcService && os.id_externo) {
-  try {
-    console.log('🔄 Sincronizando com IXC...');
-
-    // Finalizar OS no IXC
-    const mensagemFinal = `Serviço finalizado via SeeNet\n\n` +
-      `PROBLEMA: ${dados.relato_problema || 'N/A'}\n` +
-      `SOLUÇÃO: ${dados.relato_solucao || 'N/A'}\n` +
-      `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
-      `OBS: ${dados.observacoes || 'Nenhuma'}`;
-
-    await ixcService.finalizarOS(os.id_externo, {
-      mensagem_resposta: mensagemFinal,  // ← mensagem_resposta (conforme método espera)
-      id_tecnico_ixc: tecnicoIdIxc  // ← CORRETO
-    });
-    console.log('✅ OS finalizada no IXC');
-
     // 8. Enviar itens de estoque para o IXC
     if (dados.itens_estoque && dados.itens_estoque.length > 0) {
       console.log(`📦 Enviando ${dados.itens_estoque.length} item(ns) de estoque para o IXC...`);
@@ -561,6 +543,26 @@ if (ixcService && os.id_externo) {
         }
       }
     }
+
+// 7. Sincronizar com IXC
+if (ixcService && os.id_externo) {
+  try {
+    console.log('🔄 Sincronizando com IXC...');
+
+    // Finalizar OS no IXC
+    const mensagemFinal = `Serviço finalizado via SeeNet\n\n` +
+      `PROBLEMA: ${dados.relato_problema || 'N/A'}\n` +
+      `SOLUÇÃO: ${dados.relato_solucao || 'N/A'}\n` +
+      `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
+      `OBS: ${dados.observacoes || 'Nenhuma'}`;
+
+    await ixcService.finalizarOS(os.id_externo, {
+      mensagem_resposta: mensagemFinal,  // ← mensagem_resposta (conforme método espera)
+      id_tecnico_ixc: tecnicoIdIxc  // ← CORRETO
+    });
+    console.log('✅ OS finalizada no IXC');
+
+
 
     // 9. Enviar fotos para o IXC
     if (fotosBase64.length > 0) {

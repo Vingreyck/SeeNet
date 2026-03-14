@@ -179,15 +179,25 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
         children: [
           const Icon(Icons.checklist, color: Color(0xFF00FF88), size: 20),
           const SizedBox(width: 8),
-          Text(
-            '${_itensAdicionados.length} item(ns) adicionado(s)',
-            style: const TextStyle(color: Color(0xFF00FF88), fontWeight: FontWeight.bold, fontSize: 14),
+          Expanded(
+            child: Text(
+              '${_itensAdicionados.length} item(ns) adicionado(s)',
+              style: const TextStyle(color: Color(0xFF00FF88), fontWeight: FontWeight.bold, fontSize: 14),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          const Spacer(),
-          if (totalProdutos > 0)
-            Text('$totalProdutos prod.  ', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          if (totalPatrimonios > 0)
-            Text('$totalPatrimonios equip.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+          const SizedBox(width: 8),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (totalProdutos > 0)
+                Text('$totalProdutos prod.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              if (totalProdutos > 0 && totalPatrimonios > 0)
+                const SizedBox(width: 4),
+              if (totalPatrimonios > 0)
+                Text('$totalPatrimonios equip.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            ],
+          ),
         ],
       ),
     );
@@ -293,7 +303,7 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
               children: [
                 // Quantidade
                 Expanded(
-                  flex: 1,
+                  flex: 2,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

@@ -524,7 +524,39 @@ if (ixcService && os.id_externo) {
     });
     console.log('✅ OS finalizada no IXC');
 
-    // 8. Enviar fotos para o IXC
+    // 8. Enviar itens de estoque para o IXC
+    if (dados.itens_estoque && dados.itens_estoque.length > 0) {
+      console.log(`📦 Enviando ${dados.itens_estoque.length} item(ns) de estoque para o IXC...`);
+
+      const mapeamentoEstoque = await db('mapeamento_tecnicos_ixc')
+        .where('usuario_id', os.tecnico_id)
+        .where('tenant_id', tenantId)
+        .first();
+
+      const idAlmox = mapeamentoEstoque?.id_almoxarifado || 22;
+      const hoje = new Date();
+      const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
+
+      for (const item of dados.itens_estoque) {
+        try {
+          await ixcService.adicionarProdutoOS(os.id_externo, {
+            id_produto: item.id_produto,
+            quantidade: item.quantidade,
+            valor_unitario: item.valor_unitario,
+            valor_total: item.valor_total,
+            id_almox: idAlmox,
+            data: dataFormatada,
+            tipo_produto: item.tipo_produto || 'O',
+            id_patrimonio: item.id_patrimonio || '0',
+          });
+          console.log(`   ✅ Item enviado: ${item.descricao} x${item.quantidade}`);
+        } catch (estoqueError) {
+          console.error(`   ❌ Erro ao enviar item ${item.descricao}:`, estoqueError.message);
+        }
+      }
+    }
+
+    // 9. Enviar fotos para o IXC
     if (fotosBase64.length > 0) {
       console.log(`📤 Enviando ${fotosBase64.length} foto(s) para o IXC...`);
 
@@ -543,7 +575,7 @@ if (ixcService && os.id_externo) {
       }
     }
 
-    // 9. Enviar PDF do APR para o IXC
+    // 10. Enviar PDF do APR para o IXC
     if (pdfBuffer) {
       console.log('📤 Enviando PDF do APR para o IXC...');
       try {

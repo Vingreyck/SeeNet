@@ -18,7 +18,13 @@ class _PerfilScreenState extends State<PerfilScreen> {
   void initState() {
     super.initState();
     controller.carregarPerfil();
+    controller.carregarMinhasRequisicoes();
   }
+
+  // Requisições concluídas do técnico (histórico de EPIs recebidos)
+  List<Map<String, dynamic>> get _historicoRecebidos => controller.minhasRequisicoes
+      .where((r) => r['status'] == 'concluida')
+      .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +32,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
       backgroundColor: const Color(0xFF1A1A1A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text('Meu Perfil',
-            style: TextStyle(color: Colors.white)),
+        title: const Text('Meu Perfil', style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
@@ -46,16 +51,13 @@ class _PerfilScreenState extends State<PerfilScreen> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              // Avatar + nome
               _buildAvatar(perfil),
               const SizedBox(height: 24),
-
-              // Dados do perfil
               _buildInfoCard(perfil),
               const SizedBox(height: 16),
-
-              // Estatísticas de requisições
               if (stats != null) _buildStatsCard(stats),
+              const SizedBox(height: 16),
+              _buildHistoricoEpis(),
             ],
           ),
         );
@@ -63,6 +65,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
+  // ── Avatar ────────────────────────────────────────────────────
   Widget _buildAvatar(Map<String, dynamic> perfil) {
     final fotoBase64 = perfil['foto_perfil'] as String?;
     final nome = perfil['nome'] as String? ?? '';
@@ -72,16 +75,11 @@ class _PerfilScreenState extends State<PerfilScreen> {
     String tipoLabel;
     switch (tipo) {
       case 'administrador':
-        tipoColor = Colors.orange;
-        tipoLabel = 'ADMINISTRADOR';
-        break;
+        tipoColor = Colors.orange; tipoLabel = 'ADMINISTRADOR'; break;
       case 'gestor_seguranca':
-        tipoColor = Colors.blue;
-        tipoLabel = 'GESTOR DE SEGURANÇA';
-        break;
+        tipoColor = Colors.blue; tipoLabel = 'GESTOR DE SEGURANÇA'; break;
       default:
-        tipoColor = const Color(0xFF00FF88);
-        tipoLabel = 'TÉCNICO';
+        tipoColor = const Color(0xFF00FF88); tipoLabel = 'TÉCNICO';
     }
 
     return Column(
@@ -114,7 +112,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: tipoColor,
-                  border: Border.all(color: const Color(0xFF1A1A1A), width: 2),
+                  border: Border.all(
+                      color: const Color(0xFF1A1A1A), width: 2),
                 ),
                 child: const Icon(Icons.camera_alt,
                     size: 16, color: Colors.black),
@@ -130,8 +129,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 fontWeight: FontWeight.bold)),
         const SizedBox(height: 6),
         Container(
-          padding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
             color: tipoColor.withOpacity(0.15),
             borderRadius: BorderRadius.circular(10),
@@ -146,6 +144,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
+  // ── Info ──────────────────────────────────────────────────────
   Widget _buildInfoCard(Map<String, dynamic> perfil) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -156,24 +155,16 @@ class _PerfilScreenState extends State<PerfilScreen> {
       ),
       child: Column(
         children: [
-          _buildInfoRow(Icons.email_outlined, 'E-mail',
-              perfil['email'] ?? '--'),
+          _buildInfoRow(Icons.email_outlined, 'E-mail', perfil['email'] ?? '--'),
           const Divider(color: Colors.white12, height: 20),
-          _buildInfoRow(Icons.business_outlined, 'Empresa',
-              perfil['empresa'] ?? '--'),
+          _buildInfoRow(Icons.business_outlined, 'Empresa', perfil['empresa'] ?? '--'),
           const Divider(color: Colors.white12, height: 20),
-          _buildInfoRow(
-            Icons.calendar_today_outlined,
-            'Membro desde',
-            _formatarData(perfil['data_criacao']),
-          ),
+          _buildInfoRow(Icons.calendar_today_outlined, 'Membro desde',
+              _formatarData(perfil['data_criacao'])),
           if (perfil['ultimo_login'] != null) ...[
             const Divider(color: Colors.white12, height: 20),
-            _buildInfoRow(
-              Icons.access_time,
-              'Último acesso',
-              _formatarData(perfil['ultimo_login']),
-            ),
+            _buildInfoRow(Icons.access_time, 'Último acesso',
+                _formatarData(perfil['ultimo_login'])),
           ],
         ],
       ),
@@ -198,6 +189,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     );
   }
 
+  // ── Stats ─────────────────────────────────────────────────────
   Widget _buildStatsCard(Map<String, dynamic> stats) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -217,14 +209,12 @@ class _PerfilScreenState extends State<PerfilScreen> {
           const SizedBox(height: 14),
           Row(
             children: [
-              _buildStatItem('Total',
-                  '${stats['total'] ?? 0}', Colors.white54),
-              _buildStatItem('Aprovadas',
-                  '${stats['aprovadas'] ?? 0}', const Color(0xFF00FF88)),
-              _buildStatItem('Pendentes',
-                  '${stats['pendentes'] ?? 0}', Colors.orange),
-              _buildStatItem('Recusadas',
-                  '${stats['recusadas'] ?? 0}', Colors.red),
+              _buildStatItem('Total', '${stats['total'] ?? 0}', Colors.white54),
+              _buildStatItem('Concluídas', '${stats['aprovadas'] ?? 0}',
+                  const Color(0xFF00FF88)),
+              _buildStatItem(
+                  'Pendentes', '${stats['pendentes'] ?? 0}', Colors.orange),
+              _buildStatItem('Recusadas', '${stats['recusadas'] ?? 0}', Colors.red),
             ],
           ),
         ],
@@ -238,13 +228,138 @@ class _PerfilScreenState extends State<PerfilScreen> {
         children: [
           Text(value,
               style: TextStyle(
-                  color: color,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold)),
+                  color: color, fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text(label,
-              style:
-              const TextStyle(color: Colors.white38, fontSize: 11)),
+              style: const TextStyle(color: Colors.white38, fontSize: 10)),
+        ],
+      ),
+    );
+  }
+
+  // ── Histórico de EPIs recebidos ───────────────────────────────
+  Widget _buildHistoricoEpis() {
+    if (_historicoRecebidos.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF242424),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.history,
+                    color: Color(0xFF00FF88), size: 18),
+                const SizedBox(width: 8),
+                const Text('Histórico de EPIs Recebidos',
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+                const Spacer(),
+                Text('${_historicoRecebidos.length} registro(s)',
+                    style: const TextStyle(
+                        color: Colors.white38, fontSize: 11)),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          ..._historicoRecebidos.take(10).map((req) {
+            final epis = req['epis_solicitados'];
+            final List<String> episLista =
+            epis is List ? epis.cast<String>() : [];
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Data
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00FF88).withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              _dia(req['data_confirmacao_recebimento'] ??
+                                  req['data_resposta']),
+                              style: const TextStyle(
+                                  color: Color(0xFF00FF88),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              _mesAno(req['data_confirmacao_recebimento'] ??
+                                  req['data_resposta']),
+                              style: const TextStyle(
+                                  color: Colors.white38, fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // EPIs
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${episLista.length} EPI(s) recebido(s)',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            Text(
+                              episLista.join(', '),
+                              style: const TextStyle(
+                                  color: Colors.white54, fontSize: 11),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (req['id_requisicao_ixc'] != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '✓ Estoque descontado no IXC',
+                                style: const TextStyle(
+                                    color: Color(0xFF00FF88), fontSize: 10),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      // Ícone de foto/assinatura
+                      if (req['foto_recebimento_base64'] != null)
+                        const Icon(Icons.photo,
+                            color: Color(0xFF00FF88), size: 14),
+                    ],
+                  ),
+                ),
+                if (req != _historicoRecebidos.take(10).last)
+                  const Divider(color: Colors.white12, height: 1),
+              ],
+            );
+          }),
+          if (_historicoRecebidos.length > 10)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Center(
+                child: Text(
+                  '+ ${_historicoRecebidos.length - 10} registros anteriores',
+                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -253,10 +368,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
   Future<void> _alterarFoto() async {
     final picker = ImagePicker();
     final image = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 70,
-      maxWidth: 400,
-    );
+        source: ImageSource.camera, imageQuality: 70, maxWidth: 400);
     if (image != null) {
       final bytes = await image.readAsBytes();
       final base64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
@@ -275,8 +387,21 @@ class _PerfilScreenState extends State<PerfilScreen> {
     try {
       final dt = DateTime.parse(data).toLocal();
       return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-    } catch (_) {
-      return '--';
-    }
+    } catch (_) { return '--'; }
+  }
+
+  String _dia(String? data) {
+    if (data == null) return '--';
+    try { return DateTime.parse(data).toLocal().day.toString().padLeft(2, '0'); }
+    catch (_) { return '--'; }
+  }
+
+  String _mesAno(String? data) {
+    if (data == null) return '--';
+    try {
+      final dt = DateTime.parse(data).toLocal();
+      const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+      return '${meses[dt.month - 1]} ${dt.year}';
+    } catch (_) { return '--'; }
   }
 }

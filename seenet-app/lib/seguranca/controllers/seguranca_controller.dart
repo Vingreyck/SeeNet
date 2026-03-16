@@ -5,7 +5,6 @@ import '../services/seguranca_service.dart';
 class SegurancaController extends GetxController {
   final SegurancaService _service = Get.find<SegurancaService>();
 
-  
   final isLoading = false.obs;
   final isSending = false.obs;
 
@@ -15,9 +14,18 @@ class SegurancaController extends GetxController {
   final minhasRequisicoes = <Map<String, dynamic>>[].obs;
   final requisicoesPendentes = <Map<String, dynamic>>[].obs;
   final todasRequisicoes = <Map<String, dynamic>>[].obs;
+  final historicoRequisicoes = <Map<String, dynamic>>[].obs;
 
   final perfilData = Rxn<Map<String, dynamic>>();
   final statsData = Rxn<Map<String, dynamic>>();
+
+  // ── Bloqueio de nova requisição ───────────────────────────────
+  // Técnico fica bloqueado enquanto houver uma aguardando confirmação
+  bool get hasRequisicaoAguardando => minhasRequisicoes
+      .any((r) => r['status'] == 'aguardando_confirmacao');
+
+  Map<String, dynamic>? get requisicaoAguardando => minhasRequisicoes
+      .firstWhereOrNull((r) => r['status'] == 'aguardando_confirmacao');
 
   @override
   void onInit() {
@@ -40,9 +48,17 @@ class SegurancaController extends GetxController {
   void limparSelecao() => episSelecionados.clear();
 
   Future<Map<String, dynamic>> enviarRequisicao() async {
-    if (episSelecionados.isEmpty) {
+    if (episSelecionados.isEmpty)
       return {'success': false, 'message': 'Selecione ao menos um EPI'};
+
+    // Bloqueia se já tiver uma aguardando confirmação
+    if (hasRequisicaoAguardando) {
+      return {
+        'success': false,
+        'message': 'Você possui uma requisição aguardando confirmação de recebimento. Confirme o recebimento antes de fazer uma nova.',
+      };
     }
+
     isSending.value = true;
     try {
       final result = await _service.criarRequisicao(
@@ -50,7 +66,7 @@ class SegurancaController extends GetxController {
       );
       if (result['success'] == true) {
         episSelecionados.clear();
-        carregarMinhasRequisicoes();
+        await carregarMinhasRequisicoes();
       }
       return result;
     } finally {
@@ -85,10 +101,30 @@ class SegurancaController extends GetxController {
     }
   }
 
-  Future<Map<String, dynamic>> aprovar(int id, {String? observacao}) async {
+  Future<void> carregarHistorico({int? tecnicoId}) async {
+    isLoading.value = true;
+    try {
+      historicoRequisicoes.value =
+      await _service.buscarHistorico(tecnicoId: tecnicoId);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<Map<String, dynamic>> aprovar(
+      int id, {
+        String? observacao,
+        String? dataEntrega,
+        List<Map<String, dynamic>>? itensIxc,
+      }) async {
     isSending.value = true;
     try {
-      final result = await _service.aprovar(id, observacao: observacao);
+      final result = await _service.aprovar(
+        id,
+        observacao: observacao,
+        dataEntrega: dataEntrega,
+        itensIxc: itensIxc,
+      );
       if (result['success'] == true) {
         carregarPendentes();
         carregarTodas();
@@ -127,26 +163,23 @@ class SegurancaController extends GetxController {
     return ok;
   }
 
-  // Helpers de status
   Color statusColor(String status) {
     switch (status) {
-      case 'aprovada':
-        return const Color(0xFF00FF88);
-      case 'recusada':
-        return const Color(0xFFFF4444);
-      default:
-        return const Color(0xFFFFAA00);
+      case 'concluida':
+      case 'aprovada':         return const Color(0xFF00FF88);
+      case 'recusada':         return const Color(0xFFFF4444);
+      case 'aguardando_confirmacao': return const Color(0xFF00BFFF);
+      default:                 return const Color(0xFFFFAA00);
     }
   }
 
   String statusLabel(String status) {
     switch (status) {
-      case 'aprovada':
-        return 'Aprovada';
-      case 'recusada':
-        return 'Recusada';
-      default:
-        return 'Pendente';
+      case 'concluida':             return 'Concluída';
+      case 'aprovada':              return 'Aprovada';
+      case 'recusada':              return 'Recusada';
+      case 'aguardando_confirmacao': return 'Ag. Confirmação';
+      default:                      return 'Pendente';
     }
   }
 }

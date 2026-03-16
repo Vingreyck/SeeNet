@@ -577,36 +577,117 @@ router.get('/requisicoes/:id', authMiddleware, async (req, res) => {
 // POST /api/seguranca/requisicoes/:id/aprovar
 router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
   try {
-    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
 
     const requisicao = await db('requisicoes_epi').where('id', req.params.id).first();
     if (!requisicao) return res.status(404).json({ error: 'Não encontrada' });
+    if (requisicao.status !== 'pendente')
+      return res.status(400).json({ error: `Requisição já está com status: ${requisicao.status}` });
 
+    const { observacao, data_entrega, itens_ixc = [] } = req.body;
+
+    // ── Integração IXC (desconto de estoque) ─────────────────────
+    let id_requisicao_ixc = null;
+    let itens_ixc_resultado = [];
+
+    if (itens_ixc.length > 0) {
+      try {
+        const integracao = await db('integracao_ixc')
+          .where('tenant_id', req.user.tenant_id)
+          .where('ativo', true)
+          .first();
+
+        if (integracao) {
+          const IXCService = require('../services/IXCService');
+          const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+          const mapeamento = await db('mapeamento_tecnicos_ixc')
+            .where('usuario_id', requisicao.tecnico_id)
+            .where('tenant_id', req.user.tenant_id)
+            .first();
+
+          if (!mapeamento) {
+            return res.status(400).json({
+              error: 'Técnico sem almoxarifado mapeado no IXC. Configure em Mapeamento de Técnicos.'
+            });
+          }
+
+          // 1️⃣ Cria a requisição de material no IXC
+          const { id: reqIxcId } = await ixc.criarRequisicaoMaterial({
+            id_filial:       integracao.id_filial || '1',
+            id_almoxarifado: mapeamento.id_almoxarifado.toString(),
+            id_colaborador:  mapeamento.tecnico_ixc_id.toString(),
+            observacao:      `Req. EPI #${requisicao.id} - SeeNet`,
+          });
+          id_requisicao_ixc = reqIxcId;
+
+          // 2️⃣ Adiciona cada item — IXC desconta do estoque automaticamente
+          // Confirmação: campo qtde_saldo na resposta mostra saldo restante
+          for (const item of itens_ixc) {
+            try {
+              const resultado = await ixc.adicionarItemRequisicaoMaterial(reqIxcId, {
+                id_produto: item.id_produto,
+                quantidade: item.quantidade || 1,
+              });
+              itens_ixc_resultado.push({
+                id_produto:  item.id_produto,
+                descricao:   item.descricao || '',
+                quantidade:  item.quantidade || 1,
+                id_item_ixc: resultado.id,
+                qtde_saldo:  resultado.qtde_saldo, // saldo após desconto
+              });
+            } catch (itemErr) {
+              console.error(`⚠️ Falha no item ${item.id_produto}:`, itemErr.message);
+              itens_ixc_resultado.push({
+                id_produto: item.id_produto,
+                descricao:  item.descricao || '',
+                quantidade: item.quantidade || 1,
+                erro:        itemErr.message,
+              });
+            }
+          }
+        }
+      } catch (ixcErr) {
+        console.error('⚠️ Erro IXC (aprovação continua sem desconto):', ixcErr.message);
+      }
+    }
+
+    // ── Atualizar banco ───────────────────────────────────────────
     await db('requisicoes_epi').where('id', req.params.id).update({
-      status: 'aguardando_confirmacao',
-      gestor_id: req.user.id,
-      observacao_gestor: req.body.observacao || null,
-      data_resposta: new Date(),
-      data_entrega: req.body.data_entrega ? new Date(req.body.data_entrega) : new Date(),
+      status:            'aguardando_confirmacao',
+      gestor_id:         req.user.id,
+      observacao_gestor: observacao || null,
+      data_resposta:     new Date(),
+      data_entrega:      data_entrega ? new Date(data_entrega) : new Date(),
+      id_requisicao_ixc,
+      itens_ixc: itens_ixc_resultado.length > 0
+        ? JSON.stringify(itens_ixc_resultado)
+        : null,
     });
 
+    // ── PDF (ainda sem foto/assinatura — será regerado na confirmação) ─
     const updated = await db('requisicoes_epi').where('id', req.params.id).first();
     const tecnico = await db('usuarios').where('id', updated.tecnico_id).first();
-    const gestor = await db('usuarios').where('id', req.user.id).first();
-
-    // Gera PDF
+    const gestor  = await db('usuarios').where('id', req.user.id).first();
     try {
       const pdfBuffer = await gerarPDF(updated, tecnico, gestor);
       await db('requisicoes_epi').where('id', req.params.id).update({
         pdf_base64: `data:application/pdf;base64,${pdfBuffer.toString('base64')}`,
       });
-    } catch (e) {
-      console.error('Erro ao gerar PDF:', e);
-    }
+    } catch (e) { console.error('⚠️ PDF falhou:', e.message); }
 
-    res.json({ success: true, message: 'Requisição aprovada! Aguardando confirmação do técnico.' });
+    const itens_com_erro = itens_ixc_resultado.filter(i => i.erro);
+    res.json({
+      success: true,
+      message: 'Requisição aprovada! Aguardando confirmação do técnico.',
+      id_requisicao_ixc,
+      itens_descontados: itens_ixc_resultado.filter(i => !i.erro).length,
+      ...(itens_com_erro.length > 0 && { itens_com_erro }),
+    });
+
   } catch (err) {
-    console.error(err);
+    console.error('❌ Erro ao aprovar:', err);
     res.status(500).json({ error: 'Erro ao aprovar' });
   }
 });
@@ -627,6 +708,43 @@ router.post('/requisicoes/:id/recusar', authMiddleware, async (req, res) => {
     res.json({ success: true, message: 'Requisição recusada.' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao recusar' });
+  }
+});
+
+// ================================================================
+// ADICIONAR NOVA ROTA: histórico de requisições concluídas
+// GET /api/seguranca/requisicoes/historico
+// Retorna todas as requisições concluídas com foto e assinatura
+// ================================================================
+router.get('/requisicoes/historico', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    let query = db('requisicoes_epi as r')
+      .join('usuarios as t', 't.id', 'r.tecnico_id')
+      .leftJoin('usuarios as g', 'g.id', 'r.gestor_id')
+      .where('r.tenant_id', req.user.tenant_id)
+      .whereIn('r.status', ['concluida', 'aprovada'])
+      .select(
+        'r.id', 'r.status', 'r.epis_solicitados', 'r.itens_ixc',
+        'r.id_requisicao_ixc', 'r.data_criacao', 'r.data_resposta',
+        'r.data_entrega', 'r.data_confirmacao_recebimento',
+        'r.assinatura_recebimento_base64', 'r.foto_recebimento_base64',
+        'r.observacao_gestor', 'r.registro_manual', 'r.pdf_base64',
+        't.nome as tecnico_nome', 't.email as tecnico_email',
+        't.foto_perfil as tecnico_foto',
+        'g.nome as gestor_nome'
+      )
+      .orderBy('r.data_confirmacao_recebimento', 'desc');
+
+    if (req.query.tecnico_id) query = query.where('r.tecnico_id', req.query.tecnico_id);
+
+    const lista = await query;
+    res.json({ requisicoes: lista });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar histórico' });
   }
 });
 

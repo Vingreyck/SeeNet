@@ -874,8 +874,65 @@ async uploadFotoOS(osId, clienteId, fotoData) {
     }
   }
 
+  async criarRequisicaoMaterial(dados) {
+      try {
+        console.log(`📋 Criando requisição de material no IXC...`);
+        const payload = {
+          data:                    this.formatarDataIXC(new Date()),
+          id_filial:               dados.id_filial || '1',
+          status:                  'A',
+          observacao:              dados.observacao || 'Requisição de EPI via SeeNet',
+          id_colaborador:          dados.id_colaborador,
+          id_funcionario:          dados.id_colaborador,
+          id_solicitante:          dados.id_colaborador,
+          id_tecnico:              dados.id_colaborador,
+          id_almoxarifado_destino: dados.id_almoxarifado,
+          id_almox_destino:        dados.id_almoxarifado,
+          id_almoxarifado:         dados.id_almoxarifado,
+          id_almox:                dados.id_almoxarifado,
+          id_almoxarifado_saida:   dados.id_almoxarifado,
+        };
+        const response = await this.clientAlterar.post('/requisicao_material', payload);
+        if (response.data?.type === 'error') throw new Error(response.data.message);
+        console.log(`✅ Requisição IXC criada - ID: ${response.data.id}`);
+        return { id: response.data.id, raw: response.data };
+      } catch (error) {
+        console.error('❌ Erro ao criar requisição de material:', error.message);
+        throw error;
+      }
+    }
 
+    async adicionarItemRequisicaoMaterial(requisicaoId, item) {
+      try {
+        const payload = {
+          id_requisicao:          requisicaoId.toString(),
+          id_requisicao_material: requisicaoId.toString(),
+          id_produto:             item.id_produto.toString(),
+          produto:                item.id_produto.toString(),
+          quantidade:             item.quantidade.toString(),
+          qtde:                   item.quantidade.toString(),
+          qtde_solicitada:        item.quantidade.toString(),
+        };
+        const response = await this.clientAlterar.post('/requisicao_material_item', payload);
+        if (response.data?.type === 'error') throw new Error(response.data.message);
 
+        // qtde_saldo na resposta CONFIRMA que o estoque foi descontado
+        const saldo = response.data?.atualiza_campos?.find(c => c.campo === 'qtde_saldo')?.valor;
+        console.log(`✅ Item ${item.id_produto} descontado — saldo restante: ${saldo ?? 'N/A'}`);
+        return { id: response.data.id, qtde_saldo: saldo };
+      } catch (error) {
+        console.error(`❌ Erro ao adicionar item ${item.id_produto}:`, error.message);
+        throw error;
+      }
+    }
+
+    async buscarSaldoProduto(almoxarifadoId, produtoId) {
+      try {
+        const saldos = await this.buscarSaldoAlmoxarifado(almoxarifadoId);
+        const item = saldos.find(s => s.id_produto === produtoId.toString());
+        return parseFloat(item?.saldo || '0');
+      } catch (_) { return 0; }
+    }
 }
 
 module.exports = IXCService;

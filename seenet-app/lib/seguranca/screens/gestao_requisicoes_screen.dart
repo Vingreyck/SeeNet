@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:convert';
 import '../controllers/seguranca_controller.dart';
-import '../widgets/botao_pdf.dart'; // ← NOVO
+import '../widgets/botao_pdf.dart';
 
 class GestaoRequisicoesScreen extends StatefulWidget {
   const GestaoRequisicoesScreen({super.key});
@@ -20,12 +20,14 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     controller.carregarPendentes();
     controller.carregarTodas();
+    controller.carregarHistorico();
     _tabController.addListener(() {
-      if (_tabController.index == 1) controller.carregarTodas(status: 'aprovada');
+      if (_tabController.index == 1) controller.carregarTodas(status: 'aguardando_confirmacao');
       if (_tabController.index == 2) controller.carregarTodas(status: 'recusada');
+      if (_tabController.index == 3) controller.carregarHistorico();
     });
   }
 
@@ -47,7 +49,6 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        // ← NOVO: botões no topo
         actions: [
           IconButton(
             icon: const Icon(Icons.add_box_outlined, color: Color(0xFF00FF88)),
@@ -59,6 +60,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
             onPressed: () {
               controller.carregarPendentes();
               controller.carregarTodas();
+              controller.carregarHistorico();
             },
           ),
         ],
@@ -67,11 +69,14 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
           indicatorColor: const Color(0xFF00FF88),
           labelColor: const Color(0xFF00FF88),
           unselectedLabelColor: Colors.white38,
+          isScrollable: true,
           tabs: [
             Obx(() => Tab(
                 text: 'Pendentes (${controller.requisicoesPendentes.length})')),
             const Tab(text: 'Aprovadas'),
             const Tab(text: 'Recusadas'),
+            Obx(() => Tab(
+                text: 'Histórico (${controller.historicoRequisicoes.length})')),
           ],
         ),
       ),
@@ -79,13 +84,17 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
         controller: _tabController,
         children: [
           _buildListaPendentes(),
-          _buildListaStatus('aprovada'),
+          _buildListaStatus('aguardando_confirmacao'),
           _buildListaStatus('recusada'),
+          _buildHistorico(),
         ],
       ),
     );
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // ABA 1: PENDENTES
+  // ══════════════════════════════════════════════════════════════
   Widget _buildListaPendentes() {
     return Obx(() {
       if (controller.isLoading.value) {
@@ -108,30 +117,9 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
     });
   }
 
-  Widget _buildListaStatus(String status) {
-    return Obx(() {
-      if (controller.isLoading.value) {
-        return const Center(
-            child: CircularProgressIndicator(color: Color(0xFF00FF88)));
-      }
-      final lista = controller.todasRequisicoes
-          .where((r) => r['status'] == status)
-          .toList();
-      if (lista.isEmpty) {
-        return _buildVazio('Nenhuma requisição $status', Icons.inbox_outlined);
-      }
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: lista.length,
-        itemBuilder: (context, i) => _buildCardSimples(lista[i]),
-      );
-    });
-  }
-
   Widget _buildCardPendente(Map<String, dynamic> req) {
     final epis = req['epis_solicitados'];
-    final List<String> episLista =
-    epis is List ? epis.cast<String>() : [];
+    final List<String> episLista = epis is List ? epis.cast<String>() : [];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -142,6 +130,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
       ),
       child: Column(
         children: [
+          // Cabeçalho — técnico
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -161,15 +150,14 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
                               color: Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.bold)),
-                      Text(req['tecnico_email'] ?? '',
+                      Text(_formatarData(req['data_criacao']),
                           style: const TextStyle(
                               color: Colors.white38, fontSize: 12)),
                     ],
                   ),
                 ),
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.orange.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -184,14 +172,14 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
             ),
           ),
 
+          // EPIs
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('${episLista.length} EPI(s) solicitado(s):',
-                    style: const TextStyle(
-                        color: Colors.white54, fontSize: 12)),
+                    style: const TextStyle(color: Colors.white54, fontSize: 12)),
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 6,
@@ -215,30 +203,13 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
             ),
           ),
 
-          const SizedBox(height: 12),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _buildBotaoVisualizar(
-                  'Ver Foto',
-                  Icons.photo,
-                      () => _verImagem(req['foto_base64'], 'Foto de Confirmação'),
-                ),
-                const SizedBox(width: 8),
-                _buildBotaoVisualizar(
-                  'Ver Assinatura',
-                  Icons.draw,
-                      () => _verImagem(
-                      req['assinatura_base64'], 'Assinatura Digital'),
-                ),
-              ],
-            ),
-          ),
+          // NOTA: Sem botões de Ver Foto / Ver Assinatura aqui.
+          // A foto e assinatura são coletadas pelo técnico APÓS receber os EPIs.
+          // Elas ficam disponíveis na aba Histórico.
 
           const SizedBox(height: 12),
 
+          // Botões Aprovar / Recusar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Row(
@@ -262,15 +233,13 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
                   child: Obx(() => ElevatedButton.icon(
                     onPressed: controller.isSending.value
                         ? null
-                        : () => _confirmarAprovacao(req['id'] as int),
-                    icon: const Icon(Icons.check,
-                        size: 16, color: Colors.black),
+                        : () => _confirmarAprovacao(req),
+                    icon: const Icon(Icons.check, size: 16, color: Colors.black),
                     label: const Text('Aprovar',
                         style: TextStyle(color: Colors.black)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00FF88),
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -284,31 +253,39 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
     );
   }
 
-  Widget _buildBotaoVisualizar(
-      String label, IconData icon, VoidCallback onTap) {
-    return Expanded(
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 14, color: Colors.white54),
-        label: Text(label,
-            style: const TextStyle(color: Colors.white54, fontSize: 12)),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Colors.white12),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      ),
-    );
+  // ══════════════════════════════════════════════════════════════
+  // ABA 2 e 3: APROVADAS / RECUSADAS
+  // ══════════════════════════════════════════════════════════════
+  Widget _buildListaStatus(String status) {
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF00FF88)));
+      }
+      final lista = controller.todasRequisicoes
+          .where((r) => r['status'] == status)
+          .toList();
+      if (lista.isEmpty) {
+        return _buildVazio(
+          status == 'aguardando_confirmacao'
+              ? 'Nenhuma requisição aguardando confirmação'
+              : 'Nenhuma requisição recusada',
+          Icons.inbox_outlined,
+        );
+      }
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: lista.length,
+        itemBuilder: (context, i) => _buildCardSimples(lista[i]),
+      );
+    });
   }
 
-  // ← ATUALIZADO: agora com botão PDF, tag de registro manual
   Widget _buildCardSimples(Map<String, dynamic> req) {
     final status = req['status'] as String? ?? 'pendente';
     final color = controller.statusColor(status);
     final epis = req['epis_solicitados'];
-    final List<String> episLista =
-    epis is List ? epis.cast<String>() : [];
+    final List<String> episLista = epis is List ? epis.cast<String>() : [];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -330,9 +307,19 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
                         fontSize: 14,
                         fontWeight: FontWeight.bold)),
               ),
-              // ← NOVO: botão PDF
-              if (status == 'aprovada')
-                BotaoPDF(requisicaoId: req['id'] as int),
+              if (status == 'aguardando_confirmacao')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00BFFF).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('Ag. Técnico',
+                      style: TextStyle(
+                          color: Color(0xFF00BFFF),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold)),
+                ),
             ],
           ),
           const SizedBox(height: 6),
@@ -341,27 +328,502 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
             style: const TextStyle(color: Colors.white54, fontSize: 12),
           ),
           if (req['observacao_gestor'] != null) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(req['observacao_gestor'],
                 style: TextStyle(color: color, fontSize: 11),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis),
           ],
-          // ← NOVO: tag de registro manual
           if (req['registro_manual'] == true) ...[
             const SizedBox(height: 6),
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: Colors.blue.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.blue.withOpacity(0.2)),
               ),
               child: const Text('📋 Registro manual',
                   style: TextStyle(color: Colors.blue, fontSize: 10)),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ABA 4: HISTÓRICO — requisições concluídas com foto e assinatura
+  // ══════════════════════════════════════════════════════════════
+  Widget _buildHistorico() {
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF00FF88)));
+      }
+      if (controller.historicoRequisicoes.isEmpty) {
+        return _buildVazio(
+            'Nenhuma requisição concluída ainda', Icons.history);
+      }
+      return RefreshIndicator(
+        onRefresh: controller.carregarHistorico,
+        color: const Color(0xFF00FF88),
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: controller.historicoRequisicoes.length,
+          itemBuilder: (context, i) =>
+              _buildCardHistorico(controller.historicoRequisicoes[i]),
+        ),
+      );
+    });
+  }
+
+  Widget _buildCardHistorico(Map<String, dynamic> req) {
+    final epis = req['epis_solicitados'];
+    final List<String> episLista = epis is List ? epis.cast<String>() : [];
+    final temFoto = req['foto_recebimento_base64'] != null;
+    final temAssinatura = req['assinatura_recebimento_base64'] != null;
+
+    return GestureDetector(
+      onTap: () => _mostrarDetalheHistorico(req),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF242424),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: const Color(0xFF00FF88).withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // Avatar técnico
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor:
+                  const Color(0xFF00FF88).withOpacity(0.15),
+                  child: req['tecnico_foto'] != null
+                      ? ClipOval(
+                    child: Image.memory(
+                      base64Decode(
+                          req['tecnico_foto'].split(',').last),
+                      fit: BoxFit.cover,
+                      width: 36,
+                      height: 36,
+                    ),
+                  )
+                      : const Icon(Icons.person,
+                      color: Color(0xFF00FF88), size: 18),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(req['tecnico_nome'] ?? 'Técnico',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold)),
+                      Text(
+                        'Confirmado em: ${_formatarData(req['data_confirmacao_recebimento'])}',
+                        style: const TextStyle(
+                            color: Colors.white38, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                // Ícones de evidência disponível
+                Row(
+                  children: [
+                    if (temFoto)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4),
+                        child: Icon(Icons.photo,
+                            color: Color(0xFF00FF88), size: 16),
+                      ),
+                    if (temAssinatura)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4),
+                        child: Icon(Icons.draw,
+                            color: Color(0xFF00FF88), size: 16),
+                      ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right,
+                        color: Colors.white38, size: 18),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${episLista.length} EPI(s): ${episLista.take(2).join(', ')}${episLista.length > 2 ? ' +${episLista.length - 2}' : ''}',
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (req['id_requisicao_ixc'] != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                '📦 IXC Req. #${req['id_requisicao_ixc']} — estoque descontado',
+                style: const TextStyle(
+                    color: Color(0xFF00FF88), fontSize: 11),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mostrarDetalheHistorico(Map<String, dynamic> req) {
+    final epis = req['epis_solicitados'];
+    final List<String> episLista = epis is List ? epis.cast<String>() : [];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF2A2A2A),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (_, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(20),
+          children: [
+            Center(
+              child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2))),
+            ),
+            const SizedBox(height: 16),
+
+            // Cabeçalho
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(req['tecnico_nome'] ?? 'Técnico',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
+                      Text('Req. #${req['id']}',
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00FF88).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('CONCLUÍDA',
+                      style: TextStyle(
+                          color: Color(0xFF00FF88),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text('Aprovado por: ${req['gestor_nome'] ?? '--'}',
+                style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            Text('Confirmado em: ${_formatarData(req['data_confirmacao_recebimento'])}',
+                style: const TextStyle(color: Colors.white38, fontSize: 12)),
+
+            const SizedBox(height: 16),
+            const Divider(color: Colors.white12),
+            const SizedBox(height: 12),
+
+            // EPIs
+            const Text('EPIs Recebidos:',
+                style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...episLista.map((e) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle,
+                      color: Color(0xFF00FF88), size: 16),
+                  const SizedBox(width: 8),
+                  Text(e,
+                      style: const TextStyle(
+                          color: Colors.white70, fontSize: 13)),
+                ],
+              ),
+            )),
+
+            // IXC info
+            if (req['id_requisicao_ixc'] != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00FF88).withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: const Color(0xFF00FF88).withOpacity(0.2)),
+                ),
+                child: Text(
+                  '📦 Estoque descontado via IXC — Requisição #${req['id_requisicao_ixc']}',
+                  style: const TextStyle(
+                      color: Color(0xFF00FF88), fontSize: 12),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 16),
+            const Divider(color: Colors.white12),
+            const SizedBox(height: 12),
+
+            // Foto e Assinatura
+            const Text('Evidências de Recebimento:',
+                style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                if (req['foto_recebimento_base64'] != null)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _verImagem(
+                          req['foto_recebimento_base64'], 'Foto de Recebimento'),
+                      child: Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.memory(
+                              base64Decode(req['foto_recebimento_base64']
+                                  .split(',')
+                                  .last),
+                              height: 140,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text('📷 Foto de Recebimento',
+                              style: TextStyle(
+                                  color: Colors.white54, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (req['foto_recebimento_base64'] != null &&
+                    req['assinatura_recebimento_base64'] != null)
+                  const SizedBox(width: 12),
+                if (req['assinatura_recebimento_base64'] != null)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _verImagem(
+                          req['assinatura_recebimento_base64'],
+                          'Assinatura Digital'),
+                      child: Column(
+                        children: [
+                          Container(
+                            height: 140,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1A1A1A),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.memory(
+                                base64Decode(
+                                    req['assinatura_recebimento_base64']
+                                        .split(',')
+                                        .last),
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text('✍️ Assinatura Digital',
+                              style: TextStyle(
+                                  color: Colors.white54, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (req['foto_recebimento_base64'] == null &&
+                    req['assinatura_recebimento_base64'] == null)
+                  const Text('Sem evidências registradas.',
+                      style: TextStyle(color: Colors.white38, fontSize: 13)),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+            if (req['pdf_base64'] != null)
+              BotaoPDF(
+                requisicaoId: req['id'] as int,
+                pdfBase64Cached: req['pdf_base64'],
+              ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // DIALOGS
+  // ══════════════════════════════════════════════════════════════
+  void _confirmarAprovacao(Map<String, dynamic> req) {
+    final obsController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Aprovar Requisição',
+            style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Técnico: ${req['tecnico_nome']}',
+              style: const TextStyle(
+                  color: Colors.white70, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'O estoque será descontado automaticamente do almoxarifado do técnico no IXC.',
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: obsController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Observação (opcional)',
+                hintStyle: const TextStyle(color: Colors.white38),
+                filled: true,
+                fillColor: const Color(0xFF1A1A1A),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar',
+                style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final result = await controller.aprovar(
+                req['id'] as int,
+                observacao: obsController.text,
+              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(result['message'] ?? ''),
+                  backgroundColor: result['success'] == true
+                      ? const Color(0xFF00C853)
+                      : Colors.red,
+                ));
+              }
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF88)),
+            child:
+            const Text('Aprovar', style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmarRecusa(int id) {
+    final obsController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Recusar Requisição',
+            style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Informe o motivo da recusa:',
+                style: TextStyle(color: Colors.white70)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: obsController,
+              style: const TextStyle(color: Colors.white),
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Motivo da recusa *',
+                hintStyle: const TextStyle(color: Colors.white38),
+                filled: true,
+                fillColor: const Color(0xFF1A1A1A),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar',
+                style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (obsController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Informe o motivo da recusa'),
+                      backgroundColor: Colors.red),
+                );
+                return;
+              }
+              Navigator.pop(context);
+              final result = await controller.recusar(id,
+                  observacao: obsController.text.trim());
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(result['message'] ?? ''),
+                  backgroundColor: result['success'] == true
+                      ? Colors.orange
+                      : Colors.red,
+                ));
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Recusar',
+                style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
     );
@@ -375,8 +837,8 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
         context: context,
         builder: (_) => Dialog(
           backgroundColor: const Color(0xFF2A2A2A),
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -411,139 +873,6 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
     } catch (_) {}
   }
 
-  void _confirmarAprovacao(int id) {
-    final obsController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Aprovar Requisição',
-            style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Deseja aprovar esta requisição de EPI?',
-                style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: obsController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Observação (opcional)',
-                hintStyle: const TextStyle(color: Colors.white38),
-                filled: true,
-                fillColor: const Color(0xFF1A1A1A),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-            const Text('Cancelar', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final result = await controller.aprovar(id,
-                  observacao: obsController.text);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(result['message'] ?? ''),
-                  backgroundColor: result['success'] == true
-                      ? const Color(0xFF00C853)
-                      : Colors.red,
-                ));
-              }
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00FF88)),
-            child: const Text('Aprovar',
-                style: TextStyle(color: Colors.black)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmarRecusa(int id) {
-    final obsController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Recusar Requisição',
-            style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Informe o motivo da recusa:',
-                style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: obsController,
-              style: const TextStyle(color: Colors.white),
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Motivo da recusa *',
-                hintStyle: const TextStyle(color: Colors.white38),
-                filled: true,
-                fillColor: const Color(0xFF1A1A1A),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-            const Text('Cancelar', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (obsController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Informe o motivo da recusa'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-              Navigator.pop(context);
-              final result = await controller.recusar(id,
-                  observacao: obsController.text.trim());
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(result['message'] ?? ''),
-                  backgroundColor: result['success'] == true
-                      ? Colors.orange
-                      : Colors.red,
-                ));
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Recusar',
-                style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildVazio(String msg, IconData icon) {
     return Center(
       child: Column(
@@ -563,8 +892,6 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
     try {
       final dt = DateTime.parse(data).toLocal();
       return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-    } catch (_) {
-      return '--';
-    }
+    } catch (_) { return '--'; }
   }
 }

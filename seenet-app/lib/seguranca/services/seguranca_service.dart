@@ -11,67 +11,43 @@ class SegurancaService extends GetxService {
   };
 
   String get _base => 'https://seenet-production.up.railway.app/api/seguranca';
+  String get _baseEstoque => 'https://seenet-production.up.railway.app/api/estoque';
 
-  // ========== EPIs disponíveis ==========
+  // ── EPIs disponíveis ──────────────────────────────────────────
   Future<List<String>> buscarEpis() async {
     try {
       final response = await GetConnect().get('$_base/epis', headers: _headers);
       if (response.statusCode == 200) {
-        final body = response.body;
-        final data = body['data'] ?? body;
-        final List epis = data['epis'] ?? [];
+        final List epis = (response.body['data'] ?? response.body)['epis'] ?? [];
         return epis.cast<String>();
       }
       return _episPadrao();
-    } catch (_) {
-      return _episPadrao();
-    }
+    } catch (_) { return _episPadrao(); }
   }
 
   List<String> _episPadrao() => [
-    'Capacete de Segurança (Classe B)',
-    'Carneira e Jugular',
-    'Balaclava',
-    'Óculos de Segurança',
-    'Luva de Segurança (Isolante)',
-    'Luva de Vaqueta',
-    'Cinto de Segurança',
-    'Talabarte de Posicionamento',
-    'Trava-Quedas',
-    'Detector de Tensão',
-    'Cones de Sinalização',
-    'Fita e/ou Corrente Zebrada',
+    'Capacete de Segurança (Classe B)', 'Carneira e Jugular', 'Balaclava',
+    'Óculos de Segurança', 'Luva de Segurança (Isolante)', 'Luva de Vaqueta',
+    'Cinto de Segurança', 'Talabarte de Posicionamento', 'Trava-Quedas',
+    'Detector de Tensão', 'Cones de Sinalização', 'Fita e/ou Corrente Zebrada',
   ];
 
-  // ========== Criar requisição ==========
-  Future<Map<String, dynamic>> criarRequisicao({
-    required List<String> episSolicitados,
-  }) async {
+  // ── Criar requisição ──────────────────────────────────────────
+  Future<Map<String, dynamic>> criarRequisicao({required List<String> episSolicitados}) async {
     try {
       final response = await GetConnect().post(
         '$_base/requisicoes',
         {'epis_solicitados': episSolicitados},
         headers: _headers,
       );
-
       if (response.statusCode == 201) {
-        return {
-          'success': true,
-          'message': response.body?['message'] ?? 'Enviado'
-        };
+        return {'success': true, 'message': response.body?['message'] ?? 'Enviado'};
       }
-
-      return {
-        'success': false,
-        'message':
-        response.body?['error'] ?? 'Erro ao enviar requisição (${response.statusCode})'
-      };
-    } catch (e) {
-      return {'success': false, 'message': 'Erro de conexão: $e'};
-    }
+      return {'success': false, 'message': response.body?['error'] ?? 'Erro (${response.statusCode})'};
+    } catch (e) { return {'success': false, 'message': 'Erro de conexão: $e'}; }
   }
 
-  // ========== Confirmar recebimento ==========
+  // ── Confirmar recebimento (técnico) ───────────────────────────
   Future<Map<String, dynamic>> confirmarRecebimento({
     required int id,
     required String assinaturaBase64,
@@ -79,62 +55,38 @@ class SegurancaService extends GetxService {
   }) async {
     final response = await GetConnect().post(
       '$_base/requisicoes/$id/confirmar-recebimento',
-      {
-        'assinatura_base64': assinaturaBase64,
-        'foto_base64': fotoBase64,
-      },
+      {'assinatura_base64': assinaturaBase64, 'foto_base64': fotoBase64},
       headers: _headers,
     );
-
-    if (response.statusCode == 200) {
-      return {'success': true, 'message': response.body['message']};
-    }
-
-    return {
-      'success': false,
-      'message': response.body['error'] ?? 'Erro ao confirmar recebimento'
-    };
+    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
+    return {'success': false, 'message': response.body['error'] ?? 'Erro ao confirmar'};
   }
 
-  // ========== Minhas requisições ==========
+  // ── Minhas requisições ────────────────────────────────────────
   Future<List<Map<String, dynamic>>> buscarMinhasRequisicoes() async {
     try {
-      final response =
-      await GetConnect().get('$_base/requisicoes/minhas', headers: _headers);
-
+      final response = await GetConnect().get('$_base/requisicoes/minhas', headers: _headers);
       if (response.statusCode == 200) {
-        final body = response.body;
-        final data = body['data'] ?? body;
-        final List lista = data['requisicoes'] ?? [];
+        final List lista = (response.body['data'] ?? response.body)['requisicoes'] ?? [];
         return lista.cast<Map<String, dynamic>>();
       }
-
       return [];
-    } catch (_) {
-      return [];
-    }
+    } catch (_) { return []; }
   }
 
-  // ========== Técnicos ==========
+  // ── Técnicos ──────────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> buscarTecnicos() async {
     try {
-      final response =
-      await GetConnect().get('$_base/tecnicos', headers: _headers);
-
+      final response = await GetConnect().get('$_base/tecnicos', headers: _headers);
       if (response.statusCode == 200) {
-        final body = response.body;
-        final data = body['data'] ?? body;
-        final List lista = data['tecnicos'] ?? [];
+        final List lista = (response.body['data'] ?? response.body)['tecnicos'] ?? [];
         return lista.cast<Map<String, dynamic>>();
       }
-
       return [];
-    } catch (_) {
-      return [];
-    }
+    } catch (_) { return []; }
   }
 
-  // ========== Criar registro manual ==========
+  // ── Registro manual ───────────────────────────────────────────
   Future<Map<String, dynamic>> criarRegistroManual({
     required int tecnicoId,
     required List<String> episSolicitados,
@@ -155,156 +107,147 @@ class SegurancaService extends GetxService {
       },
       headers: _headers,
     );
-
-    if (response.statusCode == 201) {
-      return {'success': true, 'message': response.body['message']};
-    }
-
-    return {
-      'success': false,
-      'message': response.body['error'] ?? 'Erro ao criar registro'
-    };
+    if (response.statusCode == 201) return {'success': true, 'message': response.body['message']};
+    return {'success': false, 'message': response.body['error'] ?? 'Erro ao criar registro'};
   }
 
-  // ========== PDF ==========
+  // ── PDF ───────────────────────────────────────────────────────
   Future<String?> buscarPdf(int id) async {
     try {
-      final response =
-      await GetConnect().get('$_base/requisicoes/$id/pdf', headers: _headers);
-
+      final response = await GetConnect().get('$_base/requisicoes/$id/pdf', headers: _headers);
       if (response.statusCode == 200) {
-        final body = response.body;
-        final data = body['data'] ?? body;
-        return data['pdf_base64'] as String?;
+        return (response.body['data'] ?? response.body)['pdf_base64'] as String?;
       }
-
       return null;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) { return null; }
   }
 
-  // ========== Pendentes ==========
+  // ── Pendentes (gestor) ────────────────────────────────────────
   Future<List<Map<String, dynamic>>> buscarPendentes() async {
     try {
-      final response = await GetConnect()
-          .get('$_base/requisicoes/pendentes', headers: _headers);
-
+      final response = await GetConnect().get('$_base/requisicoes/pendentes', headers: _headers);
       if (response.statusCode == 200) {
-        final body = response.body;
-        final data = body['data'] ?? body;
-        final List lista = data['requisicoes'] ?? [];
+        final List lista = (response.body['data'] ?? response.body)['requisicoes'] ?? [];
         return lista.cast<Map<String, dynamic>>();
       }
-
       return [];
-    } catch (_) {
-      return [];
-    }
+    } catch (_) { return []; }
   }
 
-  // ========== Todas ==========
+  // ── Todas (gestor) ────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> buscarTodas({String? status}) async {
     try {
-      final url =
-      status != null ? '$_base/requisicoes?status=$status' : '$_base/requisicoes';
-
+      final url = status != null ? '$_base/requisicoes?status=$status' : '$_base/requisicoes';
       final response = await GetConnect().get(url, headers: _headers);
-
       if (response.statusCode == 200) {
-        final body = response.body;
-        final data = body['data'] ?? body;
-        final List lista = data['requisicoes'] ?? [];
+        final List lista = (response.body['data'] ?? response.body)['requisicoes'] ?? [];
         return lista.cast<Map<String, dynamic>>();
       }
-
       return [];
-    } catch (_) {
-      return [];
-    }
+    } catch (_) { return []; }
   }
 
-  // ========== Detalhe ==========
+  // ── Histórico (gestor) — requisições concluídas com foto/assinatura ──
+  Future<List<Map<String, dynamic>>> buscarHistorico({int? tecnicoId}) async {
+    try {
+      final url = tecnicoId != null
+          ? '$_base/requisicoes/historico?tecnico_id=$tecnicoId'
+          : '$_base/requisicoes/historico';
+      final response = await GetConnect().get(url, headers: _headers);
+      if (response.statusCode == 200) {
+        final List lista = (response.body['data'] ?? response.body)['requisicoes'] ?? [];
+        return lista.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (_) { return []; }
+  }
+
+  // ── Detalhe ───────────────────────────────────────────────────
   Future<Map<String, dynamic>?> buscarDetalhe(int id) async {
     try {
-      final response =
-      await GetConnect().get('$_base/requisicoes/$id', headers: _headers);
-
+      final response = await GetConnect().get('$_base/requisicoes/$id', headers: _headers);
       if (response.statusCode == 200) {
-        final body = response.body;
-        final data = body['data'] ?? body;
-        return data['requisicao'];
+        return (response.body['data'] ?? response.body)['requisicao'];
       }
-
       return null;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) { return null; }
   }
 
-  // ========== Aprovar ==========
-  Future<Map<String, dynamic>> aprovar(int id, {String? observacao}) async {
+  // ── Aprovar — aceita itens do estoque IXC ─────────────────────
+  Future<Map<String, dynamic>> aprovar(
+      int id, {
+        String? observacao,
+        String? dataEntrega,
+        List<Map<String, dynamic>>? itensIxc,
+        // itensIxc: [{'id_produto': '525', 'descricao': 'Luva', 'quantidade': 2}]
+      }) async {
     final response = await GetConnect().post(
       '$_base/requisicoes/$id/aprovar',
-      {'observacao': observacao ?? ''},
+      {
+        'observacao': observacao ?? '',
+        if (dataEntrega != null) 'data_entrega': dataEntrega,
+        if (itensIxc != null && itensIxc.isNotEmpty) 'itens_ixc': itensIxc,
+      },
       headers: _headers,
     );
-
     if (response.statusCode == 200) {
-      return {'success': true, 'message': response.body['message']};
+      return {
+        'success': true,
+        'message': response.body['message'],
+        'id_requisicao_ixc': response.body['id_requisicao_ixc'],
+        'itens_descontados': response.body['itens_descontados'],
+      };
     }
-
-    return {
-      'success': false,
-      'message': response.body['error'] ?? 'Erro ao aprovar'
-    };
+    return {'success': false, 'message': response.body['error'] ?? 'Erro ao aprovar'};
   }
 
-  // ========== Recusar ==========
-  Future<Map<String, dynamic>> recusar(int id,
-      {required String observacao}) async {
+  // ── Recusar ───────────────────────────────────────────────────
+  Future<Map<String, dynamic>> recusar(int id, {required String observacao}) async {
     final response = await GetConnect().post(
       '$_base/requisicoes/$id/recusar',
       {'observacao': observacao},
       headers: _headers,
     );
-
-    if (response.statusCode == 200) {
-      return {'success': true, 'message': response.body['message']};
-    }
-
-    return {
-      'success': false,
-      'message': response.body['error'] ?? 'Erro ao recusar'
-    };
+    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
+    return {'success': false, 'message': response.body['error'] ?? 'Erro ao recusar'};
   }
 
-  // ========== Perfil ==========
+  // ── Estoque IXC (para o gestor selecionar itens ao aprovar) ──
+  Future<List<Map<String, dynamic>>> buscarProdutosEstoqueDoTecnico(int tecnicoId) async {
+    try {
+      // Usa o endpoint de saldo que já filtra pelo almoxarifado do técnico logado
+      final response = await GetConnect().get('$_baseEstoque/saldo', headers: _headers);
+      if (response.statusCode == 200) {
+        final List lista = (response.body['data'] ?? response.body)['data'] ?? [];
+        return lista
+            .where((item) => (item['saldo'] ?? 0) > 0)
+            .map<Map<String, dynamic>>((item) => {
+          'id_produto': item['id_produto']?.toString() ?? '',
+          'descricao': item['descricao'] ?? '',
+          'saldo': item['saldo'] ?? 0,
+          'unidade': item['unidade'] ?? 'UND',
+        })
+            .toList();
+      }
+      return [];
+    } catch (_) { return []; }
+  }
+
+  // ── Perfil ────────────────────────────────────────────────────
   Future<Map<String, dynamic>?> buscarPerfil() async {
     try {
-      final response =
-      await GetConnect().get('$_base/perfil', headers: _headers);
-
-      if (response.statusCode == 200) {
-        final body = response.body;
-        final data = body['data'] ?? body;
-        return data;
-      }
-
+      final response = await GetConnect().get('$_base/perfil', headers: _headers);
+      if (response.statusCode == 200) return response.body['data'] ?? response.body;
       return null;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) { return null; }
   }
 
-  // ========== Atualizar foto ==========
   Future<bool> atualizarFotoPerfil(String fotoBase64) async {
     final response = await GetConnect().put(
       '$_base/perfil/foto',
       {'foto_base64': fotoBase64},
       headers: _headers,
     );
-
     return response.statusCode == 200;
   }
 }

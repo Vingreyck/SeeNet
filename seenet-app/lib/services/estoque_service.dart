@@ -28,7 +28,7 @@ class ProdutoEstoque {
 
   factory ProdutoEstoque.fromJson(Map<String, dynamic> json) {
     return ProdutoEstoque(
-      id: json['id']?.toString() ?? json['id_produto']?.toString() ?? '',
+      id: json['id_produto']?.toString() ?? json['id']?.toString() ?? '',
       descricao: json['descricao'] ?? json['produto_descricao'] ?? '',
       valor: _parseDouble(json['valor']),
       precoBase: _parseDouble(json['preco_base'] ?? json['produto_preco_base']),

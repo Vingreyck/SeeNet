@@ -292,6 +292,8 @@ class _ConfirmarRecebimentoScreenState
         fotoBase64: _fotoBase64!,
       );
 
+      await Get.find<SegurancaController>().carregarMinhasRequisicoes();
+
       if (mounted) {
         if (result['success'] == true) {
           await showDialog(

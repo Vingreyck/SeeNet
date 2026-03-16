@@ -725,7 +725,7 @@ router.get('/requisicoes/historico', authMiddleware, async (req, res) => {
       .join('usuarios as t', 't.id', 'r.tecnico_id')
       .leftJoin('usuarios as g', 'g.id', 'r.gestor_id')
       .where('r.tenant_id', req.user.tenant_id)
-      .whereIn('r.status', ['concluida', 'aprovada'])
+      .whereIn('r.status', ['concluida', 'aprovada', 'aguardando_confirmacao'])
       .select(
         'r.id', 'r.status', 'r.epis_solicitados', 'r.itens_ixc',
         'r.id_requisicao_ixc', 'r.data_criacao', 'r.data_resposta',

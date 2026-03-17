@@ -10,6 +10,7 @@ import '../widgets/anexos_widget.dart';
 import '../../services/estoque_service.dart';
 import '../widgets/materiais_estoque_widget.dart';
 import '../widgets/assinatura_widget.dart';
+import '../widgets/campo_com_voz.dart';
 import 'apr_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -277,17 +278,29 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           _buildCard(
             child: Column(
               children: [
-                _buildTextField(controller: onuModeloController, label: 'Modelo da ONU', hint: 'Ex: AN5506-04-F'),
+                CampoComVoz(
+                  controller: onuModeloController,
+                  label: 'Modelo da ONU',
+                  hint: 'Ex: AN5506-04-F',
+                ),
                 const SizedBox(height: 16),
-                _buildTextField(controller: onuSerialController, label: 'Serial da ONU', hint: 'Ex: HWTC12345678'),
+                CampoComVoz(
+                  controller: onuSerialController,
+                  label: 'Serial da ONU',
+                  hint: 'Ex: HWTC12345678',
+                ),
                 const SizedBox(height: 16),
-                _buildTextField(controller: onuStatusController, label: 'Status', hint: 'Ex: Online'),
+                CampoComVoz(
+                  controller: onuStatusController,
+                  label: 'Status',
+                  hint: 'Ex: Online',
+                ),
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: onuSinalController,
                   label: 'Sinal Óptico (dBm)',
                   hint: 'Ex: -24.5',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                 ),
               ],
             ),
@@ -313,18 +326,20 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           _buildCard(
             child: Column(
               children: [
-                _buildTextField(
+                CampoComVoz(
                   controller: relatoProblemaController,
                   label: 'Problema Identificado *',
                   hint: 'Descreva o problema encontrado...',
                   maxLines: 4,
+                  appendMode: true,
                 ),
                 const SizedBox(height: 16),
-                _buildTextField(
+                CampoComVoz(
                   controller: relatoSolucaoController,
                   label: 'Solução Aplicada *',
                   hint: 'Descreva a solução aplicada...',
                   maxLines: 4,
+                  appendMode: true,
                 ),
               ],
             ),
@@ -353,9 +368,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
               onItensAlterados: (itens) {
                 setState(() {
                   itensEstoque = itens;
-                  // Atualizar o controller de texto para compatibilidade com finalização
                   materiaisController.text = itens.map((i) =>
-                    '${i.produto.descricao} x${i.quantidade.toStringAsFixed(0)} (R\$${i.valorTotal.toStringAsFixed(2)})'
+                  '${i.produto.descricao} x${i.quantidade.toStringAsFixed(0)} (R\$${i.valorTotal.toStringAsFixed(2)})'
                   ).join('\n');
                 });
               },
@@ -380,11 +394,12 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           ),
           const SizedBox(height: 24),
           _buildCard(
-            child: _buildTextField(
+            child: CampoComVoz(
               controller: observacoesController,
               label: 'Observações',
               hint: 'Detalhes adicionais, dificuldades encontradas...',
               maxLines: 6,
+              appendMode: true,
             ),
           ),
         ],
@@ -440,12 +455,12 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
             editarEtapa: 3,
           ),
           _buildResumoCard(
-           titulo: 'Materiais',
-           icone: Icons.build,
-           conteudo: itensEstoque.isNotEmpty
-             ? '${itensEstoque.length} item(ns) - R\$ ${itensEstoque.fold<double>(0, (s, i) => s + i.valorTotal).toStringAsFixed(2)}'
-             : 'Nenhum material adicionado',
-           editarEtapa: 4,
+            titulo: 'Materiais',
+            icone: Icons.build,
+            conteudo: itensEstoque.isNotEmpty
+                ? '${itensEstoque.length} item(ns) - R\$ ${itensEstoque.fold<double>(0, (s, i) => s + i.valorTotal).toStringAsFixed(2)}'
+                : 'Nenhum material adicionado',
+            editarEtapa: 4,
           ),
           _buildResumoCard(titulo: 'Assinatura', icone: Icons.draw, conteudo: assinaturaBytes != null ? '✓ Confirmada' : '✗ Não assinada', editarEtapa: 6),
         ],
@@ -657,15 +672,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     ));
   }
 
-  // ──────────────────────────────────────────────
-  // LÓGICA DE INÍCIO / APR
-  // ──────────────────────────────────────────────
-
   Future<void> _iniciarOS() async {
-    // ESTADO 1: Pendente → Iniciar Deslocamento
     if (statusAtual == 'pendente') {
       final sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!);
-
       if (sucesso) {
         setState(() { statusAtual = 'em_deslocamento'; osIniciada = false; });
         if (mounted) {
@@ -681,26 +690,20 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       return;
     }
 
-    // ESTADO 2: Em Deslocamento → Chegar ao Local → ABRIR APR
     if (statusAtual == 'em_deslocamento') {
       final sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
-
       if (!sucesso) {
         if (mounted) _mostrarErro('Erro ao informar chegada');
         return;
       }
 
-      // ✅ ABRE O APR OBRIGATÓRIO
       if (!mounted) return;
       final aprConcluido = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(
-          builder: (_) => AprScreen(os: os),
-        ),
+        MaterialPageRoute(builder: (_) => AprScreen(os: os)),
       );
 
       if (aprConcluido == true) {
-        // APR preenchido → avança para o formulário de execução
         setState(() {
           statusAtual = 'em_execucao';
           osIniciada = true;
@@ -714,7 +717,6 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           ));
         }
       } else {
-        // Técnico voltou sem preencher o APR — fica na etapa de localização
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('⚠️ O APR é obrigatório para continuar o atendimento.'),
@@ -726,15 +728,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       return;
     }
 
-    // ESTADO 3: Já está em execução
     if (statusAtual == 'em_execucao') {
       setState(() { osIniciada = true; _etapaAtual = 1; });
     }
   }
-
-  // ──────────────────────────────────────────────
-  // FINALIZAR OS
-  // ──────────────────────────────────────────────
 
   Future<void> _finalizarOS() async {
     final confirmar = await showDialog<bool>(
@@ -768,15 +765,15 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       'relato_solucao': relatoSolucaoController.text.trim(),
       'materiais_utilizados': materiaisController.text.trim(),
       'itens_estoque': itensEstoque.map((item) => {
-      'id_produto': item.produto.id,
-      'descricao': item.produto.descricao,
-      'quantidade': item.quantidade,
-      'valor_unitario': item.valorUnitario,
-      'valor_total': item.valorTotal,
-      'id_patrimonio': item.patrimonio?.id ?? '0',
-      'numero_serie': item.patrimonio?.serial ?? '',
-      'tipo_produto': item.isPatrimonio ? 'P' : 'O',
-    }).toList(),
+        'id_produto': item.produto.id,
+        'descricao': item.produto.descricao,
+        'quantidade': item.quantidade,
+        'valor_unitario': item.valorUnitario,
+        'valor_total': item.valorTotal,
+        'id_patrimonio': item.patrimonio?.id ?? '0',
+        'numero_serie': item.patrimonio?.serial ?? '',
+        'tipo_produto': item.isPatrimonio ? 'P' : 'O',
+      }).toList(),
       'observacoes': observacoesController.text.trim(),
       'fotos': fotosAnexadas.map((anexo) => {'tipo': anexo.tipo, 'descricao': anexo.descricao, 'path': anexo.foto.path}).toList(),
       'assinatura': base64Encode(assinaturaBytes!),

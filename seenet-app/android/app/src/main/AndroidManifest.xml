@@ -15,6 +15,12 @@
 
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
         android:label="SeeNet"
         android:name="${applicationName}"

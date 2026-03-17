@@ -846,6 +846,61 @@ router.get('/tecnicos', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/seguranca/tecnicos/:id/perfil — gestor vê perfil de um técnico
+router.get('/tecnicos/:id/perfil', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const tecnicoId = req.params.id;
+
+    const usuario = await db('usuarios')
+      .where('id', tecnicoId)
+      .where('tenant_id', req.user.tenant_id)
+      .select('id', 'nome', 'email', 'tipo_usuario', 'foto_perfil', 'data_criacao', 'ultimo_login')
+      .first();
+
+    if (!usuario) return res.status(404).json({ error: 'Técnico não encontrado' });
+
+    const tenant = await db('tenants').where('id', req.user.tenant_id).first();
+
+    const stats = await db('requisicoes_epi')
+      .where('tecnico_id', tecnicoId)
+      .where('tenant_id', req.user.tenant_id)
+      .select(
+        db.raw('COUNT(*) as total'),
+        db.raw("COUNT(*) FILTER (WHERE status = 'concluida') as concluidas"),
+        db.raw("COUNT(*) FILTER (WHERE status = 'aprovada' OR status = 'aguardando_confirmacao') as aprovadas"),
+        db.raw("COUNT(*) FILTER (WHERE status = 'pendente') as pendentes"),
+        db.raw("COUNT(*) FILTER (WHERE status = 'recusada') as recusadas")
+      )
+      .first();
+
+    const requisicoes = await db('requisicoes_epi as r')
+      .leftJoin('usuarios as g', 'g.id', 'r.gestor_id')
+      .where('r.tecnico_id', tecnicoId)
+      .where('r.tenant_id', req.user.tenant_id)
+      .select(
+        'r.id', 'r.status', 'r.epis_solicitados', 'r.itens_ixc',
+        'r.id_requisicao_ixc', 'r.data_criacao', 'r.data_resposta',
+        'r.data_entrega', 'r.data_confirmacao_recebimento',
+        'r.observacao_gestor', 'r.registro_manual', 'r.pdf_base64',
+        'r.assinatura_recebimento_base64', 'r.foto_recebimento_base64',
+        'g.nome as gestor_nome'
+      )
+      .orderBy('r.data_criacao', 'desc');
+
+    res.json({
+      usuario: { ...usuario, empresa: tenant?.nome },
+      stats,
+      requisicoes,
+    });
+  } catch (err) {
+    console.error('❌ Erro ao buscar perfil do técnico:', err);
+    res.status(500).json({ error: 'Erro ao buscar perfil do técnico' });
+  }
+});
+
 // GET /api/seguranca/perfil
 router.get('/perfil', authMiddleware, async (req, res) => {
   try {

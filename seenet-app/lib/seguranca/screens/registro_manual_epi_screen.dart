@@ -9,12 +9,21 @@ import '../services/seguranca_service.dart';
 import 'package:seenet/services/auth_service.dart';
 
 class RegistroManualEpiScreen extends StatefulWidget {
-  const RegistroManualEpiScreen({super.key});
+  final int? tecnicoIdFixo;
+  final String? tecnicoNomeFixo;
+
+  const RegistroManualEpiScreen({
+    super.key,
+    this.tecnicoIdFixo,
+    this.tecnicoNomeFixo,
+  });
 
   @override
   State<RegistroManualEpiScreen> createState() =>
       _RegistroManualEpiScreenState();
 }
+
+
 
 class _RegistroManualEpiScreenState extends State<RegistroManualEpiScreen> {
   final controller = Get.find<SegurancaController>();
@@ -44,6 +53,10 @@ class _RegistroManualEpiScreenState extends State<RegistroManualEpiScreen> {
     super.initState();
     _carregarTecnicos();
     controller.carregarEpis();
+    if (widget.tecnicoIdFixo != null) {
+      tecnicoSelecionadoId = widget.tecnicoIdFixo;
+      tecnicoSelecionadoNome = widget.tecnicoNomeFixo;
+    }
   }
 
   @override
@@ -113,7 +126,13 @@ class _RegistroManualEpiScreenState extends State<RegistroManualEpiScreen> {
                 ? const Center(
                 child: CircularProgressIndicator(
                     color: Color(0xFF00FF88), strokeWidth: 2))
-                : _buildDropdownTecnico(),
+                : IgnorePointer(
+              ignoring: widget.tecnicoIdFixo != null,
+              child: Opacity(
+                opacity: widget.tecnicoIdFixo != null ? 0.6 : 1.0,
+                child: _buildDropdownTecnico(),
+              ),
+            ),
             const SizedBox(height: 20),
 
             // ── Data de entrega ──

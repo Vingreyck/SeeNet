@@ -47,6 +47,22 @@ class SegurancaService extends GetxService {
     } catch (e) { return {'success': false, 'message': 'Erro de conexão: $e'}; }
   }
 
+  // ── Perfil de um técnico (visão gestor) ───────────────────────
+  Future<Map<String, dynamic>?> buscarPerfilTecnico(int tecnicoId) async {
+    try {
+      final response = await GetConnect().get(
+        '$_base/tecnicos/$tecnicoId/perfil',
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        return response.body['data'] ?? response.body;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Confirmar recebimento (técnico) ───────────────────────────
   Future<Map<String, dynamic>> confirmarRecebimento({
     required int id,

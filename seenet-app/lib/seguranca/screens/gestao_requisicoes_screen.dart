@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'perfil_tecnico_gestor_screen.dart';
 import 'dart:convert';
 import '../controllers/seguranca_controller.dart';
 import '../widgets/botao_pdf.dart';
@@ -20,14 +21,14 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     controller.carregarPendentes();
     controller.carregarTodas();
     controller.carregarHistorico();
     _tabController.addListener(() {
-      if (_tabController.index == 1) controller.carregarTodas(status: 'aguardando_confirmacao');
-      if (_tabController.index == 2) controller.carregarTodas(status: 'recusada');
-      if (_tabController.index == 3) controller.carregarHistorico();
+      if (_tabController.index == 2) controller.carregarTodas(status: 'aguardando_confirmacao');
+      if (_tabController.index == 3) controller.carregarTodas(status: 'recusada');
+      if (_tabController.index == 4) controller.carregarHistorico();
     });
   }
 
@@ -71,6 +72,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
           unselectedLabelColor: Colors.white38,
           isScrollable: true,
           tabs: [
+            const Tab(text: 'Técnicos'),
             Obx(() => Tab(
                 text: 'Pendentes (${controller.requisicoesPendentes.length})')),
             const Tab(text: 'Aprovadas'),
@@ -83,6 +85,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
+          _buildListaTecnicos(),
           _buildListaPendentes(),
           _buildListaStatus('aguardando_confirmacao'),
           _buildListaStatus('recusada'),
@@ -883,6 +886,110 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
           Text(msg,
               style: const TextStyle(color: Colors.white38, fontSize: 15)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildListaTecnicos() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: Get.find<SegurancaService>().buscarTecnicos(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF00FF88)));
+        }
+
+        final tecnicos = snapshot.data ?? [];
+
+        if (tecnicos.isEmpty) {
+          return _buildVazio('Nenhum técnico cadastrado', Icons.people_outline);
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: tecnicos.length,
+          itemBuilder: (context, index) {
+            final tec = tecnicos[index];
+            return _buildCardTecnico(tec);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCardTecnico(Map<String, dynamic> tec) {
+    final tipo = tec['tipo_usuario'] as String? ?? 'tecnico';
+    Color tipoColor;
+    String tipoLabel;
+    switch (tipo) {
+      case 'administrador':
+        tipoColor = Colors.orange;
+        tipoLabel = 'Admin';
+        break;
+      case 'gestor_seguranca':
+        tipoColor = Colors.blue;
+        tipoLabel = 'Gestor';
+        break;
+      default:
+        tipoColor = const Color(0xFF00FF88);
+        tipoLabel = 'Técnico';
+    }
+
+    return InkWell(
+      onTap: () => Get.to(() => PerfilTecnicoGestorScreen(
+        tecnicoId: tec['id'] as int,
+        tecnicoNome: tec['nome'] as String,
+      )),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF242424),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: tipoColor.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: tipoColor.withOpacity(0.15),
+              child: Icon(Icons.person, color: tipoColor, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(tec['nome'] as String? ?? '',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(tec['email'] as String? ?? '',
+                      style:
+                      const TextStyle(color: Colors.white38, fontSize: 12)),
+                ],
+              ),
+            ),
+            Container(
+              padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: tipoColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(tipoLabel,
+                  style: TextStyle(
+                      color: tipoColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right, color: tipoColor, size: 20),
+          ],
+        ),
       ),
     );
   }

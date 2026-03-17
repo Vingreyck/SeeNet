@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../services/seguranca_service.dart';
 import 'perfil_tecnico_gestor_screen.dart';
 import 'dart:convert';
 import '../controllers/seguranca_controller.dart';

@@ -26,10 +26,13 @@ class SegurancaService extends GetxService {
   }
 
   List<String> _episPadrao() => [
-    'Capacete de Segurança (Classe B)', 'Carneira e Jugular', 'Balaclava',
+    'Capacete de Segurança (Classe B)', 'Carneira', 'Jugular', 'Balaclava',
     'Óculos de Segurança', 'Luva de Segurança (Isolante)', 'Luva de Vaqueta',
-    'Cinto de Segurança', 'Talabarte de Posicionamento', 'Trava-Quedas',
-    'Detector de Tensão', 'Cones de Sinalização', 'Fita e/ou Corrente Zebrada',
+    'Bota de Segurança', 'Cinto de Segurança', 'Talabarte de Posicionamento',
+    'Protetor Solar', 'Escada de Alumínio', 'Escada Extensível',
+    'Fita de Sinalização Zebrada', 'Cone de Sinalização', 'Bandeirola',
+    'Detector de Tensão', 'Calça Operacional', 'Camisa Manga Longa',
+    'Catraca Trava Escada', 'Jaleco Operacional', 'Avental', 'Luva Latex',
   ];
 
   // ── Criar requisição ──────────────────────────────────────────
@@ -265,5 +268,35 @@ class SegurancaService extends GetxService {
       headers: _headers,
     );
     return response.statusCode == 200;
+  }
+
+  // ── Almoxarifados de colaboradores (para aprovação) ───────────
+  Future<List<Map<String, dynamic>>> buscarAlmoxarifadosColaboradores() async {
+    try {
+      final response = await GetConnect().get(
+        '$_base/almoxarifados-colaboradores',
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final List lista = (response.body['data'] ?? response.body)['almoxarifados'] ?? [];
+        return lista.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (_) { return []; }
+  }
+
+  // ── Mapeamento EPI → Produto IXC ─────────────────────────────
+  Future<List<Map<String, dynamic>>> buscarMapeamentoEpi() async {
+    try {
+      final response = await GetConnect().get(
+        '$_base/produtos-epi',
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final List lista = (response.body['data'] ?? response.body)['mapeamento'] ?? [];
+        return lista.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (_) { return []; }
   }
 }

@@ -389,17 +389,28 @@ async function gerarPDF(requisicao, tecnico, gestor) {
 // ================================================================
 const EPIS_PADRAO = [
   'Capacete de Segurança (Classe B)',
-  'Carneira e Jugular',
+  'Carneira',
+  'Jugular',
   'Balaclava',
   'Óculos de Segurança',
   'Luva de Segurança (Isolante)',
   'Luva de Vaqueta',
+  'Bota de Segurança',
   'Cinto de Segurança',
   'Talabarte de Posicionamento',
-  'Trava-Quedas',
+  'Protetor Solar',
+  'Escada de Alumínio',
+  'Escada Extensível',
+  'Fita de Sinalização Zebrada',
+  'Cone de Sinalização',
+  'Bandeirola',
   'Detector de Tensão',
-  'Cones de Sinalização',
-  'Fita e/ou Corrente Zebrada',
+  'Calça Operacional',
+  'Camisa Manga Longa',
+  'Catraca Trava Escada',
+  'Jaleco Operacional',
+  'Avental',
+  'Luva Latex',
 ];
 
 // ================================================================
@@ -898,6 +909,160 @@ router.get('/tecnicos/:id/perfil', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('❌ Erro ao buscar perfil do técnico:', err);
     res.status(500).json({ error: 'Erro ao buscar perfil do técnico' });
+  }
+});
+
+// GET /api/seguranca/almoxarifados-colaboradores — lista almoxarifados de colaboradores
+router.get('/almoxarifados-colaboradores', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const integracao = await db('integracao_ixc')
+      .where('tenant_id', req.user.tenant_id)
+      .where('ativo', true)
+      .first();
+
+    if (!integracao) return res.json({ almoxarifados: [] });
+
+    const IXCService = require('../services/IXCService');
+    const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+    const IDS_COLABORADORES = [25,26,27,28,29,30,31,32,33,35,36,37,38,39,40,41,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,76,97,102,107,116];
+
+    const body = {
+      qtype: 'almox.id',
+      query: '1',
+      oper: '>=',
+      page: '1',
+      rp: '200',
+      sortname: 'almox.descricao',
+      sortorder: 'asc'
+    };
+
+    const response = await ixc.clientAlterar.post('/almox', body, {
+      headers: { 'ixcsoft': 'listar' }
+    });
+
+    const todos = response.data.registros || [];
+    const filtrados = todos
+      .filter(a => IDS_COLABORADORES.includes(parseInt(a.id)) && a.ativo === 'S')
+      .map(a => ({ id: a.id, descricao: a.descricao }));
+
+    res.json({ almoxarifados: filtrados });
+  } catch (err) {
+    console.error('❌ Erro ao buscar almoxarifados:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar almoxarifados' });
+  }
+});
+
+// GET /api/seguranca/produtos-epi — lista produtos de EPI do IXC
+router.get('/produtos-epi', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    // Mapeamento fixo: EPI SeeNet → ID produto IXC
+    const MAPEAMENTO_EPI = [
+      { epi: 'Capacete de Segurança (Classe B)', id_produto: '397', descricao_ixc: 'CAPACETE DE ABA REDONDA' },
+      { epi: 'Carneira e Jugular', id_produto: '398', descricao_ixc: 'CARNEIRA COM CATRACA' },
+      { epi: 'Balaclava', id_produto: '388', descricao_ixc: 'TOUCA BALACLAVA' },
+      { epi: 'Óculos de Segurança', id_produto: '421', descricao_ixc: 'ÓCULOS DE PROTEÇÃO' },
+      { epi: 'Luva de Segurança (Isolante)', id_produto: '419', descricao_ixc: 'LUVA NBR' },
+      { epi: 'Luva de Vaqueta', id_produto: '418', descricao_ixc: 'LUVA DE COURO VAQUETA' },
+      { epi: 'Cinto de Segurança', id_produto: '400', descricao_ixc: 'CINTO DE SEGURANÇA PQD' },
+      { epi: 'Talabarte de Posicionamento', id_produto: '429', descricao_ixc: 'TALABARTE DE POSICIONAMENTO' },
+      { epi: 'Trava-Quedas', id_produto: null, descricao_ixc: null },
+      { epi: 'Detector de Tensão', id_produto: '637', descricao_ixc: 'DETECTOR TENSÃO' },
+      { epi: 'Cones de Sinalização', id_produto: '484', descricao_ixc: 'CONE DE SINALIZAÇÃO' },
+      { epi: 'Fita e/ou Corrente Zebrada', id_produto: '411', descricao_ixc: 'FITA DE SINALIZAÇÃO ZEBRADA' },
+    ];
+
+    res.json({ mapeamento: MAPEAMENTO_EPI });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar produtos EPI' });
+  }
+});
+
+// GET /api/seguranca/almoxarifados-colaboradores
+router.get('/almoxarifados-colaboradores', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const integracao = await db('integracao_ixc')
+      .where('tenant_id', req.user.tenant_id)
+      .where('ativo', true)
+      .first();
+
+    if (!integracao) return res.json({ almoxarifados: [] });
+
+    const IXCService = require('../services/IXCService');
+    const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+    const IDS_COLABORADORES = [25,26,27,28,29,30,31,32,33,35,36,37,38,39,40,41,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,76,97,102,107,116];
+
+    const body = {
+      qtype: 'almox.id',
+      query: '1',
+      oper: '>=',
+      page: '1',
+      rp: '200',
+      sortname: 'almox.descricao',
+      sortorder: 'asc'
+    };
+
+    const response = await ixc.clientAlterar.post('/almox', body, {
+      headers: { 'ixcsoft': 'listar' }
+    });
+
+    const todos = response.data.registros || [];
+    const filtrados = todos
+      .filter(a => IDS_COLABORADORES.includes(parseInt(a.id)) && a.ativo === 'S')
+      .map(a => ({ id: a.id, descricao: a.descricao }));
+
+    res.json({ almoxarifados: filtrados });
+  } catch (err) {
+    console.error('❌ Erro ao buscar almoxarifados:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar almoxarifados' });
+  }
+});
+
+// GET /api/seguranca/produtos-epi
+router.get('/produtos-epi', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const MAPEAMENTO_EPI = [
+      { epi: 'Capacete de Segurança (Classe B)', id_produto: '397', descricao_ixc: 'CAPACETE DE ABA REDONDA', tamanhos: null },
+      { epi: 'Carneira', id_produto: '398', descricao_ixc: 'CARNEIRA COM CATRACA', tamanhos: null },
+      { epi: 'Jugular', id_produto: '417', descricao_ixc: 'JUGULAR DE ELÁSTICO PARA CAPACETE', tamanhos: null },
+      { epi: 'Balaclava', id_produto: '388', descricao_ixc: 'TOUCA BALACLAVA', tamanhos: null },
+      { epi: 'Óculos de Segurança', id_produto: '421', descricao_ixc: 'ÓCULOS DE PROTEÇÃO', tamanhos: null },
+      { epi: 'Luva de Segurança (Isolante)', id_produto: '419', descricao_ixc: 'LUVA NBR', tamanhos: null },
+      { epi: 'Luva de Vaqueta', id_produto: '418', descricao_ixc: 'LUVA DE COURO VAQUETA', tamanhos: null },
+      { epi: 'Bota de Segurança', id_produto: '390', descricao_ixc: 'BOTA OPERACIONAL', tamanhos: ['39','40','41'] },
+      { epi: 'Cinto de Segurança', id_produto: '400', descricao_ixc: 'CINTO DE SEGURANÇA PQD', tamanhos: null },
+      { epi: 'Talabarte de Posicionamento', id_produto: '429', descricao_ixc: 'TALABARTE DE POSICIONAMENTO', tamanhos: null },
+      { epi: 'Protetor Solar', id_produto: '423', descricao_ixc: 'PROTETOR SOLAR FPS60 FPUVA20', tamanhos: null },
+      { epi: 'Escada de Alumínio', id_produto: '494', descricao_ixc: 'ESCADA ALUMÍNIO', tamanhos: null },
+      { epi: 'Escada Extensível', id_produto: '485', descricao_ixc: 'ESCADA EXTENSÍVEL FIBRA VAZADA', tamanhos: null },
+      { epi: 'Fita de Sinalização Zebrada', id_produto: '411', descricao_ixc: 'FITA DE SINALIZAÇÃO ZEBRADA', tamanhos: null },
+      { epi: 'Cone de Sinalização', id_produto: '484', descricao_ixc: 'CONE DE SINALIZAÇÃO', tamanhos: null },
+      { epi: 'Bandeirola', id_produto: '556', descricao_ixc: 'BANDEIROLA P/ SINALIZAÇÃO', tamanhos: null },
+      { epi: 'Detector de Tensão', id_produto: '637', descricao_ixc: 'DETECTOR TENSÃO', tamanhos: null },
+      { epi: 'Calça Operacional', id_produto: '395', descricao_ixc: 'CALÇA OPERACIONAL', tamanhos: ['36','38','40','41','42','46','48'] },
+      { epi: 'Camisa Manga Longa', id_produto: '538', descricao_ixc: 'CAMISA MANGA LONGA', tamanhos: ['P','M','G','GG'] },
+      { epi: 'Catraca Trava Escada', id_produto: '430', descricao_ixc: 'CATRACA TRAVA GANCHO PARA ESCADA EXTENSÍVEL', tamanhos: null },
+      { epi: 'Jaleco Operacional', id_produto: '416', descricao_ixc: 'JALECO OPERACIONAL', tamanhos: null },
+      { epi: 'Avental', id_produto: '635', descricao_ixc: 'AVENTAL', tamanhos: null },
+      { epi: 'Luva Latex', id_produto: '636', descricao_ixc: 'LUVA LATEX', tamanhos: null },
+    ];
+
+    res.json({ mapeamento: MAPEAMENTO_EPI });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar produtos EPI' });
   }
 });
 

@@ -231,7 +231,8 @@ class _RequisicaoEpiScreenState extends State<RequisicaoEpiScreen>
                 ),
               ],
             ),
-            // Seletor de tamanho (só aparece se selecionado e tem tamanho)
+
+            // TAMANHOS
             if (selecionado && temTamanho) ...[
               const SizedBox(height: 10),
               Padding(
@@ -276,6 +277,71 @@ class _RequisicaoEpiScreenState extends State<RequisicaoEpiScreen>
                             ),
                           );
                         }).toList(),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+
+            // QUANTIDADE (NOVO)
+            if (selecionado) ...[
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.only(left: 34),
+                child: Row(
+                  children: [
+                    const Text('Quantidade:',
+                        style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    const SizedBox(width: 10),
+                    Obx(() {
+                      final qtd = controller.quantidadesSelecionadas[epi] ?? 1;
+                      return Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              if (qtd > 1) {
+                                controller.quantidadesSelecionadas[epi] = qtd - 1;
+                              }
+                            },
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2A2A2A),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.remove,
+                                    color: Colors.white54, size: 18),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text('$qtd',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () {
+                              controller.quantidadesSelecionadas[epi] = qtd + 1;
+                            },
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00FF88).withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.add,
+                                    color: Color(0xFF00FF88), size: 18),
+                              ),
+                            ),
+                          ),
+                        ],
                       );
                     }),
                   ],

@@ -51,7 +51,10 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
     // Vincular automaticamente cada EPI ao produto IXC correspondente
     final itens = <Map<String, dynamic>>[];
     for (final epi in episLista) {
-      final epiLimpo = epi.replaceAll(RegExp(r'\s*\(Tam\.\s*\w+\)'), '');
+      final epiLimpo = epi
+          .replaceAll(RegExp(r'\s*\(Tam\.\s*\w+\)'), '')
+          .replaceAll(RegExp(r'\s*x\d+$'), '')
+          .trim();
       final match = mapeamento.firstWhereOrNull(
             (m) => m['epi'] == epiLimpo,
       );
@@ -283,7 +286,6 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
   // ── Card de cada item EPI ─────────────────────────────────────
   Widget _buildItemCard(int index, Map<String, dynamic> item) {
     final vinculado = item['vinculado'] == true;
-    final tamanhos = item['tamanhos'] as List<String>?;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -300,7 +302,6 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // EPI solicitado
           Row(
             children: [
               Icon(
@@ -318,10 +319,8 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
               ),
             ],
           ),
-
           if (vinculado) ...[
             const SizedBox(height: 6),
-            // Produto IXC vinculado
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -330,113 +329,8 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
               ),
               child: Text(
                 '→ ${item['descricao_ixc']} (ID ${item['id_produto']})',
-                style:
-                const TextStyle(color: Color(0xFF00FF88), fontSize: 11),
+                style: const TextStyle(color: Color(0xFF00FF88), fontSize: 11),
               ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // Quantidade + Tamanho
-            Row(
-              children: [
-                // Quantidade
-                const Text('Qtd:',
-                    style: TextStyle(color: Colors.white54, fontSize: 12)),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () {
-                    if (item['quantidade'] > 1) {
-                      setState(() => _itensVinculados[index]['quantidade']--);
-                    }
-                  },
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2A2A2A),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Center(
-                      child:
-                      Icon(Icons.remove, color: Colors.white54, size: 16),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text('${item['quantidade']}',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold)),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () {
-                    setState(() => _itensVinculados[index]['quantidade']++);
-                  },
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00FF88).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Center(
-                      child:
-                      Icon(Icons.add, color: Color(0xFF00FF88), size: 16),
-                    ),
-                  ),
-                ),
-
-                // Tamanho (se aplicável)
-                if (tamanhos != null) ...[
-                  const SizedBox(width: 16),
-                  const Text('Tam:',
-                      style: TextStyle(color: Colors.white54, fontSize: 12)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SizedBox(
-                      height: 30,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: tamanhos.map((t) {
-                          final sel = item['tamanho_selecionado'] == t;
-                          return GestureDetector(
-                            onTap: () => setState(() =>
-                            _itensVinculados[index]
-                            ['tamanho_selecionado'] = t),
-                            child: Container(
-                              margin: const EdgeInsets.only(right: 6),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: sel
-                                    ? const Color(0xFF00FF88)
-                                    : const Color(0xFF2A2A2A),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: sel
-                                      ? const Color(0xFF00FF88)
-                                      : Colors.white24,
-                                ),
-                              ),
-                              child: Text(t,
-                                  style: TextStyle(
-                                    color:
-                                    sel ? Colors.black : Colors.white70,
-                                    fontSize: 12,
-                                    fontWeight: sel
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                  )),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
             ),
           ] else ...[
             const SizedBox(height: 6),
@@ -456,7 +350,6 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
       ),
     );
   }
-
   // ── Resumo ────────────────────────────────────────────────────
   Widget _buildResumo() {
     final vinculados =
@@ -464,7 +357,10 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
     final naoVinculados = _itensVinculados.length - vinculados;
     final totalItens = _itensVinculados
         .where((i) => i['vinculado'] == true)
-        .fold<int>(0, (sum, i) => sum + (i['quantidade'] as int));
+        .fold<int>(0, (sum, i) {
+      final match = RegExp(r'x(\d+)$').firstMatch(i['epi'] ?? '');
+      return sum + (match != null ? int.parse(match.group(1)!) : 1);
+    });
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -524,20 +420,6 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
       return;
     }
 
-    // Validar tamanhos obrigatórios
-    for (final item in _itensVinculados) {
-      if (item['vinculado'] == true &&
-          item['tamanhos'] != null &&
-          item['tamanho_selecionado'] == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Selecione o tamanho de: ${item['epi']}'),
-              backgroundColor: Colors.red),
-        );
-        return;
-      }
-    }
-
     setState(() => _isSending = true);
 
     try {
@@ -545,14 +427,13 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
       final itensIxc = _itensVinculados
           .where((i) => i['vinculado'] == true && i['id_produto'] != null)
           .map((i) {
-        String descricao = i['descricao_ixc'] ?? i['epi'];
-        if (i['tamanho_selecionado'] != null) {
-          descricao += ' - Tam. ${i['tamanho_selecionado']}';
-        }
+        String descricao = i['epi'];
+        final qtdMatch = RegExp(r'x(\d+)$').firstMatch(i['epi'] ?? '');
+        final quantidade = qtdMatch != null ? int.parse(qtdMatch.group(1)!) : 1;
         return {
           'id_produto': i['id_produto'],
           'descricao': descricao,
-          'quantidade': i['quantidade'],
+          'quantidade': quantidade,
         };
       }).toList();
 

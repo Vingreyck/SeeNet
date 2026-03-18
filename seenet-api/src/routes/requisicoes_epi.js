@@ -417,9 +417,23 @@ const EPIS_PADRAO = [
 // ROTAS
 // ================================================================
 
-// GET /api/seguranca/epis
-router.get('/epis', authMiddleware, (req, res) => {
-  res.json({ epis: EPIS_PADRAO });
+// GET /api/seguranca/epis — lista de EPIs para o técnico solicitar (agora do banco)
+router.get('/epis', authMiddleware, async (req, res) => {
+  try {
+    const produtos = await db('produtos_epi')
+      .where('tenant_id', req.user.tenant_id)
+      .where('ativo', true)
+      .orderBy('nome', 'asc');
+
+    if (produtos.length > 0) {
+      return res.json({ epis: produtos.map(p => p.nome) });
+    }
+
+    // Fallback se não tiver produtos cadastrados
+    res.json({ epis: EPIS_PADRAO });
+  } catch (err) {
+    res.json({ epis: EPIS_PADRAO });
+  }
 });
 
 // POST /api/seguranca/requisicoes — técnico cria
@@ -1039,41 +1053,131 @@ router.get('/almoxarifados-colaboradores', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/seguranca/produtos-epi
+// GET /api/seguranca/produtos-epi — mapeamento EPI → IXC (agora do banco)
 router.get('/produtos-epi', authMiddleware, async (req, res) => {
   try {
     if (!isGestorOuAdmin(req.user.tipo_usuario))
       return res.status(403).json({ error: 'Sem permissão' });
 
-    const MAPEAMENTO_EPI = [
-      { epi: 'Capacete de Segurança (Classe B)', id_produto: '397', descricao_ixc: 'CAPACETE DE ABA REDONDA', tamanhos: null },
-      { epi: 'Carneira', id_produto: '398', descricao_ixc: 'CARNEIRA COM CATRACA', tamanhos: null },
-      { epi: 'Jugular', id_produto: '417', descricao_ixc: 'JUGULAR DE ELÁSTICO PARA CAPACETE', tamanhos: null },
-      { epi: 'Balaclava', id_produto: '388', descricao_ixc: 'TOUCA BALACLAVA', tamanhos: null },
-      { epi: 'Óculos de Segurança', id_produto: '421', descricao_ixc: 'ÓCULOS DE PROTEÇÃO', tamanhos: null },
-      { epi: 'Luva de Segurança (Isolante)', id_produto: '419', descricao_ixc: 'LUVA NBR', tamanhos: null },
-      { epi: 'Luva de Vaqueta', id_produto: '418', descricao_ixc: 'LUVA DE COURO VAQUETA', tamanhos: null },
-      { epi: 'Bota de Segurança', id_produto: '390', descricao_ixc: 'BOTA OPERACIONAL', tamanhos: ['39','40','41'] },
-      { epi: 'Cinto de Segurança', id_produto: '400', descricao_ixc: 'CINTO DE SEGURANÇA PQD', tamanhos: null },
-      { epi: 'Talabarte de Posicionamento', id_produto: '429', descricao_ixc: 'TALABARTE DE POSICIONAMENTO', tamanhos: null },
-      { epi: 'Protetor Solar', id_produto: '423', descricao_ixc: 'PROTETOR SOLAR FPS60 FPUVA20', tamanhos: null },
-      { epi: 'Escada de Alumínio', id_produto: '494', descricao_ixc: 'ESCADA ALUMÍNIO', tamanhos: null },
-      { epi: 'Escada Extensível', id_produto: '485', descricao_ixc: 'ESCADA EXTENSÍVEL FIBRA VAZADA', tamanhos: null },
-      { epi: 'Fita de Sinalização Zebrada', id_produto: '411', descricao_ixc: 'FITA DE SINALIZAÇÃO ZEBRADA', tamanhos: null },
-      { epi: 'Cone de Sinalização', id_produto: '484', descricao_ixc: 'CONE DE SINALIZAÇÃO', tamanhos: null },
-      { epi: 'Bandeirola', id_produto: '556', descricao_ixc: 'BANDEIROLA P/ SINALIZAÇÃO', tamanhos: null },
-      { epi: 'Detector de Tensão', id_produto: '637', descricao_ixc: 'DETECTOR TENSÃO', tamanhos: null },
-      { epi: 'Calça Operacional', id_produto: '395', descricao_ixc: 'CALÇA OPERACIONAL', tamanhos: ['36','38','40','41','42','46','48'] },
-      { epi: 'Camisa Manga Longa', id_produto: '538', descricao_ixc: 'CAMISA MANGA LONGA', tamanhos: ['P','M','G','GG'] },
-      { epi: 'Catraca Trava Escada', id_produto: '430', descricao_ixc: 'CATRACA TRAVA GANCHO PARA ESCADA EXTENSÍVEL', tamanhos: null },
-      { epi: 'Jaleco Operacional', id_produto: '416', descricao_ixc: 'JALECO OPERACIONAL', tamanhos: null },
-      { epi: 'Avental', id_produto: '635', descricao_ixc: 'AVENTAL', tamanhos: null },
-      { epi: 'Luva Latex', id_produto: '636', descricao_ixc: 'LUVA LATEX', tamanhos: null },
-    ];
+    const produtos = await db('produtos_epi')
+      .where('tenant_id', req.user.tenant_id)
+      .where('ativo', true)
+      .orderBy('nome', 'asc');
 
-    res.json({ mapeamento: MAPEAMENTO_EPI });
+    const mapeamento = produtos.map(p => ({
+      epi: p.nome,
+      id_produto: p.id_produto_ixc,
+      descricao_ixc: p.descricao_ixc,
+      tamanhos: p.tamanhos,
+      ca: p.ca,
+      fornecedor: p.fornecedor,
+    }));
+
+    res.json({ mapeamento });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar produtos EPI' });
+  }
+});
+
+// ================================================================
+// CRUD PRODUTOS EPI (CA, Fornecedor, etc.)
+// ================================================================
+
+// GET /api/seguranca/produtos-epi-cadastro — lista todos os produtos EPI do tenant
+router.get('/produtos-epi-cadastro', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const produtos = await db('produtos_epi')
+      .where('tenant_id', req.user.tenant_id)
+      .where('ativo', true)
+      .orderBy('nome', 'asc');
+
+    res.json({ produtos });
+  } catch (err) {
+    console.error('❌ Erro ao buscar produtos EPI:', err);
+    res.status(500).json({ error: 'Erro ao buscar produtos' });
+  }
+});
+
+// PUT /api/seguranca/produtos-epi-cadastro/:id — atualizar CA e fornecedor
+router.put('/produtos-epi-cadastro/:id', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const { ca, fornecedor, tamanhos } = req.body;
+
+    const produto = await db('produtos_epi')
+      .where('id', req.params.id)
+      .where('tenant_id', req.user.tenant_id)
+      .first();
+
+    if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
+
+    const updateData = { data_atualizacao: new Date() };
+    if (ca !== undefined) updateData.ca = ca;
+    if (fornecedor !== undefined) updateData.fornecedor = fornecedor;
+    if (tamanhos !== undefined) updateData.tamanhos = JSON.stringify(tamanhos);
+
+    await db('produtos_epi').where('id', req.params.id).update(updateData);
+
+    res.json({ success: true, message: 'Produto atualizado!' });
+  } catch (err) {
+    console.error('❌ Erro ao atualizar produto EPI:', err);
+    res.status(500).json({ error: 'Erro ao atualizar' });
+  }
+});
+
+// POST /api/seguranca/produtos-epi-cadastro — adicionar novo produto EPI
+router.post('/produtos-epi-cadastro', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const { nome, id_produto_ixc, descricao_ixc, ca, fornecedor, tamanhos } = req.body;
+
+    if (!nome) return res.status(400).json({ error: 'Nome obrigatório' });
+
+    const existe = await db('produtos_epi')
+      .where('tenant_id', req.user.tenant_id)
+      .where('nome', nome)
+      .first();
+
+    if (existe) return res.status(400).json({ error: 'Produto já cadastrado' });
+
+    const [inserted] = await db('produtos_epi').insert({
+      tenant_id: req.user.tenant_id,
+      nome,
+      id_produto_ixc: id_produto_ixc || null,
+      descricao_ixc: descricao_ixc || null,
+      ca: ca || 'N/A',
+      fornecedor: fornecedor || '',
+      tamanhos: tamanhos ? JSON.stringify(tamanhos) : null,
+    }).returning('*');
+
+    res.status(201).json({ success: true, message: 'Produto cadastrado!', produto: inserted });
+  } catch (err) {
+    console.error('❌ Erro ao cadastrar produto EPI:', err);
+    res.status(500).json({ error: 'Erro ao cadastrar' });
+  }
+});
+
+// DELETE /api/seguranca/produtos-epi-cadastro/:id — desativar produto
+router.delete('/produtos-epi-cadastro/:id', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    await db('produtos_epi')
+      .where('id', req.params.id)
+      .where('tenant_id', req.user.tenant_id)
+      .update({ ativo: false, data_atualizacao: new Date() });
+
+    res.json({ success: true, message: 'Produto removido!' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao remover' });
   }
 });
 

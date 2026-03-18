@@ -11,6 +11,7 @@ class SegurancaController extends GetxController {
   final epis = <String>[].obs;
   final episSelecionados = <String>{}.obs;
   final tamanhosSelecionados = <String, String>{}.obs;
+  final quantidadesSelecionadas = <String, int>{}.obs;
 
   final minhasRequisicoes = <Map<String, dynamic>>[].obs;
   final requisicoesPendentes = <Map<String, dynamic>>[].obs;
@@ -49,11 +50,13 @@ class SegurancaController extends GetxController {
   void limparSelecao() {
     episSelecionados.clear();
     tamanhosSelecionados.clear();
+    quantidadesSelecionadas.clear();
   }
 
   Future<Map<String, dynamic>> enviarRequisicao() async {
-    if (episSelecionados.isEmpty)
+    if (episSelecionados.isEmpty) {
       return {'success': false, 'message': 'Selecione ao menos um EPI'};
+    }
 
     // Bloqueia se já tiver uma aguardando confirmação
     if (hasRequisicaoAguardando) {
@@ -65,18 +68,29 @@ class SegurancaController extends GetxController {
 
     isSending.value = true;
     try {
-      final episComTamanho = episSelecionados.map((epi) {
+      final episComDetalhes = <String>[];
+
+      for (final epi in episSelecionados) {
         final tam = tamanhosSelecionados[epi];
-        return tam != null ? '$epi (Tam. $tam)' : epi;
-      }).toList();
+        final qtd = quantidadesSelecionadas[epi] ?? 1;
+
+        String nome = epi;
+
+        if (tam != null) nome += ' (Tam. $tam)';
+        if (qtd > 1) nome += ' x$qtd';
+
+        episComDetalhes.add(nome);
+      }
 
       final result = await _service.criarRequisicao(
-        episSolicitados: episComTamanho,
+        episSolicitados: episComDetalhes,
       );
+
       if (result['success'] == true) {
         episSelecionados.clear();
         await carregarMinhasRequisicoes();
       }
+
       return result;
     } finally {
       isSending.value = false;

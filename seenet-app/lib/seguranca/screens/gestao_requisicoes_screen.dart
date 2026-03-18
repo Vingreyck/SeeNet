@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../services/seguranca_service.dart';
 import 'perfil_tecnico_gestor_screen.dart';
 import 'dart:convert';
+import '../widgets/dialog_aprovacao_epi.dart';
 import '../controllers/seguranca_controller.dart';
 import '../widgets/botao_pdf.dart';
 
@@ -694,73 +695,11 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
   // DIALOGS
   // ══════════════════════════════════════════════════════════════
   void _confirmarAprovacao(Map<String, dynamic> req) {
-    final obsController = TextEditingController();
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Aprovar Requisição',
-            style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Técnico: ${req['tecnico_nome']}',
-              style: const TextStyle(
-                  color: Colors.white70, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'O estoque será descontado automaticamente do almoxarifado do técnico no IXC.',
-              style: TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: obsController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Observação (opcional)',
-                hintStyle: const TextStyle(color: Colors.white38),
-                filled: true,
-                fillColor: const Color(0xFF1A1A1A),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar',
-                style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final result = await controller.aprovar(
-                req['id'] as int,
-                observacao: obsController.text,
-              );
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(result['message'] ?? ''),
-                  backgroundColor: result['success'] == true
-                      ? const Color(0xFF00C853)
-                      : Colors.red,
-                ));
-              }
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00FF88)),
-            child:
-            const Text('Aprovar', style: TextStyle(color: Colors.black)),
-          ),
-        ],
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => DialogAprovacaoEpi(requisicao: req),
     );
   }
 

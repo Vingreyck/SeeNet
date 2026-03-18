@@ -181,14 +181,23 @@ class _RequisicaoEpiScreenState extends State<RequisicaoEpiScreen>
     ));
   }
 
+  // Mapa de tamanhos por EPI
+  static const Map<String, List<String>> _tamanhosPorEpi = {
+    'Bota de Segurança': ['39', '40', '41'],
+    'Calça Operacional': ['36', '38', '40', '41', '42', '46', '48'],
+    'Camisa Manga Longa': ['P', 'M', 'G', 'GG'],
+  };
+
   Widget _buildEpiTile(String epi, bool selecionado) {
+    final tamanhos = _tamanhosPorEpi[epi];
+    final temTamanho = tamanhos != null;
+
     return GestureDetector(
       onTap: () => controller.toggleEpi(epi),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 8),
-        padding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: selecionado
               ? const Color(0xFF00FF88).withOpacity(0.1)
@@ -201,28 +210,78 @@ class _RequisicaoEpiScreenState extends State<RequisicaoEpiScreen>
             width: selecionado ? 1.5 : 1,
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              selecionado
-                  ? Icons.check_box
-                  : Icons.check_box_outline_blank,
-              color: selecionado
-                  ? const Color(0xFF00FF88)
-                  : Colors.white38,
-              size: 22,
+            Row(
+              children: [
+                Icon(
+                  selecionado ? Icons.check_box : Icons.check_box_outline_blank,
+                  color: selecionado ? const Color(0xFF00FF88) : Colors.white38,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(epi,
+                      style: TextStyle(
+                        color: selecionado ? Colors.white : Colors.white70,
+                        fontSize: 14,
+                        fontWeight: selecionado ? FontWeight.w600 : FontWeight.normal,
+                      )),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(epi,
-                  style: TextStyle(
-                    color: selecionado ? Colors.white : Colors.white70,
-                    fontSize: 14,
-                    fontWeight: selecionado
-                        ? FontWeight.w600
-                        : FontWeight.normal,
-                  )),
-            ),
+            // Seletor de tamanho (só aparece se selecionado e tem tamanho)
+            if (selecionado && temTamanho) ...[
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.only(left: 34),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Selecione o tamanho:',
+                        style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    const SizedBox(height: 6),
+                    Obx(() {
+                      final tamSel = controller.tamanhosSelecionados[epi];
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: tamanhos.map((t) {
+                          final sel = tamSel == t;
+                          return GestureDetector(
+                            onTap: () {
+                              controller.tamanhosSelecionados[epi] = t;
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: sel
+                                    ? const Color(0xFF00FF88)
+                                    : const Color(0xFF1A1A1A),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: sel
+                                      ? const Color(0xFF00FF88)
+                                      : Colors.white24,
+                                ),
+                              ),
+                              child: Text(t,
+                                  style: TextStyle(
+                                    color: sel ? Colors.black : Colors.white70,
+                                    fontSize: 13,
+                                    fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                  )),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -414,8 +473,8 @@ class _RequisicaoEpiScreenState extends State<RequisicaoEpiScreen>
     );
   }
 
-  Future<void> _avancar(int etapa) async {
-    if (etapa == 0 && controller.episSelecionados.isEmpty) {
+  Future<void> _avancar(int etapa) async {    if (etapa == 0 && controller.episSelecionados.isEmpty) {
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Selecione ao menos um EPI'),
@@ -423,6 +482,19 @@ class _RequisicaoEpiScreenState extends State<RequisicaoEpiScreen>
         ),
       );
       return;
+    }
+    // Validar tamanhos obrigatórios
+    for (final epi in controller.episSelecionados) {
+      if (_tamanhosPorEpi.containsKey(epi) &&
+          controller.tamanhosSelecionados[epi] == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Selecione o tamanho de: $epi'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
     }
 
     if (etapa == 1) {
@@ -487,6 +559,7 @@ class _RequisicaoEpiScreenState extends State<RequisicaoEpiScreen>
     }
 
     _tabController.animateTo(etapa + 1);
+
   }
 }
 

@@ -10,6 +10,7 @@ class SegurancaController extends GetxController {
 
   final epis = <String>[].obs;
   final episSelecionados = <String>{}.obs;
+  final tamanhosSelecionados = <String, String>{}.obs;
 
   final minhasRequisicoes = <Map<String, dynamic>>[].obs;
   final requisicoesPendentes = <Map<String, dynamic>>[].obs;
@@ -45,7 +46,10 @@ class SegurancaController extends GetxController {
     }
   }
 
-  void limparSelecao() => episSelecionados.clear();
+  void limparSelecao() {
+    episSelecionados.clear();
+    tamanhosSelecionados.clear();
+  }
 
   Future<Map<String, dynamic>> enviarRequisicao() async {
     if (episSelecionados.isEmpty)
@@ -61,8 +65,13 @@ class SegurancaController extends GetxController {
 
     isSending.value = true;
     try {
+      final episComTamanho = episSelecionados.map((epi) {
+        final tam = tamanhosSelecionados[epi];
+        return tam != null ? '$epi (Tam. $tam)' : epi;
+      }).toList();
+
       final result = await _service.criarRequisicao(
-        episSolicitados: episSelecionados.toList(),
+        episSolicitados: episComTamanho,
       );
       if (result['success'] == true) {
         episSelecionados.clear();

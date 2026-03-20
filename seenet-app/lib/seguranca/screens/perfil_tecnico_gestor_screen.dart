@@ -109,6 +109,8 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
               if (_stats != null) _buildStatsCard(),
               const SizedBox(height: 16),
               _buildBotaoRegistroManual(),
+              const SizedBox(height: 12),
+              _buildBotaoFichaEpi(),
               const SizedBox(height: 20),
               _buildHistoricoRequisicoes(),
               const SizedBox(height: 20),
@@ -290,9 +292,6 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
       ),
     );
   }
-
-  const SizedBox(height: 12),
-  _buildBotaoFichaEpi(),
 
   // ── Histórico de Requisições ──────────────────────────────────
   Widget _buildHistoricoRequisicoes() {

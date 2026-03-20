@@ -34,7 +34,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
       if (_tabController.index == 3) controller.carregarRecusadas();
       if (_tabController.index == 4) controller.carregarHistorico();
     });
-
+  }
   @override
   void dispose() {
     _tabController.dispose();

@@ -413,268 +413,268 @@ const EPIS_PADRAO = [
   'Luva Latex',
 ];
 
-// ================================================================
-// GERAÇÃO DE PDF — FICHA DE EPI (formato BW Telecom)
-// ================================================================
-async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const doc = new PDFDocument({
-        size: 'A4',
-        margin: 30,
-        info: {
-          Title: `Ficha de EPI - ${tecnico.nome} - BBnet Up`,
-          Author: 'SeeNet - BBnet Up',
-          Subject: 'Ficha de Controle de Equipamentos de Proteção Individual',
-        },
-      });
+    // ================================================================
+    // GERAÇÃO DE PDF — FICHA DE EPI (formato BW Telecom)
+    // ================================================================
+    const LOGO_CRUZ_BASE64 = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAA0JCgsKCA0LCwsPDg0QFCEVFBISFCgdHhghMCoyMS8qLi00O0tANDhHOS0uQllCR05QVFVUMz9dY1xSYktTVFH/2wBDAQ4PDxQRFCcVFSdRNi42UVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVH/wAARCAAmACcDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD0TUb+3020a5uX2oOAB1Y+g965PUtWv5LmP7XerZ2pk2lLYncCrAOpbGdwDZ4+U44zRrGo+bqd3dMElgtd1t5OSHXoC46gZbjJGCOCOa6HRdISxhSWceZd7QNzEt5Q7ImScKM4681GsnocUpSrScYuyRyxjnkeCRtO1aG4Ur5tzGsjSONvzYyeOf0+mDYsNZvoYpbiC6N3AJgq20xzIVZjtAbqX+U8c8c1ag1nUH8ZGwa4zbeay7Ni9ApI5xmtXW9GjvYXuLeNUvlVtjgD58rja3qCOOen0yDKXVGcINpypvb5f1+poWV5FfW4mh3AdGVhhkPoR2NFcRo+r2emXNtOJJgs8bLco7+YFC8Jtxz2xg9B+Boq1JdTop4mEo+80mZkbGDxOjXUi7kvAZXPTIfk/wA66LXbHxHNq88lg9wLY7dgS4Cj7ozxuHfNGuRPpl/KTGXsrzcVAYoFlZdrAtnAyOcsCPTHJrQ0TXopbJRdvsVHMSXDHKSbR1LHocY+9jPb0EJdGcsKcU3Tm7a3OKjt9TOsmBGk/tDcRkS4bOOfmz6e9dLoVj4jh1eCS/e4NsN28PcBh90443Hvip4tEnj8SHWmuLb7JuaXO852lTz0x39al1zxFB5D2unzq0r4jNwCfLiyCR8w7nBx6cnPFCVtWFOlGneU21Z6eZxGpPHJqd28JBiaZyhHTG44orrNGsLa/vNiRLJZWvDbz5iFwCuF4AwfvEjOflPHQFJQb1Mo4OVT3kzqbm3hu7d7e4jEkTjDKe9clf6Rc6Chvbe4Wa0hUJskJWRQzjIUgdT03cHBPtRRVyWlzvxMVyOXVGJHqtmsYWTSoZWAIJOFySQSeFHcHHoCRyK3dI0ifVIUuvPFpYszNHFCcyL85ONxHADYOBxwDjPNFFZx1ep5+GftJ8sjq7a3htLdLe3jEcSDCqO1FFFbnspW0R//2Q==';
+    const LOGO_BW_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAACkAAAApCAIAAAAnApehAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAC8klEQVR4nGNgGAWjYBSMglEwYgAbL7uMqRwcCSoK08VaRoawNYlFTxvQUP69WrMsG9pabZhgVvQEZJnP9FApU1kg8p0WCrG+8Em9hLQEEEBUsrOzS4IBMzMzRISHh2fp0qVaWlpk2u01KQhik2mmNUSEQ4ATavfj+us3rn/9+hUiPnfu3P9gYGpqChGBcI2Njcm0O/FgLsQmrSA9iIi6rw5EJHpz6rNnz75//87IyAgU//v3L8SyiIgIILetrQ3I/v37NzwYSASMDMCAhdjkXOthm+9kX+qWdaUMHOB1SWUpQNN//vwJNJ2FheU/DBQVFQG1Pn/+HMjeunUrmZ5mYWeBRDYaAjpIyUm1pqYGaPqfP39YWVn37t0LtxsoLioqCmE7OjqSaTcbDzvE3zm3qiT0pUHIQDpkRTzE+oDaUKDpwKBmY2N79eoV3O6WlpaKigog48ePH8DwINNuDn5ossq6Wg4XtK9zhwjaVrkALf7375+6uvp/JNDd3X3r1i0gY+PGjWRaDATCqqIQazLOl8AFAxdFQQRDO2MgllVXVwNJoNd//foFZCxevBgizsvLS77dOWfLIda4t/vDBQvv10EDozwbYse7d++AZEdHx4cPH4CML1++QMTJtxhkDSyhRaxLCl4SB0SRG5MhInl3qp2dnZGDmoOD4/Xr13Du5MmTKbIbM4UDUcHj2ry7tcA8LSsrC7cJmI+B6l+8eAEXgZd3lAKgTcyszExACCRZQAygIJANRBApCJeRiREoC2QzsTBRx2IgEFMVL7hZq2CtbF/lJqohEbk6EWhN8qE8RTvVuO0ZhnFmBlGmBtGmAfMiCx/WSRnLJh/Jp5rdQH/4zgxTclJT99YR05TQjzJm5WILmBchrCyWdroYqCBxRxY7H0f05rTwZYlxOzIi1idTzW42LjaTFCtFO+WQOTFe7QGh8+Nc6rzDlyf49oWGLI0Nmh/j3uPvMynYptiZR4LXKNHSOMWSanaPglEwCkbBKBj0AABRRteQUzXwCAAAAABJRU5ErkJggg==';
 
-      const chunks = [];
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
+    async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const doc = new PDFDocument({
+            size: 'A4',
+            margin: 30,
+            info: {
+              Title: `Ficha de EPI - ${tecnico.nome} - BW Telecom`,
+              Author: 'SeeNet - BW Telecom',
+              Subject: 'Ficha de Controle de Equipamentos de Proteção Individual',
+            },
+          });
 
-      const W = 595.28;
-      const M = 30;
-      const CW = W - M * 2; // largura útil
-      const VERDE = '#007A4A';
-      const CINZA_BORDA = '#999999';
+          const chunks = [];
+          doc.on('data', (chunk) => chunks.push(chunk));
+          doc.on('end', () => resolve(Buffer.concat(chunks)));
+          doc.on('error', reject);
 
-      // ── CABEÇALHO ─────────────────────────────────────────────
-      // Logo tentativa
-      let logoBuffer = null;
-      try {
-        const https = require('https');
-        logoBuffer = await new Promise((res, rej) => {
-          https.get('https://static.wixstatic.com/media/40655f_6e4972b166904af6957a3208c1ab4fa4~mv2.png', (response) => {
-            const chunks = [];
-            response.on('data', (c) => chunks.push(c));
-            response.on('end', () => res(Buffer.concat(chunks)));
-            response.on('error', rej);
-          }).on('error', rej);
-        });
-      } catch (_) {}
+          const W = 595.28;
+          const M = 30;
+          const CW = W - M * 2;
+          const CINZA_BORDA = '#999999';
 
-      let y = M;
+          let y = M;
 
-      // Borda do cabeçalho
-      doc.rect(M, y, CW, 60).stroke(CINZA_BORDA);
+          // ── CABEÇALHO ─────────────────────────────────────────────
+          doc.rect(M, y, CW, 55).stroke(CINZA_BORDA);
 
-      if (logoBuffer) {
-        try { doc.image(logoBuffer, M + 8, y + 8, { height: 44 }); } catch (_) {}
-      }
+          // Logo cruz verde
+          try {
+            const cruzBuf = Buffer.from(LOGO_CRUZ_BASE64, 'base64');
+            doc.image(cruzBuf, M + 8, y + 8, { height: 38 });
+          } catch (_) {}
 
-      doc.fontSize(14).font('Helvetica-Bold').fillColor('#000000')
-        .text('FICHA DE CONTROLE DE EQUIPAMENTOS', M + 120, y + 12, { width: CW - 130, align: 'center' });
-      doc.fontSize(12).font('Helvetica-Bold')
-        .text('DE PROTEÇÃO INDIVIDUAL – EPI', M + 120, y + 30, { width: CW - 130, align: 'center' });
+          // Logo BW
+          try {
+            const bwBuf = Buffer.from(LOGO_BW_BASE64, 'base64');
+            doc.image(bwBuf, M + 50, y + 10, { height: 34 });
+          } catch (_) {}
 
-      y += 64;
+          doc.fontSize(12).font('Helvetica-Bold').fillColor('#000000')
+            .text('FICHA DE CONTROLE DE EQUIPAMENTOS', M + 100, y + 10, { width: CW - 110, align: 'center' });
+          doc.fontSize(11).font('Helvetica-Bold')
+            .text('DE PROTEÇÃO INDIVIDUAL – EPI', M + 100, y + 28, { width: CW - 110, align: 'center' });
 
-      // ── DADOS DO COLABORADOR ──────────────────────────────────
-      const dataRevisao = formatarDataBR(new Date(), false);
+          y += 59;
 
-      // Linha 1: Nome + Data Revisão
-      doc.rect(M, y, CW * 0.6, 22).stroke(CINZA_BORDA);
-      doc.rect(M + CW * 0.6, y, CW * 0.4, 22).stroke(CINZA_BORDA);
-      doc.fontSize(8).font('Helvetica-Bold').fillColor('#000000')
-        .text(`NOME: ${tecnico.nome?.toUpperCase() || ''}`, M + 4, y + 7);
-      doc.text(`DATA DE REVISÃO: ${dataRevisao}`, M + CW * 0.6 + 4, y + 7);
-      y += 22;
+          // ── DADOS DO COLABORADOR ──────────────────────────────────
+          const dataRevisao = formatarDataBR(new Date(), false);
 
-      // Linha 2: Função + CBO
-      doc.rect(M, y, CW * 0.6, 22).stroke(CINZA_BORDA);
-      doc.rect(M + CW * 0.6, y, CW * 0.4, 22).stroke(CINZA_BORDA);
-      doc.fontSize(8).font('Helvetica-Bold')
-        .text('FUNÇÃO: TÉCNICO DE REDE', M + 4, y + 7);
-      doc.text('CBO: 313305', M + CW * 0.6 + 4, y + 7);
-      y += 22;
+          // Linha 1: Nome + Data Revisão
+          doc.rect(M, y, CW * 0.6, 20).stroke(CINZA_BORDA);
+          doc.rect(M + CW * 0.6, y, CW * 0.4, 20).stroke(CINZA_BORDA);
+          doc.fontSize(8).font('Helvetica-Bold').fillColor('#000000')
+            .text(`NOME: ${tecnico.nome?.toUpperCase() || ''}`, M + 4, y + 6);
+          doc.text(`DATA DE REVISÃO: ${dataRevisao}`, M + CW * 0.6 + 4, y + 6);
+          y += 20;
 
-      // Linha 3: Empresa + Data Admissão
-      doc.rect(M, y, CW * 0.6, 22).stroke(CINZA_BORDA);
-      doc.rect(M + CW * 0.6, y, CW * 0.4, 22).stroke(CINZA_BORDA);
-      doc.fontSize(8).font('Helvetica-Bold')
-        .text('EMPRESA: BBNET UP PROVEDOR LTDA', M + 4, y + 7);
-      doc.text(`DATA ADMISSÃO: ${tecnico.data_criacao ? formatarDataBR(tecnico.data_criacao, false) : '---'}`, M + CW * 0.6 + 4, y + 7);
-      y += 26;
+          // Linha 2: Função + CBO
+          doc.rect(M, y, CW * 0.6, 20).stroke(CINZA_BORDA);
+          doc.rect(M + CW * 0.6, y, CW * 0.4, 20).stroke(CINZA_BORDA);
+          doc.fontSize(8).font('Helvetica-Bold')
+            .text('FUNÇÃO: TÉCNICO DE REDE', M + 4, y + 6);
+          doc.text('CBO: 313305', M + CW * 0.6 + 4, y + 6);
+          y += 20;
 
-      // ── DECLARAÇÃO LEGAL ──────────────────────────────────────
-      const declaracao = `Reconheço ter sido orientado sobre os riscos à saúde dos eventuais agentes agressivos do meu trabalho e ter sido orientado adequadamente sobre as proteções que devem ser tomadas. Reconheço, também, estar recebendo todos os equipamentos de proteção individual necessários à minha função e ter sido treinado e orientado quanto a sua correta e obrigatória utilização. Declaro ainda:\n►Ter recebido treinamento sobre a utilização adequada destes EPIs, seu prazo de validade, bem como dos riscos que estou sujeito pelo seu não uso;\n►Indenizar a empresa, autorizando o desconto do custo da reparação do dano que eventualmente vier a provocar nos EPIs em questão, por atos de negligência ou mau uso, extravio ou na sua não devolução quando a mim solicitado, já que atesto tê-lo recebido em perfeitas condições (ciente e colocando minha anuência às disposições do Art. 462 da CLT);\n► Estar ciente da disposição legal constante na Norma Regulamentadora NR 01, sub-item 1.8.1 e item 1.9, de que constitui ato faltoso a recusa injustificada de usar os EPIs fornecidos pelo empregador, incorrendo nas penalidades previstas na legislação pertinente;\n► Que na não observância do seu uso, por negligência, os danos e/ou lesões resultantes de acidentes serão de minha inteira responsabilidade.`;
+          // Linha 3: Empresa + Data Admissão
+          doc.rect(M, y, CW * 0.6, 20).stroke(CINZA_BORDA);
+          doc.rect(M + CW * 0.6, y, CW * 0.4, 20).stroke(CINZA_BORDA);
+          doc.fontSize(8).font('Helvetica-Bold')
+            .text('EMPRESA: BW TELECOM LTDA', M + 4, y + 6);
+          doc.text(`DATA ADMISSÃO: ${tecnico.data_criacao ? formatarDataBR(tecnico.data_criacao, false) : '---'}`, M + CW * 0.6 + 4, y + 6);
+          y += 24;
 
-      doc.fontSize(7).font('Helvetica').fillColor('#000000')
-        .text(declaracao, M, y, { width: CW, lineGap: 1 });
+          // ── DECLARAÇÃO LEGAL ──────────────────────────────────────
+          const declaracao = 'Reconheço ter sido orientado sobre os riscos à saúde dos eventuais agentes agressivos do meu trabalho e ter sido orientado adequadamente sobre as proteções que devem ser tomadas. Reconheço, também, estar recebendo todos os equipamentos de proteção individual necessários à minha função e ter sido treinado e orientado quanto a sua correta e obrigatória utilização. Declaro ainda:\n►Ter recebido treinamento sobre a utilização adequada destes EPIs, seu prazo de validade, bem como dos riscos que estou sujeito pelo seu não uso;\n►Indenizar a empresa, autorizando o desconto do custo da reparação do dano que eventualmente vier a provocar nos EPIs em questão, por atos de negligência ou mau uso, extravio ou na sua não devolução quando a mim solicitado, já que atesto tê-lo recebido em perfeitas condições (ciente e colocando minha anuência às disposições do Art. 462 da CLT);\n► Estar ciente da disposição legal constante na Norma Regulamentadora NR 01, sub-item 1.8.1 e item 1.9, de que constitui ato faltoso a recusa injustificada de usar os EPIs fornecidos pelo empregador, incorrendo nas penalidades previstas na legislação pertinente;\n► Que na não observância do seu uso, por negligência, os danos e/ou lesões resultantes de acidentes serão de minha inteira responsabilidade.';
 
-      y = doc.y + 10;
+          doc.fontSize(6.5).font('Helvetica').fillColor('#000000')
+            .text(declaracao, M, y, { width: CW, lineGap: 1 });
 
-      // Linha de assinatura
-      doc.fontSize(8).font('Helvetica')
-        .text('__________________________________', M + 80, y);
-      y += 12;
-      doc.text('ASSINATURA DO EMPREGADO', M + 100, y);
-      doc.text(`LOCAL: ITABAIANA/SE`, M + CW * 0.6, y);
-      y += 20;
+          y = doc.y + 8;
 
-      // ── TABELA DE EPIs ────────────────────────────────────────
-      // Cabeçalho da tabela
-      const colWidths = {
-        quat: 45,
-        descricao: 150,
-        fabricante: 105,
-        ca: 50,
-        data: 60,
-        assinatura: CW - 45 - 150 - 105 - 50 - 60
-      };
-
-      function desenharCabecalhoTabela(yPos) {
-        // Título "ESPECIFICAÇÃO DO EPI" + "RETIRADA"
-        doc.rect(M, yPos, colWidths.quat + colWidths.descricao + colWidths.fabricante + colWidths.ca, 14)
-          .fill('#E8E8E8').stroke(CINZA_BORDA);
-        doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
-          .text('ESPECIFICAÇÃO DO EPI', M + 4, yPos + 4);
-
-        doc.rect(M + colWidths.quat + colWidths.descricao + colWidths.fabricante + colWidths.ca, yPos,
-          colWidths.data + colWidths.assinatura, 14)
-          .fill('#E8E8E8').stroke(CINZA_BORDA);
-        doc.text('RETIRADA', M + colWidths.quat + colWidths.descricao + colWidths.fabricante + colWidths.ca + 4, yPos + 4);
-
-        yPos += 14;
-
-        // Sub-cabeçalho
-        let x = M;
-        const headers = [
-          { label: 'QUAT', w: colWidths.quat },
-          { label: 'DESCRIÇÃO DO EPI', w: colWidths.descricao },
-          { label: 'FABRICANTE', w: colWidths.fabricante },
-          { label: 'CA', w: colWidths.ca },
-          { label: 'DATA', w: colWidths.data },
-          { label: 'ASSINATURA', w: colWidths.assinatura },
-        ];
-
-        headers.forEach(h => {
-          doc.rect(x, yPos, h.w, 14).fill('#F0F0F0').stroke(CINZA_BORDA);
-          doc.fontSize(6).font('Helvetica-Bold').fillColor('#000000')
-            .text(h.label, x + 2, yPos + 4, { width: h.w - 4 });
-          x += h.w;
-        });
-
-        return yPos + 14;
-      }
-
-      y = desenharCabecalhoTabela(y);
-
-      // Mapa de produtos EPI para buscar CA/fornecedor
-      const produtoMap = {};
-      produtosEpi.forEach(p => {
-        produtoMap[p.nome] = p;
-      });
-
-      // Desenhar linhas dos EPIs de cada requisição
-      const reqsAprovadas = requisicoes
-        .filter(r => ['concluida', 'aprovada', 'aguardando_confirmacao'].includes(r.status))
-        .sort((a, b) => new Date(a.data_resposta || a.data_criacao) - new Date(b.data_resposta || b.data_criacao));
-
-      for (const req of reqsAprovadas) {
-        const epis = Array.isArray(req.epis_solicitados)
-          ? req.epis_solicitados
-          : JSON.parse(req.epis_solicitados || '[]');
-
-        const dataEntrega = req.data_entrega || req.data_resposta || req.data_criacao;
-        const dataStr = dataEntrega ? formatarDataBR(new Date(dataEntrega), false) : '---';
-
-        for (const epiNome of epis) {
-          // Nova página se necessário
-          if (y > 740) {
-            doc.addPage();
-            y = M;
-            y = desenharCabecalhoTabela(y);
-          }
-
-          // Extrair quantidade e nome limpo
-          const qtdMatch = epiNome.match(/x(\d+)$/);
-          const quantidade = qtdMatch ? parseInt(qtdMatch[1]) : 1;
-          const nomeLimpo = epiNome
-            .replace(/\s*\(Tam\.\s*\w+\)/, '')
-            .replace(/\s*x\d+$/, '')
-            .trim();
-
-          // Buscar CA e fornecedor do produto
-          const prodInfo = produtoMap[nomeLimpo] || {};
-          const ca = prodInfo.ca || '........';
-          const fornecedor = prodInfo.fornecedor || '';
-
-          // Extrair tamanho
-          const tamMatch = epiNome.match(/\(Tam\.\s*(\w+)\)/);
-          let descricaoFinal = nomeLimpo;
-          if (tamMatch) descricaoFinal += ` - ${tamMatch[1]}`;
-
-          // Desenhar linha
-          let x = M;
-          const rowH = 16;
-
-          // QUAT
-          doc.rect(x, y, colWidths.quat, rowH).stroke(CINZA_BORDA);
-          doc.fontSize(7).font('Helvetica').fillColor('#000000')
-            .text(`${quantidade} UNI`, x + 2, y + 5, { width: colWidths.quat - 4 });
-          x += colWidths.quat;
-
-          // DESCRIÇÃO
-          doc.rect(x, y, colWidths.descricao, rowH).stroke(CINZA_BORDA);
-          doc.fontSize(7).font('Helvetica')
-            .text(descricaoFinal, x + 2, y + 5, { width: colWidths.descricao - 4 });
-          x += colWidths.descricao;
-
-          // FABRICANTE
-          doc.rect(x, y, colWidths.fabricante, rowH).stroke(CINZA_BORDA);
-          doc.fontSize(6).font('Helvetica')
-            .text(fornecedor.toUpperCase(), x + 2, y + 5, { width: colWidths.fabricante - 4 });
-          x += colWidths.fabricante;
-
-          // CA
-          doc.rect(x, y, colWidths.ca, rowH).stroke(CINZA_BORDA);
-          doc.fontSize(7).font('Helvetica')
-            .text(ca, x + 2, y + 5, { width: colWidths.ca - 4 });
-          x += colWidths.ca;
-
-          // DATA
-          doc.rect(x, y, colWidths.data, rowH).stroke(CINZA_BORDA);
-          doc.fontSize(6).font('Helvetica')
-            .text(dataStr, x + 2, y + 5, { width: colWidths.data - 4 });
-          x += colWidths.data;
-
-          // ASSINATURA (foto da assinatura se disponível)
-          doc.rect(x, y, colWidths.assinatura, rowH).stroke(CINZA_BORDA);
-          if (req.assinatura_recebimento_base64) {
+          // ── ASSINATURA DE ADMISSÃO ────────────────────────────────
+          if (tecnico.assinatura_admissao) {
             try {
-              const sigClean = req.assinatura_recebimento_base64.replace(/^data:image\/\w+;base64,/, '');
+              const sigClean = tecnico.assinatura_admissao.replace(/^data:image\/\w+;base64,/, '');
               const sigBuf = Buffer.from(sigClean, 'base64');
-              doc.image(sigBuf, x + 2, y + 1, { height: rowH - 2, fit: [colWidths.assinatura - 4, rowH - 2] });
-            } catch (_) {}
+              doc.image(sigBuf, M + 60, y, { height: 30 });
+              y += 34;
+            } catch (_) {
+              doc.text('__________________________________', M + 80, y);
+              y += 14;
+            }
+          } else {
+            doc.text('__________________________________', M + 80, y);
+            y += 14;
           }
 
-          y += rowH;
+          doc.fontSize(8).font('Helvetica')
+            .text('ASSINATURA DO EMPREGADO', M + 80, y);
+          doc.text('LOCAL: MALHADOR/SE', M + CW * 0.6, y);
+          y += 18;
+
+          // ── TABELA DE EPIs ────────────────────────────────────────
+          const colWidths = {
+            quat: 40,
+            descricao: 145,
+            fabricante: 100,
+            ca: 45,
+            data: 55,
+            assinatura: CW - 40 - 145 - 100 - 45 - 55
+          };
+
+          function desenharCabecalhoTabela(yPos) {
+            // Título ESPECIFICAÇÃO + RETIRADA
+            const specW = colWidths.quat + colWidths.descricao + colWidths.fabricante + colWidths.ca;
+            const retW = colWidths.data + colWidths.assinatura;
+
+            doc.rect(M, yPos, specW, 13).fill('#E0E0E0').stroke(CINZA_BORDA);
+            doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#000000')
+              .text('ESPECIFICAÇÃO DO EPI', M + 4, yPos + 3);
+
+            doc.rect(M + specW, yPos, retW, 13).fill('#E0E0E0').stroke(CINZA_BORDA);
+            doc.text('RETIRADA', M + specW + 4, yPos + 3);
+            yPos += 13;
+
+            // Sub-cabeçalho
+            let x = M;
+            const headers = [
+              { label: 'QUAT', w: colWidths.quat },
+              { label: 'DESCRIÇÃO DO EPI', w: colWidths.descricao },
+              { label: 'FABRICANTE', w: colWidths.fabricante },
+              { label: 'CA', w: colWidths.ca },
+              { label: 'DATA', w: colWidths.data },
+              { label: 'ASSINATURA', w: colWidths.assinatura },
+            ];
+
+            headers.forEach(h => {
+              doc.rect(x, yPos, h.w, 12).fill('#F0F0F0').stroke(CINZA_BORDA);
+              doc.fontSize(5.5).font('Helvetica-Bold').fillColor('#000000')
+                .text(h.label, x + 2, yPos + 3, { width: h.w - 4 });
+              x += h.w;
+            });
+
+            return yPos + 12;
+          }
+
+          y = desenharCabecalhoTabela(y);
+
+          // Mapa de produtos para CA/fornecedor
+          const produtoMap = {};
+          produtosEpi.forEach(p => { produtoMap[p.nome] = p; });
+
+          // Requisições aprovadas/concluídas ordenadas por data
+          const reqsAprovadas = requisicoes
+            .filter(r => ['concluida', 'aprovada', 'aguardando_confirmacao'].includes(r.status))
+            .sort((a, b) => new Date(a.data_resposta || a.data_criacao) - new Date(b.data_resposta || b.data_criacao));
+
+          for (const req of reqsAprovadas) {
+            const epis = Array.isArray(req.epis_solicitados)
+              ? req.epis_solicitados
+              : JSON.parse(req.epis_solicitados || '[]');
+
+            const dataEntrega = req.data_entrega || req.data_resposta || req.data_criacao;
+            const dataStr = dataEntrega ? formatarDataBR(new Date(dataEntrega), false) : '---';
+
+            for (const epiNome of epis) {
+              if (y > 750) {
+                doc.addPage();
+                y = M;
+                y = desenharCabecalhoTabela(y);
+              }
+
+              const qtdMatch = epiNome.match(/x(\d+)$/);
+              const quantidade = qtdMatch ? parseInt(qtdMatch[1]) : 1;
+              const nomeLimpo = epiNome
+                .replace(/\s*\(Tam\.\s*\w+\)/, '')
+                .replace(/\s*x\d+$/, '')
+                .trim();
+
+              const prodInfo = produtoMap[nomeLimpo] || {};
+              const ca = prodInfo.ca || '........';
+              const fornecedor = prodInfo.fornecedor || '';
+
+              const tamMatch = epiNome.match(/\(Tam\.\s*(\w+)\)/);
+              let descricaoFinal = nomeLimpo;
+              if (tamMatch) descricaoFinal += ` - ${tamMatch[1]}`;
+
+              let x = M;
+              const rowH = 15;
+
+              // QUAT
+              doc.rect(x, y, colWidths.quat, rowH).stroke(CINZA_BORDA);
+              doc.fontSize(6).font('Helvetica').fillColor('#000000')
+                .text(`${quantidade} UNI`, x + 2, y + 4, { width: colWidths.quat - 4 });
+              x += colWidths.quat;
+
+              // DESCRIÇÃO
+              doc.rect(x, y, colWidths.descricao, rowH).stroke(CINZA_BORDA);
+              doc.fontSize(6).font('Helvetica')
+                .text(descricaoFinal, x + 2, y + 4, { width: colWidths.descricao - 4 });
+              x += colWidths.descricao;
+
+              // FABRICANTE
+              doc.rect(x, y, colWidths.fabricante, rowH).stroke(CINZA_BORDA);
+              doc.fontSize(5.5).font('Helvetica')
+                .text(fornecedor.toUpperCase(), x + 2, y + 4, { width: colWidths.fabricante - 4 });
+              x += colWidths.fabricante;
+
+              // CA
+              doc.rect(x, y, colWidths.ca, rowH).stroke(CINZA_BORDA);
+              doc.fontSize(6).font('Helvetica')
+                .text(ca, x + 2, y + 4, { width: colWidths.ca - 4 });
+              x += colWidths.ca;
+
+              // DATA
+              doc.rect(x, y, colWidths.data, rowH).stroke(CINZA_BORDA);
+              doc.fontSize(5.5).font('Helvetica')
+                .text(dataStr, x + 2, y + 4, { width: colWidths.data - 4 });
+              x += colWidths.data;
+
+              // ASSINATURA
+              doc.rect(x, y, colWidths.assinatura, rowH).stroke(CINZA_BORDA);
+              if (req.assinatura_recebimento_base64) {
+                try {
+                  const sigClean = req.assinatura_recebimento_base64.replace(/^data:image\/\w+;base64,/, '');
+                  const sigBuf = Buffer.from(sigClean, 'base64');
+                  doc.image(sigBuf, x + 2, y + 1, { height: rowH - 2, fit: [colWidths.assinatura - 4, rowH - 2] });
+                } catch (_) {}
+              }
+
+              y += rowH;
+            }
+          }
+
+          // ── OBS NR-01 ─────────────────────────────────────────────
+          if (y > 750) { doc.addPage(); y = M; }
+          y += 10;
+          doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#000000')
+            .text('OBS: ', M, y, { continued: true });
+          doc.font('Helvetica')
+            .text('Conforme determina a NR 01, a substituição do Equipamento de Proteção Individual (EPI) deve ser feita de acordo com o prazo de validade do fabricante e o estado do equipamento.', { width: CW });
+
+          // ── RODAPÉ ────────────────────────────────────────────────
+          const footerY = 841.89 - 36;
+          doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
+            .text('BW TELECOM LTDA - CNPJ: 47.626.282/0001-09', M, footerY, { width: CW, align: 'center' });
+          doc.fontSize(7).font('Helvetica')
+            .text('PRAÇA PADRE MANOEL DE OLIVEIRA, Nº10 – MALHADOR-SE.', M, footerY + 10, { width: CW, align: 'center' });
+
+          doc.end();
+        } catch (err) {
+          reject(err);
         }
-      }
-
-      // ── OBS NR-01 ─────────────────────────────────────────────
-      if (y > 740) { doc.addPage(); y = M; }
-      y += 10;
-      doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
-        .text('OBS: ', M, y, { continued: true });
-      doc.font('Helvetica')
-        .text('Conforme determina a NR 01, a substituição do Equipamento de Proteção Individual (EPI) deve ser feita de acordo com o prazo de validade do fabricante e o estado do equipamento.', { width: CW });
-
-      // ── RODAPÉ ────────────────────────────────────────────────
-      const footerY = 841.89 - 40;
-      doc.fontSize(7).font('Helvetica').fillColor('#555555')
-        .text('BBNET UP PROVEDOR LTDA - CNPJ: 23.870.928/0002-03', M, footerY, { width: CW, align: 'center' });
-      doc.text('RUA DOUTOR AUGUSTO CEZAR LEITE, 428 – ITABAIANA/SE', M, footerY + 10, { width: CW, align: 'center' });
-
-      doc.end();
-    } catch (err) {
-      reject(err);
+      });
     }
-  });
-}
 
 // ================================================================
 // ROTAS
@@ -1145,7 +1145,7 @@ router.get('/tecnicos/:id/perfil', authMiddleware, async (req, res) => {
     const usuario = await db('usuarios')
       .where('id', tecnicoId)
       .where('tenant_id', req.user.tenant_id)
-      .select('id', 'nome', 'email', 'tipo_usuario', 'foto_perfil', 'data_criacao', 'ultimo_login')
+      .select('id', 'nome', 'email', 'tipo_usuario', 'foto_perfil', 'assinatura_admissao', 'data_criacao', 'ultimo_login')
       .first();
 
     if (!usuario) return res.status(404).json({ error: 'Técnico não encontrado' });
@@ -1481,12 +1481,32 @@ router.get('/tecnicos/:id/ficha-epi', authMiddleware, async (req, res) => {
   }
 });
 
+// PUT /api/seguranca/tecnicos/:id/assinatura-admissao — gestor faz upload da assinatura de admissão
+router.put('/tecnicos/:id/assinatura-admissao', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const { assinatura_base64 } = req.body;
+    if (!assinatura_base64) return res.status(400).json({ error: 'Assinatura obrigatória' });
+
+    await db('usuarios')
+      .where('id', req.params.id)
+      .where('tenant_id', req.user.tenant_id)
+      .update({ assinatura_admissao: assinatura_base64 });
+
+    res.json({ success: true, message: 'Assinatura de admissão salva!' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao salvar assinatura' });
+  }
+});
+
 // GET /api/seguranca/perfil
 router.get('/perfil', authMiddleware, async (req, res) => {
   try {
     const usuario = await db('usuarios')
       .where('id', req.user.id)
-      .select('id', 'nome', 'email', 'tipo_usuario', 'foto_perfil', 'data_criacao', 'ultimo_login')
+      .select('id', 'nome', 'email', 'tipo_usuario', 'foto_perfil', 'assinatura_admissao', 'data_criacao')
       .first();
 
     const tenant = await db('tenants').where('id', req.user.tenant_id).first();

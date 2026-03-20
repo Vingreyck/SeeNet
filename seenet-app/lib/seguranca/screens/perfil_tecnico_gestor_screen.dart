@@ -1,6 +1,8 @@
 // lib/seguranca/screens/perfil_tecnico_gestor_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
+
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
@@ -111,6 +113,8 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
               _buildBotaoRegistroManual(),
               const SizedBox(height: 12),
               _buildBotaoFichaEpi(),
+              const SizedBox(height: 12),
+              _buildBotaoAssinaturaAdmissao(),
               const SizedBox(height: 20),
               _buildHistoricoRequisicoes(),
               const SizedBox(height: 20),
@@ -332,6 +336,62 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
         ..._requisicoes.map((req) => _buildRequisicaoCard(req)),
       ],
     );
+  }
+
+  Widget _buildBotaoAssinaturaAdmissao() {
+    final temAssinatura = _perfil?['assinatura_admissao'] != null;
+
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _uploadAssinaturaAdmissao,
+        icon: Icon(
+          temAssinatura ? Icons.check_circle : Icons.upload_file,
+          color: temAssinatura ? const Color(0xFF00FF88) : Colors.orange,
+          size: 20,
+        ),
+        label: Text(
+          temAssinatura ? 'Assinatura de Admissão ✓' : 'Enviar Assinatura de Admissão',
+          style: TextStyle(
+            color: temAssinatura ? const Color(0xFF00FF88) : Colors.orange,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: temAssinatura ? const Color(0xFF00FF88) : Colors.orange),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadAssinaturaAdmissao() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+      maxWidth: 800,
+    );
+
+    if (image == null) return;
+
+    final bytes = await image.readAsBytes();
+    final base64Str = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+
+    final result = await _service.uploadAssinaturaAdmissao(widget.tecnicoId, base64Str);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result['message'] ?? 'Erro'),
+        backgroundColor: result['success'] == true ? const Color(0xFF00C853) : Colors.red,
+      ));
+
+      if (result['success'] == true) {
+        _carregarPerfil();
+      }
+    }
   }
 
   Widget _buildRequisicaoCard(Map<String, dynamic> req) {

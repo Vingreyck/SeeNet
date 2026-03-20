@@ -313,6 +313,16 @@ class SegurancaService extends GetxService {
       return null;
     } catch (_) { return null; }
   }
+  // ── Upload assinatura de admissão ─────────────────────────────
+  Future<Map<String, dynamic>> uploadAssinaturaAdmissao(int tecnicoId, String assinaturaBase64) async {
+    final response = await GetConnect().put(
+      '$_base/tecnicos/$tecnicoId/assinatura-admissao',
+      {'assinatura_base64': assinaturaBase64},
+      headers: _headers,
+    );
+    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
+    return {'success': false, 'message': response.body['error'] ?? 'Erro'};
+  }
 
   // ── Produtos EPI (cadastro CA/Fornecedor) ─────────────────────
   Future<List<Map<String, dynamic>>> buscarProdutosEpiCadastro() async {

@@ -17,6 +17,8 @@ class SegurancaController extends GetxController {
   final requisicoesPendentes = <Map<String, dynamic>>[].obs;
   final todasRequisicoes = <Map<String, dynamic>>[].obs;
   final historicoRequisicoes = <Map<String, dynamic>>[].obs;
+  final requisacoesAprovadas = <Map<String, dynamic>>[].obs;
+  final requisacoesRecusadas = <Map<String, dynamic>>[].obs;
 
   final perfilData = Rxn<Map<String, dynamic>>();
   final statsData = Rxn<Map<String, dynamic>>();
@@ -115,6 +117,24 @@ class SegurancaController extends GetxController {
     }
   }
 
+  Future<void> carregarAprovadas() async {
+    isLoading.value = true;
+    try {
+      requisacoesAprovadas.value = await _service.buscarTodas(status: 'aguardando_confirmacao');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> carregarRecusadas() async {
+    isLoading.value = true;
+    try {
+      requisacoesRecusadas.value = await _service.buscarTodas(status: 'recusada');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<void> carregarTodas({String? status}) async {
     isLoading.value = true;
     try {
@@ -150,7 +170,8 @@ class SegurancaController extends GetxController {
       );
       if (result['success'] == true) {
         carregarPendentes();
-        carregarTodas();
+        carregarAprovadas();
+        carregarHistorico();
       }
       return result;
     } finally {
@@ -164,7 +185,7 @@ class SegurancaController extends GetxController {
       final result = await _service.recusar(id, observacao: observacao);
       if (result['success'] == true) {
         carregarPendentes();
-        carregarTodas();
+        carregarRecusadas();
       }
       return result;
     } finally {

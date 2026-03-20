@@ -26,14 +26,14 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
     super.initState();
     _tabController = TabController(length: 6, vsync: this);
     controller.carregarPendentes();
-    controller.carregarTodas();
+    controller.carregarAprovadas();
+    controller.carregarRecusadas();
     controller.carregarHistorico();
     _tabController.addListener(() {
-      if (_tabController.index == 2) controller.carregarTodas(status: 'aguardando_confirmacao');
-      if (_tabController.index == 3) controller.carregarTodas(status: 'recusada');
+      if (_tabController.index == 2) controller.carregarAprovadas();
+      if (_tabController.index == 3) controller.carregarRecusadas();
       if (_tabController.index == 4) controller.carregarHistorico();
     });
-  }
 
   @override
   void dispose() {
@@ -63,7 +63,8 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
             icon: const Icon(Icons.refresh, color: Colors.white70),
             onPressed: () {
               controller.carregarPendentes();
-              controller.carregarTodas();
+              controller.carregarAprovadas();
+              controller.carregarRecusadas();
               controller.carregarHistorico();
             },
           ),
@@ -91,8 +92,8 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
         children: [
           _buildListaTecnicos(),
           _buildListaPendentes(),
-          _buildListaStatus('aguardando_confirmacao'),
-          _buildListaStatus('recusada'),
+          _buildListaAprovadas(),    // ← TROCOU
+          _buildListaRecusadas(),    // ← TROCOU
           _buildHistorico(),
           const AbaProdutosEpi(),
         ],
@@ -264,30 +265,47 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
   // ══════════════════════════════════════════════════════════════
   // ABA 2 e 3: APROVADAS / RECUSADAS
   // ══════════════════════════════════════════════════════════════
-  Widget _buildListaStatus(String status) {
-    return Obx(() {
-      if (controller.isLoading.value) {
-        return const Center(
-            child: CircularProgressIndicator(color: Color(0xFF00FF88)));
-      }
-      final lista = controller.todasRequisicoes
-          .where((r) => r['status'] == status)
-          .toList();
-      if (lista.isEmpty) {
-        return _buildVazio(
-          status == 'aguardando_confirmacao'
-              ? 'Nenhuma requisição aguardando confirmação'
-              : 'Nenhuma requisição recusada',
-          Icons.inbox_outlined,
+    Widget _buildListaAprovadas() {
+      return Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF00FF88)));
+        }
+        if (controller.requisacoesAprovadas.isEmpty) {
+          return _buildVazio('Nenhuma requisição aguardando confirmação', Icons.inbox_outlined);
+        }
+        return RefreshIndicator(
+          onRefresh: controller.carregarAprovadas,
+          color: const Color(0xFF00FF88),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: controller.requisacoesAprovadas.length,
+            itemBuilder: (context, i) => _buildCardSimples(controller.requisacoesAprovadas[i]),
+          ),
         );
-      }
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: lista.length,
-        itemBuilder: (context, i) => _buildCardSimples(lista[i]),
-      );
-    });
-  }
+      });
+    }
+
+    Widget _buildListaRecusadas() {
+      return Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF00FF88)));
+        }
+        if (controller.requisacoesRecusadas.isEmpty) {
+          return _buildVazio('Nenhuma requisição recusada', Icons.inbox_outlined);
+        }
+        return RefreshIndicator(
+          onRefresh: controller.carregarRecusadas,
+          color: const Color(0xFF00FF88),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: controller.requisacoesRecusadas.length,
+            itemBuilder: (context, i) => _buildCardSimples(controller.requisacoesRecusadas[i]),
+          ),
+        );
+      });
+    }
 
   Widget _buildCardSimples(Map<String, dynamic> req) {
     final status = req['status'] as String? ?? 'pendente';

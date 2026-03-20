@@ -1,6 +1,9 @@
 // lib/seguranca/screens/perfil_tecnico_gestor_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import 'dart:convert';
 import '../services/seguranca_service.dart';
 import '../controllers/seguranca_controller.dart';
@@ -288,6 +291,9 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
     );
   }
 
+  const SizedBox(height: 12),
+  _buildBotaoFichaEpi(),
+
   // ── Histórico de Requisições ──────────────────────────────────
   Widget _buildHistoricoRequisicoes() {
     if (_requisicoes.isEmpty) {
@@ -527,6 +533,52 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildBotaoFichaEpi() {
+  return SizedBox(
+  width: double.infinity,
+  child: OutlinedButton.icon(
+  onPressed: _gerarFichaEpi,
+  icon: const Icon(Icons.description, color: Color(0xFF00FF88), size: 20),
+  label: const Text('Ficha de EPI Completa (PDF)',
+  style: TextStyle(color: Color(0xFF00FF88), fontSize: 14, fontWeight: FontWeight.bold)),
+  style: OutlinedButton.styleFrom(
+  side: const BorderSide(color: Color(0xFF00FF88)),
+  padding: const EdgeInsets.symmetric(vertical: 14),
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+  ),
+  );
+  }
+
+  Future<void> _gerarFichaEpi() async {
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(content: Text('Gerando ficha de EPI...'), backgroundColor: Color(0xFF00FF88)),
+  );
+
+  final pdfBase64 = await _service.buscarFichaEpi(widget.tecnicoId);
+
+  if (pdfBase64 == null) {
+  if (mounted) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(content: Text('Erro ao gerar ficha'), backgroundColor: Colors.red),
+  );
+  }
+  return;
+  }
+
+  // Salvar e compartilhar
+  final clean = pdfBase64.replaceFirst(RegExp(r'^data:application/pdf;base64,'), '');
+  final bytes = base64Decode(clean);
+  final dir = await getTemporaryDirectory();
+  final file = File('${dir.path}/Ficha_EPI_${widget.tecnicoNome.replaceAll(' ', '_')}.pdf');
+  await file.writeAsBytes(bytes);
+
+  await Share.shareXFiles(
+  [XFile(file.path, mimeType: 'application/pdf')],
+  subject: 'Ficha de EPI - ${widget.tecnicoNome} - BBnet Up',
+  );
   }
 
   Widget _buildErro() {

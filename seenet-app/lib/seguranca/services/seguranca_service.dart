@@ -299,4 +299,78 @@ class SegurancaService extends GetxService {
       return [];
     } catch (_) { return []; }
   }
+
+  // ── Ficha de EPI completa (PDF formato BW Telecom) ────────────
+  Future<String?> buscarFichaEpi(int tecnicoId) async {
+    try {
+      final response = await GetConnect().get(
+        '$_base/tecnicos/$tecnicoId/ficha-epi',
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        return (response.body['data'] ?? response.body)['pdf_base64'] as String?;
+      }
+      return null;
+    } catch (_) { return null; }
+  }
+
+  // ── Produtos EPI (cadastro CA/Fornecedor) ─────────────────────
+  Future<List<Map<String, dynamic>>> buscarProdutosEpiCadastro() async {
+    try {
+      final response = await GetConnect().get(
+        '$_base/produtos-epi-cadastro',
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final List lista = (response.body['data'] ?? response.body)['produtos'] ?? [];
+        return lista.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (_) { return []; }
+  }
+
+  Future<Map<String, dynamic>> atualizarProdutoEpi(int id, {String? ca, String? fornecedor}) async {
+    final response = await GetConnect().put(
+      '$_base/produtos-epi-cadastro/$id',
+      {
+        if (ca != null) 'ca': ca,
+        if (fornecedor != null) 'fornecedor': fornecedor,
+      },
+      headers: _headers,
+    );
+    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
+    return {'success': false, 'message': response.body['error'] ?? 'Erro ao atualizar'};
+  }
+
+  Future<Map<String, dynamic>> criarProdutoEpi({
+    required String nome,
+    String? idProdutoIxc,
+    String? descricaoIxc,
+    String? ca,
+    String? fornecedor,
+  }) async {
+    final response = await GetConnect().post(
+      '$_base/produtos-epi-cadastro',
+      {
+        'nome': nome,
+        if (idProdutoIxc != null) 'id_produto_ixc': idProdutoIxc,
+        if (descricaoIxc != null) 'descricao_ixc': descricaoIxc,
+        'ca': ca ?? 'N/A',
+        'fornecedor': fornecedor ?? '',
+      },
+      headers: _headers,
+    );
+    if (response.statusCode == 201) return {'success': true, 'message': response.body['message']};
+    return {'success': false, 'message': response.body['error'] ?? 'Erro ao cadastrar'};
+  }
+
+  Future<Map<String, dynamic>> removerProdutoEpi(int id) async {
+    final response = await GetConnect().delete(
+      '$_base/produtos-epi-cadastro/$id',
+      headers: _headers,
+    );
+    if (response.statusCode == 200) return {'success': true};
+    return {'success': false};
+  }
+
 }

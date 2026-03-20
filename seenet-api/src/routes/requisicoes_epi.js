@@ -414,6 +414,269 @@ const EPIS_PADRAO = [
 ];
 
 // ================================================================
+// GERAÇÃO DE PDF — FICHA DE EPI (formato BW Telecom)
+// ================================================================
+async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 30,
+        info: {
+          Title: `Ficha de EPI - ${tecnico.nome} - BBnet Up`,
+          Author: 'SeeNet - BBnet Up',
+          Subject: 'Ficha de Controle de Equipamentos de Proteção Individual',
+        },
+      });
+
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const W = 595.28;
+      const M = 30;
+      const CW = W - M * 2; // largura útil
+      const VERDE = '#007A4A';
+      const CINZA_BORDA = '#999999';
+
+      // ── CABEÇALHO ─────────────────────────────────────────────
+      // Logo tentativa
+      let logoBuffer = null;
+      try {
+        const https = require('https');
+        logoBuffer = await new Promise((res, rej) => {
+          https.get('https://static.wixstatic.com/media/40655f_6e4972b166904af6957a3208c1ab4fa4~mv2.png', (response) => {
+            const chunks = [];
+            response.on('data', (c) => chunks.push(c));
+            response.on('end', () => res(Buffer.concat(chunks)));
+            response.on('error', rej);
+          }).on('error', rej);
+        });
+      } catch (_) {}
+
+      let y = M;
+
+      // Borda do cabeçalho
+      doc.rect(M, y, CW, 60).stroke(CINZA_BORDA);
+
+      if (logoBuffer) {
+        try { doc.image(logoBuffer, M + 8, y + 8, { height: 44 }); } catch (_) {}
+      }
+
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#000000')
+        .text('FICHA DE CONTROLE DE EQUIPAMENTOS', M + 120, y + 12, { width: CW - 130, align: 'center' });
+      doc.fontSize(12).font('Helvetica-Bold')
+        .text('DE PROTEÇÃO INDIVIDUAL – EPI', M + 120, y + 30, { width: CW - 130, align: 'center' });
+
+      y += 64;
+
+      // ── DADOS DO COLABORADOR ──────────────────────────────────
+      const dataRevisao = formatarDataBR(new Date(), false);
+
+      // Linha 1: Nome + Data Revisão
+      doc.rect(M, y, CW * 0.6, 22).stroke(CINZA_BORDA);
+      doc.rect(M + CW * 0.6, y, CW * 0.4, 22).stroke(CINZA_BORDA);
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#000000')
+        .text(`NOME: ${tecnico.nome?.toUpperCase() || ''}`, M + 4, y + 7);
+      doc.text(`DATA DE REVISÃO: ${dataRevisao}`, M + CW * 0.6 + 4, y + 7);
+      y += 22;
+
+      // Linha 2: Função + CBO
+      doc.rect(M, y, CW * 0.6, 22).stroke(CINZA_BORDA);
+      doc.rect(M + CW * 0.6, y, CW * 0.4, 22).stroke(CINZA_BORDA);
+      doc.fontSize(8).font('Helvetica-Bold')
+        .text('FUNÇÃO: TÉCNICO DE REDE', M + 4, y + 7);
+      doc.text('CBO: 313305', M + CW * 0.6 + 4, y + 7);
+      y += 22;
+
+      // Linha 3: Empresa + Data Admissão
+      doc.rect(M, y, CW * 0.6, 22).stroke(CINZA_BORDA);
+      doc.rect(M + CW * 0.6, y, CW * 0.4, 22).stroke(CINZA_BORDA);
+      doc.fontSize(8).font('Helvetica-Bold')
+        .text('EMPRESA: BBNET UP PROVEDOR LTDA', M + 4, y + 7);
+      doc.text(`DATA ADMISSÃO: ${tecnico.data_criacao ? formatarDataBR(tecnico.data_criacao, false) : '---'}`, M + CW * 0.6 + 4, y + 7);
+      y += 26;
+
+      // ── DECLARAÇÃO LEGAL ──────────────────────────────────────
+      const declaracao = `Reconheço ter sido orientado sobre os riscos à saúde dos eventuais agentes agressivos do meu trabalho e ter sido orientado adequadamente sobre as proteções que devem ser tomadas. Reconheço, também, estar recebendo todos os equipamentos de proteção individual necessários à minha função e ter sido treinado e orientado quanto a sua correta e obrigatória utilização. Declaro ainda:\n►Ter recebido treinamento sobre a utilização adequada destes EPIs, seu prazo de validade, bem como dos riscos que estou sujeito pelo seu não uso;\n►Indenizar a empresa, autorizando o desconto do custo da reparação do dano que eventualmente vier a provocar nos EPIs em questão, por atos de negligência ou mau uso, extravio ou na sua não devolução quando a mim solicitado, já que atesto tê-lo recebido em perfeitas condições (ciente e colocando minha anuência às disposições do Art. 462 da CLT);\n► Estar ciente da disposição legal constante na Norma Regulamentadora NR 01, sub-item 1.8.1 e item 1.9, de que constitui ato faltoso a recusa injustificada de usar os EPIs fornecidos pelo empregador, incorrendo nas penalidades previstas na legislação pertinente;\n► Que na não observância do seu uso, por negligência, os danos e/ou lesões resultantes de acidentes serão de minha inteira responsabilidade.`;
+
+      doc.fontSize(7).font('Helvetica').fillColor('#000000')
+        .text(declaracao, M, y, { width: CW, lineGap: 1 });
+
+      y = doc.y + 10;
+
+      // Linha de assinatura
+      doc.fontSize(8).font('Helvetica')
+        .text('__________________________________', M + 80, y);
+      y += 12;
+      doc.text('ASSINATURA DO EMPREGADO', M + 100, y);
+      doc.text(`LOCAL: ITABAIANA/SE`, M + CW * 0.6, y);
+      y += 20;
+
+      // ── TABELA DE EPIs ────────────────────────────────────────
+      // Cabeçalho da tabela
+      const colWidths = {
+        quat: 45,
+        descricao: 150,
+        fabricante: 105,
+        ca: 50,
+        data: 60,
+        assinatura: CW - 45 - 150 - 105 - 50 - 60
+      };
+
+      function desenharCabecalhoTabela(yPos) {
+        // Título "ESPECIFICAÇÃO DO EPI" + "RETIRADA"
+        doc.rect(M, yPos, colWidths.quat + colWidths.descricao + colWidths.fabricante + colWidths.ca, 14)
+          .fill('#E8E8E8').stroke(CINZA_BORDA);
+        doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
+          .text('ESPECIFICAÇÃO DO EPI', M + 4, yPos + 4);
+
+        doc.rect(M + colWidths.quat + colWidths.descricao + colWidths.fabricante + colWidths.ca, yPos,
+          colWidths.data + colWidths.assinatura, 14)
+          .fill('#E8E8E8').stroke(CINZA_BORDA);
+        doc.text('RETIRADA', M + colWidths.quat + colWidths.descricao + colWidths.fabricante + colWidths.ca + 4, yPos + 4);
+
+        yPos += 14;
+
+        // Sub-cabeçalho
+        let x = M;
+        const headers = [
+          { label: 'QUAT', w: colWidths.quat },
+          { label: 'DESCRIÇÃO DO EPI', w: colWidths.descricao },
+          { label: 'FABRICANTE', w: colWidths.fabricante },
+          { label: 'CA', w: colWidths.ca },
+          { label: 'DATA', w: colWidths.data },
+          { label: 'ASSINATURA', w: colWidths.assinatura },
+        ];
+
+        headers.forEach(h => {
+          doc.rect(x, yPos, h.w, 14).fill('#F0F0F0').stroke(CINZA_BORDA);
+          doc.fontSize(6).font('Helvetica-Bold').fillColor('#000000')
+            .text(h.label, x + 2, yPos + 4, { width: h.w - 4 });
+          x += h.w;
+        });
+
+        return yPos + 14;
+      }
+
+      y = desenharCabecalhoTabela(y);
+
+      // Mapa de produtos EPI para buscar CA/fornecedor
+      const produtoMap = {};
+      produtosEpi.forEach(p => {
+        produtoMap[p.nome] = p;
+      });
+
+      // Desenhar linhas dos EPIs de cada requisição
+      const reqsAprovadas = requisicoes
+        .filter(r => ['concluida', 'aprovada', 'aguardando_confirmacao'].includes(r.status))
+        .sort((a, b) => new Date(a.data_resposta || a.data_criacao) - new Date(b.data_resposta || b.data_criacao));
+
+      for (const req of reqsAprovadas) {
+        const epis = Array.isArray(req.epis_solicitados)
+          ? req.epis_solicitados
+          : JSON.parse(req.epis_solicitados || '[]');
+
+        const dataEntrega = req.data_entrega || req.data_resposta || req.data_criacao;
+        const dataStr = dataEntrega ? formatarDataBR(new Date(dataEntrega), false) : '---';
+
+        for (const epiNome of epis) {
+          // Nova página se necessário
+          if (y > 740) {
+            doc.addPage();
+            y = M;
+            y = desenharCabecalhoTabela(y);
+          }
+
+          // Extrair quantidade e nome limpo
+          const qtdMatch = epiNome.match(/x(\d+)$/);
+          const quantidade = qtdMatch ? parseInt(qtdMatch[1]) : 1;
+          const nomeLimpo = epiNome
+            .replace(/\s*\(Tam\.\s*\w+\)/, '')
+            .replace(/\s*x\d+$/, '')
+            .trim();
+
+          // Buscar CA e fornecedor do produto
+          const prodInfo = produtoMap[nomeLimpo] || {};
+          const ca = prodInfo.ca || '........';
+          const fornecedor = prodInfo.fornecedor || '';
+
+          // Extrair tamanho
+          const tamMatch = epiNome.match(/\(Tam\.\s*(\w+)\)/);
+          let descricaoFinal = nomeLimpo;
+          if (tamMatch) descricaoFinal += ` - ${tamMatch[1]}`;
+
+          // Desenhar linha
+          let x = M;
+          const rowH = 16;
+
+          // QUAT
+          doc.rect(x, y, colWidths.quat, rowH).stroke(CINZA_BORDA);
+          doc.fontSize(7).font('Helvetica').fillColor('#000000')
+            .text(`${quantidade} UNI`, x + 2, y + 5, { width: colWidths.quat - 4 });
+          x += colWidths.quat;
+
+          // DESCRIÇÃO
+          doc.rect(x, y, colWidths.descricao, rowH).stroke(CINZA_BORDA);
+          doc.fontSize(7).font('Helvetica')
+            .text(descricaoFinal, x + 2, y + 5, { width: colWidths.descricao - 4 });
+          x += colWidths.descricao;
+
+          // FABRICANTE
+          doc.rect(x, y, colWidths.fabricante, rowH).stroke(CINZA_BORDA);
+          doc.fontSize(6).font('Helvetica')
+            .text(fornecedor.toUpperCase(), x + 2, y + 5, { width: colWidths.fabricante - 4 });
+          x += colWidths.fabricante;
+
+          // CA
+          doc.rect(x, y, colWidths.ca, rowH).stroke(CINZA_BORDA);
+          doc.fontSize(7).font('Helvetica')
+            .text(ca, x + 2, y + 5, { width: colWidths.ca - 4 });
+          x += colWidths.ca;
+
+          // DATA
+          doc.rect(x, y, colWidths.data, rowH).stroke(CINZA_BORDA);
+          doc.fontSize(6).font('Helvetica')
+            .text(dataStr, x + 2, y + 5, { width: colWidths.data - 4 });
+          x += colWidths.data;
+
+          // ASSINATURA (foto da assinatura se disponível)
+          doc.rect(x, y, colWidths.assinatura, rowH).stroke(CINZA_BORDA);
+          if (req.assinatura_recebimento_base64) {
+            try {
+              const sigClean = req.assinatura_recebimento_base64.replace(/^data:image\/\w+;base64,/, '');
+              const sigBuf = Buffer.from(sigClean, 'base64');
+              doc.image(sigBuf, x + 2, y + 1, { height: rowH - 2, fit: [colWidths.assinatura - 4, rowH - 2] });
+            } catch (_) {}
+          }
+
+          y += rowH;
+        }
+      }
+
+      // ── OBS NR-01 ─────────────────────────────────────────────
+      if (y > 740) { doc.addPage(); y = M; }
+      y += 10;
+      doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
+        .text('OBS: ', M, y, { continued: true });
+      doc.font('Helvetica')
+        .text('Conforme determina a NR 01, a substituição do Equipamento de Proteção Individual (EPI) deve ser feita de acordo com o prazo de validade do fabricante e o estado do equipamento.', { width: CW });
+
+      // ── RODAPÉ ────────────────────────────────────────────────
+      const footerY = 841.89 - 40;
+      doc.fontSize(7).font('Helvetica').fillColor('#555555')
+        .text('BBNET UP PROVEDOR LTDA - CNPJ: 23.870.928/0002-03', M, footerY, { width: CW, align: 'center' });
+      doc.text('RUA DOUTOR AUGUSTO CEZAR LEITE, 428 – ITABAIANA/SE', M, footerY + 10, { width: CW, align: 'center' });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// ================================================================
 // ROTAS
 // ================================================================
 
@@ -1178,6 +1441,43 @@ router.delete('/produtos-epi-cadastro/:id', authMiddleware, async (req, res) => 
     res.json({ success: true, message: 'Produto removido!' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao remover' });
+  }
+});
+
+// GET /api/seguranca/tecnicos/:id/ficha-epi — PDF da ficha completa de EPI
+router.get('/tecnicos/:id/ficha-epi', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const tecnicoId = req.params.id;
+
+    const tecnico = await db('usuarios')
+      .where('id', tecnicoId)
+      .where('tenant_id', req.user.tenant_id)
+      .first();
+
+    if (!tecnico) return res.status(404).json({ error: 'Técnico não encontrado' });
+
+    const requisicoes = await db('requisicoes_epi')
+      .where('tecnico_id', tecnicoId)
+      .where('tenant_id', req.user.tenant_id)
+      .whereIn('status', ['concluida', 'aprovada', 'aguardando_confirmacao'])
+      .orderBy('data_criacao', 'asc');
+
+    const produtosEpi = await db('produtos_epi')
+      .where('tenant_id', req.user.tenant_id)
+      .where('ativo', true);
+
+    const tenant = await db('tenants').where('id', req.user.tenant_id).first();
+
+    const pdfBuffer = await gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant);
+    const pdfBase64 = `data:application/pdf;base64,${pdfBuffer.toString('base64')}`;
+
+    res.json({ pdf_base64: pdfBase64 });
+  } catch (err) {
+    console.error('❌ Erro ao gerar ficha EPI:', err);
+    res.status(500).json({ error: 'Erro ao gerar ficha de EPI' });
   }
 });
 

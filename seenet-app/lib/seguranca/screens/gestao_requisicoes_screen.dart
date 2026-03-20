@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/seguranca_service.dart';
 import 'perfil_tecnico_gestor_screen.dart';
+import '../widgets/aba_produtos_epi.dart';
 import 'dart:convert';
 import '../widgets/dialog_aprovacao_epi.dart';
 import '../controllers/seguranca_controller.dart';
@@ -23,7 +24,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     controller.carregarPendentes();
     controller.carregarTodas();
     controller.carregarHistorico();
@@ -81,6 +82,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
             const Tab(text: 'Recusadas'),
             Obx(() => Tab(
                 text: 'Histórico (${controller.historicoRequisicoes.length})')),
+            const Tab(text: 'Produtos'),
           ],
         ),
       ),
@@ -92,6 +94,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
           _buildListaStatus('aguardando_confirmacao'),
           _buildListaStatus('recusada'),
           _buildHistorico(),
+          const AbaProdutosEpi(),
         ],
       ),
     );

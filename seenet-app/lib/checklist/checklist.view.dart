@@ -381,18 +381,6 @@ Positioned(
                 color: const Color(0xFF00FF88), // Verde do SeeNet
               ),
               const SizedBox(height: 12),
-              // Opção de transcrição técnica (para todos os usuários)
-              _buildMenuOption(
-                icon: Icons.description,
-                title: 'Documentar Ações',
-                subtitle: 'Grave suas ações técnicas por voz',
-                onTap: () {
-                  Navigator.pop(context);
-                  Get.toNamed('/transcricao');
-                },
-                color: Colors.purple,
-              ),
-              const SizedBox(height: 12),
               _buildMenuOption(
                 icon: Icons.health_and_safety,
                 title: 'Segurança do Trabalho',

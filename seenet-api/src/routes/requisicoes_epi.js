@@ -419,12 +419,17 @@ const EPIS_PADRAO = [
     const LOGO_CRUZ_BASE64 = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAA0JCgsKCA0LCwsPDg0QFCEVFBISFCgdHhghMCoyMS8qLi00O0tANDhHOS0uQllCR05QVFVUMz9dY1xSYktTVFH/2wBDAQ4PDxQRFCcVFSdRNi42UVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVH/wAARCAAmACcDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD0TUb+3020a5uX2oOAB1Y+g965PUtWv5LmP7XerZ2pk2lLYncCrAOpbGdwDZ4+U44zRrGo+bqd3dMElgtd1t5OSHXoC46gZbjJGCOCOa6HRdISxhSWceZd7QNzEt5Q7ImScKM4681GsnocUpSrScYuyRyxjnkeCRtO1aG4Ur5tzGsjSONvzYyeOf0+mDYsNZvoYpbiC6N3AJgq20xzIVZjtAbqX+U8c8c1ag1nUH8ZGwa4zbeay7Ni9ApI5xmtXW9GjvYXuLeNUvlVtjgD58rja3qCOOen0yDKXVGcINpypvb5f1+poWV5FfW4mh3AdGVhhkPoR2NFcRo+r2emXNtOJJgs8bLco7+YFC8Jtxz2xg9B+Boq1JdTop4mEo+80mZkbGDxOjXUi7kvAZXPTIfk/wA66LXbHxHNq88lg9wLY7dgS4Cj7ozxuHfNGuRPpl/KTGXsrzcVAYoFlZdrAtnAyOcsCPTHJrQ0TXopbJRdvsVHMSXDHKSbR1LHocY+9jPb0EJdGcsKcU3Tm7a3OKjt9TOsmBGk/tDcRkS4bOOfmz6e9dLoVj4jh1eCS/e4NsN28PcBh90443Hvip4tEnj8SHWmuLb7JuaXO852lTz0x39al1zxFB5D2unzq0r4jNwCfLiyCR8w7nBx6cnPFCVtWFOlGneU21Z6eZxGpPHJqd28JBiaZyhHTG44orrNGsLa/vNiRLJZWvDbz5iFwCuF4AwfvEjOflPHQFJQb1Mo4OVT3kzqbm3hu7d7e4jEkTjDKe9clf6Rc6Chvbe4Wa0hUJskJWRQzjIUgdT03cHBPtRRVyWlzvxMVyOXVGJHqtmsYWTSoZWAIJOFySQSeFHcHHoCRyK3dI0ifVIUuvPFpYszNHFCcyL85ONxHADYOBxwDjPNFFZx1ep5+GftJ8sjq7a3htLdLe3jEcSDCqO1FFFbnspW0R//2Q==';
     const LOGO_BW_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAACkAAAApCAIAAAAnApehAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAC8klEQVR4nGNgGAWjYBSMglEwYgAbL7uMqRwcCSoK08VaRoawNYlFTxvQUP69WrMsG9pabZhgVvQEZJnP9FApU1kg8p0WCrG+8Em9hLQEEEBUsrOzS4IBMzMzRISHh2fp0qVaWlpk2u01KQhik2mmNUSEQ4ATavfj+us3rn/9+hUiPnfu3P9gYGpqChGBcI2Njcm0O/FgLsQmrSA9iIi6rw5EJHpz6rNnz75//87IyAgU//v3L8SyiIgIILetrQ3I/v37NzwYSASMDMCAhdjkXOthm+9kX+qWdaUMHOB1SWUpQNN//vwJNJ2FheU/DBQVFQG1Pn/+HMjeunUrmZ5mYWeBRDYaAjpIyUm1pqYGaPqfP39YWVn37t0LtxsoLioqCmE7OjqSaTcbDzvE3zm3qiT0pUHIQDpkRTzE+oDaUKDpwKBmY2N79eoV3O6WlpaKigog48ePH8DwINNuDn5ossq6Wg4XtK9zhwjaVrkALf7375+6uvp/JNDd3X3r1i0gY+PGjWRaDATCqqIQazLOl8AFAxdFQQRDO2MgllVXVwNJoNd//foFZCxevBgizsvLS77dOWfLIda4t/vDBQvv10EDozwbYse7d++AZEdHx4cPH4CML1++QMTJtxhkDSyhRaxLCl4SB0SRG5MhInl3qp2dnZGDmoOD4/Xr13Du5MmTKbIbM4UDUcHj2ry7tcA8LSsrC7cJmI+B6l+8eAEXgZd3lAKgTcyszExACCRZQAygIJANRBApCJeRiREoC2QzsTBRx2IgEFMVL7hZq2CtbF/lJqohEbk6EWhN8qE8RTvVuO0ZhnFmBlGmBtGmAfMiCx/WSRnLJh/Jp5rdQH/4zgxTclJT99YR05TQjzJm5WILmBchrCyWdroYqCBxRxY7H0f05rTwZYlxOzIi1idTzW42LjaTFCtFO+WQOTFe7QGh8+Nc6rzDlyf49oWGLI0Nmh/j3uPvMynYptiZR4LXKNHSOMWSanaPglEwCkbBKBj0AABRRteQUzXwCAAAAABJRU5ErkJggg==';
 
+    // ================================================================
+    // COLE ESTA FUNÇÃO NO requisicoes_epi.js
+    // SUBSTITUINDO A FUNÇÃO gerarFichaEPI ANTERIOR
+    // ================================================================
+
     async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
       return new Promise(async (resolve, reject) => {
         try {
           const doc = new PDFDocument({
             size: 'A4',
-            margin: 30,
+            margin: 25,
             info: {
               Title: `Ficha de EPI - ${tecnico.nome} - BW Telecom`,
               Author: 'SeeNet - BW Telecom',
@@ -438,141 +443,157 @@ const EPIS_PADRAO = [
           doc.on('error', reject);
 
           const W = 595.28;
-          const M = 30;
+          const M = 25;
           const CW = W - M * 2;
-          const CINZA_BORDA = '#999999';
+          const CB = '#999999';
 
           let y = M;
 
-          // ── CABEÇALHO ─────────────────────────────────────────────
-          doc.rect(M, y, CW, 55).stroke(CINZA_BORDA);
-
-          // Logo cruz verde
+          // ── LOGOS ─────────────────────────────────────────────────
           try {
             const cruzBuf = Buffer.from(LOGO_CRUZ_BASE64, 'base64');
-            doc.image(cruzBuf, M + 8, y + 8, { height: 38 });
+            doc.image(cruzBuf, M + 5, y + 6, { height: 42 });
           } catch (_) {}
-
-          // Logo BW
           try {
             const bwBuf = Buffer.from(LOGO_BW_BASE64, 'base64');
             doc.image(bwBuf, M + 50, y + 10, { height: 34 });
           } catch (_) {}
 
-          doc.fontSize(12).font('Helvetica-Bold').fillColor('#000000')
-            .text('FICHA DE CONTROLE DE EQUIPAMENTOS', M + 100, y + 10, { width: CW - 110, align: 'center' });
-          doc.fontSize(11).font('Helvetica-Bold')
-            .text('DE PROTEÇÃO INDIVIDUAL – EPI', M + 100, y + 28, { width: CW - 110, align: 'center' });
+          // Cabeçalho título
+          doc.rect(M, y, CW, 55).stroke(CB);
+          doc.fontSize(13).font('Helvetica-Bold').fillColor('#000000')
+            .text('FICHA DE CONTROLE DE EQUIPAMENTOS', M + 95, y + 10, { width: CW - 200, align: 'center' });
+          doc.fontSize(12).font('Helvetica-Bold')
+            .text('DE PROTEÇÃO INDIVIDUAL – EPI', M + 95, y + 28, { width: CW - 200, align: 'center' });
+
+          // Cruz do trabalho (direita)
+          try {
+            const cruzBuf2 = Buffer.from(LOGO_CRUZ_BASE64, 'base64');
+            doc.image(cruzBuf2, W - M - 50, y + 6, { height: 42 });
+          } catch (_) {}
 
           y += 59;
 
           // ── DADOS DO COLABORADOR ──────────────────────────────────
           const dataRevisao = formatarDataBR(new Date(), false);
+          const lCol = CW * 0.55;
+          const rCol = CW * 0.45;
 
-          // Linha 1: Nome + Data Revisão
-          doc.rect(M, y, CW * 0.6, 20).stroke(CINZA_BORDA);
-          doc.rect(M + CW * 0.6, y, CW * 0.4, 20).stroke(CINZA_BORDA);
-          doc.fontSize(8).font('Helvetica-Bold').fillColor('#000000')
-            .text(`NOME: ${tecnico.nome?.toUpperCase() || ''}`, M + 4, y + 6);
-          doc.text(`DATA DE REVISÃO: ${dataRevisao}`, M + CW * 0.6 + 4, y + 6);
-          y += 20;
+          // Data de revisão (direita, acima do nome)
+          doc.rect(M + lCol, y, rCol, 18).stroke(CB);
+          doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#000000')
+            .text(`DATA DE REVISÃO: ${dataRevisao}`, M + lCol + 4, y + 5);
+          y += 18;
 
-          // Linha 2: Função + CBO
-          doc.rect(M, y, CW * 0.6, 20).stroke(CINZA_BORDA);
-          doc.rect(M + CW * 0.6, y, CW * 0.4, 20).stroke(CINZA_BORDA);
-          doc.fontSize(8).font('Helvetica-Bold')
-            .text('FUNÇÃO: TÉCNICO DE REDE', M + 4, y + 6);
-          doc.text('CBO: 313305', M + CW * 0.6 + 4, y + 6);
-          y += 20;
+          // Nome + Data Admissão
+          doc.rect(M, y - 18, lCol, 36).stroke(CB);
+          doc.fontSize(7.5).font('Helvetica-Bold')
+            .text(`NOME: ${tecnico.nome?.toUpperCase() || ''}`, M + 4, y - 12);
 
-          // Linha 3: Empresa + Data Admissão
-          doc.rect(M, y, CW * 0.6, 20).stroke(CINZA_BORDA);
-          doc.rect(M + CW * 0.6, y, CW * 0.4, 20).stroke(CINZA_BORDA);
-          doc.fontSize(8).font('Helvetica-Bold')
-            .text('EMPRESA: BW TELECOM LTDA', M + 4, y + 6);
-          doc.text(`DATA ADMISSÃO: ${tecnico.data_criacao ? formatarDataBR(tecnico.data_criacao, false) : '---'}`, M + CW * 0.6 + 4, y + 6);
-          y += 24;
+          doc.rect(M + lCol, y, rCol, 18).stroke(CB);
+          doc.text(`DATA ADMISSÃO: ${tecnico.data_criacao ? formatarDataBR(tecnico.data_criacao, false) : '---'}`, M + lCol + 4, y + 5);
+          y += 18;
+
+          // Endereço + Cargo + CBO
+          doc.rect(M, y, lCol, 18).stroke(CB);
+          doc.fontSize(7).font('Helvetica-Bold')
+            .text('END: PRAÇA PADRE MANOEL DE OLIVEIRA, Nº10 – MALHADOR-SE.', M + 4, y + 5);
+          doc.rect(M + lCol, y, rCol * 0.6, 18).stroke(CB);
+          doc.text('CARGO: TÉCNICO DE REDE', M + lCol + 4, y + 5);
+          doc.rect(M + lCol + rCol * 0.6, y, rCol * 0.4, 18).stroke(CB);
+          doc.text('CBO: 313305', M + lCol + rCol * 0.6 + 4, y + 5);
+          y += 22;
 
           // ── DECLARAÇÃO LEGAL ──────────────────────────────────────
           const declaracao = 'Reconheço ter sido orientado sobre os riscos à saúde dos eventuais agentes agressivos do meu trabalho e ter sido orientado adequadamente sobre as proteções que devem ser tomadas. Reconheço, também, estar recebendo todos os equipamentos de proteção individual necessários à minha função e ter sido treinado e orientado quanto a sua correta e obrigatória utilização. Declaro ainda:\n►Ter recebido treinamento sobre a utilização adequada destes EPIs, seu prazo de validade, bem como dos riscos que estou sujeito pelo seu não uso;\n►Indenizar a empresa, autorizando o desconto do custo da reparação do dano que eventualmente vier a provocar nos EPIs em questão, por atos de negligência ou mau uso, extravio ou na sua não devolução quando a mim solicitado, já que atesto tê-lo recebido em perfeitas condições (ciente e colocando minha anuência às disposições do Art. 462 da CLT);\n► Estar ciente da disposição legal constante na Norma Regulamentadora NR 01, sub-item 1.8.1 e item 1.9, de que constitui ato faltoso a recusa injustificada de usar os EPIs fornecidos pelo empregador, incorrendo nas penalidades previstas na legislação pertinente;\n► Que na não observância do seu uso, por negligência, os danos e/ou lesões resultantes de acidentes serão de minha inteira responsabilidade.';
 
-          doc.fontSize(6.5).font('Helvetica').fillColor('#000000')
-            .text(declaracao, M, y, { width: CW, lineGap: 1 });
+          doc.fontSize(6).font('Helvetica').fillColor('#000000')
+            .text(declaracao, M, y, { width: CW, lineGap: 0.8 });
+          y = doc.y + 6;
 
-          y = doc.y + 8;
-
-          // ── ASSINATURA DE ADMISSÃO ────────────────────────────────
+          // Assinatura de admissão
           if (tecnico.assinatura_admissao) {
             try {
               const sigClean = tecnico.assinatura_admissao.replace(/^data:image\/\w+;base64,/, '');
               const sigBuf = Buffer.from(sigClean, 'base64');
-              doc.image(sigBuf, M + 60, y, { height: 30 });
-              y += 34;
+              doc.image(sigBuf, M + 50, y, { height: 28 });
+              y += 32;
             } catch (_) {
-              doc.text('__________________________________', M + 80, y);
+              doc.text('__________________________________', M + 60, y);
               y += 14;
             }
           } else {
-            doc.text('__________________________________', M + 80, y);
+            doc.text('__________________________________', M + 60, y);
             y += 14;
           }
 
-          doc.fontSize(8).font('Helvetica')
-            .text('ASSINATURA DO EMPREGADO', M + 80, y);
+          doc.fontSize(7.5).font('Helvetica')
+            .text('ASSINATURA DO EMPREGADO', M + 70, y);
           doc.text('LOCAL: MALHADOR/SE', M + CW * 0.6, y);
-          y += 18;
+          y += 16;
 
-          // ── TABELA DE EPIs ────────────────────────────────────────
-          const colWidths = {
-            quat: 40,
-            descricao: 145,
-            fabricante: 100,
-            ca: 45,
-            data: 55,
-            assinatura: CW - 40 - 145 - 100 - 45 - 55
+          // ── TABELA DE EPIs (com DEVOLUÇÃO) ────────────────────────
+          const col = {
+            quat: 28,
+            uni: 22,
+            desc: 118,
+            fab: 78,
+            ca: 38,
+            data: 48,
+            assRet: 58,
+            subst: 32,
+            dataDev: 48,
+            assDev: CW - 28 - 22 - 118 - 78 - 38 - 48 - 58 - 32 - 48
           };
 
-          function desenharCabecalhoTabela(yPos) {
-            // Título ESPECIFICAÇÃO + RETIRADA
-            const specW = colWidths.quat + colWidths.descricao + colWidths.fabricante + colWidths.ca;
-            const retW = colWidths.data + colWidths.assinatura;
+          function cabecalhoTabela(yPos) {
+            // Linha 1: ESPECIFICAÇÃO + RETIRADA + DEVOLUÇÃO
+            const specW = col.quat + col.uni + col.desc + col.fab + col.ca;
+            const retW = col.data + col.assRet;
+            const devW = col.subst + col.dataDev + col.assDev;
 
-            doc.rect(M, yPos, specW, 13).fill('#E0E0E0').stroke(CINZA_BORDA);
-            doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#000000')
+            doc.rect(M, yPos, specW, 12).fill('#E0E0E0').stroke(CB);
+            doc.fontSize(6).font('Helvetica-Bold').fillColor('#000000')
               .text('ESPECIFICAÇÃO DO EPI', M + 4, yPos + 3);
 
-            doc.rect(M + specW, yPos, retW, 13).fill('#E0E0E0').stroke(CINZA_BORDA);
+            doc.rect(M + specW, yPos, retW, 12).fill('#E0E0E0').stroke(CB);
             doc.text('RETIRADA', M + specW + 4, yPos + 3);
-            yPos += 13;
 
-            // Sub-cabeçalho
+            doc.rect(M + specW + retW, yPos, devW, 12).fill('#E0E0E0').stroke(CB);
+            doc.text('DEVOLUÇÃO', M + specW + retW + 4, yPos + 3);
+            yPos += 12;
+
+            // Linha 2: sub-headers
             let x = M;
             const headers = [
-              { label: 'QUAT', w: colWidths.quat },
-              { label: 'DESCRIÇÃO DO EPI', w: colWidths.descricao },
-              { label: 'FABRICANTE', w: colWidths.fabricante },
-              { label: 'CA', w: colWidths.ca },
-              { label: 'DATA', w: colWidths.data },
-              { label: 'ASSINATURA', w: colWidths.assinatura },
+              { l: 'QUAT', w: col.quat },
+              { l: 'UNI', w: col.uni },
+              { l: 'DESCRIÇÃO DO EPI', w: col.desc },
+              { l: 'FABRICANTE', w: col.fab },
+              { l: 'CA', w: col.ca },
+              { l: 'DATA', w: col.data },
+              { l: 'ASSINATURA', w: col.assRet },
+              { l: 'SUBST', w: col.subst },
+              { l: 'DATA', w: col.dataDev },
+              { l: 'ASSINATURA', w: col.assDev },
             ];
 
             headers.forEach(h => {
-              doc.rect(x, yPos, h.w, 12).fill('#F0F0F0').stroke(CINZA_BORDA);
-              doc.fontSize(5.5).font('Helvetica-Bold').fillColor('#000000')
-                .text(h.label, x + 2, yPos + 3, { width: h.w - 4 });
+              doc.rect(x, yPos, h.w, 11).fill('#F0F0F0').stroke(CB);
+              doc.fontSize(5).font('Helvetica-Bold').fillColor('#000000')
+                .text(h.l, x + 1, yPos + 3, { width: h.w - 2 });
               x += h.w;
             });
 
-            return yPos + 12;
+            return yPos + 11;
           }
 
-          y = desenharCabecalhoTabela(y);
+          y = cabecalhoTabela(y);
 
-          // Mapa de produtos para CA/fornecedor
+          // Mapa de produtos e devoluções
           const produtoMap = {};
           produtosEpi.forEach(p => { produtoMap[p.nome] = p; });
 
-          // Requisições aprovadas/concluídas ordenadas por data
           const reqsAprovadas = requisicoes
             .filter(r => ['concluida', 'aprovada', 'aguardando_confirmacao'].includes(r.status))
             .sort((a, b) => new Date(a.data_resposta || a.data_criacao) - new Date(b.data_resposta || b.data_criacao));
@@ -582,14 +603,18 @@ const EPIS_PADRAO = [
               ? req.epis_solicitados
               : JSON.parse(req.epis_solicitados || '[]');
 
+            const devolucoes = req.devolucoes
+              ? (Array.isArray(req.devolucoes) ? req.devolucoes : JSON.parse(req.devolucoes || '[]'))
+              : [];
+
             const dataEntrega = req.data_entrega || req.data_resposta || req.data_criacao;
             const dataStr = dataEntrega ? formatarDataBR(new Date(dataEntrega), false) : '---';
 
             for (const epiNome of epis) {
-              if (y > 750) {
+              if (y > 740) {
                 doc.addPage();
                 y = M;
-                y = desenharCabecalhoTabela(y);
+                y = cabecalhoTabela(y);
               }
 
               const qtdMatch = epiNome.match(/x(\d+)$/);
@@ -604,69 +629,128 @@ const EPIS_PADRAO = [
               const fornecedor = prodInfo.fornecedor || '';
 
               const tamMatch = epiNome.match(/\(Tam\.\s*(\w+)\)/);
-              let descricaoFinal = nomeLimpo;
-              if (tamMatch) descricaoFinal += ` - ${tamMatch[1]}`;
+              let descFinal = nomeLimpo;
+              if (tamMatch) descFinal += ` - ${tamMatch[1]}`;
+
+              // Buscar devolução deste item
+              const devInfo = devolucoes.find(d => d.epi === epiNome || d.epi === nomeLimpo) || {};
+              const codigoSubst = devInfo.codigo_subst || '';
+              const dataDev = devInfo.data_devolucao || '';
 
               let x = M;
-              const rowH = 15;
+              const rH = 14;
 
               // QUAT
-              doc.rect(x, y, colWidths.quat, rowH).stroke(CINZA_BORDA);
-              doc.fontSize(6).font('Helvetica').fillColor('#000000')
-                .text(`${quantidade} UNI`, x + 2, y + 4, { width: colWidths.quat - 4 });
-              x += colWidths.quat;
+              doc.rect(x, y, col.quat, rH).stroke(CB);
+              doc.fontSize(5.5).font('Helvetica').fillColor('#000000')
+                .text(`${quantidade}`, x + 2, y + 4, { width: col.quat - 4, align: 'center' });
+              x += col.quat;
+
+              // UNI
+              doc.rect(x, y, col.uni, rH).stroke(CB);
+              doc.fontSize(5.5).text('UNI', x + 2, y + 4, { width: col.uni - 4, align: 'center' });
+              x += col.uni;
 
               // DESCRIÇÃO
-              doc.rect(x, y, colWidths.descricao, rowH).stroke(CINZA_BORDA);
-              doc.fontSize(6).font('Helvetica')
-                .text(descricaoFinal, x + 2, y + 4, { width: colWidths.descricao - 4 });
-              x += colWidths.descricao;
+              doc.rect(x, y, col.desc, rH).stroke(CB);
+              doc.fontSize(5.5).text(descFinal, x + 2, y + 4, { width: col.desc - 4 });
+              x += col.desc;
 
               // FABRICANTE
-              doc.rect(x, y, colWidths.fabricante, rowH).stroke(CINZA_BORDA);
-              doc.fontSize(5.5).font('Helvetica')
-                .text(fornecedor.toUpperCase(), x + 2, y + 4, { width: colWidths.fabricante - 4 });
-              x += colWidths.fabricante;
+              doc.rect(x, y, col.fab, rH).stroke(CB);
+              doc.fontSize(5).text(fornecedor.toUpperCase(), x + 2, y + 4, { width: col.fab - 4 });
+              x += col.fab;
 
               // CA
-              doc.rect(x, y, colWidths.ca, rowH).stroke(CINZA_BORDA);
-              doc.fontSize(6).font('Helvetica')
-                .text(ca, x + 2, y + 4, { width: colWidths.ca - 4 });
-              x += colWidths.ca;
+              doc.rect(x, y, col.ca, rH).stroke(CB);
+              doc.fontSize(5.5).text(ca, x + 2, y + 4, { width: col.ca - 4 });
+              x += col.ca;
 
-              // DATA
-              doc.rect(x, y, colWidths.data, rowH).stroke(CINZA_BORDA);
-              doc.fontSize(5.5).font('Helvetica')
-                .text(dataStr, x + 2, y + 4, { width: colWidths.data - 4 });
-              x += colWidths.data;
+              // DATA RETIRADA
+              doc.rect(x, y, col.data, rH).stroke(CB);
+              doc.fontSize(5).text(dataStr, x + 2, y + 4, { width: col.data - 4 });
+              x += col.data;
 
-              // ASSINATURA
-              doc.rect(x, y, colWidths.assinatura, rowH).stroke(CINZA_BORDA);
+              // ASSINATURA RETIRADA
+              doc.rect(x, y, col.assRet, rH).stroke(CB);
               if (req.assinatura_recebimento_base64) {
                 try {
                   const sigClean = req.assinatura_recebimento_base64.replace(/^data:image\/\w+;base64,/, '');
                   const sigBuf = Buffer.from(sigClean, 'base64');
-                  doc.image(sigBuf, x + 2, y + 1, { height: rowH - 2, fit: [colWidths.assinatura - 4, rowH - 2] });
+                  doc.image(sigBuf, x + 1, y + 1, { height: rH - 2, fit: [col.assRet - 2, rH - 2] });
+                } catch (_) {}
+              }
+              x += col.assRet;
+
+              // SUBST (código de substituição)
+              doc.rect(x, y, col.subst, rH).stroke(CB);
+              if (codigoSubst) {
+                doc.fontSize(5).font('Helvetica-Bold').text(codigoSubst, x + 1, y + 4, { width: col.subst - 2, align: 'center' });
+                doc.font('Helvetica');
+              }
+              x += col.subst;
+
+              // DATA DEVOLUÇÃO
+              doc.rect(x, y, col.dataDev, rH).stroke(CB);
+              if (dataDev) {
+                doc.fontSize(5).text(dataDev, x + 2, y + 4, { width: col.dataDev - 4 });
+              }
+              x += col.dataDev;
+
+              // ASSINATURA DEVOLUÇÃO
+              doc.rect(x, y, col.assDev, rH).stroke(CB);
+              if (devInfo.assinatura_devolucao) {
+                try {
+                  const devSigClean = devInfo.assinatura_devolucao.replace(/^data:image\/\w+;base64,/, '');
+                  const devSigBuf = Buffer.from(devSigClean, 'base64');
+                  doc.image(devSigBuf, x + 1, y + 1, { height: rH - 2, fit: [col.assDev - 2, rH - 2] });
                 } catch (_) {}
               }
 
-              y += rowH;
+              y += rH;
             }
           }
 
+          // ── CÓDIGO DE SUBSTITUIÇÃO (legenda) ──────────────────────
+          if (y > 720) { doc.addPage(); y = M; }
+          y += 8;
+
+          doc.rect(M, y, CW, 12).fill('#E0E0E0').stroke(CB);
+          doc.fontSize(6).font('Helvetica-Bold').fillColor('#000000')
+            .text('CÓDIGO DE SUBSTITUIÇÃO', M + CW / 2 - 50, y + 3);
+          y += 14;
+
+          const codigos = [
+            { cod: 'PE', desc: 'PERDA OU EXTRAVIO', cod2: 'IU', desc2: 'IMPRÓPRIO PARA USO' },
+            { cod: 'SP', desc: 'SUBST. (PERDA VIDA ÚTIL)', cod2: 'AD', desc2: 'APRESENTA DEFEITO' },
+            { cod: 'DT', desc: 'DANIFICADO P/ TRABALHO', cod2: 'DE', desc2: 'DESLIG. DA EMPRESA' },
+          ];
+
+          codigos.forEach(row => {
+            doc.rect(M, y, CW / 2, 12).fill('#F5F5F5').stroke(CB);
+            doc.rect(M + CW / 2, y, CW / 2, 12).fill('#F5F5F5').stroke(CB);
+            doc.fontSize(5.5).font('Helvetica-Bold').fillColor('#000000')
+              .text(`${row.cod} - `, M + 4, y + 3, { continued: true });
+            doc.font('Helvetica').text(row.desc);
+            doc.fontSize(5.5).font('Helvetica-Bold')
+              .text(`${row.cod2} - `, M + CW / 2 + 4, y + 3, { continued: true });
+            doc.font('Helvetica').text(row.desc2);
+            y += 12;
+          });
+
           // ── OBS NR-01 ─────────────────────────────────────────────
-          if (y > 750) { doc.addPage(); y = M; }
-          y += 10;
-          doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#000000')
+          if (y > 740) { doc.addPage(); y = M; }
+          y += 8;
+          doc.fontSize(6).font('Helvetica-Bold').fillColor('#000000')
             .text('OBS: ', M, y, { continued: true });
           doc.font('Helvetica')
             .text('Conforme determina a NR 01, a substituição do Equipamento de Proteção Individual (EPI) deve ser feita de acordo com o prazo de validade do fabricante e o estado do equipamento.', { width: CW });
 
           // ── RODAPÉ ────────────────────────────────────────────────
-          const footerY = 841.89 - 36;
-          doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
+          const footerY = 841.89 - 34;
+          doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#000000')
             .text('BW TELECOM LTDA - CNPJ: 47.626.282/0001-09', M, footerY, { width: CW, align: 'center' });
-          doc.fontSize(7).font('Helvetica')
+          doc.fontSize(6.5).font('Helvetica')
             .text('PRAÇA PADRE MANOEL DE OLIVEIRA, Nº10 – MALHADOR-SE.', M, footerY + 10, { width: CW, align: 'center' });
 
           doc.end();
@@ -942,17 +1026,7 @@ router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
     }
 
     // ── Atualizar banco ───────────────────────────────────────────
-    await db('requisicoes_epi').where('id', req.params.id).update({
-      status:            'aguardando_confirmacao',
-      gestor_id:         req.user.id,
-      observacao_gestor: observacao || null,
-      data_resposta:     new Date(),
-      data_entrega:      data_entrega ? new Date(data_entrega) : new Date(),
-      id_requisicao_ixc,
-      itens_ixc: itens_ixc_resultado.length > 0
-        ? JSON.stringify(itens_ixc_resultado)
-        : null,
-    });
+    const { observacao, data_entrega, itens_ixc = [], devolucoes = [] } = req.body;
 
     // ── PDF (ainda sem foto/assinatura — será regerado na confirmação) ─
     const updated = await db('requisicoes_epi').where('id', req.params.id).first();
@@ -1173,8 +1247,9 @@ router.get('/tecnicos/:id/perfil', authMiddleware, async (req, res) => {
         'r.id_requisicao_ixc', 'r.data_criacao', 'r.data_resposta',
         'r.data_entrega', 'r.data_confirmacao_recebimento',
         'r.observacao_gestor', 'r.registro_manual', 'r.pdf_base64',
-        'r.assinatura_recebimento_base64', 'r.foto_recebimento_base64',
-        'g.nome as gestor_nome'
+                'r.assinatura_recebimento_base64', 'r.foto_recebimento_base64',
+                'r.devolucoes',
+                'g.nome as gestor_nome'
       )
       .orderBy('r.data_criacao', 'desc');
 
@@ -1498,6 +1573,44 @@ router.put('/tecnicos/:id/assinatura-admissao', authMiddleware, async (req, res)
     res.json({ success: true, message: 'Assinatura de admissão salva!' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao salvar assinatura' });
+  }
+});
+
+// PUT /api/seguranca/requisicoes/:id/devolucoes — gestor edita códigos de substituição
+router.put('/requisicoes/:id/devolucoes', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const { devolucoes } = req.body;
+    // devolucoes: [{ epi: "Bota de Segurança", codigo_subst: "SUBST", data_devolucao: "10/04/2025" }]
+
+    await db('requisicoes_epi')
+      .where('id', req.params.id)
+      .where('tenant_id', req.user.tenant_id)
+      .update({
+        devolucoes: devolucoes ? JSON.stringify(devolucoes) : null,
+      });
+
+    // Regenerar PDF da ficha se for concluída
+    const requisicao = await db('requisicoes_epi').where('id', req.params.id).first();
+    if (requisicao && ['concluida', 'aprovada'].includes(requisicao.status)) {
+      try {
+        const tecnico = await db('usuarios').where('id', requisicao.tecnico_id).first();
+        const gestor = requisicao.gestor_id
+          ? await db('usuarios').where('id', requisicao.gestor_id).first()
+          : null;
+        const pdfBuffer = await gerarPDF(requisicao, tecnico, gestor);
+        await db('requisicoes_epi').where('id', req.params.id).update({
+          pdf_base64: `data:application/pdf;base64,${pdfBuffer.toString('base64')}`,
+        });
+      } catch (e) { console.error('⚠️ PDF regen falhou:', e.message); }
+    }
+
+    res.json({ success: true, message: 'Devoluções atualizadas!' });
+  } catch (err) {
+    console.error('❌ Erro ao atualizar devoluções:', err);
+    res.status(500).json({ error: 'Erro ao atualizar' });
   }
 });
 

@@ -330,9 +330,7 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
 
       // ── TABELA DE EPIs (com DEVOLUÇÃO) ────────────────────────
       function cabecalhoTabela(yPos) {
-              const specW = colT.quat + colT.uni + colT.desc + colT.fab + colT.ca;
-              const retW = colT.data + colT.assRet;
-              const devW = colT.subst + colT.dataDev + colT.assDev;
+              const colT = { quat: 30, uni: 24, desc: 110, fab: 72, ca: 36, data: 46, assRet: 55, subst: 30, dataDev: 46, assDev: CW - 30 - 24 - 110 - 72 - 36 - 46 - 55 - 30 - 46 };
 
               // Linha 1: 3 grupos
               doc.rect(M, yPos, specW, 14).fill('#D0D0D0');

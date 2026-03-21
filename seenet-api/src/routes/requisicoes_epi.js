@@ -329,38 +329,45 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
       y += 16;
 
       // ── TABELA DE EPIs (com DEVOLUÇÃO) ────────────────────────
-      // ── TABELA DE EPIs (com DEVOLUÇÃO) ────────────────────────
-            const colT = { quat: 30, uni: 24, desc: 110, fab: 72, ca: 36, data: 46, assRet: 55, subst: 30, dataDev: 46, assDev: CW - 30 - 24 - 110 - 72 - 36 - 46 - 55 - 30 - 46 };
-
-            function cabecalhoTabela(yPos) {
+      function cabecalhoTabela(yPos) {
               const specW = colT.quat + colT.uni + colT.desc + colT.fab + colT.ca;
               const retW = colT.data + colT.assRet;
               const devW = colT.subst + colT.dataDev + colT.assDev;
 
-              // Linha 1: títulos agrupados
-              doc.rect(M, yPos, specW, 14).fill('#D0D0D0').stroke(CB);
-              doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000').text('ESPECIFICAÇÃO DO EPI', M + specW / 2 - 40, yPos + 4);
+              // Linha 1: 3 grupos com borda grossa
+              // ESPECIFICAÇÃO
+              doc.rect(M, yPos, specW, 14).fillAndStroke('#D0D0D0', '#000000');
+              doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
+                .text('ESPECIFICAÇÃO DO EPI', M, yPos + 4, { width: specW, align: 'center' });
 
-              doc.rect(M + specW, yPos, retW, 14).fill('#D0D0D0').stroke(CB);
-              doc.fontSize(7).font('Helvetica-Bold').text('RETIRADA', M + specW + retW / 2 - 18, yPos + 4);
+              // RETIRADA
+              doc.rect(M + specW, yPos, retW, 14).fillAndStroke('#D0D0D0', '#000000');
+              doc.fontSize(7).font('Helvetica-Bold')
+                .text('RETIRADA', M + specW, yPos + 4, { width: retW, align: 'center' });
 
-              doc.rect(M + specW + retW, yPos, devW, 14).fill('#D0D0D0').stroke(CB);
-              doc.fontSize(7).font('Helvetica-Bold').text('DEVOLUÇÃO', M + specW + retW + devW / 2 - 22, yPos + 4);
+              // DEVOLUÇÃO
+              doc.rect(M + specW + retW, yPos, devW, 14).fillAndStroke('#D0D0D0', '#000000');
+              doc.fontSize(7).font('Helvetica-Bold')
+                .text('DEVOLUÇÃO', M + specW + retW, yPos + 4, { width: devW, align: 'center' });
+
               yPos += 14;
 
-              // Linha 2: sub-headers
+              // Linha 2: sub-colunas com borda fina
               let x = M;
               const headers = [
-                { l: 'QUAT', w: colT.quat }, { l: 'UNI', w: colT.uni }, { l: 'DESCRIÇÃO DO EPI', w: colT.desc },
-                { l: 'FABRICANTE', w: colT.fab }, { l: 'CA', w: colT.ca }, { l: 'DATA', w: colT.data },
-                { l: 'ASSINATURA', w: colT.assRet }, { l: 'SUBST', w: colT.subst }, { l: 'DATA', w: colT.dataDev },
-                { l: 'ASSINATURA', w: colT.assDev },
+                { l: 'QUAT', w: colT.quat }, { l: 'UNI', w: colT.uni },
+                { l: 'DESCRIÇÃO DO EPI', w: colT.desc }, { l: 'FABRICANTE', w: colT.fab },
+                { l: 'CA', w: colT.ca }, { l: 'DATA', w: colT.data },
+                { l: 'ASSINATURA', w: colT.assRet }, { l: 'SUBST', w: colT.subst },
+                { l: 'DATA', w: colT.dataDev }, { l: 'ASSINATURA', w: colT.assDev },
               ];
-              headers.forEach(h => {
-                doc.rect(x, yPos, h.w, 12).fill('#E8E8E8').stroke(CB);
-                doc.fontSize(5).font('Helvetica-Bold').fillColor('#000000').text(h.l, x + 2, yPos + 3, { width: h.w - 4, align: 'center' });
+              headers.forEach((h, i) => {
+                doc.rect(x, yPos, h.w, 12).fillAndStroke('#E8E8E8', '#000000');
+                doc.fontSize(5.5).font('Helvetica-Bold').fillColor('#000000')
+                  .text(h.l, x, yPos + 3, { width: h.w, align: 'center' });
                 x += h.w;
               });
+
               return yPos + 12;
             }
       y = cabecalhoTabela(y);

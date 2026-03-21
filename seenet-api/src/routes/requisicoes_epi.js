@@ -246,7 +246,7 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
     try {
       const doc = new PDFDocument({
         size: 'A4',
-        margin: 25,
+        margin: 15,
         info: {
           Title: `Ficha de EPI - ${tecnico.nome} - BW Telecom`,
           Author: 'SeeNet - BW Telecom',
@@ -260,7 +260,7 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
       doc.on('error', reject);
 
       const W = 595.28;
-      const M = 25;
+      const M = 15;
       const CW = W - M * 2;
       const CB = '#999999';
 
@@ -329,36 +329,40 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
       y += 16;
 
       // ── TABELA DE EPIs (com DEVOLUÇÃO) ────────────────────────
-      const colT = { quat: 28, uni: 22, desc: 118, fab: 78, ca: 38, data: 48, assRet: 58, subst: 32, dataDev: 48, assDev: CW - 28 - 22 - 118 - 78 - 38 - 48 - 58 - 32 - 48 };
+      // ── TABELA DE EPIs (com DEVOLUÇÃO) ────────────────────────
+            const colT = { quat: 30, uni: 24, desc: 110, fab: 72, ca: 36, data: 46, assRet: 55, subst: 30, dataDev: 46, assDev: CW - 30 - 24 - 110 - 72 - 36 - 46 - 55 - 30 - 46 };
 
-      function cabecalhoTabela(yPos) {
-        const specW = colT.quat + colT.uni + colT.desc + colT.fab + colT.ca;
-        const retW = colT.data + colT.assRet;
-        const devW = colT.subst + colT.dataDev + colT.assDev;
+            function cabecalhoTabela(yPos) {
+              const specW = colT.quat + colT.uni + colT.desc + colT.fab + colT.ca;
+              const retW = colT.data + colT.assRet;
+              const devW = colT.subst + colT.dataDev + colT.assDev;
 
-        doc.rect(M, yPos, specW, 12).fill('#E0E0E0').stroke(CB);
-        doc.fontSize(6).font('Helvetica-Bold').fillColor('#000000').text('ESPECIFICAÇÃO DO EPI', M + 4, yPos + 3);
-        doc.rect(M + specW, yPos, retW, 12).fill('#E0E0E0').stroke(CB);
-        doc.text('RETIRADA', M + specW + 4, yPos + 3);
-        doc.rect(M + specW + retW, yPos, devW, 12).fill('#E0E0E0').stroke(CB);
-        doc.text('DEVOLUÇÃO', M + specW + retW + 4, yPos + 3);
-        yPos += 12;
+              // Linha 1: títulos agrupados
+              doc.rect(M, yPos, specW, 14).fill('#D0D0D0').stroke(CB);
+              doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000').text('ESPECIFICAÇÃO DO EPI', M + specW / 2 - 40, yPos + 4);
 
-        let x = M;
-        const headers = [
-          { l: 'QUAT', w: colT.quat }, { l: 'UNI', w: colT.uni }, { l: 'DESCRIÇÃO DO EPI', w: colT.desc },
-          { l: 'FABRICANTE', w: colT.fab }, { l: 'CA', w: colT.ca }, { l: 'DATA', w: colT.data },
-          { l: 'ASSINATURA', w: colT.assRet }, { l: 'SUBST', w: colT.subst }, { l: 'DATA', w: colT.dataDev },
-          { l: 'ASSINATURA', w: colT.assDev },
-        ];
-        headers.forEach(h => {
-          doc.rect(x, yPos, h.w, 11).fill('#F0F0F0').stroke(CB);
-          doc.fontSize(5).font('Helvetica-Bold').fillColor('#000000').text(h.l, x + 1, yPos + 3, { width: h.w - 2 });
-          x += h.w;
-        });
-        return yPos + 11;
-      }
+              doc.rect(M + specW, yPos, retW, 14).fill('#D0D0D0').stroke(CB);
+              doc.fontSize(7).font('Helvetica-Bold').text('RETIRADA', M + specW + retW / 2 - 18, yPos + 4);
 
+              doc.rect(M + specW + retW, yPos, devW, 14).fill('#D0D0D0').stroke(CB);
+              doc.fontSize(7).font('Helvetica-Bold').text('DEVOLUÇÃO', M + specW + retW + devW / 2 - 22, yPos + 4);
+              yPos += 14;
+
+              // Linha 2: sub-headers
+              let x = M;
+              const headers = [
+                { l: 'QUAT', w: colT.quat }, { l: 'UNI', w: colT.uni }, { l: 'DESCRIÇÃO DO EPI', w: colT.desc },
+                { l: 'FABRICANTE', w: colT.fab }, { l: 'CA', w: colT.ca }, { l: 'DATA', w: colT.data },
+                { l: 'ASSINATURA', w: colT.assRet }, { l: 'SUBST', w: colT.subst }, { l: 'DATA', w: colT.dataDev },
+                { l: 'ASSINATURA', w: colT.assDev },
+              ];
+              headers.forEach(h => {
+                doc.rect(x, yPos, h.w, 12).fill('#E8E8E8').stroke(CB);
+                doc.fontSize(5).font('Helvetica-Bold').fillColor('#000000').text(h.l, x + 2, yPos + 3, { width: h.w - 4, align: 'center' });
+                x += h.w;
+              });
+              return yPos + 12;
+            }
       y = cabecalhoTabela(y);
 
       const produtoMap = {};

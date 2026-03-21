@@ -329,15 +329,13 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
       y += 16;
 
       // ── TABELA DE EPIs (com DEVOLUÇÃO) ────────────────────────
-      function cabecalhoTabela(yPos) {
-        const colT = { quat: 30, uni: 24, desc: 110, fab: 72, ca: 36, data: 46, assRet: 55, subst: 30, dataDev: 46, assDev: CW - 30 - 24 - 110 - 72 - 36 - 46 - 55 - 30 - 46 };
+            const colT = { quat: 30, uni: 24, desc: 110, fab: 72, ca: 36, data: 46, assRet: 55, subst: 30, dataDev: 46, assDev: CW - 30 - 24 - 110 - 72 - 36 - 46 - 55 - 30 - 46 };
 
-              function cabecalhoTabela(yPos) {
-                      const specW = colT.quat + colT.uni + colT.desc + colT.fab + colT.ca;
-                      const retW = colT.data + colT.assRet;
-                      const devW = colT.subst + colT.dataDev + colT.assDev;
-        
-              // Linha 1: 3 grupos
+            function cabecalhoTabela(yPos) {
+              const specW = colT.quat + colT.uni + colT.desc + colT.fab + colT.ca;
+              const retW = colT.data + colT.assRet;
+              const devW = colT.subst + colT.dataDev + colT.assDev;
+
               doc.rect(M, yPos, specW, 14).fill('#D0D0D0');
               doc.rect(M, yPos, specW, 14).lineWidth(1).stroke('#000000');
               doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
@@ -355,7 +353,6 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
 
               yPos += 14;
 
-              // Linha 2: sub-colunas
               let x = M;
               const headers = [
                 { l: 'QUAT', w: colT.quat }, { l: 'UNI', w: colT.uni },
@@ -375,7 +372,7 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
               doc.lineWidth(1);
               return yPos + 12;
             }
-      y = cabecalhoTabela(y);
+            y = cabecalhoTabela(y);
 
       const produtoMap = {};
       produtosEpi.forEach(p => { produtoMap[p.nome] = p; });

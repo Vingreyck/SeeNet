@@ -334,25 +334,25 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
               const retW = colT.data + colT.assRet;
               const devW = colT.subst + colT.dataDev + colT.assDev;
 
-              // Linha 1: 3 grupos com borda grossa
-              // ESPECIFICAÇÃO
-              doc.rect(M, yPos, specW, 14).fillAndStroke('#D0D0D0', '#000000');
+              // Linha 1: 3 grupos
+              doc.rect(M, yPos, specW, 14).fill('#D0D0D0');
+              doc.rect(M, yPos, specW, 14).lineWidth(1).stroke('#000000');
               doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
                 .text('ESPECIFICAÇÃO DO EPI', M, yPos + 4, { width: specW, align: 'center' });
 
-              // RETIRADA
-              doc.rect(M + specW, yPos, retW, 14).fillAndStroke('#D0D0D0', '#000000');
-              doc.fontSize(7).font('Helvetica-Bold')
+              doc.rect(M + specW, yPos, retW, 14).fill('#D0D0D0');
+              doc.rect(M + specW, yPos, retW, 14).lineWidth(1).stroke('#000000');
+              doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
                 .text('RETIRADA', M + specW, yPos + 4, { width: retW, align: 'center' });
 
-              // DEVOLUÇÃO
-              doc.rect(M + specW + retW, yPos, devW, 14).fillAndStroke('#D0D0D0', '#000000');
-              doc.fontSize(7).font('Helvetica-Bold')
+              doc.rect(M + specW + retW, yPos, devW, 14).fill('#D0D0D0');
+              doc.rect(M + specW + retW, yPos, devW, 14).lineWidth(1).stroke('#000000');
+              doc.fontSize(7).font('Helvetica-Bold').fillColor('#000000')
                 .text('DEVOLUÇÃO', M + specW + retW, yPos + 4, { width: devW, align: 'center' });
 
               yPos += 14;
 
-              // Linha 2: sub-colunas com borda fina
+              // Linha 2: sub-colunas
               let x = M;
               const headers = [
                 { l: 'QUAT', w: colT.quat }, { l: 'UNI', w: colT.uni },
@@ -361,13 +361,15 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
                 { l: 'ASSINATURA', w: colT.assRet }, { l: 'SUBST', w: colT.subst },
                 { l: 'DATA', w: colT.dataDev }, { l: 'ASSINATURA', w: colT.assDev },
               ];
-              headers.forEach((h, i) => {
-                doc.rect(x, yPos, h.w, 12).fillAndStroke('#E8E8E8', '#000000');
+              headers.forEach(h => {
+                doc.rect(x, yPos, h.w, 12).fill('#E8E8E8');
+                doc.rect(x, yPos, h.w, 12).lineWidth(0.5).stroke('#000000');
                 doc.fontSize(5.5).font('Helvetica-Bold').fillColor('#000000')
                   .text(h.l, x, yPos + 3, { width: h.w, align: 'center' });
                 x += h.w;
               });
 
+              doc.lineWidth(1);
               return yPos + 12;
             }
       y = cabecalhoTabela(y);

@@ -888,6 +888,162 @@ router.delete('/produtos-epi-cadastro/:id', authMiddleware, async (req, res) => 
   } catch (err) { res.status(500).json({ error: 'Erro ao remover' }); }
 });
 
+// GET /api/seguranca/epis-duplicados — verifica quais EPIs o técnico já tem
+router.get('/epis-duplicados', authMiddleware, async (req, res) => {
+  try {
+    const reqsAtivas = await db('requisicoes_epi')
+      .where('tecnico_id', req.user.id)
+      .where('tenant_id', req.user.tenant_id)
+      .whereIn('status', ['aprovada', 'aguardando_confirmacao', 'concluida'])
+      .select('id', 'epis_solicitados', 'data_entrega', 'data_resposta');
+
+    const episAtivos = {};
+    for (const r of reqsAtivas) {
+      const epis = Array.isArray(r.epis_solicitados) ? r.epis_solicitados : JSON.parse(r.epis_solicitados || '[]');
+      for (const epi of epis) {
+        const nomeLimpo = epi.replace(/\s*\(Tam\.\s*\w+\)/, '').replace(/\s*x\d+$/, '').trim();
+        // Verifica se já tem devolução aprovada para este item
+        const devolvido = await db('devolucoes_epi')
+          .where('requisicao_original_id', r.id)
+          .where('epi_nome', epi)
+          .where('status', 'aprovada')
+          .first();
+        if (!devolvido) {
+          episAtivos[nomeLimpo] = { requisicao_id: r.id, epi_completo: epi, data: r.data_entrega || r.data_resposta };
+        }
+      }
+    }
+    res.json({ epis_ativos: episAtivos });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao verificar EPIs' }); }
+});
+
+// POST /api/seguranca/devolucoes — técnico assina devolução de EPI
+router.post('/devolucoes', authMiddleware, async (req, res) => {
+  try {
+    const { requisicao_original_id, epi_nome, assinatura_base64 } = req.body;
+    if (!requisicao_original_id || !epi_nome) return res.status(400).json({ error: 'Dados obrigatórios' });
+    if (!assinatura_base64) return res.status(400).json({ error: 'Assinatura obrigatória' });
+
+    // Verifica se já existe devolução pendente
+    const existe = await db('devolucoes_epi')
+      .where('requisicao_original_id', requisicao_original_id)
+      .where('epi_nome', epi_nome)
+      .whereIn('status', ['pendente', 'aprovada'])
+      .first();
+    if (existe) return res.status(400).json({ error: 'Devolução já registrada para este item' });
+
+    const [inserted] = await db('devolucoes_epi').insert({
+      tenant_id: req.user.tenant_id,
+      tecnico_id: req.user.id,
+      requisicao_original_id,
+      epi_nome,
+      status: 'pendente',
+      assinatura_devolucao: assinatura_base64,
+      data_devolucao: new Date(),
+    }).returning('*');
+
+    res.status(201).json({ success: true, message: 'Devolução registrada! Aguardando aprovação do gestor.', id: inserted.id });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao registrar devolução' }); }
+});
+
+// GET /api/seguranca/devolucoes/pendentes — gestor vê devoluções pendentes
+router.get('/devolucoes/pendentes', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
+    const lista = await db('devolucoes_epi as d')
+      .join('usuarios as t', 't.id', 'd.tecnico_id')
+      .join('requisicoes_epi as r', 'r.id', 'd.requisicao_original_id')
+      .where('d.tenant_id', req.user.tenant_id)
+      .where('d.status', 'pendente')
+      .select('d.*', 't.nome as tecnico_nome', 'r.data_entrega as data_entrega_original')
+      .orderBy('d.data_criacao', 'asc');
+    res.json({ devolucoes: lista });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao buscar devoluções' }); }
+});
+
+// POST /api/seguranca/devolucoes/:id/aprovar — gestor aprova devolução
+router.post('/devolucoes/:id/aprovar', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
+    const { codigo_subst } = req.body;
+    if (!codigo_subst) return res.status(400).json({ error: 'Código de substituição obrigatório' });
+
+    const devolucao = await db('devolucoes_epi').where('id', req.params.id).where('tenant_id', req.user.tenant_id).first();
+    if (!devolucao) return res.status(404).json({ error: 'Devolução não encontrada' });
+    if (devolucao.status !== 'pendente') return res.status(400).json({ error: 'Devolução já processada' });
+
+    await db('devolucoes_epi').where('id', req.params.id).update({
+      status: 'aprovada',
+      codigo_subst,
+      gestor_id: req.user.id,
+      data_resposta: new Date(),
+    });
+
+    // Atualiza o campo devolucoes na requisição original (para o PDF da ficha)
+    const reqOriginal = await db('requisicoes_epi').where('id', devolucao.requisicao_original_id).first();
+    if (reqOriginal) {
+      let devolucoes = reqOriginal.devolucoes ? (Array.isArray(reqOriginal.devolucoes) ? reqOriginal.devolucoes : JSON.parse(reqOriginal.devolucoes || '[]')) : [];
+      // Remove entrada anterior do mesmo EPI se existir
+      devolucoes = devolucoes.filter(d => d.epi !== devolucao.epi_nome);
+      // Adiciona nova
+      devolucoes.push({
+        epi: devolucao.epi_nome,
+        codigo_subst,
+        data_devolucao: formatarDataBR(devolucao.data_devolucao || new Date(), false),
+        assinatura_devolucao: devolucao.assinatura_devolucao,
+      });
+      await db('requisicoes_epi').where('id', devolucao.requisicao_original_id).update({
+        devolucoes: JSON.stringify(devolucoes),
+      });
+    }
+
+    res.json({ success: true, message: 'Devolução aprovada!' });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao aprovar devolução' }); }
+});
+
+// POST /api/seguranca/devolucoes/:id/recusar — gestor recusa (devedor)
+router.post('/devolucoes/:id/recusar', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
+    const { observacao } = req.body;
+
+    await db('devolucoes_epi').where('id', req.params.id).where('tenant_id', req.user.tenant_id).update({
+      status: 'recusada',
+      gestor_id: req.user.id,
+      observacao_gestor: observacao || 'Devolução não confirmada pelo gestor.',
+      data_resposta: new Date(),
+    });
+
+    res.json({ success: true, message: 'Devolução recusada. Técnico marcado como devedor.' });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao recusar' }); }
+});
+
+// GET /api/seguranca/devolucoes/devedores — lista técnicos devedores
+router.get('/devolucoes/devedores', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
+    const lista = await db('devolucoes_epi as d')
+      .join('usuarios as t', 't.id', 'd.tecnico_id')
+      .leftJoin('usuarios as g', 'g.id', 'd.gestor_id')
+      .where('d.tenant_id', req.user.tenant_id)
+      .where('d.status', 'recusada')
+      .select('d.*', 't.nome as tecnico_nome', 'g.nome as gestor_nome')
+      .orderBy('d.data_resposta', 'desc');
+    res.json({ devedores: lista });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao buscar devedores' }); }
+});
+
+// GET /api/seguranca/devolucoes/minhas — técnico vê suas devoluções
+router.get('/devolucoes/minhas', authMiddleware, async (req, res) => {
+  try {
+    const lista = await db('devolucoes_epi')
+      .where('tecnico_id', req.user.id)
+      .where('tenant_id', req.user.tenant_id)
+      .orderBy('data_criacao', 'desc');
+    res.json({ devolucoes: lista });
+  } catch (err) { res.status(500).json({ error: 'Erro ao buscar devoluções' }); }
+});
+
 router.get('/perfil', authMiddleware, async (req, res) => {
   try {
     const usuario = await db('usuarios').where('id', req.user.id)

@@ -10,11 +10,9 @@ class OrdemServicoService {
   final String baseUrl = 'https://seenet-production.up.railway.app/api';
   final AuthService _authService = Get.find<AuthService>();
 
-  // Headers padrão com autenticação
   Map<String, String> get _headers {
     final token = _authService.token;
     final tenantCode = _authService.tenantCode;
-
     return {
       'Authorization': 'Bearer $token',
       'X-Tenant-Code': tenantCode ?? '',
@@ -22,12 +20,32 @@ class OrdemServicoService {
     };
   }
 
-  // Buscar OSs do técnico logado (pendentes e em execução)
+  // ✅ NOVO: Buscar lista de admins do tenant
+  Future<List<Map<String, dynamic>>> buscarAdmins() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ordens-servico/admins'),
+        headers: _headers,
+      );
+
+      print('📥 buscarAdmins - Status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> admins = data['admins'] ?? [];
+        return admins.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      print('❌ Erro em buscarAdmins: $e');
+      return [];
+    }
+  }
+
   Future<List<OrdemServico>> buscarMinhasOSs() async {
     try {
       final token = _authService.token;
       final tenantCode = _authService.tenantCode;
-
       if (token == null) throw Exception('Token não encontrado');
       if (tenantCode == null) throw Exception('Código da empresa não encontrado');
 
@@ -40,11 +58,9 @@ class OrdemServicoService {
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-
         final List<dynamic> data = responseData is Map && responseData.containsKey('data')
             ? responseData['data']
             : responseData;
-
         return data.map((json) => OrdemServico.fromJson(json)).toList();
       } else {
         throw Exception('Erro ao buscar OSs: ${response.statusCode}');
@@ -55,16 +71,13 @@ class OrdemServicoService {
     }
   }
 
-  // ✅ NOVO: Buscar OSs concluídas
   Future<List<OrdemServico>> buscarOSsConcluidas({String busca = '', int limite = 50}) async {
     try {
       final token = _authService.token;
       final tenantCode = _authService.tenantCode;
-
       if (token == null) throw Exception('Token não encontrado');
       if (tenantCode == null) throw Exception('Código da empresa não encontrado');
 
-      // Montar URL com query params
       final uri = Uri.parse('$baseUrl/ordens-servico/concluidas').replace(
         queryParameters: {
           'limite': limite.toString(),
@@ -74,15 +87,11 @@ class OrdemServicoService {
 
       final response = await http.get(uri, headers: _headers);
 
-      print('📥 buscarOSsConcluidas - Status: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-
         final List<dynamic> data = responseData is Map && responseData.containsKey('data')
             ? responseData['data']
             : responseData;
-
         return data.map((json) => OrdemServico.fromJson(json)).toList();
       } else {
         throw Exception('Erro ao buscar OSs concluídas: ${response.statusCode}');
@@ -93,15 +102,8 @@ class OrdemServicoService {
     }
   }
 
-  // Buscar detalhes de uma OS específica
   Future<OrdemServico> buscarDetalhesOS(String osId) async {
     try {
-      final token = _authService.token;
-      final tenantCode = _authService.tenantCode;
-
-      if (token == null) throw Exception('Token não encontrado');
-      if (tenantCode == null) throw Exception('Código da empresa não encontrado');
-
       final response = await http.get(
         Uri.parse('$baseUrl/ordens-servico/$osId/detalhes'),
         headers: _headers,
@@ -118,42 +120,29 @@ class OrdemServicoService {
     }
   }
 
-  // Iniciar execução da OS
-  Future<bool> deslocarParaOS(String osId, double latitude, double longitude) async {
+  // ✅ MODIFICADO: Agora aceita adminId
+  Future<bool> deslocarParaOS(String osId, double latitude, double longitude, {int? adminId}) async {
     try {
-      final token = _authService.token;
-      final tenantCode = _authService.tenantCode;
-
-      if (token == null) throw Exception('Token não encontrado');
-      if (tenantCode == null) throw Exception('Código da empresa não encontrado');
-
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/deslocar'),
         headers: _headers,
         body: json.encode({
           'latitude': latitude,
           'longitude': longitude,
+          if (adminId != null) 'admin_responsavel_id': adminId,  // ✅ NOVO
         }),
       );
 
       print('📥 deslocarParaOS - Status: ${response.statusCode}');
-
-      return response.statusCode ==200;
+      return response.statusCode == 200;
     } catch (e) {
       print('❌ Erro em deslocarParaOS: $e');
       return false;
     }
   }
 
-  // 2️⃣ Informar chegada ao local
   Future<bool> chegarAoLocal(String osId, double latitude, double longitude) async {
     try {
-      final token = _authService.token;
-      final tenantCode = _authService.tenantCode;
-
-      if (token == null) throw Exception('Token não encontrado');
-      if (tenantCode == null) throw Exception('Código da empresa não encontrado');
-
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/chegar-local'),
         headers: _headers,
@@ -164,7 +153,6 @@ class OrdemServicoService {
       );
 
       print('📥 chegarAoLocal - Status: ${response.statusCode}');
-
       return response.statusCode == 200;
     } catch (e) {
       print('❌ Erro em chegarAoLocal: $e');
@@ -176,39 +164,27 @@ class OrdemServicoService {
     try {
       print('🏁 Finalizando OS $osId');
 
-      // ✅ CONVERTER FOTOS PARA BASE64 COM METADADOS
       if (dados['fotos'] != null && (dados['fotos'] as List).isNotEmpty) {
         List<Map<String, String>> fotosComMetadados = [];
         List<Map<String, dynamic>> anexos = List<Map<String, dynamic>>.from(dados['fotos']);
 
-        print('📸 Convertendo ${anexos.length} foto(s) para base64...');
-
         for (var anexo in anexos) {
           try {
             final File file = File(anexo['path']);
-
-            if (!await file.exists()) {
-              print('⚠️ Arquivo não encontrado: ${anexo['path']}');
-              continue;
-            }
-
+            if (!await file.exists()) continue;
             final Uint8List bytes = await file.readAsBytes();
             final String base64Image = base64Encode(bytes);
-
             fotosComMetadados.add({
               'base64': base64Image,
               'tipo': anexo['tipo'] ?? 'outro',
               'descricao': anexo['descricao'] ?? '',
             });
-
-            print('✅ Foto ${anexo['tipo']} convertida (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
           } catch (e) {
             print('❌ Erro ao converter foto: $e');
           }
         }
 
         dados['fotos'] = fotosComMetadados;
-        print('📤 ${fotosComMetadados.length} foto(s) prontas para envio');
       }
 
       final response = await http.post(

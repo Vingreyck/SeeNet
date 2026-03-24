@@ -1,5 +1,6 @@
 const { db } = require('../config/database');
 const IXCService = require('../services/IXCService');
+const notificationService = require('../services/NotificationService');
 
 class OrdensServicoController {
   /**
@@ -153,13 +154,12 @@ async deslocarParaOS(req, res) {
 
   try {
     const { id } = req.params;
-    const { latitude, longitude } = req.body;
+    const { latitude, longitude, admin_responsavel_id } = req.body;  // ✅ NOVO: admin_responsavel_id
     const userId = req.user.id;
     const tenantId = req.tenantId;
 
-    console.log(`🚗 Técnico deslocando para OS ${id}`);
+    console.log(`🚗 Técnico deslocando para OS ${id} (admin responsável: ${admin_responsavel_id || 'nenhum'})`);
 
-    // Buscar OS
     const os = await trx('ordem_servico')
       .where('id', id)
       .where('tenant_id', tenantId)
@@ -176,24 +176,24 @@ async deslocarParaOS(req, res) {
       return res.status(400).json({ success: false, error: 'OS já foi iniciada' });
     }
 
-    // Atualizar status para "em_deslocamento"
+    // Atualizar status + admin responsável
     await trx('ordem_servico')
       .where('id', id)
       .update({
         status: 'em_deslocamento',
         latitude_inicio: latitude,
         longitude_inicio: longitude,
+        admin_responsavel_id: admin_responsavel_id || null,  // ✅ NOVO
         data_inicio_deslocamento: db.fn.now(),
         data_atualizacao: db.fn.now()
       });
 
-    // ✅ Sincronizar deslocamento com IXC (apenas como mensagem)
+    // Sincronizar com IXC
     if (os.origem === 'IXC' && os.id_externo) {
       try {
         await this.sincronizarDeslocamentoComIXC(trx, os, { latitude, longitude });
       } catch (error) {
         console.error('⚠️ Erro ao sincronizar com IXC:', error.message);
-        // Não bloqueia o deslocamento local se IXC falhar
       }
     }
 
@@ -201,10 +201,23 @@ async deslocarParaOS(req, res) {
 
     console.log(`✅ OS ${os.numero_os} - Técnico em deslocamento`);
 
-    return res.json({
-      success: true,
-      message: 'Deslocamento iniciado com sucesso'
-    });
+    // ✅ NOTIFICAÇÃO: Avisar admin específico
+    if (admin_responsavel_id) {
+      try {
+        const tecnico = await db('usuarios').where('id', userId).first();
+        await notificationService.enviarParaUsuario(
+          db,
+          admin_responsavel_id,
+          '🚗 Técnico em Deslocamento',
+          `${tecnico.nome} iniciou deslocamento para OS #${os.numero_os} - ${os.cliente_nome}`,
+          { route: '/ordens-servico', tipo: 'os_deslocamento', referencia_id: String(id) }
+        );
+      } catch (notifErr) {
+        console.warn('⚠️ Falha ao notificar admin:', notifErr.message);
+      }
+    }
+
+    return res.json({ success: true, message: 'Deslocamento iniciado com sucesso' });
   } catch (error) {
     await trx.rollback();
     console.error('❌ Erro ao iniciar deslocamento:', error);
@@ -328,6 +341,22 @@ async chegarAoLocal(req, res) {
     }
 
     await trx.commit();
+
+        // ✅ NOTIFICAÇÃO: Avisar admin que técnico chegou
+        if (os.admin_responsavel_id) {
+          try {
+            const tecnico = await db('usuarios').where('id', userId).first();
+            await notificationService.enviarParaUsuario(
+              db,
+              os.admin_responsavel_id,
+              '📍 Técnico Chegou ao Local',
+              `${tecnico.nome} chegou no cliente - OS #${os.numero_os}`,
+              { route: '/ordens-servico', tipo: 'os_chegada', referencia_id: String(id) }
+            );
+          } catch (notifErr) {
+            console.warn('⚠️ Falha ao notificar admin:', notifErr.message);
+          }
+        }
 
     console.log(`✅ OS ${os.numero_os} em execução`);
 
@@ -622,6 +651,22 @@ if (ixcService && os.id_externo) {
 
     console.log(`✅ OS ${id} finalizada com sucesso`);
 
+    // ✅ NOTIFICAÇÃO: Avisar admin que OS foi finalizada
+        if (os.admin_responsavel_id) {
+          try {
+            const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
+            await notificationService.enviarParaUsuario(
+              db,
+              os.admin_responsavel_id,
+              '✅ OS Finalizada',
+              `${tecnico.nome} finalizou a OS #${os.numero_os} - ${os.cliente_nome}`,
+              { route: '/ordens-servico', tipo: 'os_finalizada', referencia_id: String(id) }
+            );
+          } catch (notifErr) {
+            console.warn('⚠️ Falha ao notificar admin:', notifErr.message);
+          }
+        }
+
     return res.json({
       success: true,
       message: 'OS finalizada com sucesso',
@@ -810,5 +855,30 @@ if (dados.fotos && dados.fotos.length > 0) {
     }
   }
 }
+
+/**
+   * Listar admins do tenant (para o técnico escolher)
+   * GET /api/ordens-servico/admins
+   */
+  async listarAdmins(req, res) {
+    try {
+      const tenantId = req.tenantId;
+
+      const admins = await db('usuarios')
+        .where('tenant_id', tenantId)
+        .where('ativo', true)
+        .where('tipo_usuario', 'administrador')
+        .select('id', 'nome', 'email', 'foto_perfil')
+        .orderBy('nome');
+
+      return res.json({
+        success: true,
+        admins: admins
+      });
+    } catch (error) {
+      console.error('❌ Erro ao listar admins:', error);
+      return res.status(500).json({ success: false, error: 'Erro ao listar administradores' });
+    }
+  }
 
 module.exports = new OrdensServicoController();

@@ -15,6 +15,9 @@ router.get('/concluidas', OrdensServicoController.buscarOSsConcluidas.bind(Orden
 // Buscar detalhes de uma OS
 router.get('/:id/detalhes', OrdensServicoController.buscarDetalhesOS.bind(OrdensServicoController));
 
+// Listar admins para seleção
+router.get('/admins', OrdensServicoController.listarAdmins.bind(OrdensServicoController));
+
 // 1️⃣ Deslocamento (técnico saindo)
 router.post('/:id/deslocar', OrdensServicoController.deslocarParaOS.bind(OrdensServicoController));
 

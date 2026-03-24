@@ -45,6 +45,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   Uint8List? assinaturaBytes;
   bool osIniciada = false;
   String statusAtual = 'pendente';
+  int? adminSelecionadoId;   // ✅ NOVO: Admin escolhido para acompanhar
+  String? adminSelecionadoNome;
 
   @override
   void initState() {
@@ -674,14 +676,24 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
 
   Future<void> _iniciarOS() async {
     if (statusAtual == 'pendente') {
-      final sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!);
+      // ✅ NOVO: Primeiro, mostrar seleção de admin
+      if (adminSelecionadoId == null) {
+        final selecionou = await _selecionarAdmin();
+        if (!selecionou) return; // Cancelou a seleção
+      }
+
+      final sucesso = await controller.deslocarParaOS(
+        os.id, latitude!, longitude!,
+        adminId: adminSelecionadoId,  // ✅ Passa o admin selecionado
+      );
+
       if (sucesso) {
         setState(() { statusAtual = 'em_deslocamento'; osIniciada = false; });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('🚗 Deslocamento iniciado! Dirija com segurança.'),
-            backgroundColor: Color(0xFF00FF88),
-            duration: Duration(seconds: 2),
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('🚗 Deslocamento iniciado! ${adminSelecionadoNome ?? "Admin"} será notificado.'),
+            backgroundColor: const Color(0xFF00FF88),
+            duration: const Duration(seconds: 3),
           ));
         }
       } else {
@@ -731,6 +743,133 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     if (statusAtual == 'em_execucao') {
       setState(() { osIniciada = true; _etapaAtual = 1; });
     }
+  }
+
+  /// Mostra bottom sheet para técnico selecionar qual admin vai acompanhar
+  Future<bool> _selecionarAdmin() async {
+    final admins = controller.adminsDisponiveis;
+
+    if (admins.isEmpty) {
+      // Se não tem admins cadastrados, continua sem notificação
+      return true;
+    }
+
+    // Se só tem 1 admin, seleciona automaticamente
+    if (admins.length == 1) {
+      adminSelecionadoId = admins.first['id'];
+      adminSelecionadoNome = admins.first['nome'];
+      return true;
+    }
+
+    // Mostrar seleção
+    final resultado = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      backgroundColor: const Color(0xFF2A2A2A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Icon(Icons.admin_panel_settings, color: Color(0xFF00FF88), size: 40),
+              const SizedBox(height: 12),
+              const Text(
+                'Selecione o Responsável',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Escolha qual administrador vai acompanhar este atendimento',
+                style: TextStyle(color: Colors.white54, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ...admins.map((admin) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: () => Navigator.pop(context, admin),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: Colors.orange.withOpacity(0.3),
+                          child: const Icon(Icons.admin_panel_settings,
+                              color: Colors.orange, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                admin['nome'] ?? '',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (admin['email'] != null &&
+                                  !admin['email'].toString().endsWith('@seenet.local'))
+                                Text(
+                                  admin['email'],
+                                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: Colors.white38),
+                      ],
+                    ),
+                  ),
+                ),
+              )),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text(
+                  'Pular (sem acompanhamento)',
+                  style: TextStyle(color: Colors.white38, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (resultado != null) {
+      adminSelecionadoId = resultado['id'];
+      adminSelecionadoNome = resultado['nome'];
+      return true;
+    }
+
+    // Se clicou "Pular", continua sem admin
+    return true;
   }
 
   Future<void> _finalizarOS() async {

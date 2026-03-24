@@ -95,6 +95,19 @@ class NotificationService {
   }
 
   /**
+   * Notificar técnico de nova OS atribuída
+   */
+  async notificarNovaOS(db, tecnicoId, numeroOs, clienteNome) {
+    return await this.enviarParaUsuario(
+      db,
+      tecnicoId,
+      '📋 Nova Ordem de Serviço',
+      `OS #${numeroOs} - ${clienteNome} foi atribuída a você.`,
+      { route: '/ordens-servico', tipo: 'nova_os' }
+    );
+  }
+
+  /**
    * Envia push APENAS para gestores de segurança (NÃO inclui administradores)
    */
   async enviarParaGestores(db, tenantId, titulo, corpo, data = {}) {

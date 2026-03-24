@@ -1,4 +1,5 @@
 const { db } = require('../config/database');
+const notificationService = require('./NotificationService');
 const IXCService = require('./IXCService');
 
 class SincronizadorIXC {
@@ -271,10 +272,17 @@ async sincronizarEmpresa(integracao) {
             });
         }
       } else {
-        // Inserir nova OS
-        await trx('ordem_servico').insert(dadosOS);
-        console.log(`   ✨ Nova OS ${dadosOS.numero_os} criada`);
-      }
+              // Inserir nova OS
+              await trx('ordem_servico').insert(dadosOS);
+              console.log(`   ✨ Nova OS ${dadosOS.numero_os} criada`);
+
+              // ✅ NOTIFICAÇÃO: Avisar técnico da nova OS
+              try {
+                await notificationService.notificarNovaOS(db, tecnicoId, dadosOS.numero_os, clienteNome);
+              } catch (notifErr) {
+                console.warn('⚠️ Falha ao notificar técnico de nova OS:', notifErr.message);
+              }
+            }
     } catch (error) {
       console.error(`   ❌ Erro ao sincronizar OS ${osIXC.id}:`, error.message);
     }

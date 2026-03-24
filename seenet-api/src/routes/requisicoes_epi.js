@@ -4,6 +4,7 @@ const router = express.Router();
 const { db } = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 const PDFDocument = require('pdfkit');
+const notificationService = require('../services/NotificationService');
 const https = require('https');
 const http = require('http');
 
@@ -525,7 +526,19 @@ router.post('/requisicoes', authMiddleware, async (req, res) => {
       epis_solicitados: JSON.stringify(epis_solicitados), registro_manual: false,
     }).returning('id');
     res.status(201).json({ success: true, message: 'Requisição enviada com sucesso!', id });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao criar requisição' }); }
+
+        // ✅ NOTIFICAÇÃO: Avisar gestores de nova requisição
+        try {
+          const tecnico = await db('usuarios').where('id', req.user.id).first();
+          await notificationService.enviarParaGestores(
+            db, req.user.tenant_id,
+            '📋 Nova Requisição de EPI',
+            `${tecnico.nome} solicitou equipamentos de proteção.`,
+            { route: '/seguranca/gestao', tipo: 'nova_requisicao', referencia_id: String(id) }
+          );
+        } catch (notifErr) { console.warn('⚠️ Falha ao notificar gestores:', notifErr.message); }
+
+      } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao criar requisição' }); }
 });
 
 router.post('/requisicoes/manual', authMiddleware, async (req, res) => {
@@ -679,11 +692,22 @@ router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
 
     const itens_com_erro = itens_ixc_resultado.filter(i => i.erro);
     res.json({
-      success: true, message: 'Requisição aprovada! Aguardando confirmação do técnico.',
-      id_requisicao_ixc, itens_descontados: itens_ixc_resultado.filter(i => !i.erro).length,
-      ...(itens_com_erro.length > 0 && { itens_com_erro }),
-    });
-  } catch (err) { console.error('❌ Erro ao aprovar:', err); res.status(500).json({ error: 'Erro ao aprovar' }); }
+          success: true, message: 'Requisição aprovada! Aguardando confirmação do técnico.',
+          id_requisicao_ixc, itens_descontados: itens_ixc_resultado.filter(i => !i.erro).length,
+          ...(itens_com_erro.length > 0 && { itens_com_erro }),
+        });
+
+        // ✅ NOTIFICAÇÃO: Avisar técnico que foi aprovada
+        try {
+          await notificationService.enviarParaUsuario(
+            db, requisicao.tecnico_id,
+            '✅ Requisição Aprovada!',
+            'Seus EPIs foram aprovados. Confirme o recebimento quando receber.',
+            { route: '/seguranca', tipo: 'requisicao_aprovada', referencia_id: String(req.params.id) }
+          );
+        } catch (notifErr) { console.warn('⚠️ Falha ao notificar técnico:', notifErr.message); }
+
+      } catch (err) { console.error('❌ Erro ao aprovar:', err); res.status(500).json({ error: 'Erro ao aprovar' }); }
 });
 
 router.post('/requisicoes/:id/recusar', authMiddleware, async (req, res) => {
@@ -694,7 +718,19 @@ router.post('/requisicoes/:id/recusar', authMiddleware, async (req, res) => {
       status: 'recusada', gestor_id: req.user.id, observacao_gestor: req.body.observacao, data_resposta: new Date(),
     });
     res.json({ success: true, message: 'Requisição recusada.' });
-  } catch (err) { res.status(500).json({ error: 'Erro ao recusar' }); }
+
+        // ✅ NOTIFICAÇÃO: Avisar técnico que foi recusada
+        try {
+          const reqRecusada = await db('requisicoes_epi').where('id', req.params.id).first();
+          await notificationService.enviarParaUsuario(
+            db, reqRecusada.tecnico_id,
+            '❌ Requisição Recusada',
+            `Motivo: ${req.body.observacao}`,
+            { route: '/seguranca/minhas', tipo: 'requisicao_recusada', referencia_id: String(req.params.id) }
+          );
+        } catch (notifErr) { console.warn('⚠️ Falha ao notificar técnico:', notifErr.message); }
+
+      } catch (err) { res.status(500).json({ error: 'Erro ao recusar' }); }
 });
 
 router.get('/requisicoes/:id/pdf', authMiddleware, async (req, res) => {
@@ -737,7 +773,19 @@ router.post('/requisicoes/:id/confirmar-recebimento', authMiddleware, async (req
       await db('requisicoes_epi').where('id', req.params.id).update({ pdf_base64: `data:application/pdf;base64,${pdfBuffer.toString('base64')}` });
     } catch (e) { console.error('Erro ao gerar PDF na confirmação:', e); }
     res.json({ success: true, message: 'Recebimento confirmado! PDF gerado.' });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao confirmar recebimento' }); }
+
+        // ✅ NOTIFICAÇÃO: Avisar gestores que técnico confirmou
+        try {
+          const tecConfirmou = await db('usuarios').where('id', req.user.id).first();
+          await notificationService.enviarParaGestores(
+            db, req.user.tenant_id,
+            '📦 Recebimento Confirmado',
+            `${tecConfirmou.nome} confirmou o recebimento dos EPIs.`,
+            { route: '/seguranca/gestao', tipo: 'recebimento_confirmado', referencia_id: String(req.params.id) }
+          );
+        } catch (notifErr) { console.warn('⚠️ Falha ao notificar gestores:', notifErr.message); }
+
+      } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao confirmar recebimento' }); }
 });
 
 router.get('/tecnicos', authMiddleware, async (req, res) => {

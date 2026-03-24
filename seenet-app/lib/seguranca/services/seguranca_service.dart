@@ -324,6 +324,92 @@ class SegurancaService extends GetxService {
     return {'success': false, 'message': response.body['error'] ?? 'Erro'};
   }
 
+  // ── Devoluções ────────────────────────────────────────────────
+  Future<Map<String, dynamic>> buscarEpisDuplicados() async {
+    try {
+      final response = await GetConnect().get(
+        '$_base/epis-duplicados',
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final data = response.body['data'] ?? response.body;
+        return Map<String, dynamic>.from(data['epis_ativos'] ?? {});
+      }
+      return {};
+    } catch (_) { return {}; }
+  }
+
+  Future<Map<String, dynamic>> registrarDevolucao({
+    required int requisicaoOriginalId,
+    required String epiNome,
+    required String assinaturaBase64,
+  }) async {
+    final response = await GetConnect().post(
+      '$_base/devolucoes',
+      {
+        'requisicao_original_id': requisicaoOriginalId,
+        'epi_nome': epiNome,
+        'assinatura_base64': assinaturaBase64,
+      },
+      headers: _headers,
+    );
+    if (response.statusCode == 201) return {'success': true, 'message': response.body['message']};
+    return {'success': false, 'message': response.body['error'] ?? 'Erro'};
+  }
+
+  Future<List<Map<String, dynamic>>> buscarDevolucoesPendentes() async {
+    try {
+      final response = await GetConnect().get('$_base/devolucoes/pendentes', headers: _headers);
+      if (response.statusCode == 200) {
+        final data = response.body['data'] ?? response.body;
+        return List<Map<String, dynamic>>.from(data['devolucoes'] ?? []);
+      }
+      return [];
+    } catch (_) { return []; }
+  }
+
+  Future<Map<String, dynamic>> aprovarDevolucao(int id, String codigoSubst) async {
+    final response = await GetConnect().post(
+      '$_base/devolucoes/$id/aprovar',
+      {'codigo_subst': codigoSubst},
+      headers: _headers,
+    );
+    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
+    return {'success': false, 'message': response.body['error'] ?? 'Erro'};
+  }
+
+  Future<Map<String, dynamic>> recusarDevolucao(int id, {String? observacao}) async {
+    final response = await GetConnect().post(
+      '$_base/devolucoes/$id/recusar',
+      {'observacao': observacao ?? ''},
+      headers: _headers,
+    );
+    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
+    return {'success': false, 'message': response.body['error'] ?? 'Erro'};
+  }
+
+  Future<List<Map<String, dynamic>>> buscarDevedores() async {
+    try {
+      final response = await GetConnect().get('$_base/devolucoes/devedores', headers: _headers);
+      if (response.statusCode == 200) {
+        final data = response.body['data'] ?? response.body;
+        return List<Map<String, dynamic>>.from(data['devedores'] ?? []);
+      }
+      return [];
+    } catch (_) { return []; }
+  }
+
+  Future<List<Map<String, dynamic>>> buscarMinhasDevolucoes() async {
+    try {
+      final response = await GetConnect().get('$_base/devolucoes/minhas', headers: _headers);
+      if (response.statusCode == 200) {
+        final data = response.body['data'] ?? response.body;
+        return List<Map<String, dynamic>>.from(data['devolucoes'] ?? []);
+      }
+      return [];
+    } catch (_) { return []; }
+  }
+
   // ── Produtos EPI (cadastro CA/Fornecedor) ─────────────────────
   Future<List<Map<String, dynamic>>> buscarProdutosEpiCadastro() async {
     try {

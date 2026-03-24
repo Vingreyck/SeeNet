@@ -27,12 +27,12 @@ class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
 
   void _inicializarDados() async {
     print('📋 Checkmarks já carregados: ${checkmarkController.checkmarksAtivos.length}');
-    
+
     if (usuarioController.usuarioLogado.value != null) {
-      final categoriaNome = checkmarkController.nomeCategoriaAtual.isNotEmpty 
-          ? checkmarkController.nomeCategoriaAtual 
+      final categoriaNome = checkmarkController.nomeCategoriaAtual.isNotEmpty
+          ? checkmarkController.nomeCategoriaAtual
           : 'Lentidão';
-      
+
       await checkmarkController.iniciarAvaliacao(
         usuarioController.usuarioLogado.value!.id!,
         'Diagnóstico - $categoriaNome',
@@ -72,24 +72,29 @@ class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
                   },
                 ),
                 const SizedBox(width: 16),
-                Obx(() {
-                  final categoriaNome = checkmarkController.nomeCategoriaAtual.isNotEmpty
-                      ? checkmarkController.nomeCategoriaAtual
-                      : 'Lentidão';
-                  
-                  return Text(
-                    'Problemas de $categoriaNome',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  );
-                }),
+                // ✅ CORRIGIDO: Expanded + overflow pra não estourar
+                Expanded(
+                  child: Obx(() {
+                    final categoriaNome = checkmarkController.nomeCategoriaAtual.isNotEmpty
+                        ? checkmarkController.nomeCategoriaAtual
+                        : 'Lentidão';
+
+                    return Text(
+                      'Problemas de $categoriaNome',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    );
+                  }),
+                ),
               ],
             ),
           ),
-          
+
           Expanded(
             child: Column(
               children: [
@@ -112,7 +117,7 @@ class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
                       itemCount: checkmarkController.checkmarksAtivos.length,
                       itemBuilder: (context, index) {
                         final checkmark = checkmarkController.checkmarksAtivos[index];
-                        
+
                         return Obx(() => ChecklistLentidaoWidget(
                           title: checkmark.titulo,
                           isChecked: checkmarkController.respostas[checkmark.id] ?? false,
@@ -169,13 +174,12 @@ class _ChecklistLentidaoScreenState extends State<ChecklistLentidaoScreen> {
             const SizedBox(height: 12),
             const Text(
               'Esta categoria ainda não possui checkmarks cadastrados.\n\n'
-              'Acesse o painel administrativo para adicionar.',
+                  'Acesse o painel administrativo para adicionar.',
               style: TextStyle(color: Colors.white60, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
-            
-            // ✅ CORREÇÃO: usar isAdmin ao invés de usuario.value
+
             if (usuarioController.isAdmin) ...[
               ElevatedButton.icon(
                 onPressed: () => Get.toNamed('/admin/checkmarks'),

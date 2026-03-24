@@ -23,13 +23,20 @@ class SegurancaController extends GetxController {
   final perfilData = Rxn<Map<String, dynamic>>();
   final statsData = Rxn<Map<String, dynamic>>();
 
+  // ── Guard contra chamadas duplicadas ──────────────────────────
+  bool _isCarregandoMinhas = false;
+  DateTime? _ultimoEnvio;
+
   // ── Bloqueio de nova requisição ───────────────────────────────
-  // Técnico fica bloqueado enquanto houver uma aguardando confirmação
   bool get hasRequisicaoAguardando => minhasRequisicoes
-      .any((r) => r['status'] == 'aguardando_confirmacao');
+      .any((r) => r['status'] == 'aguardando_confirmacao' || r['status'] == 'pendente');
 
   Map<String, dynamic>? get requisicaoAguardando => minhasRequisicoes
       .firstWhereOrNull((r) => r['status'] == 'aguardando_confirmacao');
+
+  // ✅ NOVO: Requisição pendente (enviada mas não aprovada ainda)
+  Map<String, dynamic>? get requisicaoPendente => minhasRequisicoes
+      .firstWhereOrNull((r) => r['status'] == 'pendente');
 
   @override
   void onInit() {
@@ -60,13 +67,20 @@ class SegurancaController extends GetxController {
       return {'success': false, 'message': 'Selecione ao menos um EPI'};
     }
 
-    // Bloqueia se já tiver uma aguardando confirmação
+    // ✅ Bloqueia se já tiver aguardando confirmação
     if (hasRequisicaoAguardando) {
       return {
         'success': false,
         'message': 'Você possui uma requisição aguardando confirmação de recebimento. Confirme o recebimento antes de fazer uma nova.',
       };
     }
+
+    // ✅ GUARD: Debounce — impede duplo envio em menos de 2s
+    final agora = DateTime.now();
+    if (_ultimoEnvio != null && agora.difference(_ultimoEnvio!).inSeconds < 2) {
+      return {'success': false, 'message': 'Aguarde antes de enviar novamente'};
+    }
+    _ultimoEnvio = agora;
 
     isSending.value = true;
     try {
@@ -89,8 +103,16 @@ class SegurancaController extends GetxController {
       );
 
       if (result['success'] == true) {
+        // ✅ REFRESH OTIMISTA: Insere requisição fake IMEDIATAMENTE
+        // Isso faz o bloqueio aparecer instantaneamente na UI
+        _inserirRequisicaoOtimista(episComDetalhes);
+
         episSelecionados.clear();
-        await carregarMinhasRequisicoes();
+        tamanhosSelecionados.clear();
+        quantidadesSelecionadas.clear();
+
+        // ✅ Refresh real em background (sem bloquear a UI)
+        _refreshMinhasEmBackground();
       }
 
       return result;
@@ -99,12 +121,50 @@ class SegurancaController extends GetxController {
     }
   }
 
+  /// ✅ NOVO: Insere uma requisição "fake" na lista local para bloqueio imediato
+  void _inserirRequisicaoOtimista(List<String> episSolicitados) {
+    final fakeRequisicao = <String, dynamic>{
+      'id': -1, // ID temporário
+      'status': 'pendente',
+      'epis_solicitados': episSolicitados,
+      'data_criacao': DateTime.now().toIso8601String(),
+      '_otimista': true, // Flag para identificar como otimista
+    };
+
+    // Insere no INÍCIO da lista (mais recente primeiro)
+    minhasRequisicoes.insert(0, fakeRequisicao);
+    minhasRequisicoes.refresh(); // Força update dos Obx()
+
+    print('⚡ Requisição otimista inserida — bloqueio ativo imediatamente');
+  }
+
+  /// ✅ NOVO: Recarrega do servidor em background e substitui dados otimistas
+  Future<void> _refreshMinhasEmBackground() async {
+    // Pequeno delay pra dar tempo do backend processar
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    try {
+      final lista = await _service.buscarMinhasRequisicoes();
+      minhasRequisicoes.value = lista;
+      print('🔄 Lista de requisições atualizada do servidor');
+    } catch (e) {
+      print('⚠️ Falha ao atualizar do servidor (dados otimistas mantidos): $e');
+      // Em caso de erro, os dados otimistas continuam valendo
+      // O próximo carregarMinhasRequisicoes() vai corrigir
+    }
+  }
+
   Future<void> carregarMinhasRequisicoes() async {
+    // ✅ GUARD: Evita chamadas simultâneas
+    if (_isCarregandoMinhas) return;
+    _isCarregandoMinhas = true;
+
     isLoading.value = true;
     try {
       minhasRequisicoes.value = await _service.buscarMinhasRequisicoes();
     } finally {
       isLoading.value = false;
+      _isCarregandoMinhas = false;
     }
   }
 
@@ -191,6 +251,21 @@ class SegurancaController extends GetxController {
     } finally {
       isSending.value = false;
     }
+  }
+
+  final devolucoesPendentes = <Map<String, dynamic>>[].obs;
+  final devedores = <Map<String, dynamic>>[].obs;
+
+  Future<void> carregarDevolucoesPendentes() async {
+    isLoading.value = true;
+    try { devolucoesPendentes.value = await _service.buscarDevolucoesPendentes(); }
+    finally { isLoading.value = false; }
+  }
+
+  Future<void> carregarDevedores() async {
+    isLoading.value = true;
+    try { devedores.value = await _service.buscarDevedores(); }
+    finally { isLoading.value = false; }
   }
 
   Future<void> carregarPerfil() async {

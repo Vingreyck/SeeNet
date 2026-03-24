@@ -36,6 +36,7 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
   List<Map<String, dynamic>> _requisicoes = [];
   bool _isLoading = true;
   String? _erro;
+  String _filtroStatus = 'todas';
 
   @override
   void initState() {
@@ -297,44 +298,93 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
     );
   }
 
-  // ── Histórico de Requisições ──────────────────────────────────
   Widget _buildHistoricoRequisicoes() {
-    if (_requisicoes.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(30),
-        decoration: BoxDecoration(
-          color: const Color(0xFF242424),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: const Column(
-          children: [
-            Icon(Icons.assignment_outlined, size: 50, color: Colors.white12),
-            SizedBox(height: 12),
-            Text('Nenhuma requisição registrada',
-                style: TextStyle(color: Colors.white38, fontSize: 14)),
-          ],
-        ),
-      );
-    }
+    final filtradas = _filtroStatus == 'todas'
+        ? _requisicoes
+        : _filtroStatus == 'aprovada'
+        ? _requisicoes.where((r) => r['status'] == 'aprovada' || r['status'] == 'aguardando_confirmacao').toList()
+        : _requisicoes.where((r) => r['status'] == _filtroStatus).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Icon(Icons.history, color: Color(0xFF00FF88), size: 20),
-            const SizedBox(width: 8),
-            const Text('Histórico Completo',
-                style: TextStyle(
-                    color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            const Spacer(),
-            Text('${_requisicoes.length} registro(s)',
-                style: const TextStyle(color: Colors.white38, fontSize: 12)),
-          ],
+        // Filtros
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildFiltroChip('Todas', 'todas', _requisicoes.length),
+              const SizedBox(width: 8),
+              _buildFiltroChip('Aprovadas', 'aprovada', _requisicoes.where((r) => r['status'] == 'aprovada' || r['status'] == 'aguardando_confirmacao').length),
+              const SizedBox(width: 8),
+              _buildFiltroChip('Concluídas', 'concluida', _requisicoes.where((r) => r['status'] == 'concluida').length),
+              const SizedBox(width: 8),
+              _buildFiltroChip('Pendentes', 'pendente', _requisicoes.where((r) => r['status'] == 'pendente').length),
+              const SizedBox(width: 8),
+              _buildFiltroChip('Recusadas', 'recusada', _requisicoes.where((r) => r['status'] == 'recusada').length),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
-        ..._requisicoes.map((req) => _buildRequisicaoCard(req)),
+
+        if (filtradas.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: const Color(0xFF242424),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Column(
+              children: [
+                Icon(Icons.assignment_outlined, size: 50, color: Colors.white12),
+                SizedBox(height: 12),
+                Text('Nenhuma requisição neste filtro',
+                    style: TextStyle(color: Colors.white38, fontSize: 14)),
+              ],
+            ),
+          )
+        else ...[
+          Row(
+            children: [
+              const Icon(Icons.history, color: Color(0xFF00FF88), size: 20),
+              const SizedBox(width: 8),
+              const Text('Histórico',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              Text('${filtradas.length} registro(s)',
+                  style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...filtradas.map((req) => _buildRequisicaoCard(req)),
+        ],
       ],
+    );
+  }
+
+  Widget _buildFiltroChip(String label, String status, int count) {
+    // Para "aprovada" filtrar ambos
+    final isSelected = _filtroStatus == status;
+    return GestureDetector(
+      onTap: () => setState(() => _filtroStatus = status),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF00FF88).withOpacity(0.15) : const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF00FF88) : Colors.white12,
+          ),
+        ),
+        child: Text(
+          '$label ($count)',
+          style: TextStyle(
+            color: isSelected ? const Color(0xFF00FF88) : Colors.white54,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
     );
   }
 
@@ -514,6 +564,46 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
                   style: const TextStyle(color: Color(0xFF00FF88), fontSize: 11),
                 ),
               ),
+            ),
+
+          // Devoluções associadas
+          if (req['devolucoes'] != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+              child: Builder(builder: (_) {
+                final devs = req['devolucoes'] is List
+                    ? req['devolucoes'] as List
+                    : jsonDecode(req['devolucoes'].toString());
+                if (devs.isEmpty) return const SizedBox.shrink();
+                return Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.assignment_return, color: Colors.blue, size: 14),
+                          SizedBox(width: 4),
+                          Text('Devoluções:', style: TextStyle(color: Colors.blue, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      ...devs.map((d) => Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          '${d['epi']} — ${d['codigo_subst'] ?? ''} ${d['data_devolucao'] ?? ''}',
+                          style: const TextStyle(color: Colors.white54, fontSize: 10),
+                        ),
+                      )),
+                    ],
+                  ),
+                );
+              }),
             ),
 
           // Evidências e PDF

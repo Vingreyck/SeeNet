@@ -791,4 +791,29 @@ router.post('/debug/clear-rate-limit', async (req, res) => {
   }
 });
 
+router.put('/fcm-token', authMiddleware, async (req, res) => {
+  try {
+    const { fcm_token } = req.body;
+
+    if (!fcm_token) {
+      return res.status(400).json({ error: 'FCM token obrigatório' });
+    }
+
+    await db('usuarios')
+      .where('id', req.user.id)
+      .update({
+        fcm_token: fcm_token,
+        fcm_token_updated_at: new Date(),
+      });
+
+    console.log(`📱 FCM token salvo para usuário ${req.user.id} (${req.user.nome})`);
+
+    res.json({ success: true, message: 'FCM token atualizado' });
+  } catch (error) {
+    console.error('❌ Erro ao salvar FCM token:', error.message);
+    res.status(500).json({ error: 'Erro ao salvar token' });
+  }
+});
+
+
 module.exports = router;

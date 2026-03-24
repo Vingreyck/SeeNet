@@ -22,8 +22,10 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     controller.carregarPendentes();
+    controller.carregarDevolucoesPendentes();
+    controller.carregarDevedores();
   }
 
   @override
@@ -49,7 +51,9 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
             icon: const Icon(Icons.refresh, color: Colors.white70),
             onPressed: () {
               controller.carregarPendentes();
-              setState(() {}); // refresh técnicos
+              controller.carregarDevolucoesPendentes();
+              controller.carregarDevedores();
+              setState(() {});
             },
           ),
         ],
@@ -58,11 +62,13 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
           indicatorColor: const Color(0xFF00FF88),
           labelColor: const Color(0xFF00FF88),
           unselectedLabelColor: Colors.white38,
+          isScrollable: true,
           tabs: [
-            Obx(() => Tab(
-                text: 'Pendentes (${controller.requisicoesPendentes.length})')),
+            Obx(() => Tab(text: 'Pendentes (${controller.requisicoesPendentes.length})')),
             const Tab(text: 'Técnicos'),
             const Tab(text: 'Produtos'),
+            Obx(() => Tab(text: 'Devoluções (${controller.devolucoesPendentes.length})')),
+            Obx(() => Tab(text: 'Devedores (${controller.devedores.length})')),
           ],
         ),
       ),
@@ -72,6 +78,8 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
           _buildListaPendentes(),
           _buildListaTecnicos(),
           const AbaProdutosEpi(),
+          _buildListaDevolucoes(),
+          _buildListaDevedores(),
         ],
       ),
     );
@@ -228,6 +236,8 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
     );
   }
 
+
+
   // ══════════════════════════════════════════════════════════════
   // ABA 2: TÉCNICOS
   // ══════════════════════════════════════════════════════════════
@@ -333,6 +343,287 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
         ),
       ),
     );
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ABA: DEVOLUÇÕES PENDENTES
+  // ══════════════════════════════════════════════════════════════
+  Widget _buildListaDevolucoes() {
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return const Center(child: CircularProgressIndicator(color: Color(0xFF00FF88)));
+      }
+      if (controller.devolucoesPendentes.isEmpty) {
+        return _buildVazio('Nenhuma devolução pendente', Icons.assignment_return_outlined);
+      }
+      return RefreshIndicator(
+        onRefresh: controller.carregarDevolucoesPendentes,
+        color: const Color(0xFF00FF88),
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: controller.devolucoesPendentes.length,
+          itemBuilder: (context, i) => _buildCardDevolucao(controller.devolucoesPendentes[i]),
+        ),
+      );
+    });
+  }
+
+  Widget _buildCardDevolucao(Map<String, dynamic> dev) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF242424),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Colors.blue.withOpacity(0.15),
+                  child: const Icon(Icons.assignment_return, color: Colors.blue, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(dev['tecnico_nome'] ?? 'Técnico',
+                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                      Text('Devolução de: ${dev['epi_nome'] ?? ''}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      Text('Data: ${_formatarData(dev['data_devolucao']?.toString())}',
+                          style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('DEVOLUÇÃO', style: TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _recusarDevolucao(dev['id'] as int),
+                    icon: const Icon(Icons.close, size: 16, color: Colors.red),
+                    label: const Text('Não Devolveu', style: TextStyle(color: Colors.red, fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _aprovarDevolucao(dev),
+                    icon: const Icon(Icons.check, size: 16, color: Colors.black),
+                    label: const Text('Confirmar', style: TextStyle(color: Colors.black, fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00FF88),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _aprovarDevolucao(Map<String, dynamic> dev) {
+    String? codigoSelecionado;
+    final codigos = ['PE', 'SP', 'DT', 'IU', 'AD', 'DE'];
+    final descricoes = {
+      'PE': 'Perda ou Extravio', 'SP': 'Subst. (Perda Vida Útil)',
+      'DT': 'Danificado p/ Trabalho', 'IU': 'Impróprio para Uso',
+      'AD': 'Apresenta Defeito', 'DE': 'Deslig. da Empresa',
+    };
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF2A2A2A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Aprovar Devolução', style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('EPI: ${dev['epi_nome']}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              Text('Técnico: ${dev['tecnico_nome']}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              const SizedBox(height: 16),
+              const Text('Código de Substituição:', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: codigos.map((cod) => ChoiceChip(
+                  label: Text('$cod - ${descricoes[cod]}', style: TextStyle(
+                      color: codigoSelecionado == cod ? Colors.black : Colors.white70, fontSize: 11)),
+                  selected: codigoSelecionado == cod,
+                  selectedColor: const Color(0xFF00FF88),
+                  backgroundColor: const Color(0xFF1A1A1A),
+                  onSelected: (sel) => setDialogState(() => codigoSelecionado = sel ? cod : null),
+                )).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: codigoSelecionado == null ? null : () async {
+                Navigator.pop(context);
+                final result = await Get.find<SegurancaService>().aprovarDevolucao(dev['id'] as int, codigoSelecionado!);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(result['message'] ?? ''),
+                    backgroundColor: result['success'] == true ? const Color(0xFF00C853) : Colors.red,
+                  ));
+                  controller.carregarDevolucoesPendentes();
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF88)),
+              child: const Text('Aprovar', style: TextStyle(color: Colors.black)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _recusarDevolucao(int id) {
+    final obsController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Recusar Devolução', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('O técnico será marcado como DEVEDOR.', style: TextStyle(color: Colors.red, fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: obsController,
+              style: const TextStyle(color: Colors.white),
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Observação (opcional)',
+                hintStyle: const TextStyle(color: Colors.white38),
+                filled: true, fillColor: const Color(0xFF1A1A1A),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final result = await Get.find<SegurancaService>().recusarDevolucao(id, observacao: obsController.text.trim());
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(result['message'] ?? ''),
+                  backgroundColor: result['success'] == true ? Colors.orange : Colors.red,
+                ));
+                controller.carregarDevolucoesPendentes();
+                controller.carregarDevedores();
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Marcar Devedor', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ABA: DEVEDORES
+  // ══════════════════════════════════════════════════════════════
+  Widget _buildListaDevedores() {
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return const Center(child: CircularProgressIndicator(color: Color(0xFF00FF88)));
+      }
+      if (controller.devedores.isEmpty) {
+        return _buildVazio('Nenhum devedor registrado', Icons.warning_amber_outlined);
+      }
+      return RefreshIndicator(
+        onRefresh: controller.carregarDevedores,
+        color: const Color(0xFF00FF88),
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: controller.devedores.length,
+          itemBuilder: (context, i) {
+            final dev = controller.devedores[i];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF242424),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.red.withOpacity(0.15),
+                    child: const Icon(Icons.warning, color: Colors.red, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(dev['tecnico_nome'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text('EPI: ${dev['epi_nome'] ?? ''}', style: const TextStyle(color: Colors.red, fontSize: 12)),
+                        if (dev['observacao_gestor'] != null)
+                          Text(dev['observacao_gestor'], style: const TextStyle(color: Colors.white38, fontSize: 11), maxLines: 2),
+                        Text('Recusado em: ${_formatarData(dev['data_resposta']?.toString())}',
+                            style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.red.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                    child: const Text('DEVEDOR', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    });
   }
 
   // ══════════════════════════════════════════════════════════════

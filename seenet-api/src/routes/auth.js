@@ -9,6 +9,7 @@ const logger = require('../config/logger');
 const auditService = require('../services/auditService');
 
 const router = express.Router();
+const authMiddleware = require('../middleware/auth');
 
 // Rate limiting para login (mais restritivo)
 const loginLimiter = rateLimit({

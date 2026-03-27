@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:seenet/seguranca/screens/confirmar_recebimento_screen.dart';
 import 'package:seenet/seguranca/screens/registro_manual_epi_screen.dart';
 import 'package:seenet/login/widgets/login.binding.dart';
+import 'services/tracking_service.dart';
+import 'ordem_de_servico/screens/acompanhamento_screen.dart';
 import 'package:seenet/registro/registro.view.dart';
 import 'package:seenet/admin/usuarios_admin.view.dart';
 import 'ordem_de_servico/screens/ordens_servico_screen.dart';
@@ -86,6 +88,8 @@ void main() async {
   Get.put(TranscricaoController(), permanent: true);
   Get.put(SegurancaService(), permanent: true);
   Get.put(SegurancaController(), permanent: true);
+  Get.put(TrackingService(), permanent: true);
+
 
   // ✅ NOVO: Inicializar NotificationService
   final notificationService = Get.put(NotificationService(), permanent: true);
@@ -249,6 +253,10 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/transcricao/historico',
           page: () => const HistoricoTranscricaoView(),
+        ),
+        GetPage(
+            name: '/acompanhamento',
+            page: () => const AcompanhamentoScreen()
         ),
         GetPage(
           name: '/seguranca',

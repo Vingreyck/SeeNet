@@ -1,5 +1,5 @@
 buildscript {
-    ext.kotlin_version = "2.1.0"
+    ext.kotlin_version = "2.1.21"
     repositories {
         google()
         mavenCentral()
@@ -16,6 +16,17 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+    }
+}
+
+// ✅ FORÇAR versão do Kotlin stdlib em TODAS as dependências
+subprojects {
+    configurations.all {
+        resolutionStrategy {
+            force "org.jetbrains.kotlin:kotlin-stdlib:2.1.21"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.21"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.21"
+        }
     }
 }
 

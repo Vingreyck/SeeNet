@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:typed_data';
+import '../../services/tracking_service.dart';
 import 'dart:convert';
 import '../../controllers/ordem_servico_controller.dart';
 import '../../models/ordem_servico_model.dart';
@@ -689,6 +690,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
 
       if (sucesso) {
         setState(() { statusAtual = 'em_deslocamento'; osIniciada = false; });
+
+        // ✅ Iniciar tracking de GPS
+        final tracking = Get.find<TrackingService>();
+        tracking.iniciar(os.id);
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('🚗 Deslocamento iniciado! ${adminSelecionadoNome ?? "Admin"} será notificado.'),
@@ -703,10 +709,20 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     }
 
     if (statusAtual == 'em_deslocamento') {
+      // ✅ Parar tracking de GPS
+      final tracking = Get.find<TrackingService>();
+      tracking.parar();
       final sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
+
       if (!sucesso) {
         if (mounted) _mostrarErro('Erro ao informar chegada');
         return;
+      }
+
+// ✅ Agora sim pode parar
+      if (Get.isRegistered<TrackingService>()) {
+        final tracking = Get.find<TrackingService>();
+        tracking.parar();
       }
 
       if (!mounted) return;

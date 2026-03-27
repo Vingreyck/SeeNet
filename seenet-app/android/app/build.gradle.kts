@@ -8,7 +8,6 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-// ✅ CARREGAR PROPRIEDADES DO KEYSTORE
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
 
@@ -30,7 +29,7 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
-    
+
     packaging {
         jniLibs {
             useLegacyPackaging = false
@@ -48,13 +47,12 @@ android {
         versionCode = 25
         versionName = "1.2"
         multiDexEnabled = true
-        
+
         ndk {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
         }
     }
 
-    // ✅ CONFIGURAÇÃO DE ASSINATURA
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
@@ -69,16 +67,13 @@ android {
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
-            
             isMinifyEnabled = true
             isShrinkResources = true
-            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
-        
         getByName("debug") {
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -93,5 +88,4 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("com.google.android.play:integrity:1.5.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-
 }

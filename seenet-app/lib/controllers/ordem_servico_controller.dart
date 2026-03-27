@@ -3,6 +3,7 @@ import '../models/ordem_servico_model.dart';
 import 'package:flutter/material.dart';
 import '../services/ordem_servico_service.dart';
 
+
 class OrdemServicoController extends GetxController {
   final OrdemServicoService _service = OrdemServicoService();
 

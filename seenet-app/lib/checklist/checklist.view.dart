@@ -357,6 +357,17 @@ Positioned(
                   color: Colors.green,
                 ),
                 const SizedBox(height: 12),
+                _buildMenuOption(
+                  icon: Icons.location_on,
+                  title: 'Acompanhar Técnicos',
+                  subtitle: 'Ver técnicos em campo no mapa',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Get.toNamed('/acompanhamento');
+                  },
+                  color: Colors.orange,
+                ),
+                const SizedBox(height: 12),
                 // ← LOGS APENAS PARA ADMIN
                 _buildMenuOption(
                   icon: Icons.security,

@@ -12,6 +12,12 @@ router.get('/minhas', OrdensServicoController.buscarMinhasOSs.bind(OrdensServico
 // Buscar OSs concluídas
 router.get('/concluidas', OrdensServicoController.buscarOSsConcluidas.bind(OrdensServicoController));
 
+// Rastreamento ao vivo
+router.get('/acompanhamento', OrdensServicoController.listarAcompanhamento.bind(OrdensServicoController));
+router.put('/:id/location', OrdensServicoController.atualizarLocalizacao.bind(OrdensServicoController));
+router.get('/:id/location', OrdensServicoController.consultarLocalizacao.bind(OrdensServicoController));
+router.delete('/:id/location', OrdensServicoController.pararLocalizacao.bind(OrdensServicoController));
+
 // Buscar detalhes de uma OS
 router.get('/:id/detalhes', OrdensServicoController.buscarDetalhesOS.bind(OrdensServicoController));
 
@@ -26,5 +32,7 @@ router.post('/:id/chegar-local', OrdensServicoController.chegarAoLocal.bind(Orde
 
 // 3️⃣ Finalizar OS (serviço concluído)
 router.post('/:id/finalizar', OrdensServicoController.finalizarExecucao.bind(OrdensServicoController));
+
+
 
 module.exports = router;

@@ -854,7 +854,6 @@ if (dados.fotos && dados.fotos.length > 0) {
       // Não propaga erro - execução em background
     }
   }
-}
 
 /**
    * Listar admins do tenant (para o técnico escolher)
@@ -881,4 +880,137 @@ if (dados.fotos && dados.fotos.length > 0) {
     }
   }
 
+  /**
+     * Técnico envia localização ao vivo (a cada 10s durante deslocamento)
+     * PUT /api/ordens-servico/:id/location
+     */
+    async atualizarLocalizacao(req, res) {
+      try {
+        const { id } = req.params;
+        const { latitude, longitude, velocidade, precisao } = req.body;
+        const userId = req.user.id;
+        const tenantId = req.tenantId;
+
+        if (!latitude || !longitude) {
+          return res.status(400).json({ success: false, error: 'Coordenadas obrigatórias' });
+        }
+
+        // Upsert: insere ou atualiza posição
+        await db.raw(`
+          INSERT INTO localizacao_tecnico (tenant_id, tecnico_id, ordem_servico_id, latitude, longitude, velocidade, precisao, atualizado_em)
+          VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+          ON CONFLICT (tecnico_id, ordem_servico_id)
+          DO UPDATE SET latitude = ?, longitude = ?, velocidade = ?, precisao = ?, atualizado_em = NOW()
+        `, [tenantId, userId, id, latitude, longitude, velocidade || null, precisao || null,
+            latitude, longitude, velocidade || null, precisao || null]);
+
+        return res.json({ success: true });
+      } catch (error) {
+        console.error('❌ Erro ao atualizar localização:', error.message);
+        return res.status(500).json({ success: false, error: 'Erro ao atualizar localização' });
+      }
+    }
+
+    /**
+     * Admin consulta localização do técnico em uma OS
+     * GET /api/ordens-servico/:id/location
+     */
+    async consultarLocalizacao(req, res) {
+      try {
+        const { id } = req.params;
+        const tenantId = req.tenantId;
+
+        // Verificar se é admin
+        if (req.user.tipo_usuario !== 'administrador') {
+          return res.status(403).json({ success: false, error: 'Apenas administradores' });
+        }
+
+        const localizacao = await db('localizacao_tecnico as l')
+          .join('usuarios as u', 'u.id', 'l.tecnico_id')
+          .join('ordem_servico as os', 'os.id', 'l.ordem_servico_id')
+          .where('l.ordem_servico_id', id)
+          .where('l.tenant_id', tenantId)
+          .select(
+            'l.latitude', 'l.longitude', 'l.velocidade', 'l.precisao', 'l.atualizado_em',
+            'u.nome as tecnico_nome',
+            'os.numero_os', 'os.cliente_nome', 'os.cliente_endereco', 'os.status as os_status'
+          )
+          .first();
+
+        if (!localizacao) {
+          return res.status(404).json({ success: false, error: 'Localização não encontrada' });
+        }
+
+        return res.json({
+          success: true,
+          data: localizacao
+        });
+      } catch (error) {
+        console.error('❌ Erro ao consultar localização:', error.message);
+        return res.status(500).json({ success: false, error: 'Erro ao consultar localização' });
+      }
+    }
+
+    /**
+     * Admin lista todas as OSs em andamento que ele é responsável
+     * GET /api/ordens-servico/acompanhamento
+     */
+    async listarAcompanhamento(req, res) {
+      try {
+        const userId = req.user.id;
+        const tenantId = req.tenantId;
+
+        if (req.user.tipo_usuario !== 'administrador') {
+          return res.status(403).json({ success: false, error: 'Apenas administradores' });
+        }
+
+        const oss = await db('ordem_servico as os')
+          .join('usuarios as t', 't.id', 'os.tecnico_id')
+          .leftJoin('localizacao_tecnico as l', function() {
+            this.on('l.tecnico_id', 'os.tecnico_id')
+                .andOn('l.ordem_servico_id', 'os.id');
+          })
+          .where('os.admin_responsavel_id', userId)
+          .where('os.tenant_id', tenantId)
+          .whereIn('os.status', ['em_deslocamento', 'em_execucao'])
+          .select(
+            'os.id', 'os.numero_os', 'os.status', 'os.cliente_nome',
+            'os.cliente_endereco', 'os.prioridade',
+            'os.data_inicio_deslocamento',
+            't.nome as tecnico_nome', 't.foto_perfil as tecnico_foto',
+            'l.latitude', 'l.longitude', 'l.velocidade', 'l.atualizado_em'
+          )
+          .orderBy('os.data_inicio_deslocamento', 'desc');
+
+        return res.json({
+          success: true,
+          data: oss
+        });
+      } catch (error) {
+        console.error('❌ Erro ao listar acompanhamento:', error.message);
+        return res.status(500).json({ success: false, error: 'Erro ao listar acompanhamento' });
+      }
+    }
+
+    /**
+     * Técnico para de enviar localização (limpar ao chegar)
+     * DELETE /api/ordens-servico/:id/location
+     */
+    async pararLocalizacao(req, res) {
+      try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        await db('localizacao_tecnico')
+          .where('tecnico_id', userId)
+          .where('ordem_servico_id', id)
+          .delete();
+
+        return res.json({ success: true });
+      } catch (error) {
+        console.error('❌ Erro ao parar localização:', error.message);
+        return res.status(500).json({ success: false });
+      }
+    }
+}
 module.exports = new OrdensServicoController();

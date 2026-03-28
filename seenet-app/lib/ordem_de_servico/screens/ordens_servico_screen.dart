@@ -81,43 +81,36 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen> with SingleTi
                 ),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Ordens de Serviço',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
-                  Row(
-                    children: [
-                      // ✅ Botão GPS — só aparece pro admin
-                      if (Get.find<UsuarioController>().isAdmin)
-                        IconButton(
-                          icon: const Icon(Icons.gps_fixed, color: Colors.white, size: 26),
-                          tooltip: 'Acompanhar Técnicos',
-                          onPressed: () => Get.toNamed('/ordens-servico/acompanhamento'),
-                        ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh, color: Colors.white, size: 28),
-                        onPressed: () {
-                          controller.carregarMinhasOSs();
-                          controller.carregarOSsConcluidas();
-                        },
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Ordens de Serviço',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                    ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (Get.find<UsuarioController>().isAdmin)
+                    IconButton(
+                      icon: const Icon(Icons.gps_fixed, color: Colors.white, size: 24),
+                      tooltip: 'Acompanhar Técnicos',
+                      onPressed: () => Get.toNamed('/ordens-servico/acompanhamento'),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.white, size: 24),
+                    onPressed: () {
+                      controller.carregarMinhasOSs();
+                      controller.carregarOSsConcluidas();
+                    },
                   ),
                 ],
               ),

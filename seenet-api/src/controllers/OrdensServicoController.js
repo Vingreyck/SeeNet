@@ -864,11 +864,12 @@ if (dados.fotos && dados.fotos.length > 0) {
       const tenantId = req.tenantId;
 
       const admins = await db('usuarios')
-        .where('tenant_id', tenantId)
-        .where('ativo', true)
-        .where('tipo_usuario', 'administrador')
-        .select('id', 'nome', 'email', 'foto_perfil')
-        .orderBy('nome');
+              .where('tenant_id', tenantId)
+              .where('ativo', true)
+              .where('tipo_usuario', 'administrador')
+              .whereNot('id', req.user.id)  // ← ADICIONAR
+              .select('id', 'nome', 'email', 'foto_perfil')
+              .orderBy('nome');
 
       return res.json({
         success: true,

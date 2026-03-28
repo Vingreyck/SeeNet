@@ -763,17 +763,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
 
   /// Mostra bottom sheet para técnico selecionar qual admin vai acompanhar
   Future<bool> _selecionarAdmin() async {
+    await controller.carregarAdmins();
     final admins = controller.adminsDisponiveis;
 
     if (admins.isEmpty) {
-      // Se não tem admins cadastrados, continua sem notificação
-      return true;
-    }
-
-    // Se só tem 1 admin, seleciona automaticamente
-    if (admins.length == 1) {
-      adminSelecionadoId = admins.first['id'];
-      adminSelecionadoNome = admins.first['nome'];
       return true;
     }
 

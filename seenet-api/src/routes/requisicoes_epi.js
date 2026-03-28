@@ -229,8 +229,8 @@ const EPIS_PADRAO = [
   'Bota de Segurança', 'Cinto de Segurança', 'Talabarte de Posicionamento',
   'Protetor Solar', 'Escada de Alumínio', 'Escada Extensível',
   'Fita de Sinalização Zebrada', 'Cone de Sinalização', 'Bandeirola',
-  'Detector de Tensão', 'Calça Operacional', 'Camisa Manga Longa',
-  'Catraca Trava Escada', 'Jaleco Operacional', 'Avental', 'Luva Latex',
+  'Detector de Tensão', 'Calça Operacional', 'Camisa Manga Longa(Jaleco)',
+  'Catraca Trava Escada', 'Avental', 'Luva Latex',
 ];
 
 // ================================================================

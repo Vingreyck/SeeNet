@@ -15,7 +15,14 @@ class NotificationService {
         return;
       }
 
-      const serviceAccount = JSON.parse(serviceAccountJson);
+      // Remove aspas extras que o Railway pode adicionar
+      let cleanJson = serviceAccountJson;
+      if (cleanJson.startsWith('"') && cleanJson.endsWith('"')) {
+        cleanJson = cleanJson.slice(1, -1);
+      }
+      // Corrige \\n que virou \\\\n (double escape)
+      cleanJson = cleanJson.replace(/\\\\n/g, '\\n');
+      const serviceAccount = JSON.parse(cleanJson);
 
       if (!admin.apps.length) {
         admin.initializeApp({

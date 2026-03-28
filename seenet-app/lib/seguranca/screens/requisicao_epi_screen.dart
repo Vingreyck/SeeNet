@@ -189,7 +189,7 @@ class _RequisicaoEpiScreenState extends State<RequisicaoEpiScreen>
   static const Map<String, List<String>> _tamanhosPorEpi = {
     'Bota de Segurança': ['39', '40', '41'],
     'Calça Operacional': ['36', '38', '40', '41', '42', '46', '48'],
-    'Camisa Manga Longa': ['P', 'M', 'G', 'GG'],
+    'Camisa Manga Longa (Jaleco)': ['P', 'M', 'G', 'GG'],
   };
 
   Widget _buildEpiTile(String epi, bool selecionado) {

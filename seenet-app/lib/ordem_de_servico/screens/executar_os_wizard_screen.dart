@@ -920,6 +920,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
         'valor_total': item.valorTotal,
         'id_patrimonio': item.patrimonio?.id ?? '0',
         'numero_serie': item.patrimonio?.serial ?? '',
+        'numero_patrimonial': item.patrimonio?.numeroPatrimonial ?? '',
         'tipo_produto': item.isPatrimonio ? 'P' : 'O',
       }).toList(),
       'observacoes': observacoesController.text.trim(),

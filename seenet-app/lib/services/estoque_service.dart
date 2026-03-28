@@ -63,6 +63,7 @@ class PatrimonioEstoque {
   final String idAlmoxarifado;
   final double valorBem;
   final String situacao;
+  final String numeroPatrimonial; // ✅ NOVO
 
   PatrimonioEstoque({
     required this.id,
@@ -73,18 +74,20 @@ class PatrimonioEstoque {
     this.idAlmoxarifado = '',
     this.valorBem = 0,
     this.situacao = '1',
+    this.numeroPatrimonial = '', // ✅ NOVO
   });
 
   factory PatrimonioEstoque.fromJson(Map<String, dynamic> json) {
     return PatrimonioEstoque(
-      id: json['id']?.toString() ?? '',
-      descricao: json['descricao'] ?? '',
-      serial: json['serial'] ?? '',
-      mac: json['id_mac'] ?? '',
-      idProduto: json['id_produto']?.toString() ?? '',
-      idAlmoxarifado: json['id_almoxarifado']?.toString() ?? '',
-      valorBem: ProdutoEstoque._parseDouble(json['valor_bem']),
-      situacao: json['situacao']?.toString() ?? '1',
+      id:                json['id']?.toString() ?? '',
+      descricao:         json['descricao'] ?? '',
+      serial:            json['numero_serie'] ?? json['serial'] ?? '',  // ✅ IXC usa numero_serie
+      mac:               json['id_mac'] ?? '',
+      idProduto:         json['id_produto']?.toString() ?? '',
+      idAlmoxarifado:    json['id_almoxarifado']?.toString() ?? '',
+      valorBem:          ProdutoEstoque._parseDouble(json['valor_bem']),
+      situacao:          json['situacao']?.toString() ?? '1',
+      numeroPatrimonial: json['numero_patrimonial']?.toString() ?? '', // ✅ NOVO
     );
   }
 }

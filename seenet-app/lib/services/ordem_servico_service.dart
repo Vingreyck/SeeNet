@@ -187,6 +187,9 @@ class OrdemServicoService {
         dados['fotos'] = fotosComMetadados;
       }
 
+      print('📦 Payload itens_estoque: ${json.encode(dados['itens_estoque'])}');
+
+      
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/finalizar'),
         headers: _headers,

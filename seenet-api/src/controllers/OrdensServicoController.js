@@ -549,40 +549,47 @@ if (ixcService && os.id_externo) {
       const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
 
       for (const item of dados.itens_estoque) {
+        const ehPatrimonio = !!(item.id_patrimonio && item.id_patrimonio !== '' && item.id_patrimonio !== '0');
+
         try {
           await ixcService.adicionarProdutoOS({
-                      id_oss_chamado: os.id_externo,
-                      id_produto: item.id_produto,
-                      descricao: '',
-                      qtde_saida: item.quantidade.toString(),
-                      valor_unitario: item.valor_unitario.toFixed(2),
-                      valor_total: item.valor_total.toFixed(2),
-                      id_almox: idAlmox.toString(),
-                      data: dataFormatada,
-                      id_unidade: '1',
-                      id_classificacao_tributaria: '1',
-                      tipo: 'C',
-                      estoque: 'S',
-                      unidade_sigla: 'UND',
-                      fator_conversao: '1.000000000',
-                      id_patrimonio: item.id_patrimonio && item.id_patrimonio !== '0' ? item.id_patrimonio : '',
-                      patrimonio: item.numero_serie || '',
-                      numero_serie: item.numero_serie || '',
-                      numero_patrimonial: item.id_patrimonio && item.id_patrimonio !== '0' ? item.id_patrimonio : '',
-                      garantia_oss: '',
-                      pcomissao: '',
-                      pdesconto: '',
-                      vdesconto: '',
-                      tipo_produto: '',
-                      id_oss_mensagem: '',
-                      id_saida: '',
-                      id_terceiro_oss: '',
-                      id_su_oss_kit_equipamento: '',
-                      id_estrutura: '',
-                      ultima_situacao_patrimonio: '',
-                      id_pedido_os: ''
-                    });
-          console.log(`   ✅ Item enviado: ${item.descricao} x${item.quantidade}`);
+            id_oss_chamado:  os.id_externo,
+            id_produto:      item.id_produto,
+            descricao:       '',
+            qtde_saida:      item.quantidade.toString(),
+            data:            dataFormatada,
+            id_unidade:      '1',
+            id_almox:        idAlmox.toString(),
+            id_classificacao_tributaria: '1',
+            tipo:            'C',
+            estoque:         'S',
+            unidade_sigla:   'UND',
+            fator_conversao: '1.000000000',
+
+            // ✅ FIX 1: patrimônio envia valor 0 pra não exigir condição de pagamento
+            valor_unitario: ehPatrimonio ? '0' : item.valor_unitario.toFixed(2),
+            valor_total:    ehPatrimonio ? '0' : item.valor_total.toFixed(2),
+
+            // ✅ FIX 2: campos de patrimônio só preenchidos quando for patrimônio
+            id_patrimonio:              ehPatrimonio ? String(item.id_patrimonio) : '',
+            patrimonio:                 ehPatrimonio ? (item.numero_serie || '') : '',
+            numero_serie:               ehPatrimonio ? (item.numero_serie || '') : '',
+            numero_patrimonial:         ehPatrimonio ? (item.numero_patrimonial || '') : '', // ✅ FIX 3: era item.id_patrimonio (errado)
+            tipo_produto:               ehPatrimonio ? 'P' : '',                             // ✅ FIX 4: era sempre ''
+            ultima_situacao_patrimonio: ehPatrimonio ? 'E' : '',                             // ✅ FIX 5: era sempre ''
+
+            garantia_oss:              '',
+            pcomissao:                 ehPatrimonio ? '0' : '',
+            pdesconto:                 ehPatrimonio ? '0' : '',
+            vdesconto:                 ehPatrimonio ? '0' : '',
+            id_oss_mensagem:           '',
+            id_saida:                  '',
+            id_terceiro_oss:           '',
+            id_su_oss_kit_equipamento: '',
+            id_estrutura:              '',
+            id_pedido_os:              '',
+          });
+          console.log(`   ✅ ${ehPatrimonio ? '[PATRIMÔNIO]' : '[PRODUTO]'} ${item.descricao} x${item.quantidade}`);
         } catch (estoqueError) {
           console.error(`   ❌ Erro ao enviar item ${item.descricao}:`, estoqueError.message);
         }

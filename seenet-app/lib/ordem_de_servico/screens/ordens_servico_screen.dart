@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../controllers/ordem_servico_controller.dart';
 import '../../models/ordem_servico_model.dart';
 import '../widgets/os_card_widget.dart';
+import '../../controllers/usuario_controller.dart';
 import 'package:seenet/widgets/skeleton_loader.dart';
 import 'executar_os_wizard_screen.dart';
 
@@ -100,12 +101,23 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen> with SingleTi
                       ),
                     ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.refresh, color: Colors.white, size: 28),
-                    onPressed: () {
-                      controller.carregarMinhasOSs();
-                      controller.carregarOSsConcluidas();
-                    },
+                  Row(
+                    children: [
+                      // ✅ Botão GPS — só aparece pro admin
+                      if (Get.find<UsuarioController>().isAdmin)
+                        IconButton(
+                          icon: const Icon(Icons.gps_fixed, color: Colors.white, size: 26),
+                          tooltip: 'Acompanhar Técnicos',
+                          onPressed: () => Get.toNamed('/ordens-servico/acompanhamento'),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh, color: Colors.white, size: 28),
+                        onPressed: () {
+                          controller.carregarMinhasOSs();
+                          controller.carregarOSsConcluidas();
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

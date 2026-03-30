@@ -48,6 +48,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   String statusAtual = 'pendente';
   int? adminSelecionadoId;   // ✅ NOVO: Admin escolhido para acompanhar
   String? adminSelecionadoNome;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -60,16 +61,29 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     } else if (os.status == 'em_deslocamento') {
       osIniciada = false;
       _etapaAtual = 0;
+      statusAtual = 'em_deslocamento'; // ✅ FIX BÔNUS: sincronizar statusAtual
     } else {
       osIniciada = false;
       _etapaAtual = 0;
+      statusAtual = 'pendente';
     }
 
     if (os.latitude != null && os.longitude != null) {
       latitude = os.latitude;
       longitude = os.longitude;
     }
+
+    // ✅ NOVO: Mostrar seleção de admin ao abrir a tela (só se OS for pendente)
+    if (os.status == 'pendente') {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await controller.carregarAdmins();
+        if (mounted) {
+          await _selecionarAdmin();
+        }
+      });
+    }
   }
+
 
   @override
   void dispose() {
@@ -605,16 +619,24 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           if (_etapaAtual > 0) const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: _proximaEtapa,
+              onPressed: _isLoading ? null : _proximaEtapa, // ✅ desabilita durante loading
               style: ElevatedButton.styleFrom(
-                backgroundColor: _etapaAtual == 0 && statusAtual == 'em_deslocamento'
+                backgroundColor: _isLoading
+                    ? Colors.grey.shade700 // ✅ cinza quando carregando
+                    : (_etapaAtual == 0 && statusAtual == 'em_deslocamento'
                     ? Colors.orange
-                    : const Color(0xFF00FF88),
+                    : const Color(0xFF00FF88)),
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
               ),
-              child: Text(
+              child: _isLoading
+                  ? const SizedBox( // ✅ spinner no lugar do texto
+                height: 22,
+                width: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+              )
+                  : Text(
                 _etapaAtual == 0
                     ? (statusAtual == 'pendente'
                     ? '🚗 Iniciar Deslocamento'
@@ -632,6 +654,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   }
 
   void _proximaEtapa() {
+    if (_isLoading) return; // ✅ Bloqueia duplo toque
     if (!_validarEtapaAtual()) return;
 
     if (_etapaAtual == 0 && !osIniciada) {
@@ -676,88 +699,95 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   }
 
   Future<void> _iniciarOS() async {
-    if (statusAtual == 'pendente') {
-      // ✅ NOVO: Primeiro, mostrar seleção de admin
-      if (adminSelecionadoId == null) {
-        final selecionou = await _selecionarAdmin();
-        if (!selecionou) return; // Cancelou a seleção
-      }
+    setState(() => _isLoading = true); // ✅ trava o botão
+    try {
 
-      final sucesso = await controller.deslocarParaOS(
-        os.id, latitude!, longitude!,
-        adminId: adminSelecionadoId,  // ✅ Passa o admin selecionado
-      );
-
-      if (sucesso) {
-        setState(() { statusAtual = 'em_deslocamento'; osIniciada = false; });
-
-        // ✅ Iniciar tracking de GPS
-        final tracking = Get.find<TrackingService>();
-        tracking.iniciar(os.id);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('🚗 Deslocamento iniciado! ${adminSelecionadoNome ?? "Admin"} será notificado.'),
-            backgroundColor: const Color(0xFF00FF88),
-            duration: const Duration(seconds: 3),
-          ));
+      if (statusAtual == 'pendente') {
+        if (adminSelecionadoId == null) {
+          final selecionou = await _selecionarAdmin();
+          if (!selecionou) return;
         }
-      } else {
-        if (mounted) _mostrarErro('Erro ao iniciar deslocamento');
-      }
-      return;
-    }
 
-    if (statusAtual == 'em_deslocamento') {
-      // ✅ Parar tracking de GPS
-      final tracking = Get.find<TrackingService>();
-      tracking.parar();
-      final sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
+        final sucesso = await controller.deslocarParaOS(
+          os.id, latitude!, longitude!,
+          adminId: adminSelecionadoId,
+        );
 
-      if (!sucesso) {
-        if (mounted) _mostrarErro('Erro ao informar chegada');
+        if (sucesso) {
+          setState(() {
+            statusAtual = 'em_deslocamento';
+            osIniciada = false;
+          });
+
+          final tracking = Get.find<TrackingService>();
+          tracking.iniciar(os.id);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('🚗 Deslocamento iniciado! ${adminSelecionadoNome ?? "Admin"} será notificado.'),
+              backgroundColor: const Color(0xFF00FF88),
+              duration: const Duration(seconds: 3),
+            ));
+          }
+        } else {
+          if (mounted) _mostrarErro('Erro ao iniciar deslocamento');
+        }
         return;
       }
 
-// ✅ Agora sim pode parar
-      if (Get.isRegistered<TrackingService>()) {
-        final tracking = Get.find<TrackingService>();
-        tracking.parar();
+      if (statusAtual == 'em_deslocamento') {
+        if (Get.isRegistered<TrackingService>()) {
+          final tracking = Get.find<TrackingService>();
+          tracking.parar();
+        }
+
+        final sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
+
+        if (!sucesso) {
+          if (mounted) _mostrarErro('Erro ao informar chegada');
+          return;
+        }
+
+        if (!mounted) return;
+        final aprConcluido = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => AprScreen(os: os)),
+        );
+
+        if (aprConcluido == true) {
+          setState(() {
+            statusAtual = 'em_execucao';
+            osIniciada = true;
+            _etapaAtual = 1;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('✅ APR concluído! Preencha os dados do atendimento.'),
+              backgroundColor: Color(0xFF00FF88),
+              duration: Duration(seconds: 2),
+            ));
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('⚠️ O APR é obrigatório para continuar o atendimento.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ));
+          }
+        }
+        return;
       }
 
-      if (!mounted) return;
-      final aprConcluido = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(builder: (_) => AprScreen(os: os)),
-      );
-
-      if (aprConcluido == true) {
+      if (statusAtual == 'em_execucao') {
         setState(() {
-          statusAtual = 'em_execucao';
           osIniciada = true;
           _etapaAtual = 1;
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('✅ APR concluído! Preencha os dados do atendimento.'),
-            backgroundColor: Color(0xFF00FF88),
-            duration: Duration(seconds: 2),
-          ));
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('⚠️ O APR é obrigatório para continuar o atendimento.'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
-          ));
-        }
       }
-      return;
-    }
 
-    if (statusAtual == 'em_execucao') {
-      setState(() { osIniciada = true; _etapaAtual = 1; });
+    } finally {
+      if (mounted) setState(() => _isLoading = false); // ✅ libera sempre
     }
   }
 
@@ -882,6 +912,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   }
 
   Future<void> _finalizarOS() async {
+    // ⚠️ dialog ANTES de ativar o loading (não bloqueia o cancelar)
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -890,10 +921,16 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
         title: const Text('Finalizar OS?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: const Text('Os dados serão enviados para o IXC. Confirma?', style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF88), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00FF88),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             child: const Text('Confirmar', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           ),
         ],
@@ -902,45 +939,58 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
 
     if (confirmar != true) return;
 
-    final dados = {
-      'latitude': latitude,
-      'longitude': longitude,
-      'onu_modelo': onuModeloController.text.trim(),
-      'onu_serial': onuSerialController.text.trim(),
-      'onu_status': onuStatusController.text.trim(),
-      'onu_sinal_optico': onuSinalController.text.trim().isNotEmpty ? double.tryParse(onuSinalController.text.trim()) : null,
-      'relato_problema': relatoProblemaController.text.trim(),
-      'relato_solucao': relatoSolucaoController.text.trim(),
-      'materiais_utilizados': materiaisController.text.trim(),
-      'itens_estoque': itensEstoque.map((item) => {
-        'id_produto': item.produto.id,
-        'descricao': item.produto.descricao,
-        'quantidade': item.quantidade,
-        'valor_unitario': item.valorUnitario,
-        'valor_total': item.valorTotal,
-        'id_patrimonio': item.patrimonio?.id ?? '0',
-        'numero_serie': item.patrimonio?.serial ?? '',
-        'numero_patrimonial': item.patrimonio?.numeroPatrimonial ?? '',
-        'tipo_produto': item.isPatrimonio ? 'P' : 'O',
-      }).toList(),
-      'observacoes': observacoesController.text.trim(),
-      'fotos': fotosAnexadas.map((anexo) => {'tipo': anexo.tipo, 'descricao': anexo.descricao, 'path': anexo.foto.path}).toList(),
-      'assinatura': base64Encode(assinaturaBytes!),
-    };
+    setState(() => _isLoading = true); // ✅ trava o botão só depois de confirmar
+    try {
 
-    final sucesso = await controller.finalizarExecucao(os.id, dados);
+      final dados = {
+        'latitude': latitude,
+        'longitude': longitude,
+        'onu_modelo': onuModeloController.text.trim(),
+        'onu_serial': onuSerialController.text.trim(),
+        'onu_status': onuStatusController.text.trim(),
+        'onu_sinal_optico': onuSinalController.text.trim().isNotEmpty
+            ? double.tryParse(onuSinalController.text.trim())
+            : null,
+        'relato_problema': relatoProblemaController.text.trim(),
+        'relato_solucao': relatoSolucaoController.text.trim(),
+        'materiais_utilizados': materiaisController.text.trim(),
+        'itens_estoque': itensEstoque.map((item) => {
+          'id_produto': item.produto.id,
+          'descricao': item.produto.descricao,
+          'quantidade': item.quantidade,
+          'valor_unitario': item.valorUnitario,
+          'valor_total': item.valorTotal,
+          'id_patrimonio': item.patrimonio?.id ?? '0',
+          'numero_serie': item.patrimonio?.serial ?? '',
+          'numero_patrimonial': item.patrimonio?.numeroPatrimonial ?? '',
+          'tipo_produto': item.isPatrimonio ? 'P' : 'O',
+        }).toList(),
+        'observacoes': observacoesController.text.trim(),
+        'fotos': fotosAnexadas.map((anexo) => {
+          'tipo': anexo.tipo,
+          'descricao': anexo.descricao,
+          'path': anexo.foto.path,
+        }).toList(),
+        'assinatura': base64Encode(assinaturaBytes!),
+      };
 
-    if (sucesso && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✓ OS finalizada com sucesso!'),
-        backgroundColor: Color(0xFF00FF88),
-      ));
-      Navigator.pop(context, true);
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Erro ao finalizar OS'),
-        backgroundColor: Colors.red,
-      ));
+      final sucesso = await controller.finalizarExecucao(os.id, dados);
+
+      if (sucesso && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('✓ OS finalizada com sucesso!'),
+          backgroundColor: Color(0xFF00FF88),
+        ));
+        Navigator.pop(context, true);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Erro ao finalizar OS'),
+          backgroundColor: Colors.red,
+        ));
+      }
+
+    } finally {
+      if (mounted) setState(() => _isLoading = false); // ✅ libera sempre
     }
   }
 }

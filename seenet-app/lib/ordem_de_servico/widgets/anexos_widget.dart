@@ -105,9 +105,6 @@ class _AnexosWidgetState extends State<AnexosWidget> {
     );
   }
 
-  // Adiciona este Map JUNTO com as outras variáveis de estado da classe
-  final Map<int, TextEditingController> _descricaoControllers = {};
-
   Widget _buildFotoCard(AnexoComDescricao anexo, int index) {
     // ✅ Controller persistente por índice, não recriado a cada build
     final controller = _descricaoControllers.putIfAbsent(

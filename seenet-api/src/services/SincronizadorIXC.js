@@ -8,6 +8,7 @@ class SincronizadorIXC {
     this.sincronizacaoAtiva = false;
     this.intervalId = null;
     this.cacheClientes = new Map();
+    this.cacheAssuntos = new Map();
     this.maxOSsPorSync = 10;
   }
 
@@ -43,6 +44,7 @@ class SincronizadorIXC {
     clearInterval(this.intervalId);
     this.sincronizacaoAtiva = false;
     this.cacheClientes.clear();
+    this.cacheAssuntos.clear();
   }
 
   async sincronizarTodasEmpresas() {
@@ -243,7 +245,7 @@ async sincronizarEmpresa(integracao) {
         cliente_endereco: clienteEndereco,
         cliente_telefone: clienteTelefone,
         cliente_id_externo: osIXC.id_cliente?.toString(),
-        tipo_servico: osIXC.tipo_servico || this.obterTipoServico(osIXC.tipo),
+        tipo_servico: await this._resolverNomeAssunto(osIXC.id_assunto, ixcService) || osIXC.tipo_servico || this.obterTipoServico(osIXC.tipo),
         prioridade: prioridade,
         status: status,
         observacoes: osIXC.observacao || osIXC.mensagem || null,
@@ -287,6 +289,26 @@ async sincronizarEmpresa(integracao) {
       console.error(`   ❌ Erro ao sincronizar OS ${osIXC.id}:`, error.message);
     }
   }
+
+async _resolverNomeAssunto(idAssunto, ixcService) {
+  if (!idAssunto) return null;
+  const idStr = idAssunto.toString();
+
+  // Verificar cache primeiro
+  if (this.cacheAssuntos.has(idStr)) {
+    return this.cacheAssuntos.get(idStr);
+  }
+
+  try {
+    const nomeAssunto = await ixcService.buscarAssunto(idStr);
+    if (nomeAssunto) {
+      this.cacheAssuntos.set(idStr, nomeAssunto);
+    }
+    return nomeAssunto;
+  } catch (e) {
+    return null;
+  }
+}
 
   parseDataIXC(dataString) {
     if (!dataString || dataString === '0000-00-00 00:00:00' || dataString === '0000-00-00') {

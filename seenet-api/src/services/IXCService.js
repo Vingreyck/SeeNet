@@ -933,6 +933,26 @@ async uploadFotoOS(osId, clienteId, fotoData) {
         return parseFloat(item?.saldo || '0');
       } catch (_) { return 0; }
     }
+
+    async buscarAssunto(assuntoId) {
+      try {
+        const body = {
+          qtype: 'su_oss_chamado_assunto.id',
+          query: assuntoId.toString(),
+          oper: '=',
+          page: '1',
+          rp: '1'
+        };
+        const response = await this.clientAlterar.post('/su_oss_chamado_assunto', body, {
+          headers: { 'ixcsoft': 'listar' }
+        });
+        return response.data.registros?.[0]?.assunto || null;
+      } catch (error) {
+        console.error(`❌ Erro ao buscar assunto ${assuntoId}:`, error.message);
+        return null;
+      }
+    }
 }
+
 
 module.exports = IXCService;

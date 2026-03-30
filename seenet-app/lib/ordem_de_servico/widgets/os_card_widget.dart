@@ -74,21 +74,45 @@ class OSCardWidget extends StatelessWidget {
             const SizedBox(height: 12),
 
             // ✅ CLIENTE
-            Row(
+            // ✅ ASSUNTO (título principal) + CLIENTE (subtítulo)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.person_outline, color: Colors.white70, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    os.clienteNome,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                Row(
+                  children: [
+                    const Icon(Icons.build_outlined, color: Colors.white70, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        os.tipoServico, // ✅ nome do assunto do IXC
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.person_outline, color: Colors.white54, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        os.clienteNome, // ✅ cliente fica como subtítulo
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

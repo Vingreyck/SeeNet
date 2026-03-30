@@ -81,13 +81,13 @@ class PatrimonioEstoque {
     return PatrimonioEstoque(
       id:                json['id']?.toString() ?? '',
       descricao:         json['descricao'] ?? '',
-      serial:            json['numero_serie'] ?? json['serial'] ?? '',  // ✅ IXC usa numero_serie
+      serial: json['serial'] ?? '',
       mac:               json['id_mac'] ?? '',
       idProduto:         json['id_produto']?.toString() ?? '',
       idAlmoxarifado:    json['id_almoxarifado']?.toString() ?? '',
       valorBem:          ProdutoEstoque._parseDouble(json['valor_bem']),
       situacao:          json['situacao']?.toString() ?? '1',
-      numeroPatrimonial: json['numero_patrimonial']?.toString() ?? '', // ✅ NOVO
+      numeroPatrimonial: json['serial'] ?? '',
     );
   }
 }

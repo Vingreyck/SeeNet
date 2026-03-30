@@ -567,16 +567,19 @@ if (ixcService && os.id_externo) {
             fator_conversao: '1.000000000',
 
             // ✅ FIX 1: patrimônio envia valor 0 pra não exigir condição de pagamento
-            valor_unitario: ehPatrimonio ? '0' : item.valor_unitario.toFixed(2),
-            valor_total:    ehPatrimonio ? '0' : item.valor_total.toFixed(2),
-
+            valor_unitario: ehPatrimonio
+              ? (parseFloat(item.valor_unitario) > 0 ? item.valor_unitario.toString() : '0.10')
+              : item.valor_unitario.toFixed(2),
+            valor_total: ehPatrimonio
+              ? (parseFloat(item.valor_total) > 0 ? item.valor_total.toString() : '0.10')
+              : item.valor_total.toFixed(2),
             // ✅ FIX 2: campos de patrimônio só preenchidos quando for patrimônio
             id_patrimonio:              ehPatrimonio ? String(item.id_patrimonio) : '',
             patrimonio:                 ehPatrimonio ? (item.numero_serie || '') : '',
             numero_serie:               ehPatrimonio ? (item.numero_serie || '') : '',
-            numero_patrimonial:         ehPatrimonio ? (item.numero_patrimonial || '') : '', // ✅ FIX 3: era item.id_patrimonio (errado)
-            tipo_produto:               ehPatrimonio ? 'P' : '',                             // ✅ FIX 4: era sempre ''
-            ultima_situacao_patrimonio: ehPatrimonio ? 'E' : '',                             // ✅ FIX 5: era sempre ''
+            numero_patrimonial: ehPatrimonio ? (item.numero_patrimonial || item.numero_serie || '') : '',
+            tipo_produto: '',                            // ✅ FIX 4: era sempre ''
+            ultima_situacao_patrimonio: '',                            // ✅ FIX 5: era sempre ''
 
             garantia_oss:              '',
             pcomissao:                 ehPatrimonio ? '0' : '',

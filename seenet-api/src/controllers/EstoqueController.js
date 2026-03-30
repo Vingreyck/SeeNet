@@ -180,16 +180,16 @@ class EstoqueController {
       const patrimonios = (resultado.registros || []).map(p => ({
         id: p.id,
         descricao: p.descricao,
-        serial: p.serial,
+        serial: p.numero_serie || p.serial || '',  // ✅ IXC retorna como numero_serie
         id_mac: p.id_mac,
         id_produto: p.id_produto,
         id_filial: p.id_filial,
         id_almoxarifado: p.id_almoxarifado,
         situacao: p.situacao,
         valor_bem: parseFloat(p.valor_bem) || 0,
-        estado: p.estado
+        estado: p.estado,
+        numero_patrimonial: p.numero_patrimonial || '',  // ✅ NOVO — é OBRIGATÓRIO no POST
       }));
-
       console.log(`✅ ${patrimonios.length} patrimônio(s) encontrado(s)`);
 
       return res.json({

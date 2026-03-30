@@ -29,6 +29,15 @@ class AnexosWidget extends StatefulWidget {
 class _AnexosWidgetState extends State<AnexosWidget> {
   final List<AnexoComDescricao> _anexos = [];
   final ImagePicker _picker = ImagePicker();
+  final Map<int, TextEditingController> _descricaoControllers = {};
+
+  @override
+  void dispose() {                                   // ✅ COLOCA AQUI
+    for (final c in _descricaoControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,8 +105,15 @@ class _AnexosWidgetState extends State<AnexosWidget> {
     );
   }
 
+  // Adiciona este Map JUNTO com as outras variáveis de estado da classe
+  final Map<int, TextEditingController> _descricaoControllers = {};
+
   Widget _buildFotoCard(AnexoComDescricao anexo, int index) {
-    final descricaoController = TextEditingController(text: anexo.descricao);
+    // ✅ Controller persistente por índice, não recriado a cada build
+    final controller = _descricaoControllers.putIfAbsent(
+      index,
+          () => TextEditingController(text: anexo.descricao),
+    );
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -109,7 +125,7 @@ class _AnexosWidgetState extends State<AnexosWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Header (igual ao atual — não muda)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
@@ -130,20 +146,12 @@ class _AnexosWidgetState extends State<AnexosWidget> {
                         color: const Color(0xFF00FF88).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(
-                        Icons.photo_camera,
-                        color: Color(0xFF00FF88),
-                        size: 20,
-                      ),
+                      child: const Icon(Icons.photo_camera, color: Color(0xFF00FF88), size: 20),
                     ),
                     const SizedBox(width: 12),
                     Text(
                       'Foto ${index + 1}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ],
                 ),
@@ -157,7 +165,7 @@ class _AnexosWidgetState extends State<AnexosWidget> {
             ),
           ),
 
-          // Preview da foto
+          // Preview da foto (igual ao atual)
           Padding(
             padding: const EdgeInsets.all(12),
             child: ClipRRect(
@@ -171,7 +179,7 @@ class _AnexosWidgetState extends State<AnexosWidget> {
             ),
           ),
 
-          // Campo de descrição OBRIGATÓRIO
+          // Campo de descrição — com textDirection corrigido
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: Column(
@@ -179,14 +187,7 @@ class _AnexosWidgetState extends State<AnexosWidget> {
               children: [
                 Row(
                   children: [
-                    const Text(
-                      'Descrição',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
+                    const Text('Descrição', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                     const SizedBox(width: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -195,20 +196,14 @@ class _AnexosWidgetState extends State<AnexosWidget> {
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(color: Colors.red),
                       ),
-                      child: const Text(
-                        'OBRIGATÓRIO',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: const Text('OBRIGATÓRIO', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 TextField(
-                  controller: descricaoController,
+                  controller: controller,
+                  textDirection: TextDirection.ltr, // ✅ FIX: texto da esquerda pra direita
                   onChanged: (value) {
                     anexo.descricao = value;
                     widget.onAnexosAlterados(_anexos);
@@ -216,45 +211,28 @@ class _AnexosWidgetState extends State<AnexosWidget> {
                   maxLines: 3,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    hintText: 'Ex: Roteador instalado na parede da sala\nCabo organizado e equipamento funcionando',
+                    hintText: 'Ex: Roteador instalado na parede da sala',
                     hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
                     filled: true,
                     fillColor: const Color(0xFF232323),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                        color: anexo.descricao.trim().isEmpty
-                            ? Colors.red
-                            : Colors.white12,
-                      ),
+                      borderSide: BorderSide(color: anexo.descricao.trim().isEmpty ? Colors.red : Colors.white12),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                        color: anexo.descricao.trim().isEmpty
-                            ? Colors.red
-                            : Colors.white12,
-                      ),
+                      borderSide: BorderSide(color: anexo.descricao.trim().isEmpty ? Colors.red : Colors.white12),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF00FF88),
-                        width: 2,
-                      ),
+                      borderSide: const BorderSide(color: Color(0xFF00FF88), width: 2),
                     ),
                   ),
                 ),
                 if (anexo.descricao.trim().isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 4),
-                    child: Text(
-                      '⚠️ A descrição é obrigatória',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                      ),
-                    ),
+                    child: Text('⚠️ A descrição é obrigatória', style: TextStyle(color: Colors.red, fontSize: 12)),
                   ),
               ],
             ),
@@ -439,6 +417,11 @@ class _AnexosWidgetState extends State<AnexosWidget> {
     if (confirmar == true) {
       setState(() {
         _anexos.removeAt(index);
+        // ✅ Recriar o map de controllers para os índices ficarem corretos
+        _descricaoControllers.clear();
+        for (int i = 0; i < _anexos.length; i++) {
+          _descricaoControllers[i] = TextEditingController(text: _anexos[i].descricao);
+        }
       });
       widget.onAnexosAlterados(_anexos);
 

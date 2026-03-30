@@ -247,15 +247,20 @@ class _AcompanhamentoScreenState extends State<AcompanhamentoScreen> {
               ],
             ),
 
-            // Substitui a checagem do botão de rastrear no _buildCard
             if (temGPS) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => Get.to(() => RastreamentoMapaScreen(...)),
+                  onPressed: () => Get.to(() => RastreamentoMapaScreen(
+                    osId: item['id'].toString(),
+                    tecnicoNome: item['tecnico_nome'] ?? '',
+                    numeroOs: item['numero_os'] ?? '',
+                    clienteNome: item['cliente_nome'] ?? '',
+                  )),
                   icon: Icon(Icons.map, color: statusColor, size: 18),
-                  label: Text('Ver no Mapa', style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
+                  label: Text('Ver no Mapa',
+                      style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: statusColor.withOpacity(0.5)),
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -267,7 +272,7 @@ class _AcompanhamentoScreenState extends State<AcompanhamentoScreen> {
               const SizedBox(height: 8),
               Text(
                 status == 'em_execucao'
-                    ? '🔧 Técnico no local (GPS encerrado)'   // ✅ diferencia dos casos
+                    ? '🔧 Técnico no local (GPS encerrado)'
                     : '📡 Aguardando sinal GPS...',
                 style: const TextStyle(color: Colors.white38, fontSize: 12),
               ),

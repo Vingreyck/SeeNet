@@ -35,8 +35,5 @@ router.post('/:id/finalizar', OrdensServicoController.finalizarExecucao.bind(Ord
 
 router.get('/:id/historico-endereco', OrdensServicoController.buscarHistoricoEndereco.bind(OrdensServicoController));
 
-module.exports = new OrdensServicoController();
-
-
 
 module.exports = router;

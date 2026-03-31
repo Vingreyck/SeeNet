@@ -1060,8 +1060,34 @@ if (dados.fotos && dados.fotos.length > 0) {
         if (osAtual.cliente_id_externo) {
           query = query.where('cliente_id_externo', osAtual.cliente_id_externo);
         } else if (osAtual.cliente_endereco) {
-          query =
-}
+          query = query.where('cliente_endereco', osAtual.cliente_endereco);
+        } else {
+          return res.json({ success: true, data: [] });
+        }
+
+        const historico = await query;
+
+        // Buscar nome dos técnicos
+        const tecnicoIds = [...new Set(historico.map(h => h.tecnico_id).filter(Boolean))];
+        const tecnicos = tecnicoIds.length > 0
+          ? await db('usuarios').whereIn('id', tecnicoIds).select('id', 'nome')
+          : [];
+
+        const tecnicoMap = {};
+        tecnicos.forEach(t => { tecnicoMap[t.id] = t.nome; });
+
+        const resultado = historico.map(h => ({
+          ...h,
+          tecnico_nome: tecnicoMap[h.tecnico_id] || 'Técnico',
+          data_conclusao: h.data_conclusao,
+        }));
+
+        return res.json({ success: true, data: resultado });
+      } catch (error) {
+        console.error('❌ Erro ao buscar histórico do endereço:', error);
+        return res.status(500).json({ success: false, error: error.message });
+      }
+    }
 /**
      * Dashboard de indicadores
      * GET /api/ordens-servico/dashboard

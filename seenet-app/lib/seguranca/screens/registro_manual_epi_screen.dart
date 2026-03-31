@@ -26,6 +26,8 @@ class RegistroManualEpiScreen extends StatefulWidget {
 
 
 class _RegistroManualEpiScreenState extends State<RegistroManualEpiScreen> {
+  String? fotoDocumentoBase64;
+  bool ehFichario = false;
   final controller = Get.find<SegurancaController>();
   final service = Get.find<SegurancaService>();
   final authService = Get.find<AuthService>();
@@ -179,6 +181,46 @@ class _RegistroManualEpiScreenState extends State<RegistroManualEpiScreen> {
             _buildAssinaturaSection(),
             const SizedBox(height: 32),
 
+            // ── Tipo de registro ──
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.purple.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.purple.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Switch(
+                    value: ehFichario,
+                    activeColor: Colors.purple,
+                    onChanged: (v) => setState(() => ehFichario = v),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Ficha antiga (Fichário)',
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text('Não entra no histórico geral — fica na aba Fichário do técnico',
+                            style: TextStyle(color: Colors.white54, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+// ── Foto do documento físico (só aparece se for fichário) ──
+            if (ehFichario) ...[
+              const SizedBox(height: 16),
+              _buildSectionTitle('Foto do Documento Físico'),
+              const SizedBox(height: 8),
+              _buildFotoDocumentoSection(),
+            ],
+
             // ── Botão enviar ──
             SizedBox(
               width: double.infinity,
@@ -258,6 +300,47 @@ class _RegistroManualEpiScreenState extends State<RegistroManualEpiScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildFotoDocumentoSection() {
+    if (fotoDocumentoBase64 != null) {
+      final bytes = base64Decode(fotoDocumentoBase64!.split(',').last);
+      return Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(bytes, height: 160, width: double.infinity, fit: BoxFit.cover),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _tirarFotoDocumento,
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('Trocar Foto'),
+            style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white54, side: const BorderSide(color: Colors.white24)),
+          ),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(child: _buildBotaoMidia(Icons.camera_alt, 'Câmera', () => _tirarFotoDocumento(camera: true))),
+        const SizedBox(width: 10),
+        Expanded(child: _buildBotaoMidia(Icons.photo_library, 'Galeria', () => _tirarFotoDocumento(camera: false))),
+      ],
+    );
+  }
+
+  Future<void> _tirarFotoDocumento({bool camera = true}) async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: camera ? ImageSource.camera : ImageSource.gallery,
+      imageQuality: 70, maxWidth: 1200,
+    );
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      setState(() => fotoDocumentoBase64 = 'data:image/jpeg;base64,${base64Encode(bytes)}');
+    }
   }
 
   Widget _buildDatePicker() {
@@ -480,10 +563,10 @@ class _RegistroManualEpiScreenState extends State<RegistroManualEpiScreen> {
         episSolicitados: episSelecionados.toList(),
         assinaturaBase64: sigBase64,
         fotoBase64: fotoBase64,
-        observacao: obsController.text.trim().isNotEmpty
-            ? obsController.text.trim()
-            : null,
+        observacao: obsController.text.trim().isNotEmpty ? obsController.text.trim() : null,
         dataEntrega: dataEntrega,
+        fotoDocumentoBase64: fotoDocumentoBase64,  // ✅ NOVO
+        ehFichario: ehFichario,                    // ✅ NOVO
       );
 
       if (result['success'] == true) {

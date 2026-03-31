@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import '../controllers/seguranca_controller.dart';
+import 'package:http/http.dart' as http;
+import '../../services/auth_service.dart';
 
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
@@ -12,6 +14,10 @@ class PerfilScreen extends StatefulWidget {
 }
 
 class _PerfilScreenState extends State<PerfilScreen> {
+  int? _anoFiltro;
+  int? _mesFiltro;
+  int _abaAtual = 0; // 0=Histórico, 1=Fichário
+
   final controller = Get.find<SegurancaController>();
 
   @override
@@ -239,7 +245,12 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
   // ── Histórico de EPIs recebidos ───────────────────────────────
   Widget _buildHistoricoEpis() {
-    if (_historicoRecebidos.isEmpty) return const SizedBox.shrink();
+    final historico = controller.minhasRequisicoes
+        .where((r) => r['status'] == 'concluida' && r['eh_fichario'] != true)
+        .toList();
+    final fichario = controller.minhasRequisicoes
+        .where((r) => r['eh_fichario'] == true)
+        .toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -250,116 +261,240 @@ class _PerfilScreenState extends State<PerfilScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Abas
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Row(
               children: [
-                const Icon(Icons.history,
-                    color: Color(0xFF00FF88), size: 18),
+                _buildAba('Histórico', 0, Icons.history),
                 const SizedBox(width: 8),
-                const Text('Histórico de EPIs Recebidos',
-                    style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600)),
-                const Spacer(),
-                Text('${_historicoRecebidos.length} registro(s)',
-                    style: const TextStyle(
-                        color: Colors.white38, fontSize: 11)),
+                _buildAba('Fichário', 1, Icons.folder_special),
               ],
             ),
           ),
           const Divider(color: Colors.white12, height: 1),
-          ..._historicoRecebidos.take(10).map((req) {
-            final epis = req['epis_solicitados'];
-            final List<String> episLista =
-            epis is List ? epis.cast<String>() : [];
-            return Column(
+
+          // Filtro de período
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Data
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00FF88).withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              _dia(req['data_confirmacao_recebimento'] ??
-                                  req['data_resposta']),
-                              style: const TextStyle(
-                                  color: Color(0xFF00FF88),
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              _mesAno(req['data_confirmacao_recebimento'] ??
-                                  req['data_resposta']),
-                              style: const TextStyle(
-                                  color: Colors.white38, fontSize: 10),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // EPIs
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('${episLista.length} EPI(s) recebido(s)',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 4),
-                            Text(
-                              episLista.join(', '),
-                              style: const TextStyle(
-                                  color: Colors.white54, fontSize: 11),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (req['id_requisicao_ixc'] != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                '✓ Estoque descontado no IXC',
-                                style: const TextStyle(
-                                    color: Color(0xFF00FF88), fontSize: 10),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      // Ícone de foto/assinatura
-                      if (req['foto_recebimento_base64'] != null)
-                        const Icon(Icons.photo,
-                            color: Color(0xFF00FF88), size: 14),
-                    ],
+                Expanded(child: _buildDropdownFiltro()),
+                const SizedBox(width: 8),
+                // Botão PDF do período filtrado
+                if (_abaAtual == 0)
+                  OutlinedButton.icon(
+                    onPressed: _gerarPDFFiltrado,
+                    icon: const Icon(Icons.picture_as_pdf, size: 16, color: Color(0xFF00FF88)),
+                    label: const Text('PDF', style: TextStyle(color: Color(0xFF00FF88), fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF00FF88)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    ),
                   ),
-                ),
-                if (req != _historicoRecebidos.take(10).last)
-                  const Divider(color: Colors.white12, height: 1),
               ],
-            );
-          }),
-          if (_historicoRecebidos.length > 10)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Center(
-                child: Text(
-                  '+ ${_historicoRecebidos.length - 10} registros anteriores',
-                  style: const TextStyle(color: Colors.white38, fontSize: 12),
-                ),
-              ),
             ),
+          ),
+
           const SizedBox(height: 8),
+
+          // Conteúdo da aba
+          if (_abaAtual == 0)
+            ...historico.take(20).map((req) => _buildItemHistorico(req))
+          else
+            ...fichario.take(20).map((req) => _buildItemFichario(req)),
+
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAba(String label, int index, IconData icon) {
+    final sel = _abaAtual == index;
+    return GestureDetector(
+      onTap: () => setState(() => _abaAtual = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? const Color(0xFF00FF88).withOpacity(0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: sel ? const Color(0xFF00FF88) : Colors.white12,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: sel ? const Color(0xFF00FF88) : Colors.white38),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(
+              color: sel ? const Color(0xFF00FF88) : Colors.white38,
+              fontSize: 12,
+              fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownFiltro() {
+    final anos = [null, DateTime.now().year, DateTime.now().year - 1, DateTime.now().year - 2];
+    final meses = [null, 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int?>(
+              value: _anoFiltro,
+              dropdownColor: const Color(0xFF2A2A2A),
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              hint: const Text('Ano', style: TextStyle(color: Colors.white38, fontSize: 12)),
+              items: anos.map((a) => DropdownMenuItem(
+                value: a,
+                child: Text(a?.toString() ?? 'Todos', style: const TextStyle(fontSize: 12)),
+              )).toList(),
+              onChanged: (v) => setState(() => _anoFiltro = v),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int?>(
+              value: _mesFiltro,
+              dropdownColor: const Color(0xFF2A2A2A),
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              hint: const Text('Mês', style: TextStyle(color: Colors.white38, fontSize: 12)),
+              items: List.generate(13, (i) => DropdownMenuItem(
+                value: i == 0 ? null : i,
+                child: Text(i == 0 ? 'Todos' : meses[i]!, style: const TextStyle(fontSize: 12)),
+              )),
+              onChanged: (v) => setState(() => _mesFiltro = v),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _gerarPDFFiltrado() async {
+    // Chama o backend com filtro
+    final auth = Get.find<AuthService>();
+    final tecnicoId = controller.perfilData.value?['id'];
+    if (tecnicoId == null) return;
+
+    final params = <String>[];
+    if (_mesFiltro != null) params.add('mes=$_mesFiltro');
+    if (_anoFiltro != null) params.add('ano=$_anoFiltro');
+    final query = params.isNotEmpty ? '?${params.join('&')}' : '';
+
+    final url = 'https://seenet-production.up.railway.app/api/seguranca/relatorio-epi/$tecnicoId$query';
+
+    // Abre no browser ou compartilha
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Gerando PDF do período...'),
+      backgroundColor: Color(0xFF00FF88),
+    ));
+
+    try {
+      final response = await http.get(Uri.parse(url), headers: {
+        'Authorization': 'Bearer ${auth.token}',
+        'X-Tenant-Code': auth.tenantCode ?? '',
+      });
+      if (response.statusCode == 200 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('PDF gerado! Compartilhando...'),
+          backgroundColor: Color(0xFF00FF88),
+        ));
+        // Compartilha via share_plus
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erro: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Widget _buildItemFichario(Map<String, dynamic> req) {
+    final epis = req['epis_solicitados'];
+    final List<String> episLista = epis is List ? epis.cast<String>() : [];
+    final temFoto = req['foto_documento_base64'] != null;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.purple.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.folder_special, color: Colors.purple, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _formatarData(req['data_entrega'] ?? req['data_criacao']),
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  episLista.join(', '),
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (temFoto)
+            const Icon(Icons.photo, color: Colors.purple, size: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemHistorico(Map<String, dynamic> req) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF242424),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            req['tecnico_nome'] ?? 'Sem nome',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Data: ${req['data_entrega'] ?? '-'}',
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'EPIs: ${(req['epis_solicitados'] ?? []).join(', ')}',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
         ],
       ),
     );

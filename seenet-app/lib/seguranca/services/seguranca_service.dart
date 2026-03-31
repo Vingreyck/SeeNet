@@ -113,21 +113,45 @@ class SegurancaService extends GetxService {
     String? fotoBase64,
     String? observacao,
     DateTime? dataEntrega,
+    String? fotoDocumentoBase64,
+    bool ehFichario = false,
   }) async {
-    final response = await GetConnect().post(
-      '$_base/requisicoes/manual',
-      {
+    try {
+      final body = {
         'tecnico_id': tecnicoId,
         'epis_solicitados': episSolicitados,
         if (assinaturaBase64 != null) 'assinatura_base64': assinaturaBase64,
         if (fotoBase64 != null) 'foto_base64': fotoBase64,
         if (observacao != null) 'observacao_gestor': observacao,
         'data_entrega': (dataEntrega ?? DateTime.now()).toIso8601String(),
-      },
-      headers: _headers,
-    );
-    if (response.statusCode == 201) return {'success': true, 'message': response.body['message']};
-    return {'success': false, 'message': response.body['error'] ?? 'Erro ao criar registro'};
+        'eh_fichario': ehFichario,
+        if (fotoDocumentoBase64 != null)
+          'foto_documento_base64': fotoDocumentoBase64,
+      };
+
+      final response = await GetConnect().post(
+        '$_base/requisicoes/manual',
+        body,
+        headers: _headers,
+      );
+
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': response.body['message']
+        };
+      }
+
+      return {
+        'success': false,
+        'message': response.body['error'] ?? 'Erro ao criar registro'
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Erro de conexão: $e'
+      };
+    }
   }
 
   // ── PDF ───────────────────────────────────────────────────────

@@ -544,7 +544,7 @@ router.post('/requisicoes', authMiddleware, async (req, res) => {
 router.post('/requisicoes/manual', authMiddleware, async (req, res) => {
   try {
     if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
-    const { tecnico_id, epis_solicitados, assinatura_base64, foto_base64, observacao_gestor, data_entrega } = req.body;
+    const { tecnico_id, epis_solicitados, assinatura_base64, foto_base64, observacao_gestor, data_entrega, foto_documento_base64, eh_fichario } = req.body;
     if (!tecnico_id) return res.status(400).json({ error: 'Técnico obrigatório' });
     if (!epis_solicitados?.length) return res.status(400).json({ error: 'Selecione ao menos um EPI' });
     const tecnico = await db('usuarios').where('id', tecnico_id).first();
@@ -555,6 +555,8 @@ router.post('/requisicoes/manual', authMiddleware, async (req, res) => {
       epis_solicitados: JSON.stringify(epis_solicitados), assinatura_base64: assinatura_base64 || null,
       foto_base64: foto_base64 || null, observacao_gestor: observacao_gestor || 'Registro manual pelo gestor de segurança.',
       data_resposta: new Date(), data_entrega: dataEntregaFinal, registro_manual: true, criado_por_gestor_id: req.user.id,
+      foto_documento_base64: foto_documento_base64 || null,
+      eh_fichario: eh_fichario === true,
     }).returning('*');
     try {
       const gestor = await db('usuarios').where('id', req.user.id).first();
@@ -567,12 +569,14 @@ router.post('/requisicoes/manual', authMiddleware, async (req, res) => {
 
 router.get('/requisicoes/minhas', authMiddleware, async (req, res) => {
   try {
-    const lista = await db('requisicoes_epi as r').leftJoin('usuarios as g', 'g.id', 'r.gestor_id')
+    const { mes, ano } = req.query;
+    let query = db('requisicoes_epi as r').leftJoin('usuarios as g', 'g.id', 'r.gestor_id')
       .where('r.tenant_id', req.user.tenant_id).where('r.tecnico_id', req.user.id)
-      .select('r.*', 'g.nome as gestor_nome').orderBy('r.data_criacao', 'desc');
+      .select('r.*', 'g.nome as gestor_nome');
+    if (ano) query = query.whereRaw('EXTRACT(YEAR FROM r.data_criacao) = ?', [ano]);
+    if (mes) query = query.whereRaw('EXTRACT(MONTH FROM r.data_criacao) = ?', [mes]);
+    const lista = await query.orderBy('r.data_criacao', 'desc');
     res.json({ requisicoes: lista });
-  } catch (err) { res.status(500).json({ error: 'Erro ao buscar requisições' }); }
-});
 
 router.get('/requisicoes/pendentes', authMiddleware, async (req, res) => {
   try {
@@ -1112,6 +1116,51 @@ router.put('/perfil/foto', authMiddleware, async (req, res) => {
     await db('usuarios').where('id', req.user.id).update({ foto_perfil: foto_base64 });
     res.json({ success: true, message: 'Foto atualizada!' });
   } catch (err) { res.status(500).json({ error: 'Erro ao atualizar foto' }); }
+});
+
+router.get('/relatorio-epi/:tecnico_id', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
+    const { tecnico_id } = req.params;
+    const { mes, ano } = req.query;
+    const tenantId = req.user.tenant_id;
+
+    const tecnico = await db('usuarios').where('id', tecnico_id).first();
+    if (!tecnico) return res.status(404).json({ error: 'Técnico não encontrado' });
+
+    let query = db('requisicoes_epi')
+      .where('tecnico_id', tecnico_id)
+      .where('tenant_id', tenantId)
+      .whereIn('status', ['concluida', 'aprovada', 'aguardando_confirmacao'])
+      .orderBy('data_criacao', 'desc');
+
+    if (ano) query = query.whereRaw('EXTRACT(YEAR FROM data_criacao) = ?', [ano]);
+    if (mes) query = query.whereRaw('EXTRACT(MONTH FROM data_criacao) = ?', [mes]);
+
+    const requisicoes = await query;
+    const produtosEpi = await db('produtos_epi').where('tenant_id', tenantId).where('ativo', true);
+    const tenant = await db('tenants').where('id', tenantId).first();
+
+    // Adiciona label do período no título
+    const meses = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const periodoLabel = mes && ano ? `${meses[parseInt(mes)]} ${ano}` : ano ? `Ano ${ano}` : 'Histórico Completo';
+
+    // Usa gerarFichaEPI já existente, passando as requisições filtradas
+    const pdfBuffer = await gerarFichaEPI(
+      { ...tecnico, _periodoLabel: periodoLabel },
+      requisicoes,
+      produtosEpi,
+      tenant
+    );
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=EPI_${tecnico.nome.replace(/ /g, '_')}_${periodoLabel.replace(/ /g, '_')}.pdf`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('❌ Erro relatorio EPI:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

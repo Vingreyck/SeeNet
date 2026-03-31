@@ -65,9 +65,9 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
           isScrollable: true,
           tabs: [
             Obx(() => Tab(text: 'Pendentes (${controller.requisicoesPendentes.length})')),
+            Obx(() => Tab(text: 'Devoluções (${controller.devolucoesPendentes.length})')),
             const Tab(text: 'Técnicos'),
             const Tab(text: 'Produtos'),
-            Obx(() => Tab(text: 'Devoluções (${controller.devolucoesPendentes.length})')),
             Obx(() => Tab(text: 'Devedores (${controller.devedores.length})')),
           ],
         ),
@@ -76,9 +76,9 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
         controller: _tabController,
         children: [
           _buildListaPendentes(),
+          _buildListaDevolucoes(),
           _buildListaTecnicos(),
           const AbaProdutosEpi(),
-          _buildListaDevolucoes(),
           _buildListaDevedores(),
         ],
       ),
@@ -460,8 +460,8 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
 
     showDialog(
       context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (_, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF2A2A2A),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Aprovar Devolução', style: TextStyle(color: Colors.white)),
@@ -495,7 +495,8 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
             ),
             ElevatedButton(
               onPressed: codigoSelecionado == null ? null : () async {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
+                final messenger = ScaffoldMessenger.of(context);
                 final result = await Get.find<SegurancaService>().aprovarDevolucao(dev['id'] as int, codigoSelecionado!);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(

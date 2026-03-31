@@ -1227,4 +1227,4 @@ if (dados.fotos && dados.fotos.length > 0) {
 
 }
 
-module.exports = new OrdensServicoController();
+module.exports = new OrdensServicoController();,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:get/get.dart';
+import 'sync_manager.dart';
 
 class ConnectivityService extends GetxService {
   final RxBool isOnline = true.obs;

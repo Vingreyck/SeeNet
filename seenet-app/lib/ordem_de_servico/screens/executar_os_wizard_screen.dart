@@ -2,13 +2,17 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:typed_data';
+import '../../services/connectivity_service.dart';
+import '../../services/sync_manager.dart';
 import '../../services/tracking_service.dart';
+import '../../services/estoque_service.dart';
 import 'dart:convert';
 import '../../controllers/ordem_servico_controller.dart';
 import '../../models/ordem_servico_model.dart';
 import '../widgets/localizacao_widget.dart';
+import '../widgets/qr_scanner_widget.dart';
 import '../widgets/anexos_widget.dart';
-import '../../services/estoque_service.dart';
+import '../widgets/historico_endereco_widget.dart';
 import '../widgets/materiais_estoque_widget.dart';
 import '../widgets/assinatura_widget.dart';
 import '../widgets/campo_com_voz.dart';
@@ -239,7 +243,12 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+
+          // ✅ NOVO: Histórico de atendimentos no mesmo endereço
+          HistoricoEnderecoWidget(osId: os.id),
+
+          const SizedBox(height: 12),
           _buildCard(
             child: LocalizacaoWidget(
               onLocalizacaoCapturada: (lat, lng) {
@@ -301,11 +310,45 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
                   hint: 'Ex: AN5506-04-F',
                 ),
                 const SizedBox(height: 16),
-                CampoComVoz(
-                  controller: onuSerialController,
-                  label: 'Serial da ONU',
-                  hint: 'Ex: HWTC12345678',
+
+                // ✅ NOVO: Campo serial com botão de scan
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: CampoComVoz(
+                        controller: onuSerialController,
+                        label: 'Serial da ONU',
+                        hint: 'Ex: HWTC12345678',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Tooltip(
+                      message: 'Escanear QR code ou código de barras',
+                      child: InkWell(
+                        onTap: _abrirScanner,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          height: 52,
+                          width: 52,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00FF88).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF00FF88).withOpacity(0.5),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.qr_code_scanner,
+                            color: Color(0xFF00FF88),
+                            size: 26,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+
                 const SizedBox(height: 16),
                 CampoComVoz(
                   controller: onuStatusController,
@@ -317,7 +360,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
                   controller: onuSinalController,
                   label: 'Sinal Óptico (dBm)',
                   hint: 'Ex: -24.5',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                    signed: true,
+                  ),
                 ),
               ],
             ),
@@ -325,6 +371,26 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _abrirScanner() async {
+    final serial = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QrScannerWidget(
+          onSerialCapturado: (s) {}, // não usado — retorna via pop
+        ),
+      ),
+    );
+
+    if (serial != null && serial.isNotEmpty && mounted) {
+      setState(() => onuSerialController.text = serial);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('✅ Serial capturado: $serial'),
+        backgroundColor: const Color(0xFF00FF88),
+        duration: const Duration(seconds: 2),
+      ));
+    }
   }
 
   // ETAPA 3: Relatos
@@ -708,10 +774,21 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           if (!selecionou) return;
         }
 
-        final sucesso = await controller.deslocarParaOS(
-          os.id, latitude!, longitude!,
-          adminId: adminSelecionadoId,
-        );
+        final connectivity = Get.find<ConnectivityService>();
+        bool sucesso;
+
+        if (connectivity.offline) {
+          // ✅ Offline: enfileira localmente
+          final sync = Get.find<SyncManager>();
+          await sync.enfileirarDeslocar(
+            os.id, latitude!, longitude!, adminId: adminSelecionadoId,
+          );
+          sucesso = true; // Considera sucesso localmente
+        } else {
+          sucesso = await controller.deslocarParaOS(
+            os.id, latitude!, longitude!, adminId: adminSelecionadoId,
+          );
+        }
 
         if (sucesso) {
           setState(() {
@@ -741,8 +818,16 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           tracking.parar();
         }
 
-        final sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
+        final connectivity = Get.find<ConnectivityService>();
+        bool sucesso;
 
+        if (connectivity.offline) {
+          final sync = Get.find<SyncManager>();
+          await sync.enfileirarChegar(os.id, latitude!, longitude!);
+          sucesso = true;
+        } else {
+          sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
+        }
         if (!sucesso) {
           if (mounted) _mostrarErro('Erro ao informar chegada');
           return;
@@ -912,7 +997,6 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   }
 
   Future<void> _finalizarOS() async {
-    // ⚠️ dialog ANTES de ativar o loading (não bloqueia o cancelar)
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -939,9 +1023,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
 
     if (confirmar != true) return;
 
-    setState(() => _isLoading = true); // ✅ trava o botão só depois de confirmar
+    setState(() => _isLoading = true);
     try {
-
       final dados = {
         'latitude': latitude,
         'longitude': longitude,
@@ -974,12 +1057,27 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
         'assinatura': base64Encode(assinaturaBytes!),
       };
 
-      final sucesso = await controller.finalizarExecucao(os.id, dados);
+      // ✅ 1. Detectar conectividade
+      final connectivity = Get.find<ConnectivityService>();
+      bool sucesso;
 
+      // ✅ 2. Offline → enfileira; Online → envia direto
+      if (connectivity.offline) {
+        final sync = Get.find<SyncManager>();
+        await sync.enfileirarFinalizarOS(os.id, dados);
+        sucesso = true;
+      } else {
+        sucesso = await controller.finalizarExecucao(os.id, dados);
+      }
+
+      // ✅ 3. Feedback ao técnico
       if (sucesso && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✓ OS finalizada com sucesso!'),
-          backgroundColor: Color(0xFF00FF88),
+        final msg = connectivity.offline
+            ? '📥 OS salva localmente — será enviada quando voltar o sinal'
+            : '✓ OS finalizada com sucesso!';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(msg),
+          backgroundColor: connectivity.offline ? Colors.orange : const Color(0xFF00FF88),
         ));
         Navigator.pop(context, true);
       } else if (mounted) {
@@ -990,7 +1088,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       }
 
     } finally {
-      if (mounted) setState(() => _isLoading = false); // ✅ libera sempre
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 }

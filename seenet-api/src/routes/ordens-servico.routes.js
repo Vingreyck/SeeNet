@@ -33,6 +33,10 @@ router.post('/:id/chegar-local', OrdensServicoController.chegarAoLocal.bind(Orde
 // 3️⃣ Finalizar OS (serviço concluído)
 router.post('/:id/finalizar', OrdensServicoController.finalizarExecucao.bind(OrdensServicoController));
 
+router.get('/:id/historico-endereco', OrdensServicoController.buscarHistoricoEndereco.bind(OrdensServicoController));
+
+module.exports = new OrdensServicoController();
+
 
 
 module.exports = router;

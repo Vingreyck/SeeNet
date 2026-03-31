@@ -7,6 +7,7 @@ import 'package:seenet/seguranca/screens/confirmar_recebimento_screen.dart';
 import 'package:seenet/seguranca/screens/registro_manual_epi_screen.dart';
 import 'package:seenet/login/widgets/login.binding.dart';
 import 'services/tracking_service.dart';
+import 'admin/dashboard_admin.view.dart';
 import 'ordem_de_servico/screens/acompanhamento_screen.dart';
 import 'package:seenet/registro/registro.view.dart';
 import 'package:seenet/admin/usuarios_admin.view.dart';
@@ -19,11 +20,14 @@ import 'package:seenet/transcricao/historico_transcricao.view.dart';
 import 'controllers/transcricao_controller.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'seguranca/screens/relatorio_epi_screen.dart';
 import 'package:firebase_core/firebase_core.dart'; // ✅ NOVO
 import 'package:seenet/login/login.view.dart';
 import 'package:seenet/checklist/checklist.view.dart';
 import 'services/avaliacao_service.dart';
 import 'services/categoria_service.dart';
+import 'services/connectivity_service.dart';
+import 'services/sync_manager.dart';
 import 'package:seenet/admin/logs_admin.view.dart';
 import 'package:seenet/diagnostico/diagnostico.view.dart';
 import 'package:seenet/registro/widgets/registro.bindings.dart';
@@ -89,6 +93,8 @@ void main() async {
   Get.put(SegurancaService(), permanent: true);
   Get.put(SegurancaController(), permanent: true);
   Get.put(TrackingService(), permanent: true);
+  Get.put(SyncManager(), permanent: true);
+  Get.put(ConnectivityService(), permanent: true);
 
 
   // ✅ NOVO: Inicializar NotificationService
@@ -236,6 +242,11 @@ class MyApp extends StatelessWidget {
           middlewares: [AuthMiddleware()],
         ),
         GetPage(
+          name: '/admin/dashboard',
+          page: () => const DashboardAdminView(),
+          middlewares: [AuthMiddleware()],
+        ),
+        GetPage(
           name: '/transcricao',
           page: () => const TranscricaoView(),
           binding: BindingsBuilder(() {
@@ -281,6 +292,11 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/seguranca/registro-manual',
           page: () => const RegistroManualEpiScreen(),
+        ),
+        GetPage(
+          name: '/seguranca/relatorio-epi',
+          page: () => const RelatorioEpiScreen(),
+          middlewares: [AuthMiddleware()],
         ),
         GetPage(
             name: '/seguranca/confirmar-recebimento',

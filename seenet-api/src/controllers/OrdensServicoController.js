@@ -1023,5 +1023,182 @@ if (dados.fotos && dados.fotos.length > 0) {
         return res.status(500).json({ success: false });
       }
     }
+
+    /**
+     * Histórico de atendimentos no mesmo endereço
+     * GET /api/ordens-servico/:id/historico-endereco
+     */
+    async buscarHistoricoEndereco(req, res) {
+      try {
+        const { id } = req.params;
+        const tenantId = req.tenantId;
+
+        // Buscar o endereço da OS atual
+        const osAtual = await db('ordem_servico')
+          .where('id', id)
+          .where('tenant_id', tenantId)
+          .select('cliente_endereco', 'cliente_id_externo')
+          .first();
+
+        if (!osAtual) {
+          return res.status(404).json({ success: false, error: 'OS não encontrada' });
+        }
+
+        // Buscar histórico pelo mesmo cliente_id_externo OU mesmo endereço
+        let query = db('ordem_servico')
+          .where('tenant_id', tenantId)
+          .where('id', '!=', id)
+          .where('status', 'concluida')
+          .orderBy('data_conclusao', 'desc')
+          .limit(5)
+          .select(
+            'id', 'numero_os', 'tipo_servico', 'cliente_nome',
+            'relato_problema', 'relato_solucao', 'data_conclusao',
+            'tecnico_id'
+          );
+
+        if (osAtual.cliente_id_externo) {
+          query = query.where('cliente_id_externo', osAtual.cliente_id_externo);
+        } else if (osAtual.cliente_endereco) {
+          query =
 }
+/**
+     * Dashboard de indicadores
+     * GET /api/ordens-servico/dashboard
+     */
+    async buscarDashboard(req, res) {
+      try {
+        const tenantId = req.tenantId;
+        const agora = new Date();
+        const mes = parseInt(req.query.mes) || agora.getMonth() + 1;
+        const ano = parseInt(req.query.ano) || agora.getFullYear();
+
+        const inicioMes = new Date(ano, mes - 1, 1);
+        const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+
+        const nomeMes = inicioMes.toLocaleDateString('pt-BR', {
+          month: 'long', year: 'numeric'
+        });
+
+        const porStatus = await db('ordem_servico')
+          .where('tenant_id', tenantId)
+          .select('status')
+          .count('id as total')
+          .groupBy('status');
+
+        const porTecnico = await db('ordem_servico as os')
+          .join('usuarios as u', 'u.id', 'os.tecnico_id')
+          .where('os.tenant_id', tenantId)
+          .where('os.data_criacao', '>=', inicioMes)
+          .where('os.data_criacao', '<=', fimMes)
+          .select('u.nome as tecnico', 'os.status')
+          .count('os.id as total')
+          .groupBy('u.nome', 'os.status');
+
+        const tempoMedio = await db('ordem_servico')
+          .where('tenant_id', tenantId)
+          .where('status', 'concluida')
+          .whereNotNull('data_inicio')
+          .whereNotNull('data_conclusao')
+          .where('data_criacao', '>=', inicioMes)
+          .where('data_criacao', '<=', fimMes)
+          .select(
+            db.raw('AVG(EXTRACT(EPOCH FROM (data_conclusao - data_inicio))/3600) as media_horas')
+          ).first();
+
+        const totalMes = await db('ordem_servico')
+          .where('tenant_id', tenantId)
+          .where('data_criacao', '>=', inicioMes)
+          .where('data_criacao', '<=', fimMes)
+          .count('id as total').first();
+
+        const concluidasNoPrazo = await db('ordem_servico')
+          .where('tenant_id', tenantId)
+          .where('status', 'concluida')
+          .where('data_criacao', '>=', inicioMes)
+          .where('data_criacao', '<=', fimMes)
+          .whereNotNull('data_agendamento')
+          .whereRaw('data_conclusao <= data_agendamento')
+          .count('id as total').first();
+
+        return res.json({
+          success: true,
+          data: {
+            por_status: porStatus,
+            por_tecnico: porTecnico,
+            tempo_medio_horas: parseFloat(tempoMedio?.media_horas || 0).toFixed(1),
+            taxa_conclusao_prazo: totalMes?.total > 0
+              ? Math.round((concluidasNoPrazo?.total / totalMes?.total) * 100)
+              : 0,
+            mes_referencia: nomeMes,
+            mes_atual: mes,
+            ano_atual: ano
+          }
+        });
+      } catch (error) {
+        console.error('❌ Erro ao buscar dashboard:', error);
+        return res.status(500).json({ success: false, error: error.message });
+      }
+    }
+
+    /**
+     * Job de verificação de SLA
+     */
+    async verificarSLAs() {
+      try {
+        const agora = new Date();
+        const em2horas = new Date(agora.getTime() + 2 * 60 * 60 * 1000);
+
+        const ossProximas = await db('ordem_servico as os')
+          .join('usuarios as t', 't.id', 'os.tecnico_id')
+          .whereIn('os.status', ['pendente', 'em_deslocamento'])
+          .whereNotNull('os.data_agendamento')
+          .where('os.data_agendamento', '<=', em2horas)
+          .where('os.data_agendamento', '>', agora)
+          .whereNull('os.sla_notificado_em')
+          .select(
+            'os.id', 'os.numero_os', 'os.cliente_nome',
+            'os.data_agendamento', 'os.admin_responsavel_id',
+            'os.tecnico_id', 't.nome as tecnico_nome'
+          );
+
+        console.log(`⏰ SLA Check: ${ossProximas.length} OS(s) próximas do prazo`);
+
+        for (const os of ossProximas) {
+          try {
+            const minutos = Math.round(
+              (new Date(os.data_agendamento) - agora) / 60000
+            );
+
+            if (os.admin_responsavel_id) {
+              await notificationService.enviarParaUsuario(
+                db, os.admin_responsavel_id,
+                '⚠️ SLA Próximo do Vencimento',
+                `OS #${os.numero_os} - ${os.cliente_nome} vence em ${minutos} minutos (${os.tecnico_nome})`,
+                { route: '/ordens-servico', tipo: 'sla_alerta', referencia_id: String(os.id) }
+              );
+            }
+
+            await notificationService.enviarParaUsuario(
+              db, os.tecnico_id,
+              '⚠️ Prazo de Atendimento',
+              `OS #${os.numero_os} - ${os.cliente_nome} deve ser atendida em ${minutos} minutos`,
+              { route: '/ordens-servico', tipo: 'sla_alerta', referencia_id: String(os.id) }
+            );
+
+            await db('ordem_servico')
+              .where('id', os.id)
+              .update({ sla_notificado_em: agora });
+
+          } catch (e) {
+            console.error(`❌ Erro ao notificar SLA da OS ${os.numero_os}:`, e.message);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erro no job de SLA:', error.message);
+      }
+    }
+
+}
+
 module.exports = new OrdensServicoController();

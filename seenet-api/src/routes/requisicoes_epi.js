@@ -573,10 +573,17 @@ router.get('/requisicoes/minhas', authMiddleware, async (req, res) => {
     let query = db('requisicoes_epi as r').leftJoin('usuarios as g', 'g.id', 'r.gestor_id')
       .where('r.tenant_id', req.user.tenant_id).where('r.tecnico_id', req.user.id)
       .select('r.*', 'g.nome as gestor_nome');
+
     if (ano) query = query.whereRaw('EXTRACT(YEAR FROM r.data_criacao) = ?', [ano]);
     if (mes) query = query.whereRaw('EXTRACT(MONTH FROM r.data_criacao) = ?', [mes]);
+
     const lista = await query.orderBy('r.data_criacao', 'desc');
     res.json({ requisicoes: lista });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar minhas requisições' });
+  }
+});
 
 router.get('/requisicoes/pendentes', authMiddleware, async (req, res) => {
   try {

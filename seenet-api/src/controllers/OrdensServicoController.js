@@ -456,17 +456,15 @@ await db('ordem_servico')
   });
 
     // 4. Buscar mapeamento do técnico IXC
-    let tecnicoIdIxc = null;
-    try {
-      const mapeamentoTecnico = await db('mapeamento_tecnicos_ixc')
-        .where('usuario_id', os.tecnico_id)
-        .where('tenant_id', tenantId)
-        .first();
+    const mapeamentoTecnico = await trx('mapeamento_tecnicos_ixc')
+      .where('usuario_id', os.tecnico_id)
+      .where('tenant_id', os.tenant_id)
+      .first();
 
-      tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
-      console.log(`👤 Técnico IXC ID: ${tecnicoIdIxc || 'não mapeado'}`);
-    } catch (error) {
-      console.error('⚠️ Erro ao buscar mapeamento:', error.message);
+    const tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
+
+    if (!mapeamentoTecnico) {
+      throw new Error('Técnico não mapeado no IXC');
     }
 
     // 3. Processar fotos se houver
@@ -1227,4 +1225,4 @@ if (dados.fotos && dados.fotos.length > 0) {
 
 }
 
-module.exports = new OrdensServicoController();,
+module.exports = new OrdensServicoController();

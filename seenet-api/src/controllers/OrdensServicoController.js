@@ -441,7 +441,7 @@ async finalizarExecucao(req, res) {
 await db('ordem_servico')
   .where('id', id)
   .update({
-    status: 'finalizada',
+    status: 'concluida',
     data_conclusao: new Date(),  // ← CORRETO
     onu_modelo: dados.onu_modelo,
     onu_serial: dados.onu_serial,
@@ -553,7 +553,7 @@ if (ixcService && os.id_externo) {
           await ixcService.adicionarProdutoOS({
             id_oss_chamado:  os.id_externo,
             id_produto:      item.id_produto,
-            descricao:       '',
+            descricao: item.descricao || '',
             qtde_saida:      item.quantidade.toString(),
             data:            dataFormatada,
             id_unidade:      '1',
@@ -714,17 +714,17 @@ async sincronizarFinalizacaoComIXC(trx, os, dados) {
     throw new Error('Integração IXC não configurada');
   }
 
-// Buscar mapeamento do técnico
+// ✅ CORRETO — usa db direto (sem transação)
 const mapeamentoTecnico = await db('mapeamento_tecnicos_ixc')
   .where('usuario_id', os.tecnico_id)
   .where('tenant_id', tenantId)
   .first();
 
-const tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
+if (!mapeamentoTecnico) {
+  console.warn('⚠️ Técnico não mapeado no IXC — finalizando sem sync de técnico');
+}
 
-  if (!mapeamento) {
-    throw new Error('Técnico não mapeado no IXC');
-  }
+const tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
 
   // Montar mensagem completa
   let mensagemResposta = '';

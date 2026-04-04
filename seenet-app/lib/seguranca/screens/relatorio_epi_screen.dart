@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
 
 class RelatorioEpiScreen extends StatefulWidget {
   const RelatorioEpiScreen({super.key});
@@ -67,23 +70,33 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
 
     setState(() => _gerando = true);
     try {
+      final auth = Get.find<AuthService>();
       final response = await http.get(
         Uri.parse('$baseUrl/seguranca/relatorio-epi/$_tecnicoSelecionado'),
-        headers: _headers,
-      );
+        headers: {
+          'Authorization': 'Bearer ${auth.token}',
+          'X-Tenant-Code': auth.tenantCode ?? '',
+        },
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        // PDF recebido em bytes — salvar localmente e abrir
-        final bytes = response.bodyBytes;
-        final base64Pdf = base64Encode(bytes);
+        // Salvar PDF em arquivo temporário
+        final dir = await getTemporaryDirectory();
+        final nomeArquivo = 'EPI_${_tecnicoNome?.replaceAll(' ', '_') ?? 'tecnico'}.pdf';
+        final arquivo = File('${dir.path}/$nomeArquivo');
+        await arquivo.writeAsBytes(response.bodyBytes);
 
-        // Mostrar opções ao usuário
-        if (mounted) _mostrarOpcoesDownload(base64Pdf, bytes.length);
+        if (mounted) {
+          // Compartilhar via share_plus
+          await Share.shareXFiles(
+            [XFile(arquivo.path, mimeType: 'application/pdf')],
+            subject: 'Relatório de EPI — $_tecnicoNome',
+          );
+        }
       } else {
-        final erro = json.decode(response.body);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Erro: ${erro['error'] ?? 'Falha ao gerar PDF'}'),
+            content: Text('Erro ao gerar PDF: ${response.statusCode}'),
             backgroundColor: Colors.red,
           ));
         }
@@ -91,7 +104,7 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erro ao gerar relatório: $e'),
+          content: Text('Erro: $e'),
           backgroundColor: Colors.red,
         ));
       }

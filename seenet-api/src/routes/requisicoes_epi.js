@@ -1170,4 +1170,39 @@ router.get('/relatorio-epi/:tecnico_id', authMiddleware, async (req, res) => {
   }
 });
 
+router.get('/relatorio-epi/:tecnico_id', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const tecnico = await db('usuarios').where('id', req.params.tecnico_id).first();
+    if (!tecnico) return res.status(404).json({ error: 'Técnico não encontrado' });
+
+    const { mes, ano } = req.query;
+    let query = db('requisicoes_epi')
+      .where('tecnico_id', req.params.tecnico_id)
+      .where('tenant_id', req.user.tenant_id)
+      .whereIn('status', ['concluida', 'aprovada', 'aguardando_confirmacao'])
+      .orderBy('data_criacao', 'asc');
+
+    if (ano) query = query.whereRaw('EXTRACT(YEAR FROM data_criacao) = ?', [ano]);
+    if (mes) query = query.whereRaw('EXTRACT(MONTH FROM data_criacao) = ?', [mes]);
+
+    const requisicoes = await query;
+    const produtosEpi = await db('produtos_epi')
+      .where('tenant_id', req.user.tenant_id).where('ativo', true);
+    const tenant = await db('tenants').where('id', req.user.tenant_id).first();
+
+    const pdfBuffer = await gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition',
+      `attachment; filename=EPI_${tecnico.nome.replace(/ /g, '_')}.pdf`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('❌ Erro relatorio EPI:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

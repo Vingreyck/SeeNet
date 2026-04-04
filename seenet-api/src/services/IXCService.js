@@ -272,8 +272,7 @@ async finalizarOS(osId, dados) {
       data_final: this.formatarDataIXC(dataFinal),
       mensagem: dados.mensagem_resposta || 'Finalizado via SeeNet',
       status: 'F',
-
-      // GPS (opcional)
+      setor: '7',  // ✅ AUDITORIAS
       latitude: dados.latitude || '',
       longitude: dados.longitude || '',
       gps_time: (dados.latitude && dados.longitude)

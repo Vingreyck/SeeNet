@@ -464,7 +464,7 @@ await db('ordem_servico')
         if (!mapeamentoTecnico) {
           console.warn('⚠️ Técnico não mapeado no IXC — continuando sem sync de técnico');
         }
-    
+
         const tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
 
     // 3. Processar fotos se houver

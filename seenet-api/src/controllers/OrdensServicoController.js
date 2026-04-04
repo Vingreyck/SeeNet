@@ -892,33 +892,37 @@ if (dados.fotos && dados.fotos.length > 0) {
   /**
      * Técnico envia localização ao vivo (a cada 10s durante deslocamento)
      * PUT /api/ordens-servico/:id/location
-     */
-    async atualizarLocalizacao(req, res) {
-      try {
-        const { id } = req.params;
-        const { latitude, longitude, velocidade, precisao } = req.body;
-        const userId = req.user.id;
-        const tenantId = req.tenantId;
+     */async atualizarLocalizacao(req, res) {
+         try {
+           const { id } = req.params;
+           const { latitude, longitude, velocidade, precisao } = req.body;
+           const userId = req.user.id;
+           const tenantId = req.tenantId;
 
-        if (!latitude || !longitude) {
-          return res.status(400).json({ success: false, error: 'Coordenadas obrigatórias' });
-        }
+           // ✅ FIX: rejeitar id inválido antes de ir ao banco
+           const osId = parseInt(id);
+           if (!osId || isNaN(osId)) {
+             return res.status(400).json({ success: false, error: 'ID da OS inválido' });
+           }
 
-        // Upsert: insere ou atualiza posição
-        await db.raw(`
-          INSERT INTO localizacao_tecnico (tenant_id, tecnico_id, ordem_servico_id, latitude, longitude, velocidade, precisao, atualizado_em)
-          VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-          ON CONFLICT (tecnico_id, ordem_servico_id)
-          DO UPDATE SET latitude = ?, longitude = ?, velocidade = ?, precisao = ?, atualizado_em = NOW()
-        `, [tenantId, userId, id, latitude, longitude, velocidade || null, precisao || null,
-            latitude, longitude, velocidade || null, precisao || null]);
+           if (!latitude || !longitude) {
+             return res.status(400).json({ success: false, error: 'Coordenadas obrigatórias' });
+           }
 
-        return res.json({ success: true });
-      } catch (error) {
-        console.error('❌ Erro ao atualizar localização:', error.message);
-        return res.status(500).json({ success: false, error: 'Erro ao atualizar localização' });
-      }
-    }
+           await db.raw(`
+             INSERT INTO localizacao_tecnico (tenant_id, tecnico_id, ordem_servico_id, latitude, longitude, velocidade, precisao, atualizado_em)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+             ON CONFLICT (tecnico_id, ordem_servico_id)
+             DO UPDATE SET latitude = ?, longitude = ?, velocidade = ?, precisao = ?, atualizado_em = NOW()
+           `, [tenantId, userId, osId, latitude, longitude, velocidade || null, precisao || null,
+               latitude, longitude, velocidade || null, precisao || null]);
+
+           return res.json({ success: true });
+         } catch (error) {
+           console.error('❌ Erro ao atualizar localização:', error.message);
+           return res.status(500).json({ success: false, error: 'Erro ao atualizar localização' });
+         }
+       }
 
     /**
      * Admin consulta localização do técnico em uma OS

@@ -271,6 +271,7 @@ async sincronizarEmpresa(integracao) {
               data_abertura: dadosOS.data_abertura,
               data_agendamento: dadosOS.data_agendamento,
               dados_ixc: dadosOS.dados_ixc,
+              id_contrato_ixc: dadosOS.id_contrato_ixc, // ✅ NOVO
               data_atualizacao: db.fn.now()
             });
         }

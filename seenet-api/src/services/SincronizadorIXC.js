@@ -253,7 +253,8 @@ async sincronizarEmpresa(integracao) {
         data_agendamento: this.parseDataIXC(osIXC.data_agenda),
         data_inicio: this.parseDataIXC(osIXC.data_inicio),
         data_conclusao: this.parseDataIXC(osIXC.data_final),
-        dados_ixc: JSON.stringify(osIXC)
+        dados_ixc: JSON.stringify(osIXC),
+        id_contrato_ixc: osIXC.id_contrato_kit?.toString() || osIXC.id_contrato?.toString() || '' // ✅ NOVO
       };
 
       if (osExistente) {

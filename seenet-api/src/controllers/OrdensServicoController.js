@@ -546,6 +546,18 @@ if (ixcService && os.id_externo) {
       const hoje = new Date();
       const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
 
+    // ✅ Buscar id_contrato no IXC (necessário para comodato)
+    let idContratoIxc = os.id_contrato_ixc || '';
+    if (!idContratoIxc && ixcService && os.id_externo) {
+      try {
+        const osIxc = await ixcService.buscarDetalhesOS(os.id_externo);
+        idContratoIxc = osIxc?.id_contrato_kit || osIxc?.id_contrato || '';
+        console.log(`📋 id_contrato IXC: ${idContratoIxc}`);
+      } catch (e) {
+        console.warn('⚠️ Não foi possível buscar id_contrato do IXC:', e.message);
+      }
+    }
+
       for (const item of dados.itens_estoque) {
         const ehPatrimonio = !!(item.id_patrimonio && item.id_patrimonio !== '' && item.id_patrimonio !== '0');
 
@@ -554,7 +566,7 @@ if (ixcService && os.id_externo) {
             // ✅ Patrimônio → endpoint de COMODATO
             await ixcService.adicionarComodatoOS({
               id_oss_chamado:              os.id_externo,
-              id_contrato:                 os.cliente_contrato_id || '',
+              id_contrato: idContratoIxc,
               id_login:                    '',
               id_patrimonio:               String(item.id_patrimonio),
               id_produto:                  item.id_produto,

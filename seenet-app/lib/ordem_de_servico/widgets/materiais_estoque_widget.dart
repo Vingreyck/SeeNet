@@ -203,6 +203,10 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
     );
   }
 
+  bool _isDrop(String descricao) {
+    return descricao.toUpperCase().contains('DROP');
+  }
+
   Widget _buildErroWidget() {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -318,21 +322,50 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                         ),
                         child: const Text('1', style: TextStyle(color: Colors.white70, fontSize: 16)),
                       )
+                          : _isDrop(item.produto.descricao)
+                          ? SizedBox(
+                        width: 90,
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white, fontSize: 16),
+                          decoration: InputDecoration(
+                            hintText: 'metros',
+                            hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
+                            suffixText: 'm',
+                            suffixStyle: const TextStyle(color: Colors.white54),
+                            filled: true,
+                            fillColor: const Color(0xFF232323),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFF00FF88)),
+                            ),
+                          ),
+                          onChanged: (value) {
+                            final metros = double.tryParse(value) ?? 1;
+                            setState(() {
+                              _itensAdicionados[index].quantidade = metros > 0 ? metros : 1;
+                            });
+                            widget.onItensAlterados(List.from(_itensAdicionados));
+                          },
+                        ),
+                      )
                           : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           GestureDetector(
                             onTap: () {
                               if (_itensAdicionados[index].quantidade > 1) {
-                                setState(() {
-                                  _itensAdicionados[index].quantidade--;
-                                });
+                                setState(() { _itensAdicionados[index].quantidade--; });
                                 widget.onItensAlterados(List.from(_itensAdicionados));
                               }
                             },
                             child: Container(
-                              width: 32,
-                              height: 32,
+                              width: 32, height: 32,
                               decoration: BoxDecoration(
                                 color: const Color(0xFF00FF88).withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(8),
@@ -350,14 +383,11 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                           ),
                           GestureDetector(
                             onTap: () {
-                              setState(() {
-                                _itensAdicionados[index].quantidade++;
-                              });
+                              setState(() { _itensAdicionados[index].quantidade++; });
                               widget.onItensAlterados(List.from(_itensAdicionados));
                             },
                             child: Container(
-                              width: 32,
-                              height: 32,
+                              width: 32, height: 32,
                               decoration: BoxDecoration(
                                 color: const Color(0xFF00FF88).withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(8),
@@ -548,8 +578,7 @@ class _BuscaProdutoSheetState extends State<_BuscaProdutoSheet> {
       } else {
         final busca = texto.toLowerCase();
         _filtrados = widget.produtos.where((p) =>
-        p.descricao.toLowerCase().contains(busca) ||
-            p.id.contains(busca)
+            p.descricao.toLowerCase().contains(busca)
         ).toList();
       }
     });
@@ -608,7 +637,7 @@ class _BuscaProdutoSheetState extends State<_BuscaProdutoSheet> {
                 onChanged: _filtrar,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Buscar por nome ou código...',
+                  hintText: 'Buscar por nome...',
                   hintStyle: const TextStyle(color: Colors.white30),
                   prefixIcon: const Icon(Icons.search, color: Colors.white38),
                   suffixIcon: _buscaController.text.isNotEmpty
@@ -716,7 +745,6 @@ class _BuscaPatrimonioSheet extends StatefulWidget {
 class _BuscaPatrimonioSheetState extends State<_BuscaPatrimonioSheet> {
   final TextEditingController _buscaController = TextEditingController();
   List<PatrimonioEstoque> _filtrados = [];
-  String _tipoBusca = 'serial'; // serial, mac, patrimonial
 
   @override
   void initState() {
@@ -730,20 +758,9 @@ class _BuscaPatrimonioSheetState extends State<_BuscaPatrimonioSheet> {
         _filtrados = widget.patrimonios;
       } else {
         final busca = texto.toLowerCase();
-        _filtrados = widget.patrimonios.where((p) {
-          switch (_tipoBusca) {
-            case 'serial':
-              return p.serial.toLowerCase().contains(busca);
-            case 'mac':
-              return p.mac.toLowerCase().contains(busca);
-            case 'patrimonial':
-              return p.id.contains(busca);
-            default:
-              return p.serial.toLowerCase().contains(busca) ||
-                  p.mac.toLowerCase().contains(busca) ||
-                  p.descricao.toLowerCase().contains(busca);
-          }
-        }).toList();
+        _filtrados = widget.patrimonios.where((p) =>
+            p.descricao.toLowerCase().contains(busca)
+        ).toList();
       }
     });
   }
@@ -805,22 +822,6 @@ class _BuscaPatrimonioSheetState extends State<_BuscaPatrimonioSheet> {
               ),
             ),
 
-            // Tabs de tipo de busca (como no InMap)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  _buildTipoBuscaChip('Núm. patrimonial', 'patrimonial'),
-                  const SizedBox(width: 8),
-                  _buildTipoBuscaChip('Núm. de série', 'serial'),
-                  const SizedBox(width: 8),
-                  _buildTipoBuscaChip('MAC', 'mac'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
             // Campo de busca
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -829,9 +830,7 @@ class _BuscaPatrimonioSheetState extends State<_BuscaPatrimonioSheet> {
                 onChanged: _filtrar,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: _tipoBusca == 'serial' ? 'Buscar por número de série...'
-                      : _tipoBusca == 'mac' ? 'Buscar por endereço MAC...'
-                      : 'Buscar por número patrimonial...',
+                  hintText: 'Buscar por nome do equipamento...',
                   hintStyle: const TextStyle(color: Colors.white30),
                   prefixIcon: const Icon(Icons.search, color: Colors.white38),
                   filled: true,
@@ -918,35 +917,4 @@ class _BuscaPatrimonioSheetState extends State<_BuscaPatrimonioSheet> {
     );
   }
 
-  Widget _buildTipoBuscaChip(String label, String tipo) {
-    final selecionado = _tipoBusca == tipo;
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _tipoBusca = tipo;
-            _filtrar(_buscaController.text);
-          });
-        },
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: selecionado ? Colors.orange : const Color(0xFF232323),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: selecionado ? Colors.orange : Colors.white24),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selecionado ? Colors.white : Colors.white54,
-              fontWeight: selecionado ? FontWeight.bold : FontWeight.normal,
-              fontSize: 12,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

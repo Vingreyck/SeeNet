@@ -951,6 +951,23 @@ async uploadFotoOS(osId, clienteId, fotoData) {
         return null;
       }
     }
+    async adicionarComodatoOS(dados) {
+      try {
+        console.log(`📦 Adicionando comodato à OS ${dados.id_oss_chamado} no IXC...`);
+
+        const response = await this.clientAlterar.post('/su_oss_mov_comodato_wiz', dados);
+
+        if (response.data?.type === 'error') {
+          throw new Error(response.data.message || 'Erro ao adicionar comodato');
+        }
+
+        console.log(`✅ Comodato adicionado com sucesso`);
+        return response.data;
+      } catch (error) {
+        console.error('❌ Erro ao adicionar comodato à OS no IXC:', error.message);
+        throw error;
+      }
+    }
 }
 
 

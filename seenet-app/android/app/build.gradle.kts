@@ -28,6 +28,7 @@ android {
 
     kotlinOptions {
         jvmTarget = "1.8"
+        freeCompilerArgs += listOf("-Xskip-metadata-version-check")  // ← adicione
     }
 
     packaging {
@@ -44,12 +45,12 @@ android {
         applicationId = "com.seenet.diagnostico"
         minSdk = flutter.minSdkVersion
         targetSdk = 35
-        versionCode = 29
+        versionCode = 32
         versionName = "1.2"
         multiDexEnabled = true
 
         ndk {
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
         }
     }
 
@@ -85,6 +86,7 @@ flutter {
 }
 
 dependencies {
+
     implementation("androidx.multidex:multidex:2.0.1")
     implementation("com.google.android.play:integrity:1.5.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")

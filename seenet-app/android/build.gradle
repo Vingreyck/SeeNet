@@ -19,15 +19,8 @@ allprojects {
     }
 }
 
-// ✅ FORÇAR versão do Kotlin stdlib em TODAS as dependências
 subprojects {
-    configurations.all {
-        resolutionStrategy {
-            force "org.jetbrains.kotlin:kotlin-stdlib:2.1.21"
-            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.21"
-            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.21"
-        }
-    }
+    project.evaluationDependsOn(":app")
 }
 
 rootProject.buildDir = "../build"

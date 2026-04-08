@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:seenet/seguranca/screens/confirmar_recebimento_screen.dart';
 import 'package:seenet/seguranca/screens/registro_manual_epi_screen.dart';
 import 'package:seenet/login/widgets/login.binding.dart';
-import 'services/tracking_service.dart';
 import 'admin/dashboard_admin.view.dart';
 import 'ordem_de_servico/screens/acompanhamento_screen.dart';
 import 'package:seenet/registro/registro.view.dart';
@@ -21,26 +20,13 @@ import 'controllers/transcricao_controller.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'seguranca/screens/relatorio_epi_screen.dart';
-import 'package:firebase_core/firebase_core.dart'; // ✅ NOVO
 import 'package:seenet/login/login.view.dart';
 import 'package:seenet/checklist/checklist.view.dart';
-import 'services/avaliacao_service.dart';
-import 'services/categoria_service.dart';
-import 'services/connectivity_service.dart';
-import 'services/sync_manager.dart';
 import 'package:seenet/admin/logs_admin.view.dart';
 import 'package:seenet/diagnostico/diagnostico.view.dart';
 import 'package:seenet/registro/widgets/registro.bindings.dart';
-import 'services/api_service.dart';
-import 'services/auth_service.dart';
-import 'services/notification_service.dart'; // ✅ NOVO
-import 'package:seenet/config/environment.dart';
 import 'controllers/usuario_controller.dart';
 import 'admin/categorias_admin.view.dart';
-import 'controllers/checkmark_controller.dart';
-import 'controllers/diagnostico_controller.dart';
-import 'package:seenet/seguranca/services/seguranca_service.dart';
-import 'package:seenet/seguranca/controllers/seguranca_controller.dart';
 import 'package:seenet/seguranca/screens/seguranca_home_screen.dart';
 import 'package:seenet/seguranca/screens/requisicao_epi_screen.dart';
 import 'package:seenet/seguranca/screens/minhas_requisicoes_screen.dart';
@@ -53,9 +39,6 @@ void main() async {
 
   // ✅ INICIALIZAR GETSTORAGE
   await GetStorage.init();
-
-  // ✅ INICIALIZAR FIREBASE
-  await Firebase.initializeApp();
 
   // ✅ CONFIGURAR TELA CHEIA (Edge-to-edge)
   SystemChrome.setEnabledSystemUIMode(
@@ -72,37 +55,7 @@ void main() async {
     ),
   );
 
-  await Environment.load();
-
-  Environment.printConfiguration();
-  Environment.validateRequiredKeys();
-
-  if (Environment.isProduction && !Environment.isConfigured) {
-    throw Exception('⚠️ Configuração incompleta para produção');
-  }
-
-  // ✅ Inicializar controllers/services
-  Get.put(ApiService(), permanent: true);
-  Get.put(AvaliacaoService(), permanent: true);
-  Get.put(CategoriaService(), permanent: true);
-  Get.put(AuthService(), permanent: true);
   Get.put(UsuarioController(), permanent: true);
-  Get.put(CheckmarkController(), permanent: true);
-  Get.lazyPut<DiagnosticoController>(() => DiagnosticoController(), fenix: true);
-  Get.put(TranscricaoController(), permanent: true);
-  Get.put(SegurancaService(), permanent: true);
-  Get.put(SegurancaController(), permanent: true);
-  Get.put(TrackingService(), permanent: true);
-  Get.put(SyncManager(), permanent: true);
-  Get.put(ConnectivityService(), permanent: true);
-
-
-  // ✅ NOVO: Inicializar NotificationService
-  final notificationService = Get.put(NotificationService(), permanent: true);
-  await notificationService.init();
-  notificationService.listenTokenRefresh();
-
-  print('✅ App inicializado - Modo 100% API + Firebase');
 
   runApp(const MyApp());
 }

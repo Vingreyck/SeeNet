@@ -21,6 +21,8 @@ class RegistroController extends GetxController {
   RxBool tokenValido = false.obs;
   RxBool verificandoToken = false.obs;
   RxBool registroSucesso = false.obs;
+  final RxInt almoxarifadoSelecionado = 0.obs;
+  final RxString almoxarifadoNome = ''.obs;
   Rx<Map<String, dynamic>?> empresaInfo = Rx<Map<String, dynamic>?>(null);
 
   // ========== DEPENDÊNCIAS ==========
@@ -101,6 +103,8 @@ class RegistroController extends GetxController {
         nomeInput.text.trim(),
         senhaInput.text,
         tokenEmpresaController.text.trim().toUpperCase(),
+        idAlmoxarifado: almoxarifadoSelecionado.value,
+        almoxarifadoNome: almoxarifadoNome.value,
       );
 
       if (sucesso) {
@@ -169,16 +173,21 @@ class RegistroController extends GetxController {
       return false;
     }
 
+    if (almoxarifadoSelecionado.value == 0) {
+      _showError('Selecione sua cidade/loja');
+      return false;
+    }
     return true;
   }
 
   bool get podeRegistrar {
     return nome.value.trim().length >= 2 &&
         senha.value.length >= 6 &&
-        confirmarSenha.value.isNotEmpty && // ← NOVO
-        senha.value == confirmarSenha.value && // ← NOVO
+        confirmarSenha.value.isNotEmpty &&
+        senha.value == confirmarSenha.value &&
         tokenEmpresa.value.length >= 4 &&
         tokenValido.value &&
+        almoxarifadoSelecionado.value != 0 && // ✅ NOVO
         !isLoading.value;
   }
 
@@ -196,6 +205,8 @@ class RegistroController extends GetxController {
     empresaInfo.value = null;
     tokenValido.value = false;
     registroSucesso.value = false;
+    almoxarifadoSelecionado.value = 0;
+    almoxarifadoNome.value = '';
   }
 
   void irParaLogin() => Get.offAllNamed('/login');

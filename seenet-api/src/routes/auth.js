@@ -127,7 +127,7 @@ router.post('/register', [
       tenant_id: tenant.id,
       tipo_usuario: 'tecnico',
       ativo: true,
-    };
+    }
 
     console.log('📝 Objeto para inserir:', {
       ...novoUsuario,
@@ -140,8 +140,73 @@ router.post('/register', [
       .returning('id');
 
     const userId = result.id;
-
     console.log('✅ Usuário criado com ID:', userId);
+
+    // ✅ Mapear almoxarifado escolhido pelo técnico no registro
+    const { id_almoxarifado, almoxarifado_nome } = req.body;
+    if (id_almoxarifado) {
+      try {
+        const integracao = await db('integracao_ixc')
+          .where({ tenant_id: tenant.id, ativo: true })
+          .first();
+
+        let tecnicoIxcId = null;
+        let tecnicoIxcNome = nome;
+
+        if (integracao) {
+          const axios = require('axios');
+          const removerAcentos = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+          try {
+            const resp = await axios.get(`${integracao.url_api}/funcionarios`, {
+              headers: {
+                'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+                'Content-Type': 'application/json',
+                'ixcsoft': 'listar'
+              },
+              data: {
+                qtype: 'funcionarios.id', query: '1', oper: '>=',
+                page: '1', rp: '1000', sortname: 'funcionarios.id', sortorder: 'desc'
+              },
+              timeout: 10000
+            });
+
+            const funcionarios = resp.data.registros || [];
+            const nomeNormalizado = removerAcentos(nome).toLowerCase().trim();
+            const match = funcionarios.find(f => {
+              if (!f.funcionario) return false;
+              return removerAcentos(f.funcionario).toLowerCase().trim() === nomeNormalizado;
+            });
+
+            if (match) {
+              tecnicoIxcId = match.id;
+              tecnicoIxcNome = match.funcionario;
+              console.log(`✅ Auto-mapeamento IXC no registro: ${nome} → IXC ID ${match.id}`);
+            } else {
+              console.log(`⚠️ Nenhum match IXC para "${nome}" — mapeamento manual necessário`);
+            }
+          } catch (ixcErr) {
+            console.warn('⚠️ Erro ao buscar funcionários IXC:', ixcErr.message);
+          }
+        }
+
+        await db('mapeamento_tecnicos_ixc').insert({
+          usuario_id: userId,
+          tecnico_ixc_id: tecnicoIxcId,
+          tecnico_ixc_nome: tecnicoIxcNome,
+          tecnico_seenet_id: userId,
+          tenant_id: tenant.id,
+          id_almoxarifado: parseInt(id_almoxarifado),
+          almoxarifado_nome: almoxarifado_nome || '',
+          ativo: true,
+        });
+
+        console.log(`✅ Mapeamento criado: ${nome} → almox ${id_almoxarifado} (${almoxarifado_nome})`);
+      } catch (mapErr) {
+        console.warn('⚠️ Erro ao criar mapeamento no registro:', mapErr.message);
+        // Não bloqueia o registro
+      }
+    }
 
     // Log de auditoria
     await auditService.log({

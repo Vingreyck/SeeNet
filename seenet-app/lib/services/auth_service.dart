@@ -103,7 +103,14 @@ class AuthService extends GetxService {
   }
 
   // ========== REGISTRO ==========
-  Future<bool> register(String nome, String senha, String codigoEmpresa) async {
+  // ========== REGISTRO ==========
+  Future<bool> register(
+      String nome,
+      String senha,
+      String codigoEmpresa, {
+        int idAlmoxarifado = 0,
+        String almoxarifadoNome = '',
+      }) async {
     try {
       _usuarioController.isLoading.value = true;
 
@@ -111,6 +118,8 @@ class AuthService extends GetxService {
         'nome': nome,
         'senha': senha,
         'codigoEmpresa': codigoEmpresa.toUpperCase(),
+        if (idAlmoxarifado != 0) 'id_almoxarifado': idAlmoxarifado,
+        if (almoxarifadoNome.isNotEmpty) 'almoxarifado_nome': almoxarifadoNome,
       }, requireAuth: false);
 
       if (response['success']) {

@@ -15,6 +15,21 @@ class RegistrarView extends GetView<RegistroController> {
   late final RxBool _obscurePassword;
   late final RxBool _obscureConfirmPassword;
 
+  static const List<Map<String, dynamic>> _almoxarifados = [
+    {'id': 108, 'nome': 'ITABAIANA'},
+    {'id': 91,  'nome': 'CAPELA'},
+    {'id': 71,  'nome': 'CAMPO DO BRITO'},
+    {'id': 69,  'nome': 'MACAMBIRA'},
+    {'id': 68,  'nome': 'AREIA BRANCA'},
+    {'id': 22,  'nome': 'MOITA BONITA'},
+    {'id': 17,  'nome': 'SÃO DOMINGOS'},
+    {'id': 16,  'nome': 'RIBEIRÓPOLIS'},
+    {'id': 14,  'nome': 'N. SRA. DA GLÓRIA'},
+    {'id': 13,  'nome': 'FREI PAULO'},
+    {'id': 9,   'nome': 'N. SRA. DE APARECIDA'},
+    {'id': 8,   'nome': 'FEIRA NOVA'},
+  ];
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -147,9 +162,9 @@ class RegistrarView extends GetView<RegistroController> {
                               const SizedBox(height: 20),
 
                               _buildTokenField(),
-
                               const SizedBox(height: 20),
-
+                              _buildCidadeField(),   // ✅ NOVO
+                              const SizedBox(height: 20),
                               _buildTokenStatus(),
 
                               const SizedBox(height: 30),
@@ -572,6 +587,61 @@ class RegistrarView extends GetView<RegistroController> {
         ),
       );
     });
+  }
+
+  Widget _buildCidadeField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 8),
+          child: Row(
+            children: [
+              Icon(Icons.store, color: Color(0xFF00FF99), size: 16),
+              SizedBox(width: 6),
+              Text('Sua Cidade/Loja', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+              Text(' *', style: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+        Obx(() => DropdownButtonFormField<int>(
+          value: controller.almoxarifadoSelecionado.value == 0
+              ? null
+              : controller.almoxarifadoSelecionado.value,
+          dropdownColor: const Color(0xFF1F2937),
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+          icon: Icon(Icons.keyboard_arrow_down, color: Colors.white.withOpacity(0.7)),
+          decoration: InputDecoration(
+            hintText: 'Selecione sua cidade',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 16),
+            prefixIcon: Icon(Icons.location_city, color: Colors.white.withOpacity(0.7), size: 24),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.1),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.3), width: 1.5),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF00FF99), width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          ),
+          items: _almoxarifados.map((a) => DropdownMenuItem<int>(
+            value: a['id'] as int,
+            child: Text(a['nome'] as String, style: const TextStyle(color: Colors.white)),
+          )).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              controller.almoxarifadoSelecionado.value = val;
+              controller.almoxarifadoNome.value =
+              _almoxarifados.firstWhere((a) => a['id'] == val)['nome'] as String;
+            }
+          },
+        )),
+      ],
+    );
   }
 
   String _getButtonText() {

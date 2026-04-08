@@ -101,12 +101,18 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
   Future<bool> registrarComAutoLogin(
       String nome,
       String senha,
-      String codigoEmpresa,
-      ) async {
+      String codigoEmpresa, {
+        int idAlmoxarifado = 0,
+        String almoxarifadoNome = '',
+      }) async {
     try {
       isLoading.value = true;
 
-      bool registroSucesso = await _authService.register(nome, senha, codigoEmpresa);
+      bool registroSucesso = await _authService.register(
+        nome, senha, codigoEmpresa,
+        idAlmoxarifado: idAlmoxarifado,
+        almoxarifadoNome: almoxarifadoNome,
+      );
 
       if (!registroSucesso) {
         print('❌ Falha no registro');

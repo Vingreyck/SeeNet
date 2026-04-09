@@ -74,10 +74,11 @@ class ApiService extends GetxService {
   
   // GET
   Future<dynamic> get(
-    String endpoint, {
-    Map<String, String>? queryParams,
-    bool requireAuth = true,
-  }) async {
+      String endpoint, {
+        Map<String, String>? queryParams,
+        bool requireAuth = true,
+        Duration? timeout,
+      }) async {
     try {
       String url = ApiConfig.getUrl(ApiConfig.endpoints[endpoint] ?? endpoint);
       
@@ -94,7 +95,7 @@ class ApiService extends GetxService {
             Uri.parse(url),
             headers: _getHeaders(requireAuth: requireAuth),
           )
-          .timeout(ApiConfig.requestTimeout);
+          .timeout(timeout ?? ApiConfig.requestTimeout);
       
       return _handleResponse(response);
     } catch (e) {

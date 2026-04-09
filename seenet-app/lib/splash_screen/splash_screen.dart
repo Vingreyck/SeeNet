@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../config/environment.dart';
+import 'dart:async';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/avaliacao_service.dart';
@@ -58,7 +59,20 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initializeApp() async {
     try {
-      // ✅ Firebase + Environment em paralelo (antes rodavam um após o outro)
+      await Future.any([
+        _doInit(),
+        Future.delayed(const Duration(seconds: 12), () {
+          throw TimeoutException('Inicialização demorou demais');
+        }),
+      ]);
+    } catch (e) {
+      print('❌ Timeout/erro na inicialização: $e');
+      Get.offAllNamed('/login');
+    }
+  }
+
+  Future<void> _doInit() async {
+    try {
       await Future.wait([
         Firebase.initializeApp(),
         Environment.load(),
@@ -70,7 +84,6 @@ class _SplashScreenState extends State<SplashScreen>
         throw Exception('⚠️ Configuração incompleta para produção');
       }
 
-      // ✅ Get.put() — síncrono, rápido
       Get.put(ApiService(), permanent: true);
       Get.put(AvaliacaoService(), permanent: true);
       Get.put(CategoriaService(), permanent: true);
@@ -84,7 +97,6 @@ class _SplashScreenState extends State<SplashScreen>
       Get.put(SyncManager(), permanent: true);
       Get.put(ConnectivityService(), permanent: true);
 
-      // ✅ NotificationService dispara sem await — não bloqueia a navegação
       final notificationService = Get.put(NotificationService(), permanent: true);
       notificationService.init().then((_) {
         notificationService.listenTokenRefresh();

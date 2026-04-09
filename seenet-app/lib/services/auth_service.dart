@@ -273,10 +273,9 @@ class AuthService extends GetxService {
 
   Future<bool> verifyToken() async {
     try {
-      final response = await _api.get('/auth/verify')
-          .timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => {'success': false},
+      final response = await _api.get(
+        '/auth/verify',
+        timeout: const Duration(seconds: 5),
       );
       return response['success'] == true;
     } catch (e) {

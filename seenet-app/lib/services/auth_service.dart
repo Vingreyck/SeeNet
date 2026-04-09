@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'api_service.dart';
 import 'notification_service.dart'; // ✅ NOVO
+import 'dart:convert';
 import '../controllers/usuario_controller.dart';
 import '../models/usuario.dart';
 import '../login/loginview.controller.dart';
@@ -167,6 +168,28 @@ class AuthService extends GetxService {
         return false;
       }
 
+      // ✅ Verificar se o token JWT ainda é válido localmente (sem rede)
+      try {
+        final jwt = savedToken.split('.');
+        if (jwt.length == 3) {
+          final payload = String.fromCharCodes(
+              base64Url.decode(base64Url.normalize(jwt[1]))
+          );
+          final data = jsonDecode(payload);
+          final exp = data['exp'] as int?;
+          if (exp != null) {
+            final expiry = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+            if (DateTime.now().isAfter(expiry)) {
+              print('⚠️ Token JWT expirado localmente — indo para login');
+              await _clearPersistedSession();
+              return false;
+            }
+          }
+        }
+      } catch (_) {
+        // se falhar a verificação local, continua para verificação remota
+      }
+
       print('🔄 Tentando auto-login...');
       _api.setAuth(savedToken, savedTenantCode);
 
@@ -250,9 +273,14 @@ class AuthService extends GetxService {
 
   Future<bool> verifyToken() async {
     try {
-      final response = await _api.get('/auth/verify');
+      final response = await _api.get('/auth/verify')
+          .timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => {'success': false},
+      );
       return response['success'] == true;
     } catch (e) {
+      print('⚠️ verifyToken falhou: $e');
       return false;
     }
   }

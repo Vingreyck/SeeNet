@@ -140,14 +140,6 @@ async sincronizarEmpresa(integracao) {
         }
 
 
-async sincronizarOS(trx, tenantId, tecnicoId, osIXC, ixcService) {
-  try {
-    // ✅ Guard: verificar que osIXC tem os campos mínimos
-    if (!osIXC || !osIXC.id) {
-      console.log('   ⚠️ OS do IXC sem dados, pulando');
-      return;
-    }
-
         // 4. Marcar OSs que não existem mais no IXC como canceladas
         // (apenas as que ainda estão pendentes ou em execução no SeeNet)
         const ossCanceladas = await trx('ordem_servico')
@@ -188,9 +180,15 @@ async sincronizarOS(trx, tenantId, tecnicoId, osIXC, ixcService) {
 }
 
   async sincronizarOS(trx, tenantId, tecnicoId, osIXC, ixcService) {
-    try {
-      // Verificar se a OS já existe no banco
-      const osExistente = await trx('ordem_servico')
+      try {
+        // ✅ Guard
+        if (!osIXC || !osIXC.id) {
+          console.log('   ⚠️ OS do IXC sem dados, pulando');
+          return;
+        }
+  
+        // Verificar se a OS já existe no banco
+        const osExistente = await trx('ordem_servico')
         .where('tenant_id', tenantId)
         .where('id_externo', osIXC.id.toString())
         .first();

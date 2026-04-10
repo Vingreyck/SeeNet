@@ -257,24 +257,21 @@ async sincronizarEmpresa(integracao) {
         id_contrato_ixc: osIXC.id_contrato_kit?.toString() || osIXC.id_contrato?.toString() || '' // ✅ NOVO
       };
 
-      if (osExistente) {
-        // Só atualiza se a OS local não estiver concluída ou em execução
-        // (não sobrescrever status local mais avançado)
-        if (osExistente.status !== 'concluida' && osExistente.status !== 'em_execucao') {
-          await trx('ordem_servico')
-            .where('id', osExistente.id)
-            .update({
-              tecnico_id: tecnicoId,
-              status: dadosOS.status,
-              prioridade: dadosOS.prioridade,
-              observacoes: dadosOS.observacoes,
-              data_abertura: dadosOS.data_abertura,
-              data_agendamento: dadosOS.data_agendamento,
-              dados_ixc: dadosOS.dados_ixc,
-              id_contrato_ixc: dadosOS.id_contrato_ixc, // ✅ NOVO
-              data_atualizacao: db.fn.now()
-            });
-        }
+      if (osExistente.status !== 'concluida' && osExistente.status !== 'em_execucao') {
+        await trx('ordem_servico')
+          .where('id', osExistente.id)
+          .update({
+            tecnico_id: tecnicoId,
+            status: dadosOS.status,
+            tipo_servico: dadosOS.tipo_servico,   // ← ADICIONAR
+            prioridade: dadosOS.prioridade,
+            observacoes: dadosOS.observacoes,
+            data_abertura: dadosOS.data_abertura,
+            data_agendamento: dadosOS.data_agendamento,
+            dados_ixc: dadosOS.dados_ixc,
+            id_contrato_ixc: dadosOS.id_contrato_ixc,
+            data_atualizacao: db.fn.now()
+          });
       } else {
               // Inserir nova OS
               await trx('ordem_servico').insert(dadosOS);
@@ -293,21 +290,25 @@ async sincronizarEmpresa(integracao) {
   }
 
 async _resolverNomeAssunto(idAssunto, ixcService) {
-  if (!idAssunto) return null;
+  if (!idAssunto) {
+    console.log('   ⚠️ id_assunto vazio/nulo');
+    return null;
+  }
   const idStr = idAssunto.toString();
 
-  // Verificar cache primeiro
   if (this.cacheAssuntos.has(idStr)) {
     return this.cacheAssuntos.get(idStr);
   }
 
   try {
     const nomeAssunto = await ixcService.buscarAssunto(idStr);
+    console.log(`   📌 Assunto ${idStr} → "${nomeAssunto}"`);
     if (nomeAssunto) {
       this.cacheAssuntos.set(idStr, nomeAssunto);
     }
     return nomeAssunto;
   } catch (e) {
+    console.error(`   ❌ Erro ao buscar assunto ${idStr}:`, e.message);
     return null;
   }
 }

@@ -84,7 +84,7 @@ class OSCardWidget extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        os.tipoServico, // ✅ nome do assunto do IXC
+                        os.tipoServico.toUpperCase(), // ✅ nome do assunto do IXC
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -147,7 +147,7 @@ class OSCardWidget extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    os.tipoServico,
+                    os.tipoServico.toUpperCase(),
                     style: const TextStyle(
                       color: Color(0xFF00FF88),
                       fontSize: 12,

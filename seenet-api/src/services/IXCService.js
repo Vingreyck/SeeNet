@@ -933,6 +933,7 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       } catch (_) { return 0; }
     }
 
+
     async buscarAssunto(assuntoId) {
       try {
         const body = {

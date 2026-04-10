@@ -936,16 +936,17 @@ async uploadFotoOS(osId, clienteId, fotoData) {
 
     async buscarAssunto(assuntoId) {
       try {
-        const body = {
-          qtype: 'su_oss_chamado_assunto.id',
+        const params = new URLSearchParams({
+          qtype: 'su_oss_assunto.id',
           query: assuntoId.toString(),
           oper: '=',
           page: '1',
           rp: '1'
-        };
-        const response = await this.clientAlterar.post('/su_oss_chamado_assunto', body, {
-          headers: { 'ixcsoft': 'listar' }
         });
+        const response = await this.clientListar.post('/su_oss_assunto', params.toString());
+
+        console.log(`   🔎 Resposta assunto ${assuntoId}:`, JSON.stringify(response.data.registros?.[0]?.assunto));
+
         return response.data.registros?.[0]?.assunto || null;
       } catch (error) {
         console.error(`❌ Erro ao buscar assunto ${assuntoId}:`, error.message);

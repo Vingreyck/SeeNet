@@ -139,6 +139,15 @@ async sincronizarEmpresa(integracao) {
           totalOSsSincronizadas++;
         }
 
+
+async sincronizarOS(trx, tenantId, tecnicoId, osIXC, ixcService) {
+  try {
+    // ✅ Guard: verificar que osIXC tem os campos mínimos
+    if (!osIXC || !osIXC.id) {
+      console.log('   ⚠️ OS do IXC sem dados, pulando');
+      return;
+    }
+
         // 4. Marcar OSs que não existem mais no IXC como canceladas
         // (apenas as que ainda estão pendentes ou em execução no SeeNet)
         const ossCanceladas = await trx('ordem_servico')
@@ -257,33 +266,34 @@ async sincronizarEmpresa(integracao) {
         id_contrato_ixc: osIXC.id_contrato_kit?.toString() || osIXC.id_contrato?.toString() || '' // ✅ NOVO
       };
 
-      if (osExistente.status !== 'concluida' && osExistente.status !== 'em_execucao') {
-        await trx('ordem_servico')
-          .where('id', osExistente.id)
-          .update({
-            tecnico_id: tecnicoId,
-            status: dadosOS.status,
-            tipo_servico: dadosOS.tipo_servico,   // ← ADICIONAR
-            prioridade: dadosOS.prioridade,
-            observacoes: dadosOS.observacoes,
-            data_abertura: dadosOS.data_abertura,
-            data_agendamento: dadosOS.data_agendamento,
-            dados_ixc: dadosOS.dados_ixc,
-            id_contrato_ixc: dadosOS.id_contrato_ixc,
-            data_atualizacao: db.fn.now()
-          });
+      if (osExistente) {
+        if (osExistente.status !== 'concluida' && osExistente.status !== 'em_execucao') {
+          await trx('ordem_servico')
+            .where('id', osExistente.id)
+            .update({
+              tecnico_id: tecnicoId,
+              status: dadosOS.status,
+              tipo_servico: dadosOS.tipo_servico,
+              prioridade: dadosOS.prioridade,
+              observacoes: dadosOS.observacoes,
+              data_abertura: dadosOS.data_abertura,
+              data_agendamento: dadosOS.data_agendamento,
+              dados_ixc: dadosOS.dados_ixc,
+              id_contrato_ixc: dadosOS.id_contrato_ixc,
+              data_atualizacao: db.fn.now()
+            });
+        }
       } else {
-              // Inserir nova OS
-              await trx('ordem_servico').insert(dadosOS);
-              console.log(`   ✨ Nova OS ${dadosOS.numero_os} criada`);
+        // Inserir nova OS
+        await trx('ordem_servico').insert(dadosOS);
+        console.log(`   ✨ Nova OS ${dadosOS.numero_os} criada`);
 
-              // ✅ NOTIFICAÇÃO: Avisar técnico da nova OS
-              try {
-                await notificationService.notificarNovaOS(db, tecnicoId, dadosOS.numero_os, clienteNome);
-              } catch (notifErr) {
-                console.warn('⚠️ Falha ao notificar técnico de nova OS:', notifErr.message);
-              }
-            }
+        try {
+          await notificationService.notificarNovaOS(db, tecnicoId, dadosOS.numero_os, clienteNome);
+        } catch (notifErr) {
+          console.warn('⚠️ Falha ao notificar técnico de nova OS:', notifErr.message);
+        }
+      }
     } catch (error) {
       console.error(`   ❌ Erro ao sincronizar OS ${osIXC.id}:`, error.message);
     }

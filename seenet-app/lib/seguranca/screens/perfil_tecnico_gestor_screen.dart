@@ -37,6 +37,9 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
   bool _isLoading = true;
   String? _erro;
   String _filtroStatus = 'todas';
+  int? _filtroAno;
+  int? _filtroMes;
+  int _abaAtual = 0; // 0=Histórico, 1=Fichário
 
   @override
   void initState() {
@@ -119,6 +122,8 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
               const SizedBox(height: 20),
               _buildHistoricoRequisicoes(),
               const SizedBox(height: 20),
+              _buildFiltroData(),
+              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -299,32 +304,67 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
   }
 
   Widget _buildHistoricoRequisicoes() {
-    final filtradas = _filtroStatus == 'todas'
-        ? _requisicoes
+    final historico = _requisicoes.where((r) => r['eh_fichario'] != true).toList();
+    final fichario = _requisicoes.where((r) => r['eh_fichario'] == true).toList();
+    final lista = _abaAtual == 0 ? historico : fichario;
+
+    // Aplica filtro de status (só no histórico)
+    var filtradas = _abaAtual == 0
+        ? (_filtroStatus == 'todas'
+        ? lista
         : _filtroStatus == 'aprovada'
-        ? _requisicoes.where((r) => r['status'] == 'aprovada' || r['status'] == 'aguardando_confirmacao').toList()
-        : _requisicoes.where((r) => r['status'] == _filtroStatus).toList();
+        ? lista.where((r) => r['status'] == 'aprovada' || r['status'] == 'aguardando_confirmacao').toList()
+        : lista.where((r) => r['status'] == _filtroStatus).toList())
+        : lista;
+
+    // Filtro por ano/mês
+    if (_filtroAno != null) {
+      filtradas = filtradas.where((r) {
+        try {
+          final dt = DateTime.parse(r['data_entrega'] ?? r['data_criacao']).toLocal();
+          if (dt.year != _filtroAno) return false;
+          if (_filtroMes != null && dt.month != _filtroMes) return false;
+          return true;
+        } catch (_) { return false; }
+      }).toList();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Filtros
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildFiltroChip('Todas', 'todas', _requisicoes.length),
-              const SizedBox(width: 8),
-              _buildFiltroChip('Aprovadas', 'aprovada', _requisicoes.where((r) => r['status'] == 'aprovada' || r['status'] == 'aguardando_confirmacao').length),
-              const SizedBox(width: 8),
-              _buildFiltroChip('Concluídas', 'concluida', _requisicoes.where((r) => r['status'] == 'concluida').length),
-              const SizedBox(width: 8),
-              _buildFiltroChip('Pendentes', 'pendente', _requisicoes.where((r) => r['status'] == 'pendente').length),
-              const SizedBox(width: 8),
-              _buildFiltroChip('Recusadas', 'recusada', _requisicoes.where((r) => r['status'] == 'recusada').length),
-            ],
-          ),
+        // Abas Histórico | Fichário
+        Row(
+          children: [
+            _buildAba('Histórico', 0, Icons.history, historico.length),
+            const SizedBox(width: 8),
+            _buildAba('Fichário', 1, Icons.folder_special, fichario.length),
+          ],
         ),
+        const SizedBox(height: 12),
+
+        // Filtros de status (só no histórico)
+        if (_abaAtual == 0) ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFiltroChip('Todas', 'todas', historico.length),
+                const SizedBox(width: 8),
+                _buildFiltroChip('Aprovadas', 'aprovada', historico.where((r) => r['status'] == 'aprovada' || r['status'] == 'aguardando_confirmacao').length),
+                const SizedBox(width: 8),
+                _buildFiltroChip('Concluídas', 'concluida', historico.where((r) => r['status'] == 'concluida').length),
+                const SizedBox(width: 8),
+                _buildFiltroChip('Pendentes', 'pendente', historico.where((r) => r['status'] == 'pendente').length),
+                const SizedBox(width: 8),
+                _buildFiltroChip('Recusadas', 'recusada', historico.where((r) => r['status'] == 'recusada').length),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Filtro de período (ambas as abas)
+        _buildFiltroData(),
         const SizedBox(height: 12),
 
         if (filtradas.isEmpty)
@@ -334,31 +374,269 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
               color: const Color(0xFF242424),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Column(
+            child: Column(
               children: [
-                Icon(Icons.assignment_outlined, size: 50, color: Colors.white12),
-                SizedBox(height: 12),
-                Text('Nenhuma requisição neste filtro',
-                    style: TextStyle(color: Colors.white38, fontSize: 14)),
+                Icon(
+                  _abaAtual == 0 ? Icons.assignment_outlined : Icons.folder_open,
+                  size: 50, color: Colors.white12,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _abaAtual == 0 ? 'Nenhuma requisição neste filtro' : 'Nenhuma ficha antiga registrada',
+                  style: const TextStyle(color: Colors.white38, fontSize: 14),
+                ),
               ],
             ),
           )
         else ...[
           Row(
             children: [
-              const Icon(Icons.history, color: Color(0xFF00FF88), size: 20),
+              Icon(
+                _abaAtual == 0 ? Icons.history : Icons.folder_special,
+                color: _abaAtual == 0 ? const Color(0xFF00FF88) : Colors.purple,
+                size: 20,
+              ),
               const SizedBox(width: 8),
-              const Text('Histórico',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                _abaAtual == 0 ? 'Histórico' : 'Fichário',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
               const Spacer(),
               Text('${filtradas.length} registro(s)',
                   style: const TextStyle(color: Colors.white38, fontSize: 12)),
             ],
           ),
           const SizedBox(height: 12),
-          ...filtradas.map((req) => _buildRequisicaoCard(req)),
+          if (_abaAtual == 0)
+            ...filtradas.map((req) => _buildRequisicaoCard(req))
+          else
+            ...filtradas.map((req) => _buildFicharioCard(req)),
         ],
       ],
+    );
+  }
+
+  Widget _buildFiltroData() {
+    final anos = _requisicoes
+        .map((r) {
+      try { return DateTime.parse(r['data_criacao']).toLocal().year; } catch (_) { return null; }
+    })
+        .whereType<int>()
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    const meses = [
+      'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF242424),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.calendar_month, color: Colors.white38, size: 16),
+              const SizedBox(width: 6),
+              const Text('Filtrar por período',
+                  style: TextStyle(color: Colors.white54, fontSize: 12)),
+              const Spacer(),
+              if (_filtroAno != null || _filtroMes != null)
+                GestureDetector(
+                  onTap: () => setState(() { _filtroAno = null; _filtroMes = null; }),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text('Limpar', style: TextStyle(color: Colors.red, fontSize: 10)),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Anos
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: anos.map((ano) {
+                final sel = _filtroAno == ano;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () => setState(() { _filtroAno = sel ? null : ano; }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: sel ? const Color(0xFF00FF88).withOpacity(0.15) : const Color(0xFF1A1A1A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: sel ? const Color(0xFF00FF88) : Colors.white12),
+                      ),
+                      child: Text('$ano',
+                          style: TextStyle(
+                            color: sel ? const Color(0xFF00FF88) : Colors.white54,
+                            fontSize: 13, fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                          )),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          // Meses (só aparece se ano selecionado)
+          if (_filtroAno != null) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: List.generate(12, (i) {
+                final mes = i + 1;
+                final sel = _filtroMes == mes;
+                final temDados = _requisicoes.any((r) {
+                  try {
+                    final dt = DateTime.parse(r['data_criacao']).toLocal();
+                    return dt.year == _filtroAno && dt.month == mes;
+                  } catch (_) { return false; }
+                });
+                return GestureDetector(
+                  onTap: temDados ? () => setState(() { _filtroMes = sel ? null : mes; }) : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: sel ? const Color(0xFF00FF88).withOpacity(0.15) : const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: sel ? const Color(0xFF00FF88) : Colors.white12),
+                    ),
+                    child: Text(meses[i],
+                        style: TextStyle(
+                          color: !temDados ? Colors.white12 : sel ? const Color(0xFF00FF88) : Colors.white54,
+                          fontSize: 11, fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                        )),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAba(String label, int index, IconData icon, int count) {
+    final sel = _abaAtual == index;
+    return GestureDetector(
+      onTap: () => setState(() { _abaAtual = index; _filtroAno = null; _filtroMes = null; }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? (index == 0 ? const Color(0xFF00FF88) : Colors.purple).withOpacity(0.15) : const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: sel ? (index == 0 ? const Color(0xFF00FF88) : Colors.purple) : Colors.white12,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: sel ? (index == 0 ? const Color(0xFF00FF88) : Colors.purple) : Colors.white38),
+            const SizedBox(width: 6),
+            Text('$label ($count)', style: TextStyle(
+              color: sel ? (index == 0 ? const Color(0xFF00FF88) : Colors.purple) : Colors.white54,
+              fontSize: 12, fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFicharioCard(Map<String, dynamic> req) {
+    final epis = req['epis_solicitados'];
+    final List<String> episLista = epis is List ? epis.cast<String>() : (epis is String ? _parseEpis(epis) : []);
+    final temFotoDoc = req['foto_documento_base64'] != null;
+    final dataRef = req['data_entrega'] ?? req['data_criacao'];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF242424),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.purple.withOpacity(0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.purple.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.folder_special, color: Colors.purple, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(_formatarData(dataRef),
+                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                    const Spacer(),
+                    Text('Req. #${req['id']}',
+                        style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text('${episLista.length} EPI(s): ${episLista.join(', ')}',
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    maxLines: 3, overflow: TextOverflow.ellipsis),
+                if (req['observacao_gestor'] != null && req['observacao_gestor'] != 'Registro manual pelo gestor de segurança.') ...[
+                  const SizedBox(height: 4),
+                  Text(req['observacao_gestor'], style: const TextStyle(color: Colors.white38, fontSize: 11, fontStyle: FontStyle.italic)),
+                ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    if (temFotoDoc)
+                      GestureDetector(
+                        onTap: () => _verImagem(req['foto_documento_base64'], 'Documento Físico'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.photo, color: Colors.purple, size: 14),
+                              SizedBox(width: 4),
+                              Text('Documento', style: TextStyle(color: Colors.purple, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (req['pdf_base64'] != null) ...[
+                      if (temFotoDoc) const SizedBox(width: 8),
+                      BotaoPDF(requisicaoId: req['id'] as int, pdfBase64Cached: req['pdf_base64']),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

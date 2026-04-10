@@ -826,7 +826,8 @@ router.get('/tecnicos/:id/perfil', authMiddleware, async (req, res) => {
       .select('r.id', 'r.status', 'r.epis_solicitados', 'r.itens_ixc', 'r.id_requisicao_ixc',
         'r.data_criacao', 'r.data_resposta', 'r.data_entrega', 'r.data_confirmacao_recebimento',
         'r.observacao_gestor', 'r.registro_manual', 'r.pdf_base64', 'r.assinatura_recebimento_base64',
-        'r.foto_recebimento_base64', 'r.devolucoes', 'g.nome as gestor_nome').orderBy('r.data_criacao', 'desc');
+        'r.foto_recebimento_base64', 'r.devolucoes', 'r.eh_fichario', 'r.foto_documento_base64',
+        'g.nome as gestor_nome').orderBy('r.data_criacao', 'desc');
     res.json({ usuario: { ...usuario, empresa: tenant?.nome }, stats, requisicoes });
   } catch (err) { console.error('❌ Erro ao buscar perfil do técnico:', err); res.status(500).json({ error: 'Erro ao buscar perfil do técnico' }); }
 });

@@ -186,7 +186,7 @@ async sincronizarEmpresa(integracao) {
           console.log('   ⚠️ OS do IXC sem dados, pulando');
           return;
         }
-  
+
         // Verificar se a OS já existe no banco
         const osExistente = await trx('ordem_servico')
         .where('tenant_id', tenantId)

@@ -28,6 +28,9 @@ class RegistrarView extends GetView<RegistroController> {
     {'id': 13,  'nome': 'FREI PAULO'},
     {'id': 9,   'nome': 'N. SRA. DE APARECIDA'},
     {'id': 8,   'nome': 'FEIRA NOVA'},
+    {'id': 7,   'nome': 'N. SRA. DAS DORES'},
+    {'id': 6,   'nome': 'MALHADOR'},
+    {'id': 5,   'nome': 'PINHÃO'},
   ];
 
   @override

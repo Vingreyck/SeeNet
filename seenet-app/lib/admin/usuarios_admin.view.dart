@@ -522,7 +522,8 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         backgroundColor: const Color(0xFF2A2A2A),
         title: Text('Resetar Senha - ${usuario.nome}',
             style: const TextStyle(color: Colors.white)),
-        content: Column(
+      content: SingleChildScrollView(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // ← exibe email só se real, senão exibe nome
@@ -565,6 +566,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
             ),
           ],
         ),
+      ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

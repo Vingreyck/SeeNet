@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:seenet/checklist/screen/ChecklistAppsScreen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:seenet/checklist/screen/ChecklistIptvScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistLentidaoScreen.dart';
 import 'package:flutter/services.dart';
@@ -119,6 +120,14 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'SeeNet',
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('pt', 'BR'),
+      ],
       theme: ThemeData(
         primarySwatch: Colors.green,
         useMaterial3: true,

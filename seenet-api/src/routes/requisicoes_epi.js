@@ -36,12 +36,13 @@ function base64ToBuffer(base64String) {
 
 function formatarDataBR(date, incluirHora = true) {
   const d = new Date(date);
-  const dia = String(d.getDate()).padStart(2, '0');
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const ano = d.getFullYear();
+  const brt = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  const dia = String(brt.getUTCDate()).padStart(2, '0');
+  const mes = String(brt.getUTCMonth() + 1).padStart(2, '0');
+  const ano = brt.getUTCFullYear();
   if (!incluirHora) return `${dia}/${mes}/${ano}`;
-  const hora = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
+  const hora = String(brt.getUTCHours()).padStart(2, '0');
+  const min = String(brt.getUTCMinutes()).padStart(2, '0');
   return `${dia}/${mes}/${ano} às ${hora}:${min}`;
 }
 
@@ -276,8 +277,6 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
         .text('FICHA DE CONTROLE DE EQUIPAMENTOS', M + 95, y + 10, { width: CW - 200, align: 'center' });
       doc.fontSize(12).font('Helvetica-Bold')
         .text('DE PROTEÇÃO INDIVIDUAL – EPI', M + 95, y + 28, { width: CW - 200, align: 'center' });
-
-      try { const cruzBuf2 = Buffer.from(LOGO_CRUZ_BASE64, 'base64'); doc.image(cruzBuf2, W - M - 50, y + 6, { height: 42 }); } catch (_) {}
 
       y += 59;
 

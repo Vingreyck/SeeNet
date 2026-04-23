@@ -66,7 +66,7 @@ class IXCService {
 
       // Filtrar apenas status A (Aberta) e EA (Em Atendimento)
       const registrosFiltrados = registros.filter(os => {
-        return os.status === 'A' || os.status === 'EA';
+        return os.status === 'A' || os.status === 'AG' || os.status === 'EA' || os.status === 'EX';
       });
 
       console.log(`✅ ${registrosFiltrados.length}/${registros.length} OSs abertas (técnico: ${filtros.tecnicoId})`);

@@ -234,11 +234,13 @@ async sincronizarEmpresa(integracao) {
 
       // Mapear status do IXC
       const statusMap = {
-        'A': 'pendente',      // Aberta
-        'EA': 'em_execucao',  // Em Atendimento
-        'E': 'em_execucao',   // Em execução
-        'F': 'concluida',     // Finalizada
-        'C': 'cancelada'      // Cancelada
+        'A': 'pendente',
+        'AG': 'pendente',
+        'EA': 'em_execucao',
+        'E': 'em_execucao',
+        'EX': 'em_execucao',
+        'F': 'concluida',
+        'C': 'cancelada'
       };
       const status = statusMap[osIXC.status] || 'pendente';
 

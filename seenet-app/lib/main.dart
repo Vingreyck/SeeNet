@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:seenet/checklist/screen/ChecklistIptvScreen.dart';
 import 'package:seenet/checklist/screen/ChecklistLentidaoScreen.dart';
 import 'package:flutter/services.dart';
+import 'web_admin/layout/web_layout.dart';
 import 'package:seenet/seguranca/screens/confirmar_recebimento_screen.dart';
 import 'package:seenet/seguranca/screens/registro_manual_epi_screen.dart';
 import 'package:seenet/login/widgets/login.binding.dart';
@@ -99,6 +100,14 @@ class AuthMiddleware extends GetMiddleware {
             snackPosition: SnackPosition.TOP,
             duration: const Duration(seconds: 3),
           );
+          return const RouteSettings(name: '/checklist');
+        }
+      }
+
+      if (route.startsWith('/web-admin')) {
+        final tipo = usuarioController.tipoUsuario;
+        final permitido = usuarioController.isAdmin || tipo == 'gestor' || tipo == 'gestor_seguranca';
+        if (!permitido) {
           return const RouteSettings(name: '/checklist');
         }
       }
@@ -258,6 +267,11 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/seguranca/relatorio-epi',
           page: () => const RelatorioEpiScreen(),
+          middlewares: [AuthMiddleware()],
+        ),
+        GetPage(
+          name: '/web-admin',
+          page: () => const WebLayout(),
           middlewares: [AuthMiddleware()],
         ),
         GetPage(

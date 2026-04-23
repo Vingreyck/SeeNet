@@ -75,42 +75,52 @@
 
     Future<void> _doInit() async {
       try {
-        // ✅ CORREÇÃO 1: Serviços registrados ANTES do Firebase
-        Get.put(ApiService(), permanent: true);
-        Get.put(AvaliacaoService(), permanent: true);
-        Get.put(CategoriaService(), permanent: true);
-        Get.put(AuthService(), permanent: true);
-        Get.put(CheckmarkController(), permanent: true);
-        Get.lazyPut<DiagnosticoController>(() => DiagnosticoController(), fenix: true);
-        Get.put(TranscricaoController(), permanent: true);
-        Get.put(SegurancaService(), permanent: true);
-        Get.put(SegurancaController(), permanent: true);
-        Get.put(TrackingService(), permanent: true);
-        Get.put(SyncManager(), permanent: true);
-        Get.put(ConnectivityService(), permanent: true);
-        Get.put(NotificationService(), permanent: true);
+        try {
+          await Environment.load();
+          Environment.validateRequiredKeys();
+        } catch (e) {
+          print('⚠️ Environment não carregado: $e');
+        }
 
-        // ✅ CORREÇÃO 2: Environment normal + Firebase isolado (não derruba tudo se falhar no web)
-        await Environment.load();
-        Environment.validateRequiredKeys();
+        print('📦 1 ApiService...');
+        Get.put(ApiService(), permanent: true);
+        print('📦 2 AvaliacaoService...');
+        Get.put(AvaliacaoService(), permanent: true);
+        print('📦 3 CategoriaService...');
+        Get.put(CategoriaService(), permanent: true);
+        print('📦 4 AuthService...');
+        Get.put(AuthService(), permanent: true);
+        print('📦 5 CheckmarkController...');
+        Get.put(CheckmarkController(), permanent: true);
+        print('📦 6 DiagnosticoController...');
+        Get.lazyPut<DiagnosticoController>(() => DiagnosticoController(), fenix: true);
+        print('📦 7 TranscricaoController...');
+        Get.put(TranscricaoController(), permanent: true);
+        print('📦 8 SegurancaService...');
+        Get.put(SegurancaService(), permanent: true);
+        print('📦 9 SegurancaController...');
+        Get.put(SegurancaController(), permanent: true);
+        print('📦 10 TrackingService...');
+        Get.put(TrackingService(), permanent: true);
+        print('📦 11 SyncManager...');
+        Get.put(SyncManager(), permanent: true);
+        print('📦 12 ConnectivityService...');
+        Get.put(ConnectivityService(), permanent: true);
+        print('📦 13 NotificationService...');
+        Get.put(NotificationService(), permanent: true);
+        print('✅ Todos registrados!');
 
         try {
           await Firebase.initializeApp();
-          final notificationService = Get.find<NotificationService>();
-          notificationService.init().then((_) {
-            notificationService.listenTokenRefresh();
+          Get.find<NotificationService>().init().then((_) {
+            Get.find<NotificationService>().listenTokenRefresh();
             print('✅ NotificationService pronto');
           });
         } catch (e) {
-          print('⚠️ Firebase não iniciado (web sem config): $e');
-          // Continua sem Firebase — push notifications não funcionam no web, tudo bem
+          print('⚠️ Firebase não iniciado: $e');
         }
 
-        if (Environment.isProduction && !Environment.isConfigured) {
-          throw Exception('⚠️ Configuração incompleta para produção');
-        }
-
-        print('✅ App inicializado em background');
+        print('✅ App inicializado');
 
         final elapsed = _animController.lastElapsedDuration?.inMilliseconds ?? 0;
         final remaining = 1500 - elapsed;
@@ -121,7 +131,7 @@
         await _decidirRota();
 
       } catch (e) {
-        print('❌ Erro na inicialização: $e');
+        print('❌ Erro crítico na inicialização: $e');
         Get.offAllNamed('/login');
       }
     }

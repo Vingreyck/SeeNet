@@ -10,7 +10,7 @@ import '../models/usuario.dart';
 import '../login/loginview.controller.dart';
 
 class AuthService extends GetxService {
-  final ApiService _api = ApiService.instance;
+  ApiService get _api => Get.find<ApiService>();
   final _storage = GetStorage();
 
   static const _keyToken = 'auth_token';

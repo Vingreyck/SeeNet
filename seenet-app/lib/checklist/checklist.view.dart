@@ -22,7 +22,7 @@ class _ChecklistviewState extends State<Checklistview>
   final AuthService authService = Get.find<AuthService>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  int _navIndex = 0; // 0=Início, 1=EPI, 2=Perfil
+  int _navIndex = 1; // 0=Início, 1=EPI, 2=Perfil
 
   @override
   void initState() {
@@ -138,7 +138,7 @@ class _ChecklistviewState extends State<Checklistview>
                   ),
                   _buildDrawerItem(
                     icon: Icons.health_and_safety_outlined,
-                    label: 'Segurança / EPI',
+                    label: 'Solicitação de EPI/EPC',
                     onTap: () { Navigator.pop(context); setState(() => _navIndex = 1); Get.toNamed('/seguranca'); },
                     active: _navIndex == 1,
                   ),

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:permission_handler/permission_handler.dart';
 import '../services/audit_service.dart';
 import 'dart:developer' as developer;
@@ -1212,161 +1213,71 @@ Future<void> _exportarLogs() async {
   }
 }
 
-Future<void> _salvarArquivoCSV(String conteudo) async {
-  try {
-    developer.log('🔍 Iniciando salvamento do arquivo...');
-    developer.log('🔍 Tamanho do conteúdo: ${conteudo.length} caracteres');
-    
-    Directory? directory;
-    
-    if (Platform.isAndroid) {
-      developer.log('🔍 Plataforma: Android');
-      
-      // Para Android, solicitar permissão
-      var status = await Permission.storage.status;
-      developer.log('🔍 Status da permissão: $status');
-      
-      if (!status.isGranted) {
-        developer.log('⚠️ Solicitando permissão...');
-        status = await Permission.storage.request();
-        developer.log('🔍 Nova status: $status');
+  Future<void> _salvarArquivoCSV(String conteudo) async {
+    try {
+      // ✅ Web: não tem acesso ao sistema de arquivos
+      if (kIsWeb) {
+        Get.snackbar(
+          'Aviso',
+          'Download de arquivo não disponível na versão web',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return;
       }
-      
-      if (status.isGranted) {
-        // Tentar usar o diretório Downloads
-        directory = Directory('/storage/emulated/0/Download');
-        developer.log('🔍 Tentando diretório: ${directory.path}');
-        
-        if (!await directory.exists()) {
-          developer.log('⚠️ Diretório Download não existe, usando alternativo');
-          directory = await getExternalStorageDirectory();
-          developer.log('🔍 Diretório alternativo: ${directory?.path}');
+
+      developer.log('🔍 Iniciando salvamento do arquivo...');
+
+      dynamic directory;
+
+      if (Platform.isAndroid) {
+        var status = await Permission.storage.status;
+        if (!status.isGranted) {
+          status = await Permission.storage.request();
         }
-      } else {
-        developer.log('❌ Permissão negada!');
-        throw Exception('Permissão de armazenamento negada');
+        if (status.isGranted) {
+          directory = Directory('/storage/emulated/0/Download');
+          if (!await directory.exists()) {
+            directory = await getExternalStorageDirectory();
+          }
+        } else {
+          throw Exception('Permissão de armazenamento negada');
+        }
+      } else if (Platform.isIOS) {
+        directory = await getApplicationDocumentsDirectory();
+      } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        directory = await getDownloadsDirectory();
       }
-    } else if (Platform.isIOS) {
-      developer.log('🔍 Plataforma: iOS');
-      directory = await getApplicationDocumentsDirectory();
-    } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      developer.log('🔍 Plataforma: Desktop');
-      directory = await getDownloadsDirectory();
+
+      if (directory == null) throw Exception('Não foi possível acessar o diretório');
+
+      String timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      String nomeArquivo = 'logs_auditoria_$timestamp.csv';
+      String caminho = '${directory.path}/$nomeArquivo';
+
+      File arquivo = File(caminho);
+      await arquivo.writeAsString(conteudo);
+
+      if (!mounted) return;
+
+      Get.snackbar(
+        'Sucesso',
+        'Arquivo salvo: $nomeArquivo',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+
+    } catch (e) {
+      developer.log('❌ Erro ao salvar arquivo: $e');
+      if (!mounted) return;
+      Get.snackbar(
+        'Erro',
+        'Erro ao salvar arquivo: ${e.toString()}',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
-    
-    if (directory == null) {
-      developer.log('❌ Diretório é null!');
-      throw Exception('Não foi possível acessar o diretório de downloads');
-    }
-    
-    developer.log('✅ Diretório definido: ${directory.path}');
-    
-    // Nome do arquivo com timestamp
-    String timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-    String nomeArquivo = 'logs_auditoria_$timestamp.csv';
-    String caminho = '${directory.path}/$nomeArquivo';
-    
-    developer.log('📝 Caminho completo: $caminho');
-    
-    // Salvar arquivo
-    File arquivo = File(caminho);
-    await arquivo.writeAsString(conteudo);
-    
-    developer.log('✅ Arquivo escrito!');
-    developer.log('📊 Tamanho do arquivo: ${arquivo.lengthSync()} bytes');
-    developer.log('✅ Arquivo existe: ${await arquivo.exists()}');
-    
-    if (!mounted) return;
-    
-    // Mostrar diálogo de sucesso
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 12),
-            Text(
-              'Arquivo Salvo!',
-              style: TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'O arquivo foi salvo com sucesso:',
-              style: TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.folder, color: Color(0xFF00FF88), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SelectableText(  // ✅ Trocado para poder copiar
-                      caminho,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Tamanho: ${(arquivo.lengthSync() / 1024).toStringAsFixed(2)} KB',
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text(
-              'OK',
-              style: TextStyle(color: Color(0xFF00FF88)),
-            ),
-          ),
-        ],
-      ),
-    );
-    
-    Get.snackbar(
-      'Sucesso',
-      'Arquivo salvo: $nomeArquivo',
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 4),
-    );
-    
-  } catch (e, stackTrace) {
-    developer.log('❌ Erro ao salvar arquivo: $e');
-    developer.log('Stack trace: $stackTrace');
-    
-    if (!mounted) return;
-    
-    Get.snackbar(
-      'Erro',
-      'Erro ao salvar arquivo: ${e.toString()}',
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 4),
-    );
   }
-}
 
 void _limparLogsAntigos() {
   showDialog(

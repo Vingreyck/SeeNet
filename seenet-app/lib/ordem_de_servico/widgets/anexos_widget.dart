@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AnexoComDescricao {
   final XFile foto;
@@ -163,11 +164,19 @@ class _AnexosWidgetState extends State<AnexosWidget> {
           ),
 
           // Preview da foto (igual ao atual)
+          // ✅ DEPOIS (corretamente fechado)
           Padding(
             padding: const EdgeInsets.all(12),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.file(
+              child: kIsWeb
+                  ? Image.network(
+                anexo.foto.path,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              )
+                  : Image.file(
                 File(anexo.foto.path),
                 height: 200,
                 width: double.infinity,

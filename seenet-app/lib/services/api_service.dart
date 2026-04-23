@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:get/get.dart';
 import '../config/api_config.dart';
@@ -16,7 +16,7 @@ class ApiService extends GetxService {
   void onInit() {
     super.onInit();
     _client = http.Client();
-    ApiConfig.printConfig();
+    if (!kIsWeb) ApiConfig.printConfig();
   }
 
   String? get token => _token;
@@ -291,45 +291,26 @@ dynamic _handleResponse(http.Response response) {
     print('\n❌ === ERRO NA REQUISIÇÃO ===');
     print('   Tipo: ${error.runtimeType}');
     print('   Mensagem: $error');
-    
-    if (error is SocketException) {
+
+    final errorStr = error.toString();
+
+    // ✅ kIsWeb não tem SocketException/HttpException — verificação por string funciona nos dois
+    if (!kIsWeb && errorStr.contains('SocketException') || errorStr.contains('Failed host lookup')) {
       print('   Categoria: Sem conexão com internet');
-      return {
-        'success': false,
-        'error': 'Sem conexão com a internet',
-        'type': 'connection',
-        'details': error.toString()
-      };
+      return {'success': false, 'error': 'Sem conexão com a internet', 'type': 'connection', 'details': errorStr};
     }
-    
-    if (error is HttpException) {
+
+    if (!kIsWeb && errorStr.contains('HttpException')) {
       print('   Categoria: Erro HTTP');
-      return {
-        'success': false,
-        'error': 'Erro de conexão com o servidor',
-        'type': 'http',
-        'details': error.toString()
-      };
+      return {'success': false, 'error': 'Erro de conexão com o servidor', 'type': 'http', 'details': errorStr};
     }
-    
-    if (error.toString().contains('TimeoutException') || 
-        error.toString().contains('Timeout')) {
+
+    if (errorStr.contains('TimeoutException') || errorStr.contains('Timeout')) {
       print('   Categoria: Timeout');
-      return {
-        'success': false,
-        'error': 'Tempo limite da requisição excedido',
-        'type': 'timeout',
-        'details': error.toString()
-      };
+      return {'success': false, 'error': 'Tempo limite da requisição excedido', 'type': 'timeout', 'details': errorStr};
     }
-    
-    print('   Categoria: Erro desconhecido');
-    return {
-      'success': false,
-      'error': error.toString(),
-      'type': 'unknown',
-      'details': error.toString()
-    };
+
+    return {'success': false, 'error': errorStr, 'type': 'unknown', 'details': errorStr};
   }
   
   // Verificar conectividade

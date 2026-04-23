@@ -1,5 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' if (dart.library.html) '../utils/io_stub.dart';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/ordem_servico_model.dart';
@@ -170,9 +172,11 @@ class OrdemServicoService {
 
         for (var anexo in anexos) {
           try {
+            if (kIsWeb) continue; // web não tem acesso ao sistema de arquivos
             final File file = File(anexo['path']);
             if (!await file.exists()) continue;
-            final Uint8List bytes = await file.readAsBytes();
+            final bytes = await file.readAsBytes();
+            final Uint8List uint8Bytes = Uint8List.fromList(bytes);
             final String base64Image = base64Encode(bytes);
             fotosComMetadados.add({
               'base64': base64Image,

@@ -1,11 +1,14 @@
-
+import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'dart:io';
-import 'dart:convert';
+import 'dart:io' if (dart.library.html) '../../utils/io_stub.dart';
 import '../services/seguranca_service.dart';
 import 'package:get/get.dart';
+
+// Web-only import
+import 'web_pdf_helper.dart' if (dart.library.io) 'web_pdf_helper_stub.dart';
 
 class BotaoPDF extends StatefulWidget {
   final int requisicaoId;
@@ -52,17 +55,18 @@ class _BotaoPDFState extends State<BotaoPDF> {
           RegExp(r'^data:application/pdf;base64,'), '');
       final bytes = base64Decode(clean);
 
-      // Salva em arquivo temporário
+      if (kIsWeb) {
+        abrirPdfNoNavegador(bytes);
+        return;
+      }
+
       final dir = await getTemporaryDirectory();
       final file = File(
           '${dir.path}/EPI_Requisicao_${String.fromCharCodes(Iterable.generate(5, (_) => 48 + (DateTime.now().millisecondsSinceEpoch % 10)))}.pdf');
       await file.writeAsBytes(bytes);
-
-      // Compartilha
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/pdf')],
-        subject:
-        'Ficha de EPI #${widget.requisicaoId.toString().padLeft(5, '0')} - BBnet Up',
+        subject: 'Ficha de EPI #${widget.requisicaoId.toString().padLeft(5, '0')} - BBnet Up',
       );
     } catch (e) {
       if (mounted) {

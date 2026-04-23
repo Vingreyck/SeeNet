@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import '../widgets/web_pdf_helper.dart' if (dart.library.io) '../widgets/web_pdf_helper_stub.dart';
 import '../../services/auth_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class RelatorioEpiScreen extends StatefulWidget {
   const RelatorioEpiScreen({super.key});
@@ -81,13 +83,15 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
 
       if (response.statusCode == 200) {
         // Salvar PDF em arquivo temporário
+        if (kIsWeb) {
+          abrirPdfNoNavegador(response.bodyBytes);
+          return;
+        }
         final dir = await getTemporaryDirectory();
         final nomeArquivo = 'EPI_${_tecnicoNome?.replaceAll(' ', '_') ?? 'tecnico'}.pdf';
         final arquivo = File('${dir.path}/$nomeArquivo');
         await arquivo.writeAsBytes(response.bodyBytes);
-
         if (mounted) {
-          // Compartilhar via share_plus
           await Share.shareXFiles(
             [XFile(arquivo.path, mimeType: 'application/pdf')],
             subject: 'Relatório de EPI — $_tecnicoNome',

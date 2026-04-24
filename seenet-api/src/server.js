@@ -966,8 +966,7 @@ app.get('/api/debug/force-sync', async (req, res) => {
         version: '1.0.0',
         environment: process.env.NODE_ENV || 'development',
         database: 'PostgreSQL conectado',
-        gemini: process.env.GEMINI_API_KEY ? 'Configurado' : 'Não configurado'
-      });
+        groq: process.env.GROQ_API_KEY ? 'Configurado' : 'Não configurado'      });
     });
 
     app.get('/api/debug/database', async (req, res) => {

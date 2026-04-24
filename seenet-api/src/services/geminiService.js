@@ -14,13 +14,6 @@ class GeminiService {
     return process.env.GROQ_API_KEY;
   }
 
-  get apiKey() {
-    const key = process.env.GROQ_API_KEY;
-    console.log('🔑 GROQ_API_KEY:', key ? key.substring(0, 15) + '...' : 'UNDEFINED');
-    console.log('🔑 Todas as vars:', Object.keys(process.env).filter(k => k.includes('GROQ') || k.includes('API')));
-    return key;
-  }
-
   async gerarDiagnostico(prompt) {
     console.log('\n🤖 === INICIANDO CHAMADA GROQ ===');
 
@@ -161,6 +154,66 @@ class GeminiService {
       {
         headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
         timeout: 30000
+      }
+    );
+
+    return response.data?.choices?.[0]?.message?.content;
+  }
+
+  async analisarFotoProblema(imageBase64) {
+    const key = this.apiKey;
+    if (!key) throw new Error('Chave da API Groq não configurada');
+
+    const messages = [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image_url',
+            image_url: { url: `data:image/jpeg;base64,${imageBase64}` }
+          },
+          {
+            type: 'text',
+            text: `Você é técnico sênior em redes de internet/fibra óptica/IPTV.
+  Analise esta imagem de um problema técnico de rede e forneça orientação no formato:
+
+  🔍 **PROBLEMA IDENTIFICADO:**
+  [descrição do problema visual]
+
+  🔧 **SOLUÇÃO RÁPIDA (2 min):**
+  1. [ação]
+  2. [ação]
+  3. [resultado]
+
+  🔧 **SE NÃO RESOLVER (5 min):**
+  1. [ação]
+  2. [ação]
+  3. [resultado]
+
+  ⚠️ **AINDA COM PROBLEMA:**
+  "Ligue para o gerente informando o problema"
+
+  ✅ **DICA RÁPIDA:**
+  [dica]
+
+  Se a imagem não mostrar problema técnico de rede/internet/IPTV, responda apenas:
+  "⚠️ Não identifiquei um problema técnico de rede nesta imagem. Fotografe o equipamento ou problema específico."`
+          }
+        ]
+      }
+    ];
+
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages,
+        max_tokens: 1024,
+        temperature: 0.5,
+      },
+      {
+        headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+        timeout: 45000
       }
     );
 

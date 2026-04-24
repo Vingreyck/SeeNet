@@ -115,7 +115,31 @@ class _DiagnosticoViewState extends State<DiagnosticoView>
   }
 
   void _initializeDiagnostico() {
-    _gerarDiagnostico();
+    // Verifica se veio de análise de foto
+    final args = Get.arguments as Map<String, dynamic>?;
+    if (args != null && args['via_foto'] == true) {
+      _carregarDiagnosticoDeFoto(args);
+    } else {
+      _gerarDiagnostico();
+    }
+  }
+
+  void _carregarDiagnosticoDeFoto(Map<String, dynamic> args) {
+    _diagnosticoController.diagnosticos.clear();
+    _diagnosticoController.diagnosticos.add(
+      Diagnostico(
+        id: args['diagnosticoId'],
+        avaliacaoId: 1,
+        categoriaId: 1,
+        promptEnviado: '[Diagnóstico via foto]',
+        respostaGemini: args['resposta'] ?? '',
+        resumoDiagnostico: 'Análise de imagem',
+        statusApi: 'sucesso',
+        dataCriacao: DateTime.now(),
+      ),
+    );
+    _diagnosticoId = args['diagnosticoId'];
+    _masterController.forward();
   }
 
   Future<void> _gerarDiagnostico() async {

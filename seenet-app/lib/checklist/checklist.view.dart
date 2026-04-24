@@ -7,6 +7,9 @@ import '../controllers/usuario_controller.dart';
 import 'package:seenet/services/auth_service.dart';
 import '../controllers/checkmark_controller.dart';
 import '../widgets/skeleton_loader.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
+import '../services/api_service.dart';
 
 class Checklistview extends StatefulWidget {
   const Checklistview({super.key});
@@ -386,6 +389,8 @@ class _ChecklistviewState extends State<Checklistview>
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF1A1A1A),
       drawer: _buildDrawer(),
+      floatingActionButton: _buildFabCamera(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Stack(
         children: [
           // ── Header verde
@@ -556,6 +561,76 @@ class _ChecklistviewState extends State<Checklistview>
     if (nome.contains('iptv') || nome.contains('tv')) return 'assets/images/iptv.svg';
     if (nome.contains('app') || nome.contains('aplicativo')) return 'assets/images/app.svg';
     return 'assets/images/logo.svg';
+  }
+
+  Widget _buildFabCamera() {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 60 + MediaQuery.of(context).padding.bottom),
+      child: FloatingActionButton(
+        backgroundColor: const Color(0xFF00FF88),
+        onPressed: _diagnosticarPorFoto,
+        child: const Icon(Icons.camera_alt, color: Colors.black, size: 28),
+      ),
+    );
+  }
+
+  Future<void> _diagnosticarPorFoto() async {
+    final picker = ImagePicker();
+    final foto = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 70,
+      maxWidth: 1280,
+    );
+
+    if (foto == null) return;
+
+    // Mostra loading
+    Get.dialog(
+      const Center(
+        child: Card(
+          color: Color(0xFF1E1E1E),
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: Color(0xFF00FF88)),
+                SizedBox(height: 16),
+                Text('🤖 Analisando imagem...', style: TextStyle(color: Colors.white)),
+              ],
+            ),
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+
+    try {
+      final bytes = await foto.readAsBytes();
+      final base64Img = base64Encode(bytes);
+
+      final api = ApiService.instance;
+      final response = await api.post('/diagnostics/foto', {
+        'imagem_base64': base64Img,
+      });
+
+      Get.back(); // fecha loading
+
+      if (response['success'] == true) {
+        Get.toNamed('/diagnostico', arguments: {
+          'resposta': response['resposta'],
+          'diagnosticoId': response['id'],
+          'via_foto': true,
+        });
+      } else {
+        Get.snackbar('Erro', 'Não foi possível analisar a imagem',
+            backgroundColor: Colors.red, colorText: Colors.white);
+      }
+    } catch (e) {
+      Get.back();
+      Get.snackbar('Erro', 'Falha ao processar imagem',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    }
   }
 
   Widget _buildEmptyStateNoCategorias() {

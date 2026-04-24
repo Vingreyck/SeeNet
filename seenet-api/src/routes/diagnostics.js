@@ -288,4 +288,48 @@ router.post('/:diagnosticoId/chat', [
   }
 });
 
+// ========== DIAGNÓSTICO POR FOTO ==========
+router.post('/foto', [
+  body('imagem_base64').notEmpty().withMessage('Imagem obrigatória'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Dados inválidos', details: errors.array() });
+    }
+
+    const { imagem_base64 } = req.body;
+
+    const resposta = await geminiService.analisarFotoProblema(imagem_base64);
+
+    if (!resposta) {
+      return res.status(500).json({ error: 'Falha ao analisar imagem' });
+    }
+
+    // Salvar no banco para habilitar o chat
+    const [{ id: diagnosticoId }] = await db('diagnosticos').insert({
+      tenant_id: req.tenantId,
+      avaliacao_id: 1, // avaliação genérica para diagnósticos por foto
+      categoria_id: 1,
+      prompt_enviado: '[Diagnóstico via foto]',
+      resposta_gemini: resposta,
+      resumo_diagnostico: 'Diagnóstico gerado por análise de imagem',
+      status_api: 'sucesso',
+      modelo_ia: 'llama-4-scout',
+      tokens_utilizados: 0,
+      data_criacao: new Date().toISOString()
+    }).returning('id');
+
+    res.json({
+      success: true,
+      id: diagnosticoId,
+      resposta,
+    });
+
+  } catch (error) {
+    logger.error('Erro ao analisar foto:', error);
+    res.status(500).json({ error: 'Erro ao analisar imagem' });
+  }
+});
+
 module.exports = router;

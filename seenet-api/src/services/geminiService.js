@@ -135,6 +135,38 @@ class GeminiService {
     }
   }
 
+  async chatDiagnostico(mensagem, historico, contexto) {
+    const key = this.apiKey;
+    if (!key) throw new Error('Chave da API Groq não configurada');
+
+    const messages = [
+      {
+        role: 'system',
+        content: `Você é um técnico sênior de redes/ISP. Responda de forma direta e conversacional.
+  Fale APENAS sobre redes. Se o assunto fugir disso, redirecione para o problema técnico. Use emojis pontualmente.
+
+  CONTEXTO DO DIAGNÓSTICO ATUAL:
+  ${contexto}`
+      },
+      ...historico.map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.content
+      })),
+      { role: 'user', content: mensagem }
+    ];
+
+    const response = await axios.post(
+      this.apiUrl,
+      { model: this.model, messages, max_tokens: 512, temperature: 0.7 },
+      {
+        headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+        timeout: 30000
+      }
+    );
+
+    return response.data?.choices?.[0]?.message?.content;
+  }
+
   async testarConexao() {
     try {
       const resposta = await this.gerarDiagnostico('Teste simples. Responda apenas: "Groq funcionando!"');

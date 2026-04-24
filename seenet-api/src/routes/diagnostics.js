@@ -272,21 +272,9 @@ router.post('/:diagnosticoId/chat', [
       return res.status(404).json({ success: false, error: 'Diagnóstico não encontrado' });
     }
 
-    let prompt = `Você é um técnico especialista em internet/IPTV. Responda de forma direta e prática.\n\n`;
-    prompt += `DIAGNÓSTICO ORIGINAL:\n${diagnostico.resposta_gemini}\n\n`;
-    prompt += `PROBLEMA IDENTIFICADO:\n${diagnostico.prompt_enviado}\n\n`;
-
-    if (historico.length > 0) {
-      prompt += `HISTÓRICO:\n`;
-      historico.forEach(m => {
-        prompt += `${m.role === 'user' ? 'Técnico' : 'IA'}: ${m.content}\n`;
-      });
-      prompt += `\n`;
-    }
-
-    prompt += `PERGUNTA: ${mensagem}\n\nResponda em no máximo 5 linhas, seja direto e use emojis.`;
-
-    const resposta = await geminiService.gerarDiagnostico(prompt);
+    // ✅ NOVO: usa chatDiagnostico ao invés de gerarDiagnostico
+    const contexto = `Problema identificado: ${diagnostico.prompt_enviado}\n\nDiagnóstico gerado:\n${diagnostico.resposta_gemini}`;
+    const resposta = await geminiService.chatDiagnostico(mensagem, historico, contexto);
 
     if (!resposta) {
       return res.status(500).json({ success: false, error: 'Falha ao gerar resposta' });

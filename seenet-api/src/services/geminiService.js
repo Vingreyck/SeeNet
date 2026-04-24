@@ -14,6 +14,13 @@ class GeminiService {
     return process.env.GROQ_API_KEY;
   }
 
+  get apiKey() {
+    const key = process.env.GROQ_API_KEY;
+    console.log('🔑 GROQ_API_KEY:', key ? key.substring(0, 15) + '...' : 'UNDEFINED');
+    console.log('🔑 Todas as vars:', Object.keys(process.env).filter(k => k.includes('GROQ') || k.includes('API')));
+    return key;
+  }
+
   async gerarDiagnostico(prompt) {
     console.log('\n🤖 === INICIANDO CHAMADA GROQ ===');
 

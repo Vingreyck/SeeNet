@@ -3,11 +3,15 @@ const logger = require('../config/logger');
 
 class GeminiService {
   constructor() {
-    this.apiKey = process.env.GROQ_API_KEY;
     this.apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
     this.model = 'llama-3.3-70b-versatile';
     this.maxRetries = 3;
     this.retryDelay = 1000;
+  }
+
+  // Getter que lê sempre na hora certa
+  get apiKey() {
+    return process.env.GROQ_API_KEY;
   }
 
   async gerarDiagnostico(prompt) {

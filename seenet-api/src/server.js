@@ -969,6 +969,14 @@ app.get('/api/debug/force-sync', async (req, res) => {
         groq: process.env.GROQ_API_KEY ? 'Configurado' : 'Não configurado'      });
     });
 
+app.get('/api/debug/check-env', (req, res) => {
+  res.json({
+    groq_key_exists: !!process.env.GROQ_API_KEY,
+    groq_key_preview: process.env.GROQ_API_KEY?.substring(0, 10) || 'NÃO ENCONTRADA',
+    node_env: process.env.NODE_ENV,
+  });
+});
+
     app.get('/api/debug/database', async (req, res) => {
       try {
         const tenants = await db('tenants').select('*').limit(5);

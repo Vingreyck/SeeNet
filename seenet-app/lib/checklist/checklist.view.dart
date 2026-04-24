@@ -5,6 +5,7 @@ import 'package:seenet/checklist/widgets/checklist_categoria_card.widget.dart';
 import 'package:get/get.dart';
 import '../controllers/usuario_controller.dart';
 import 'package:seenet/services/auth_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../controllers/checkmark_controller.dart';
 import '../widgets/skeleton_loader.dart';
 import 'package:image_picker/image_picker.dart';
@@ -128,6 +129,7 @@ class _ChecklistviewState extends State<Checklistview>
                   const SizedBox(height: 8),
 
                   // Todos os usuários
+                  // Todos os usuários
                   _buildDrawerItem(
                     icon: Icons.home_outlined,
                     label: 'Início',
@@ -139,6 +141,12 @@ class _ChecklistviewState extends State<Checklistview>
                     label: 'Ordens de Serviço',
                     onTap: () { Navigator.pop(context); Get.toNamed('/ordens-servico'); },
                   ),
+                  if (kIsWeb)
+                    _buildDrawerItem(
+                      icon: Icons.camera_alt_outlined,
+                      label: 'Diagnóstico por Foto',
+                      onTap: () { Navigator.pop(context); _diagnosticarPorFoto(); },
+                    ),
                   _buildDrawerItem(
                     icon: Icons.health_and_safety_outlined,
                     label: 'Solicitação de EPI/EPC',
@@ -564,6 +572,7 @@ class _ChecklistviewState extends State<Checklistview>
   }
 
   Widget _buildFabCamera() {
+    if (kIsWeb) return const SizedBox.shrink(); // ✅ esconde no web
     return Padding(
       padding: EdgeInsets.only(bottom: 60 + MediaQuery.of(context).padding.bottom),
       child: FloatingActionButton(
@@ -577,7 +586,7 @@ class _ChecklistviewState extends State<Checklistview>
   Future<void> _diagnosticarPorFoto() async {
     final picker = ImagePicker();
     final foto = await picker.pickImage(
-      source: ImageSource.camera,
+      source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
       imageQuality: 70,
       maxWidth: 1280,
     );

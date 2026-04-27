@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../controllers/usuario_controller.dart';
 import '../utils/error_handler.dart';
 import '../services/auth_service.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 class RegistroController extends GetxController {
   // ========== TEXT CONTROLLERS ==========

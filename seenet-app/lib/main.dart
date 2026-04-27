@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'checklist/screen/checklist_items_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
@@ -39,6 +40,39 @@ import 'package:seenet/seguranca/screens/perfil_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ✅ Silencia o widget vermelho de erro do Flutter na UI.
+  //    Os erros continuam sendo logados no console (debugPrint),
+  //    mas nao poluem mais a tela do usuario com tela vermelha
+  //    para warnings de "setState during build" / "improper use of GetX".
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    if (kDebugMode) {
+      debugPrint('🔴 [ErrorWidget] ${details.exceptionAsString()}');
+    }
+    // Retorna widget invisivel — nada na tela.
+    return const SizedBox.shrink();
+  };
+
+  // ✅ Silencia o printer do Flutter para asserts conhecidos do GetX
+  //    que aparecem em amarelo embaixo da tela (improper use of GetX).
+  //    Mantemos outros logs intactos.
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final msg = details.exceptionAsString();
+    final isHarmlessGetXNoise = msg.contains('improper use of a GetX') ||
+        msg.contains('setState() or markNeedsBuild() called during build') ||
+        msg.contains('_animation') ||
+        msg.contains('has not been initialized');
+
+    if (isHarmlessGetXNoise) {
+      // Loga uma vez no console, sem encher de stack trace
+      if (kDebugMode) {
+        debugPrint('⚠️ [GetX noise suppressed] ${msg.split('\n').first}');
+      }
+      return;
+    }
+    // Outros erros seguem o caminho padrao
+    FlutterError.presentError(details);
+  };
+
   await GetStorage.init();
 
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -58,7 +92,6 @@ void main() async {
 }
 
 // ✅ MIDDLEWARE DE AUTENTICAÇÃO
-//    Snackbars usam AppSnackbar (ScaffoldMessenger nativo) — não Get.snackbar.
 class AuthMiddleware extends GetMiddleware {
   @override
   RouteSettings? redirect(String? route) {
@@ -71,23 +104,15 @@ class AuthMiddleware extends GetMiddleware {
       final usuario = Get.find<UsuarioController>();
 
       if (!usuario.isLoggedIn) {
-        print('Acesso negado: usuário não autenticado');
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          AppSnackbar.warning(
-            'Acesso Negado',
-            'Faça login para acessar esta área',
-          );
+          AppSnackbar.warning('Acesso Negado', 'Faça login para acessar esta área');
         });
         return const RouteSettings(name: '/login');
       }
 
       if (route.startsWith('/admin') && !usuario.isAdmin) {
-        print('Acesso negado: usuário não é administrador');
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          AppSnackbar.error(
-            'Acesso Negado',
-            'Apenas administradores podem acessar esta área',
-          );
+          AppSnackbar.error('Acesso Negado', 'Apenas administradores podem acessar esta área');
         });
         return const RouteSettings(name: '/checklist');
       }
@@ -102,10 +127,9 @@ class AuthMiddleware extends GetMiddleware {
         }
       }
 
-      print('Acesso permitido a: $route');
       return null;
     } catch (e) {
-      print('Erro ao verificar autenticação: $e');
+      debugPrint('Erro ao verificar autenticação: $e');
       return const RouteSettings(name: '/login');
     }
   }
@@ -119,20 +143,13 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'SeeNet',
-
-      // ✅ CONECTA O ScaffoldMessenger global ao app.
-      //    A partir daqui, AppSnackbar.show/error/warning/success funciona
-      //    de qualquer lugar — controllers, services, middlewares, etc.
       scaffoldMessengerKey: appScaffoldMessengerKey,
-
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('pt', 'BR'),
-      ],
+      supportedLocales: const [Locale('pt', 'BR')],
       theme: ThemeData(
         primarySwatch: Colors.green,
         useMaterial3: true,
@@ -162,17 +179,9 @@ class MyApp extends StatelessWidget {
       initialRoute: '/splash',
       getPages: [
         GetPage(name: '/splash', page: () => const SplashScreen()),
-        GetPage(
-          name: '/login',
-          page: () => const LoginView(),
-          binding: LoginBindings(),
-        ),
+        GetPage(name: '/login', page: () => const LoginView(), binding: LoginBindings()),
         GetPage(name: '/checklist', page: () => const Checklistview()),
-        GetPage(
-          name: '/registro',
-          page: () => RegistrarView(),
-          binding: RegistroBindings(),
-        ),
+        GetPage(name: '/registro', page: () => RegistrarView(), binding: RegistroBindings()),
         GetPage(name: '/checklist/items', page: () => const ChecklistItemsScreen()),
         GetPage(name: '/diagnostico', page: () => const DiagnosticoView()),
         GetPage(

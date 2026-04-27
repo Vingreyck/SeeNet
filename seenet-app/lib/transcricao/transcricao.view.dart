@@ -6,6 +6,7 @@ import 'dart:async';
 import '../controllers/transcricao_controller.dart';
 import 'historico_transcricao.view.dart';
 import '../widgets/skeleton_loader.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 
 class TranscricaoView extends StatefulWidget {

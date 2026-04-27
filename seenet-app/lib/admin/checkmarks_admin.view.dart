@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../models/categoria_checkmark.dart';
 import '../models/checkmark.dart';
 import '../services/api_service.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 class CheckmarksAdminView extends StatefulWidget {
   const CheckmarksAdminView({super.key});

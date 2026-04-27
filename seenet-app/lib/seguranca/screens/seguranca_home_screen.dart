@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import '../controllers/seguranca_controller.dart';
 import 'confirmar_recebimento_screen.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 class SegurancaHomeScreen extends StatefulWidget {
   const SegurancaHomeScreen({super.key});

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:async';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 /// Sistema centralizado de tratamento de erros
 /// Garante mensagens e estilos consistentes em todo o app

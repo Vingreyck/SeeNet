@@ -8,6 +8,7 @@ import 'dart:convert';
 import '../controllers/usuario_controller.dart';
 import '../models/usuario.dart';
 import '../login/loginview.controller.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 class AuthService extends GetxService {
   ApiService get _api => Get.find<ApiService>();

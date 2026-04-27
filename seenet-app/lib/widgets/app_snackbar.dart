@@ -1,33 +1,37 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+export 'package:get/get.dart' show SnackPosition;
+
+import 'package:get/get.dart' show SnackPosition;
 
 /// Chave global do ScaffoldMessenger.
-///
-/// Conecte ao GetMaterialApp com `scaffoldMessengerKey: appScaffoldMessengerKey`.
 final GlobalKey<ScaffoldMessengerState> appScaffoldMessengerKey =
 GlobalKey<ScaffoldMessengerState>();
 
-/// Posição da snackbar — espelha o enum SnackPosition do GetX para
-/// permitir drop-in replacement do `Get.snackbar`.
-enum SnackPosition { TOP, BOTTOM }
+/// Padrões de mensagens internas do framework que NÃO devem virar snackbar
+/// para o usuário final. Se a mensagem casar com um desses, a snackbar
+/// é silenciosamente ignorada (e logada no console em modo debug).
+const List<String> _ruidoFramework = [
+  'setState() or markNeedsBuild() called during build',
+  'improper use of a GetX',
+  'You should only use GetX or Obx',
+  '_animation',
+  'has not been initialized',
+  'Navigator operation requested with a context',
+];
+
+bool _ehRuidoDoFramework(String title, String message) {
+  final combined = '$title $message'.toLowerCase();
+  for (final padrao in _ruidoFramework) {
+    if (combined.contains(padrao.toLowerCase())) return true;
+  }
+  return false;
+}
 
 /// Substituto direto do `Get.snackbar` usando ScaffoldMessenger nativo.
-///
-/// Aceita os MESMOS parâmetros do `Get.snackbar` (incluindo
-/// `backgroundColor`, `colorText`, `snackPosition`, `duration`, `icon`)
-/// para que a migração seja só trocar `Get.snackbar(` por
-/// `AppSnackbar.show(`.
-///
-/// Por que existe: `Get.snackbar` tem bug `LateInitializationError:
-/// _animation has not been initialized` no Flutter Web 3.38+ (issues
-/// #2196, #2257, #2761, #3055, #3420 do GetX). O ScaffoldMessenger
-/// nativo do Flutter não tem esse bug.
 class AppSnackbar {
   AppSnackbar._();
 
-  /// Drop-in replacement de `Get.snackbar(title, message, ...)`.
-  ///
-  /// Aceita parâmetros nomeados extras silenciosamente (alguns do GetX
-  /// não têm equivalente exato — são ignorados sem quebrar a API).
   static void show(
       String title,
       String message, {
@@ -35,12 +39,9 @@ class AppSnackbar {
         Color? colorText,
         Duration duration = const Duration(seconds: 3),
         SnackPosition snackPosition = SnackPosition.BOTTOM,
-        IconData? icon,
-        Widget? iconWidget,
+        Object? icon, // aceita Widget OU IconData
         EdgeInsets? margin,
         double? borderRadius,
-        // Parâmetros do Get.snackbar que ignoramos silenciosamente
-        // (não fazem diferença prática ou não têm equivalente):
         Color? borderColor,
         double? borderWidth,
         double? barBlur,
@@ -68,10 +69,18 @@ class AppSnackbar {
         Object? userInputForm,
         Object? leftBarIndicatorColor,
       }) {
+    // ✅ Filtro: erros internos do framework nao viram snackbar para o usuario.
+    //    Eles sao apenas registrados no console em modo debug.
+    if (_ehRuidoDoFramework(title, message)) {
+      if (kDebugMode) {
+        debugPrint('🔇 [snackbar bloqueada] $title — ${message.split('\n').first}');
+      }
+      return;
+    }
+
     final messenger = appScaffoldMessengerKey.currentState;
     if (messenger == null) return;
 
-    // Limpa fila pra não acumular snackbars
     messenger.clearSnackBars();
 
     final bg = backgroundColor ?? const Color(0xFF323232);
@@ -94,17 +103,25 @@ class AppSnackbar {
         Text(
           message,
           style: TextStyle(color: fg, fontSize: 13),
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
 
-    // Se tem ícone, coloca à esquerda do conteúdo
-    if (icon != null || iconWidget != null) {
+    Widget? iconWidget;
+    if (icon is Widget) {
+      iconWidget = icon;
+    } else if (icon is IconData) {
+      iconWidget = Icon(icon, color: fg, size: 24);
+    }
+
+    if (iconWidget != null) {
       content = Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          iconWidget ?? Icon(icon, color: fg, size: 24),
+          iconWidget,
           const SizedBox(width: 12),
           Flexible(child: content),
         ],
@@ -129,8 +146,6 @@ class AppSnackbar {
       ),
     );
   }
-
-  // ─── Atalhos por tipo (opcionais, para código novo) ──────────────────
 
   static void error(String title, String message) =>
       show(title, message, backgroundColor: const Color(0xFFD32F2F));

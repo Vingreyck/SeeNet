@@ -12,6 +12,7 @@ import '../widgets/skeleton_loader.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import '../services/api_service.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 class Checklistview extends StatefulWidget {
   const Checklistview({super.key});

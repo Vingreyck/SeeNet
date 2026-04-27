@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'checkmark_controller.dart';
 import '../services/categoria_service.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 class CategoriaAdminController extends GetxController {
   final CategoriaService _categoriaService = Get.find<CategoriaService>();

@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:permission_handler/permission_handler.dart';
 import '../services/audit_service.dart';
 import 'dart:developer' as developer;
+import 'package:seenet/widgets/app_snackbar.dart';
 
 class LogsAdminView extends StatefulWidget {
   const LogsAdminView({super.key});

@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 class CheckmarkAdminDialog {
   // ========== DIALOG PARA CRIAR CHECKMARK ==========

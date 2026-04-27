@@ -7,6 +7,7 @@ import '../controllers/diagnostico_controller.dart';
 import '../controllers/checkmark_controller.dart';
 import '../models/diagnostico.dart';
 import '../widgets/skeleton_loader.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 /// Diagnóstico View OTIMIZADO - Memory Leak Prevention
 /// Round 7: Consolidação de AnimationControllers (4 → 1)

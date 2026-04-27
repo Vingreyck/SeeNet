@@ -5,6 +5,7 @@ import '../widgets/checkmark_enviar.widget.dart';
 import '../../utils/nav_helper.dart';
 import '../../controllers/checkmark_controller.dart';
 import '../../controllers/usuario_controller.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 class ChecklistItemsScreen extends StatefulWidget {
   const ChecklistItemsScreen({super.key});

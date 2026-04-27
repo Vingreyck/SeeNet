@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 
@@ -23,40 +25,61 @@ class NavController extends GetxController {
     '/transcricao',
   ];
 
-  final RxString _rotaAtual = '/checklist'.obs;
+  // ✅ ValueNotifier nativo do Flutter para a visibilidade do nav.
+  //    Substitui o Obx externo do GlobalBottomNav, que estava
+  //    causando "setState during build" + "improper use of GetX".
+  //    ValueListenableBuilder agenda notificacoes corretamente fora
+  //    do frame de build, sem warnings.
+  final ValueNotifier<bool> mostrarNavNotifier = ValueNotifier<bool>(true);
 
-  /// Atualiza a rota atual e o índice da tab.
-  ///
-  /// IMPORTANTE: este método deve ser chamado a partir do
-  /// `routingCallback` do GetMaterialApp já protegido por
-  /// `WidgetsBinding.instance.addPostFrameCallback`. Isso garante que
-  /// as mudanças reativas (`_rotaAtual` e `selectedIndex`) só disparem
-  /// rebuild do GlobalBottomNav DEPOIS que a transição de rota terminou,
-  /// evitando o LateInitializationError no overlay do GetX.
+  String _rotaAtual = '/checklist';
+
+  /// Atualiza a rota atual e o índice da tab — sempre adiado para
+  /// fora do frame atual, evitando "setState during build".
   void atualizarRota(String rota) {
-    _rotaAtual.value = rota;
-    if (rota == '/checklist') {
-      selectedIndex.value = 1;
-    } else if (rota == '/seguranca') {
-      selectedIndex.value = 2;
-    } else if (rota == '/seguranca/perfil') {
-      selectedIndex.value = 3;
-    }
+    _aplicarSeguro(() {
+      _rotaAtual = rota;
+      mostrarNavNotifier.value = !_rotasOcultas.any((r) => rota.startsWith(r));
+
+      if (rota == '/checklist') {
+        selectedIndex.value = 1;
+      } else if (rota == '/seguranca') {
+        selectedIndex.value = 2;
+      } else if (rota == '/seguranca/perfil') {
+        selectedIndex.value = 3;
+      }
+    });
   }
 
-  /// Atualiza apenas o índice da tab selecionada, com proteção contra
-  /// disparar rebuild durante o frame de navegação.
-  ///
-  /// Use esta versão a partir do `onTap` do bottom nav, que dispara
-  /// junto com `Get.toNamed`.
+  /// Atualiza apenas o índice da tab — também adiado.
   void selecionarTabSafe(int i) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _aplicarSeguro(() {
       selectedIndex.value = i;
     });
   }
 
-  bool get mostrarNav {
-    final rota = _rotaAtual.value;
-    return !_rotasOcultas.any((r) => rota.startsWith(r));
+  /// Executa [acao] em momento seguro:
+  /// - Se o framework está em build/layout/paint, agenda para depois do frame.
+  /// - Caso contrário, executa imediatamente.
+  void _aplicarSeguro(VoidCallback acao) {
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    final emFrame = phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks ||
+        phase == SchedulerPhase.transientCallbacks;
+
+    if (emFrame) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => acao());
+    } else {
+      acao();
+    }
+  }
+
+  /// Getter de compatibilidade — alguns lugares podem ainda chamar `mostrarNav`.
+  bool get mostrarNav => mostrarNavNotifier.value;
+
+  @override
+  void onClose() {
+    mostrarNavNotifier.dispose();
+    super.onClose();
   }
 }

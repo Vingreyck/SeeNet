@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/categoria_admin_controller.dart';
+import 'package:seenet/widgets/app_snackbar.dart';
 
 class CategoriasAdminView extends StatelessWidget {
   const CategoriasAdminView({super.key});

@@ -303,7 +303,7 @@ class CategoriasAdminView extends StatelessWidget {
                 final descricao = descricaoController.text.trim();
 
                 if (nome.isEmpty) {
-                  Get.snackbar(
+                  AppSnackbar.show(
                     'Erro',
                     'Nome da categoria é obrigatório',
                     backgroundColor: Colors.red,
@@ -398,7 +398,7 @@ class CategoriasAdminView extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 if (nomeController.text.trim().isEmpty) {
-                  Get.snackbar(
+                  AppSnackbar.show(
                     'Erro',
                     'Nome da categoria é obrigatório',
                     backgroundColor: Colors.red,

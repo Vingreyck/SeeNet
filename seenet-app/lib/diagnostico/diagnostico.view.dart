@@ -263,7 +263,7 @@ Entre em contato com a operadora informando os testes realizados.
 
   void _showSnackbar(String title, String message, SnackbarType type) {
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         title,
         message,
         snackPosition: SnackPosition.BOTTOM,
@@ -644,24 +644,21 @@ Entre em contato com a operadora informando os testes realizados.
   }
 
   Widget _buildTypeChip(bool isDemo) {
+    // ✅ Detecta se veio por foto
+    final isFoto = _diagnosticoController.diagnosticos.isNotEmpty &&
+        _diagnosticoController.diagnosticos.first.promptEnviado.contains('[Diagnóstico via foto]');
+
+    final label = isDemo ? 'DEMO' : isFoto ? 'FOTO' : 'GROQ';
+    final color = isDemo ? Colors.orange : isFoto ? Colors.purple : Colors.blue;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isDemo ? Colors.orange.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
+        color: color.withOpacity(0.2),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDemo ? Colors.orange : Colors.blue,
-          width: 1,
-        ),
+        border: Border.all(color: color, width: 1),
       ),
-      child: Text(
-        isDemo ? 'DEMO' : 'GEMINI',
-        style: TextStyle(
-          color: isDemo ? Colors.orange : Colors.blue,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      child: Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
     );
   }
 

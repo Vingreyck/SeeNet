@@ -300,7 +300,7 @@ class _SegurancaHomeScreenState extends State<SegurancaHomeScreen> {
                       epis: episLista,
                     ));
                   } else {
-                    Get.snackbar(
+                    AppSnackbar.show(
                       'Requisição pendente',
                       'Aguarde a aprovação da sua requisição atual antes de fazer uma nova.',
                       backgroundColor: const Color(0xFFFFAA00),

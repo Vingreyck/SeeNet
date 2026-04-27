@@ -1,0 +1,1 @@
+class NavController extends GetxController {

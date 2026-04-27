@@ -89,7 +89,7 @@ class OrdemServicoController extends GetxController {
 
       if (sucesso) {
         await carregarMinhasOSs();
-        Get.snackbar(
+        AppSnackbar.show(
           'Sucesso',
           'Deslocamento iniciado!',
           backgroundColor: const Color(0xFF00FF88),
@@ -99,7 +99,7 @@ class OrdemServicoController extends GetxController {
 
       return sucesso;
     } catch (e) {
-      Get.snackbar('Erro', 'Falha ao iniciar: $e',
+      AppSnackbar.show('Erro', 'Falha ao iniciar: $e',
           backgroundColor: Colors.red, colorText: Colors.white);
       return false;
     }
@@ -111,7 +111,7 @@ class OrdemServicoController extends GetxController {
 
       if (sucesso) {
         await carregarMinhasOSs();
-        Get.snackbar(
+        AppSnackbar.show(
           'Sucesso',
           '📍 Você chegou ao local!',
           backgroundColor: Colors.orange,
@@ -121,7 +121,7 @@ class OrdemServicoController extends GetxController {
 
       return sucesso;
     } catch (e) {
-      Get.snackbar('Erro', 'Falha ao informar chegada: $e',
+      AppSnackbar.show('Erro', 'Falha ao informar chegada: $e',
           backgroundColor: Colors.red, colorText: Colors.white);
       return false;
     }
@@ -134,7 +134,7 @@ class OrdemServicoController extends GetxController {
       if (sucesso) {
         await carregarMinhasOSs();
         await carregarOSsConcluidas();
-        Get.snackbar(
+        AppSnackbar.show(
           'Sucesso',
           'OS finalizada com sucesso!',
           backgroundColor: const Color(0xFF00FF88),
@@ -144,7 +144,7 @@ class OrdemServicoController extends GetxController {
 
       return sucesso;
     } catch (e) {
-      Get.snackbar('Erro', 'Falha ao finalizar: $e',
+      AppSnackbar.show('Erro', 'Falha ao finalizar: $e',
           backgroundColor: Colors.red, colorText: Colors.white);
       return false;
     }

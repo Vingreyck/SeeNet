@@ -26,7 +26,7 @@ class CategoriaAdminController extends GetxController {
       statusMensagem.value = '';
     } catch (e) {
       statusMensagem.value = 'Erro ao carregar categorias';
-      Get.snackbar(
+      AppSnackbar.show(
         'Erro',
         'Não foi possível carregar as categorias: $e',
         backgroundColor: Colors.red,
@@ -151,7 +151,7 @@ Future<void> criarCategoria({
 
     await carregarCategorias();
   } catch (e) {
-    Get.snackbar(
+    AppSnackbar.show(
       'Erro',
       'Não foi possível criar a categoria: $e',
       backgroundColor: Colors.red,
@@ -228,7 +228,7 @@ Future<void> criarCategoria({
         ativo: ativo,
       );
 
-      Get.snackbar(
+      AppSnackbar.show(
         'Sucesso',
         'Categoria atualizada com sucesso',
         backgroundColor: const Color(0xFF00FF88),
@@ -237,7 +237,7 @@ Future<void> criarCategoria({
 
       await carregarCategorias();
     } catch (e) {
-      Get.snackbar(
+      AppSnackbar.show(
         'Erro',
         'Não foi possível atualizar a categoria: $e',
         backgroundColor: Colors.red,
@@ -301,7 +301,7 @@ Future<void> deletarCategoria(int id, String nome) async {
       await checkmarkController.carregarCategorias();
     }
 
-    Get.snackbar(
+    AppSnackbar.show(
       'Sucesso',
       'Categoria deletada com sucesso',
       backgroundColor: const Color(0xFF00FF88),
@@ -312,7 +312,7 @@ Future<void> deletarCategoria(int id, String nome) async {
     await carregarCategorias();
   } catch (e) {
     print('❌ Erro ao deletar categoria: $e');
-    Get.snackbar(
+    AppSnackbar.show(
       'Erro',
       'Não foi possível deletar a categoria: $e',
       backgroundColor: Colors.red,

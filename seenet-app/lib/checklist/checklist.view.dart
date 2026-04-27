@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import '../controllers/usuario_controller.dart';
 import 'package:seenet/services/auth_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../controllers/nav_controller.dart';
 import '../controllers/checkmark_controller.dart';
 import '../widgets/skeleton_loader.dart';
 import 'package:image_picker/image_picker.dart';
@@ -19,19 +20,18 @@ class Checklistview extends StatefulWidget {
   State<Checklistview> createState() => _ChecklistviewState();
 }
 
-class _ChecklistviewState extends State<Checklistview>
-    with SingleTickerProviderStateMixin {
+class _ChecklistviewState extends State<Checklistview> {
   final UsuarioController usuarioController = Get.find<UsuarioController>();
   final CheckmarkController checkmarkController = Get.find<CheckmarkController>();
   final AuthService authService = Get.find<AuthService>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  int _navIndex = 1; // 0=Início, 1=EPI, 2=Perfil
-
   @override
   void initState() {
     super.initState();
     _carregarCategorias();
+    // ✅ Registra o scaffoldKey no NavController
+    Get.find<NavController>().scaffoldKey = _scaffoldKey;
   }
 
   Future<void> _carregarCategorias() async {
@@ -133,8 +133,8 @@ class _ChecklistviewState extends State<Checklistview>
                   _buildDrawerItem(
                     icon: Icons.home_outlined,
                     label: 'Início',
-                    onTap: () { Navigator.pop(context); setState(() => _navIndex = 0); },
-                    active: _navIndex == 0,
+                    onTap: () { Navigator.pop(context); Get.find<NavController>().selectedIndex.value = 1; },
+                    active: Get.find<NavController>().selectedIndex.value == 1,
                   ),
                   _buildDrawerItem(
                     icon: Icons.assignment_outlined,
@@ -150,8 +150,8 @@ class _ChecklistviewState extends State<Checklistview>
                   _buildDrawerItem(
                     icon: Icons.health_and_safety_outlined,
                     label: 'Solicitação de EPI/EPC',
-                    onTap: () { Navigator.pop(context); setState(() => _navIndex = 1); Get.toNamed('/seguranca'); },
-                    active: _navIndex == 1,
+                    onTap: () { Navigator.pop(context); Get.find<NavController>().selectedIndex.value = 2; Get.toNamed('/seguranca'); },
+                    active: Get.find<NavController>().selectedIndex.value == 2,
                   ),
 
                   // Gestor de segurança
@@ -302,92 +302,6 @@ class _ChecklistviewState extends State<Checklistview>
   }
 
   // ──────────────────────────────────────────────
-  // BOTTOM NAV ANIMADO
-  // ──────────────────────────────────────────────
-
-  Widget _buildBottomNav() {
-    // ✅ 4 itens: Menu, Início, EPI, Perfil
-    final labels = ['Menu', 'Início', 'EPI', 'Perfil'];
-    final icons = [
-      Icons.menu_rounded,
-      Icons.home_rounded,
-      Icons.health_and_safety_rounded,
-      Icons.person_rounded,
-    ];
-
-    return Container(
-      height: 60 + MediaQuery.of(context).padding.bottom,
-      decoration: const BoxDecoration(
-        color: Color(0xFF232323),
-        border: Border(top: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-        child: Row(
-          children: List.generate(4, (i) {
-            // Menu (i=0) não tem estado "selecionado" — é sempre neutro
-            final selected = i != 0 && _navIndex == i;
-
-            return Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  if (i == 0) {
-                    // ✅ Abre o drawer
-                    _scaffoldKey.currentState?.openDrawer();
-                    return;
-                  }
-                  setState(() => _navIndex = i);
-                  if (i == 2) Get.toNamed('/seguranca');
-                  if (i == 3) Get.toNamed('/seguranca/perfil');
-                },
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? const Color(0xFF00FF88).withOpacity(0.15)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(
-                        icons[i],
-                        color: i == 0
-                            ? const Color(0xFF888888) // Menu sempre neutro
-                            : selected
-                            ? const Color(0xFF00FF88)
-                            : const Color(0xFF555555),
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                        color: i == 0
-                            ? const Color(0xFF888888)
-                            : selected
-                            ? const Color(0xFF00FF88)
-                            : const Color(0xFF555555),
-                      ),
-                      child: Text(labels[i]),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-
-  // ──────────────────────────────────────────────
   // BUILD PRINCIPAL
   // ──────────────────────────────────────────────
 
@@ -397,8 +311,6 @@ class _ChecklistviewState extends State<Checklistview>
       key: _scaffoldKey,
       backgroundColor: const Color(0xFF1A1A1A),
       drawer: _buildDrawer(),
-      floatingActionButton: _buildFabCamera(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Stack(
         children: [
           // ── Header verde
@@ -445,28 +357,32 @@ class _ChecklistviewState extends State<Checklistview>
                       ),
                     ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.2),
-                      border: usuarioController.isAdmin
-                          ? Border.all(color: Colors.orange, width: 2)
-                          : null,
-                    ),
-                    child: CircleAvatar(
-                      radius: 20,
-                      backgroundColor: usuarioController.isAdmin
-                          ? Colors.orange.withOpacity(0.3)
-                          : Colors.white.withOpacity(0.2),
-                      child: Icon(
-                        usuarioController.isAdmin
-                            ? Icons.admin_panel_settings
-                            : Icons.person_outline,
-                        color: Colors.white,
-                        size: 24,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.2),
+                          border: usuarioController.isAdmin
+                              ? Border.all(color: Colors.orange, width: 2)
+                              : null,
+                        ),
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: usuarioController.isAdmin
+                              ? Colors.orange.withOpacity(0.3)
+                              : Colors.white.withOpacity(0.2),
+                          child: Icon(
+                            usuarioController.isAdmin
+                                ? Icons.admin_panel_settings
+                                : Icons.person_outline,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -505,7 +421,7 @@ class _ChecklistviewState extends State<Checklistview>
             top: MediaQuery.of(context).padding.top + 195,
             left: 0,
             right: 0,
-            bottom: 60 + MediaQuery.of(context).padding.bottom,
+            bottom: 0,
             child: Obx(() {
               if (checkmarkController.isLoading.value) {
                 return const CategoriasSkeleton(itemCount: 4);
@@ -529,16 +445,7 @@ class _ChecklistviewState extends State<Checklistview>
                             if (categoria.id != null) {
                               checkmarkController.categoriaAtual.value = categoria.id!;
                               await checkmarkController.carregarCheckmarks(categoria.id!);
-                              final nome = categoria.nome.toLowerCase();
-                              if (nome.contains('lentidão') || nome.contains('lentidao')) {
-                                Get.toNamed('/checklist/lentidao');
-                              } else if (nome.contains('iptv') || nome.contains('tv')) {
-                                Get.toNamed('/checklist/iptv');
-                              } else if (nome.contains('app') || nome.contains('aplicativo')) {
-                                Get.toNamed('/checklist/apps');
-                              } else {
-                                Get.toNamed('/checklist/lentidao');
-                              }
+                              Get.toNamed('/checklist/items');
                             }
                           },
                         );
@@ -549,14 +456,6 @@ class _ChecklistviewState extends State<Checklistview>
                 ),
               );
             }),
-          ),
-
-          // ── Bottom nav no rodapé
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildBottomNav(),
           ),
         ],
       ),
@@ -569,18 +468,6 @@ class _ChecklistviewState extends State<Checklistview>
     if (nome.contains('iptv') || nome.contains('tv')) return 'assets/images/iptv.svg';
     if (nome.contains('app') || nome.contains('aplicativo')) return 'assets/images/app.svg';
     return 'assets/images/logo.svg';
-  }
-
-  Widget _buildFabCamera() {
-    if (kIsWeb) return const SizedBox.shrink(); // ✅ esconde no web
-    return Padding(
-      padding: EdgeInsets.only(bottom: 60 + MediaQuery.of(context).padding.bottom),
-      child: FloatingActionButton(
-        backgroundColor: const Color(0xFF00FF88),
-        onPressed: _diagnosticarPorFoto,
-        child: const Icon(Icons.camera_alt, color: Colors.black, size: 28),
-      ),
-    );
   }
 
   Future<void> _diagnosticarPorFoto() async {
@@ -632,12 +519,12 @@ class _ChecklistviewState extends State<Checklistview>
           'via_foto': true,
         });
       } else {
-        Get.snackbar('Erro', 'Não foi possível analisar a imagem',
+        AppSnackbar.show('Erro', 'Não foi possível analisar a imagem',
             backgroundColor: Colors.red, colorText: Colors.white);
       }
     } catch (e) {
       Get.back();
-      Get.snackbar('Erro', 'Falha ao processar imagem',
+      AppSnackbar.show('Erro', 'Falha ao processar imagem',
           backgroundColor: Colors.red, colorText: Colors.white);
     }
   }

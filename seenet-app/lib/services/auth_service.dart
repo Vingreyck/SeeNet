@@ -126,13 +126,13 @@ class AuthService extends GetxService {
       if (response['success']) {
         return true;
       } else {
-        Get.snackbar('Erro no Registro', response['error'] ?? 'Falha no registro',
+        AppSnackbar.show('Erro no Registro', response['error'] ?? 'Falha no registro',
             backgroundColor: Colors.red, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
         return false;
       }
     } catch (e) {
       print('❌ Erro no registro: $e');
-      Get.snackbar('Erro de Conexão', 'Não foi possível conectar ao servidor.',
+      AppSnackbar.show('Erro de Conexão', 'Não foi possível conectar ao servidor.',
           backgroundColor: Colors.red, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
       return false;
     } finally {

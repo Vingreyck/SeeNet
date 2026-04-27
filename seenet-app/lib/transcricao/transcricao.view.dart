@@ -106,7 +106,7 @@ class _TranscricaoViewState extends State<TranscricaoView>
       // Iniciar animação de pulse
       _pulseController.repeat(reverse: true);
     } else {
-      Get.snackbar(
+      AppSnackbar.show(
         'Erro',
         'Não foi possível iniciar a gravação. Verifique as permissões.',
         backgroundColor: Colors.red,
@@ -121,7 +121,7 @@ class _TranscricaoViewState extends State<TranscricaoView>
     _pulseController.stop();
     _pulseController.reset();
     
-    Get.snackbar(
+    AppSnackbar.show(
       'Sucesso',
       'Gravação finalizada com sucesso!',
       backgroundColor: const Color(0xFF00FF88),
@@ -135,7 +135,7 @@ class _TranscricaoViewState extends State<TranscricaoView>
     _pulseController.stop();
     _pulseController.reset();
     
-    Get.snackbar(
+    AppSnackbar.show(
       'Cancelado',
       'Gravação cancelada',
       backgroundColor: Colors.orange,
@@ -145,7 +145,7 @@ class _TranscricaoViewState extends State<TranscricaoView>
 
   Future<void> _salvarDocumentacao() async {
     if (controller.textoProcessado.isEmpty) {
-      Get.snackbar(
+      AppSnackbar.show(
         'Erro',
         'Não há documentação para salvar',
         backgroundColor: Colors.red,
@@ -165,14 +165,14 @@ class _TranscricaoViewState extends State<TranscricaoView>
         controller.limpar();
         _seconds = 0;
         
-        Get.snackbar(
+        AppSnackbar.show(
           'Sucesso',
           'Documentação salva com sucesso!',
           backgroundColor: const Color(0xFF00FF88),
           colorText: Colors.black,
         );
       } else {
-        Get.snackbar(
+        AppSnackbar.show(
           'Erro',
           'Erro ao salvar documentação',
           backgroundColor: Colors.red,
@@ -256,7 +256,7 @@ class _TranscricaoViewState extends State<TranscricaoView>
 
   void _copiarTexto(String texto) {
     if (texto.isEmpty) {
-      Get.snackbar(
+      AppSnackbar.show(
         'Aviso',
         'Não há texto para copiar',
         backgroundColor: Colors.orange,
@@ -266,7 +266,7 @@ class _TranscricaoViewState extends State<TranscricaoView>
     }
     
     Clipboard.setData(ClipboardData(text: texto));
-    Get.snackbar(
+    AppSnackbar.show(
       'Copiado',
       'Texto copiado para a área de transferência',
       backgroundColor: Colors.blue,

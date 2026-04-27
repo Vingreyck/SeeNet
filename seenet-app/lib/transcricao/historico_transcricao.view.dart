@@ -540,7 +540,7 @@ class _HistoricoTranscricaoViewState extends State<HistoricoTranscricaoView> {
 
   void _copiarTexto(String texto, String mensagem) {
     Clipboard.setData(ClipboardData(text: texto));
-    Get.snackbar(
+    AppSnackbar.show(
       'Copiado',
       mensagem,
       backgroundColor: Colors.blue,
@@ -551,7 +551,7 @@ class _HistoricoTranscricaoViewState extends State<HistoricoTranscricaoView> {
 
   void _compartilharTranscricao(TranscricaoTecnica transcricao) {
     // Implementar compartilhamento
-    Get.snackbar(
+    AppSnackbar.show(
       'Compartilhamento',
       'Funcionalidade em desenvolvimento',
       backgroundColor: Colors.orange,

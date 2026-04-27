@@ -70,7 +70,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
 
     } catch (e) {
       print('❌ Erro ao carregar usuários: $e');
-      Get.snackbar(
+      AppSnackbar.show(
         'Erro',
         'Erro ao conectar com servidor',
         backgroundColor: Colors.red,
@@ -575,17 +575,17 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
           ElevatedButton(
             onPressed: () async {
               if (novaSenhaController.text.isEmpty) {
-                Get.snackbar('Erro', 'Nova senha não pode ser vazia',
+                AppSnackbar.show('Erro', 'Nova senha não pode ser vazia',
                     backgroundColor: Colors.red, colorText: Colors.white);
                 return;
               }
               if (novaSenhaController.text.length < 6) {
-                Get.snackbar('Erro', 'Nova senha deve ter pelo menos 6 caracteres',
+                AppSnackbar.show('Erro', 'Nova senha deve ter pelo menos 6 caracteres',
                     backgroundColor: Colors.red, colorText: Colors.white);
                 return;
               }
               if (novaSenhaController.text != confirmarSenhaController.text) {
-                Get.snackbar('Erro', 'Senhas não coincidem',
+                AppSnackbar.show('Erro', 'Senhas não coincidem',
                     backgroundColor: Colors.red, colorText: Colors.white);
                 return;
               }
@@ -607,7 +607,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
         'nova_senha': novaSenha,
       });
       if (response['success']) {
-        Get.snackbar(
+        AppSnackbar.show(
           'Sucesso',
           '🔐 Senha resetada com sucesso!\nO usuário deve fazer login com a nova senha.',
           backgroundColor: Colors.green,
@@ -619,7 +619,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       }
     } catch (e) {
       print('❌ Erro ao resetar senha: $e');
-      Get.snackbar('Erro', 'Erro ao resetar senha',
+      AppSnackbar.show('Erro', 'Erro ao resetar senha',
           backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
@@ -664,7 +664,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       final response =
       await _api.put('/auth/usuarios/$id/status', {'ativo': ativo});
       if (response['success']) {
-        Get.snackbar(
+        AppSnackbar.show(
           'Sucesso',
           'Status do usuário ${ativo ? 'ativado' : 'desativado'} com sucesso!',
           backgroundColor: ativo ? Colors.green : Colors.orange,
@@ -676,7 +676,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       }
     } catch (e) {
       print('❌ Erro ao atualizar status: $e');
-      Get.snackbar('Erro', 'Erro ao atualizar status do usuário',
+      AppSnackbar.show('Erro', 'Erro ao atualizar status do usuário',
           backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
@@ -744,7 +744,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
     try {
       final response = await _api.delete('/auth/usuarios/$id');
       if (response['success']) {
-        Get.snackbar('Sucesso', 'Usuário removido com sucesso!',
+        AppSnackbar.show('Sucesso', 'Usuário removido com sucesso!',
             backgroundColor: Colors.green, colorText: Colors.white);
         await carregarUsuarios();
       } else {
@@ -752,7 +752,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView> {
       }
     } catch (e) {
       print('❌ Erro ao remover usuário: $e');
-      Get.snackbar('Erro', 'Erro ao remover usuário',
+      AppSnackbar.show('Erro', 'Erro ao remover usuário',
           backgroundColor: Colors.red, colorText: Colors.white);
     }
   }

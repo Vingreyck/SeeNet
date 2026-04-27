@@ -23,7 +23,7 @@ dependencies:
   signature: ^5.4.1
   get_storage: ^2.1.1
   flutter_svg: ^2.0.10
-  get: ^4.7.2
+  get: ^4.7.3
   google_maps_flutter: ^2.9.0
   intl: ^0.20.2
   pdfkit: 0.0.1

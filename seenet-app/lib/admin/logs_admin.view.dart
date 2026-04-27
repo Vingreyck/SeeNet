@@ -62,7 +62,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
         
         if (!mounted) return;
         
-        Get.snackbar(
+        AppSnackbar.show(
           '🔒 Sessão Expirada',
           'Sua sessão expirou. Por favor, faça login novamente.',
           backgroundColor: Colors.red,
@@ -104,7 +104,7 @@ class _LogsAdminViewState extends State<LogsAdminView>
       
       if (!mounted) return;
       
-      Get.snackbar(
+      AppSnackbar.show(
         'Erro',
         'Erro ao carregar logs da API',
         backgroundColor: Colors.red,
@@ -1176,7 +1176,7 @@ Future<void> _exportarLogs() async {
       
       if (!mounted) return;
       
-      Get.snackbar(
+      AppSnackbar.show(
         'Aviso',
         'Nenhum dado para exportar no período selecionado',
         backgroundColor: Colors.orange,
@@ -1203,7 +1203,7 @@ Future<void> _exportarLogs() async {
     
     if (!mounted) return;
     
-    Get.snackbar(
+    AppSnackbar.show(
       'Erro',
       'Erro ao exportar logs: ${e.toString()}',
       backgroundColor: Colors.red,
@@ -1217,7 +1217,7 @@ Future<void> _exportarLogs() async {
     try {
       // ✅ Web: não tem acesso ao sistema de arquivos
       if (kIsWeb) {
-        Get.snackbar(
+        AppSnackbar.show(
           'Aviso',
           'Download de arquivo não disponível na versão web',
           backgroundColor: Colors.orange,
@@ -1260,7 +1260,7 @@ Future<void> _exportarLogs() async {
 
       if (!mounted) return;
 
-      Get.snackbar(
+      AppSnackbar.show(
         'Sucesso',
         'Arquivo salvo: $nomeArquivo',
         backgroundColor: Colors.green,
@@ -1270,7 +1270,7 @@ Future<void> _exportarLogs() async {
     } catch (e) {
       developer.log('❌ Erro ao salvar arquivo: $e');
       if (!mounted) return;
-      Get.snackbar(
+      AppSnackbar.show(
         'Erro',
         'Erro ao salvar arquivo: ${e.toString()}',
         backgroundColor: Colors.red,
@@ -1345,7 +1345,7 @@ void _limparLogsAntigos() {
               
               if (!mounted) return;
               
-              Get.snackbar(
+              AppSnackbar.show(
                 'Sucesso',
                 'Logs antigos removidos com sucesso!',
                 backgroundColor: Colors.green,
@@ -1368,7 +1368,7 @@ void _limparLogsAntigos() {
               
               if (!mounted) return;
               
-              Get.snackbar(
+              AppSnackbar.show(
                 'Erro',
                 'Erro ao limpar logs: ${e.toString()}',
                 backgroundColor: Colors.red,

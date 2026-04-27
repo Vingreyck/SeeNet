@@ -15,7 +15,7 @@ class ErrorHandler {
     String message = _getNetworkErrorMessage(error);
     
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         'Erro de Conexão',
         message,
         snackPosition: SnackPosition.TOP,
@@ -34,7 +34,7 @@ class ErrorHandler {
     print('🔐 Auth Error: ${message ?? "Token inválido"}');
     
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         'Sessão Expirada',
         message ?? 'Faça login novamente',
         snackPosition: SnackPosition.TOP,
@@ -68,7 +68,7 @@ class ErrorHandler {
     }
     
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         'Erro no Servidor',
         displayMessage,
         snackPosition: SnackPosition.TOP,
@@ -87,7 +87,7 @@ class ErrorHandler {
     print('⚠️ Validation Error: $message');
     
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         'Validação',
         message,
         snackPosition: SnackPosition.TOP,
@@ -106,7 +106,7 @@ class ErrorHandler {
     print('🚫 Permission Error: ${message ?? "Acesso negado"}');
     
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         'Acesso Negado',
         message ?? 'Você não tem permissão para esta ação',
         snackPosition: SnackPosition.TOP,
@@ -129,7 +129,7 @@ class ErrorHandler {
         : 'Recurso não encontrado';
     
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         'Não Encontrado',
         message,
         snackPosition: SnackPosition.TOP,
@@ -148,7 +148,7 @@ class ErrorHandler {
     print('❌ Generic Error: $message');
     
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         'Erro',
         message,
         snackPosition: SnackPosition.TOP,
@@ -246,7 +246,7 @@ class ErrorHandler {
     print('✅ Success: $message');
     
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         title ?? 'Sucesso',
         message,
         snackPosition: SnackPosition.TOP,
@@ -264,7 +264,7 @@ class ErrorHandler {
     print('ℹ️ Info: $message');
     
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         title ?? 'Informação',
         message,
         snackPosition: SnackPosition.TOP,
@@ -282,7 +282,7 @@ class ErrorHandler {
     print('⚠️ Warning: $message');
     
     if (Get.context != null) {
-      Get.snackbar(
+      AppSnackbar.show(
         title ?? 'Aviso',
         message,
         snackPosition: SnackPosition.TOP,

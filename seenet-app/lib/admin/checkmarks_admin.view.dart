@@ -108,7 +108,7 @@ Future<void> carregarDados() async {
   } catch (e) {
     print('❌ Erro ao carregar dados: $e');
     if (mounted) {
-      Get.snackbar('Erro', 'Erro ao carregar dados',
+      AppSnackbar.show('Erro', 'Erro ao carregar dados',
         backgroundColor: Colors.red, colorText: Colors.white);
     }
   } finally {
@@ -475,7 +475,7 @@ void _editarCheckmark(Checkmark checkmark) {
 
 Future<void> _salvarEdicaoCheckmark(int id, String titulo, String desc, String prompt) async {
   if (titulo.isEmpty || prompt.isEmpty) {
-    Get.snackbar('Erro', 'Título e Prompt obrigatórios', 
+    AppSnackbar.show('Erro', 'Título e Prompt obrigatórios',
       backgroundColor: Colors.red, colorText: Colors.white);
     return;
   }
@@ -489,15 +489,15 @@ Future<void> _salvarEdicaoCheckmark(int id, String titulo, String desc, String p
     });
     
     if (res['success']) {
-      Get.snackbar('Sucesso', 'Atualizado!', 
+      AppSnackbar.show('Sucesso', 'Atualizado!',
         backgroundColor: Colors.green, colorText: Colors.white);
       await recarregarCheckmarks();
     } else {
-      Get.snackbar('Erro', res['error'] ?? 'Falha ao atualizar',
+      AppSnackbar.show('Erro', res['error'] ?? 'Falha ao atualizar',
         backgroundColor: Colors.red, colorText: Colors.white);
     }
   } catch (e) {
-    Get.snackbar('Erro', 'Falha ao atualizar', 
+    AppSnackbar.show('Erro', 'Falha ao atualizar',
       backgroundColor: Colors.red, colorText: Colors.white);
   }
 }
@@ -530,17 +530,17 @@ Future<void> _confirmarRemocao(int id) async {
   try {
     final res = await _api.delete('/checkmark/checkmarks/$id');  // ✅ CORRIGIDO: plural
     if (res['success']) {
-      Get.snackbar('Sucesso', 'Removido!', backgroundColor: Colors.green, colorText: Colors.white);
+      AppSnackbar.show('Sucesso', 'Removido!', backgroundColor: Colors.green, colorText: Colors.white);
         await recarregarCheckmarks();  // ✅ MUDOU: usa recarregarCheckmarks
     }
   } catch (e) {
-    Get.snackbar('Erro', 'Falha ao remover', backgroundColor: Colors.red, colorText: Colors.white);
+    AppSnackbar.show('Erro', 'Falha ao remover', backgroundColor: Colors.red, colorText: Colors.white);
   }
 }
 
   void _adicionarCheckmark() {
     if (categorias.isEmpty) {
-      Get.snackbar('Erro', 'Nenhuma categoria', backgroundColor: Colors.red, colorText: Colors.white);
+      AppSnackbar.show('Erro', 'Nenhuma categoria', backgroundColor: Colors.red, colorText: Colors.white);
       return;
     }
     _adicionarCheckmarkCategoria(categorias.first.id!);
@@ -613,14 +613,14 @@ Future<void> _confirmarRemocao(int id) async {
 Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) async {
   // ✅ VALIDAÇÃO: Título obrigatório
   if (titulo.isEmpty) {
-    Get.snackbar('Erro', 'Título é obrigatório', 
+    AppSnackbar.show('Erro', 'Título é obrigatório',
       backgroundColor: Colors.red, colorText: Colors.white);
     return;
   }
   
   // ✅ VALIDAÇÃO: Prompt obrigatório
   if (prompt.isEmpty) {
-    Get.snackbar('Erro', 'Prompt é obrigatório', 
+    AppSnackbar.show('Erro', 'Prompt é obrigatório',
       backgroundColor: Colors.red, colorText: Colors.white);
     return;
   }
@@ -717,17 +717,17 @@ Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) a
     print('   Response completa: $res');
     
     if (res['success']) {
-      Get.snackbar('Sucesso', 'Criado!', 
+      AppSnackbar.show('Sucesso', 'Criado!',
         backgroundColor: Colors.green, colorText: Colors.white);
         await recarregarCheckmarks();  // ✅ MUDOU: usa recarregarCheckmarks
     } else {
       print('❌ Erro do servidor: ${res['error']}');
-      Get.snackbar('Erro', res['error'] ?? 'Falha ao criar',
+      AppSnackbar.show('Erro', res['error'] ?? 'Falha ao criar',
         backgroundColor: Colors.red, colorText: Colors.white);
     }
   } catch (e) {
     print('❌ Exceção ao criar: $e');
-    Get.snackbar('Erro', 'Falha ao criar', 
+    AppSnackbar.show('Erro', 'Falha ao criar',
       backgroundColor: Colors.red, colorText: Colors.white);
   }
 }
@@ -776,7 +776,7 @@ Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) a
 
   Future<void> _salvarEdicaoCategoria(int id, String nome, String desc) async {
     if (nome.isEmpty) {
-      Get.snackbar('Erro', 'Nome obrigatório', backgroundColor: Colors.red, colorText: Colors.white);
+      AppSnackbar.show('Erro', 'Nome obrigatório', backgroundColor: Colors.red, colorText: Colors.white);
       return;
     }
     try {
@@ -784,11 +784,11 @@ Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) a
         'nome': nome, 'descricao': desc.isEmpty ? null : desc,
       });
       if (res['success']) {
-        Get.snackbar('Sucesso', 'Categoria atualizada!', backgroundColor: Colors.green, colorText: Colors.white);
+        AppSnackbar.show('Sucesso', 'Categoria atualizada!', backgroundColor: Colors.green, colorText: Colors.white);
         await recarregarCheckmarks();  // ✅ MUDOU: usa recarregarCheckmarks
       }
     } catch (e) {
-      Get.snackbar('Erro', 'Falha', backgroundColor: Colors.red, colorText: Colors.white);
+      AppSnackbar.show('Erro', 'Falha', backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 }

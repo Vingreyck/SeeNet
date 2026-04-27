@@ -156,7 +156,7 @@ class CheckmarkAdminDialog {
               if (formKey.currentState!.validate()) {
                 if (categoriaSelecionada == null) {
                   // ✅ POPUP DE ERRO
-                  Get.snackbar(
+                  AppSnackbar.show(
                     'Erro',
                     'Selecione uma categoria',
                     backgroundColor: Colors.red,

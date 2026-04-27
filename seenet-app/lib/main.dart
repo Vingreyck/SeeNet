@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:seenet/checklist/screen/ChecklistAppsScreen.dart';
+import 'checklist/screen/checklist_items_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:seenet/checklist/screen/ChecklistIptvScreen.dart';
-import 'package:seenet/checklist/screen/ChecklistLentidaoScreen.dart';
 import 'package:flutter/services.dart';
+import 'widgets/global_bottom_nav.dart';
+import 'widgets/app_snackbar.dart';
+import 'controllers/nav_controller.dart';
 import 'web_admin/layout/web_layout.dart';
 import 'package:seenet/seguranca/screens/confirmar_recebimento_screen.dart';
 import 'package:seenet/seguranca/screens/registro_manual_epi_screen.dart';
@@ -35,19 +36,12 @@ import 'package:seenet/seguranca/screens/minhas_requisicoes_screen.dart';
 import 'package:seenet/seguranca/screens/gestao_requisicoes_screen.dart';
 import 'package:seenet/seguranca/screens/perfil_screen.dart';
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ INICIALIZAR GETSTORAGE
   await GetStorage.init();
 
-  // ✅ CONFIGURAR TELA CHEIA (Edge-to-edge)
-  SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.edgeToEdge,
-  );
-
-  // ✅ CONFIGURAR COR DA STATUS BAR
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -58,55 +52,51 @@ void main() async {
   );
 
   Get.put(UsuarioController(), permanent: true);
+  Get.put(NavController(), permanent: true);
 
   runApp(const MyApp());
 }
 
 // ✅ MIDDLEWARE DE AUTENTICAÇÃO
+//    Snackbars usam AppSnackbar (ScaffoldMessenger nativo) — não Get.snackbar.
 class AuthMiddleware extends GetMiddleware {
   @override
   RouteSettings? redirect(String? route) {
     if (route == null) return null;
 
-    List<String> publicRoutes = ['/login', '/registro', '/splash'];
-    if (publicRoutes.contains(route)) {
-      return null;
-    }
+    const publicRoutes = ['/login', '/registro', '/splash'];
+    if (publicRoutes.contains(route)) return null;
 
     try {
-      final usuarioController = Get.find<UsuarioController>();
+      final usuario = Get.find<UsuarioController>();
 
-      if (!usuarioController.isLoggedIn) {
+      if (!usuario.isLoggedIn) {
         print('Acesso negado: usuário não autenticado');
-        Get.snackbar(
-          'Acesso Negado',
-          'Faça login para acessar esta área',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-          snackPosition: SnackPosition.TOP,
-          duration: const Duration(seconds: 3),
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          AppSnackbar.warning(
+            'Acesso Negado',
+            'Faça login para acessar esta área',
+          );
+        });
         return const RouteSettings(name: '/login');
       }
 
-      if (route.startsWith('/admin')) {
-        if (!usuarioController.isAdmin) {
-          print('Acesso negado: usuário não é administrador');
-          Get.snackbar(
+      if (route.startsWith('/admin') && !usuario.isAdmin) {
+        print('Acesso negado: usuário não é administrador');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          AppSnackbar.error(
             'Acesso Negado',
             'Apenas administradores podem acessar esta área',
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
-            snackPosition: SnackPosition.TOP,
-            duration: const Duration(seconds: 3),
           );
-          return const RouteSettings(name: '/checklist');
-        }
+        });
+        return const RouteSettings(name: '/checklist');
       }
 
       if (route.startsWith('/web-admin')) {
-        final tipo = usuarioController.tipoUsuario;
-        final permitido = usuarioController.isAdmin || tipo == 'gestor' || tipo == 'gestor_seguranca';
+        final tipo = usuario.tipoUsuario;
+        final permitido = usuario.isAdmin ||
+            tipo == 'gestor' ||
+            tipo == 'gestor_seguranca';
         if (!permitido) {
           return const RouteSettings(name: '/checklist');
         }
@@ -129,6 +119,12 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'SeeNet',
+
+      // ✅ CONECTA O ScaffoldMessenger global ao app.
+      //    A partir daqui, AppSnackbar.show/error/warning/success funciona
+      //    de qualquer lugar — controllers, services, middlewares, etc.
+      scaffoldMessengerKey: appScaffoldMessengerKey,
+
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -149,49 +145,36 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
+      routingCallback: (routing) {
+        if (routing?.current != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Get.find<NavController>().atualizarRota(routing!.current);
+          });
+        }
+      },
       builder: (context, child) {
-        return SafeArea(
-          top: false,
-          bottom: true,
-          child: child ?? const SizedBox.shrink(),
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: child ?? const SizedBox.shrink(),
+          bottomNavigationBar: const GlobalBottomNav(),
         );
       },
       initialRoute: '/splash',
       getPages: [
-        GetPage(
-          name: '/splash',
-          page: () => const SplashScreen(),
-        ),
+        GetPage(name: '/splash', page: () => const SplashScreen()),
         GetPage(
           name: '/login',
           page: () => const LoginView(),
           binding: LoginBindings(),
         ),
-        GetPage(
-          name: '/checklist',
-          page: () => const Checklistview(),
-        ),
+        GetPage(name: '/checklist', page: () => const Checklistview()),
         GetPage(
           name: '/registro',
           page: () => RegistrarView(),
           binding: RegistroBindings(),
         ),
-        GetPage(
-          name: '/checklist/apps',
-          page: () => const ChecklistAppsScreen(),
-        ),
-        GetPage(
-          name: '/checklist/iptv',
-          page: () => const ChecklistIptvScreen(),
-        ),
-        GetPage(
-          name: '/checklist/lentidao',
-          page: () => const ChecklistLentidaoScreen(),
-        ),
-        GetPage(
-          name: '/diagnostico',
-          page: () => const DiagnosticoView(),
-        ),
+        GetPage(name: '/checklist/items', page: () => const ChecklistItemsScreen()),
+        GetPage(name: '/diagnostico', page: () => const DiagnosticoView()),
         GetPage(
           name: '/admin/usuarios',
           page: () => const UsuariosAdminView(),
@@ -224,46 +207,16 @@ class MyApp extends StatelessWidget {
             Get.lazyPut(() => TranscricaoController());
           }),
         ),
-        GetPage(
-          name: '/ordens-servico',
-          page: () => const OrdensServicoScreen(),
-        ),
-        GetPage(
-          name: '/ordens-servico/executar',
-          page: () => const ExecutarOSScreen(),
-        ),
-        GetPage(
-          name: '/transcricao/historico',
-          page: () => const HistoricoTranscricaoView(),
-        ),
-        GetPage(
-            name: '/acompanhamento',
-            page: () => const AcompanhamentoScreen()
-        ),
-        GetPage(
-          name: '/seguranca',
-          page: () => const SegurancaHomeScreen(),
-        ),
-        GetPage(
-          name: '/seguranca/requisicao',
-          page: () => const RequisicaoEpiScreen(),
-        ),
-        GetPage(
-          name: '/seguranca/minhas',
-          page: () => const MinhasRequisicoesScreen(),
-        ),
-        GetPage(
-          name: '/seguranca/gestao',
-          page: () => const GestaoRequisicoesScreen(),
-        ),
-        GetPage(
-          name: '/seguranca/perfil',
-          page: () => const PerfilScreen(),
-        ),
-        GetPage(
-          name: '/seguranca/registro-manual',
-          page: () => const RegistroManualEpiScreen(),
-        ),
+        GetPage(name: '/ordens-servico', page: () => const OrdensServicoScreen()),
+        GetPage(name: '/ordens-servico/executar', page: () => const ExecutarOSScreen()),
+        GetPage(name: '/transcricao/historico', page: () => const HistoricoTranscricaoView()),
+        GetPage(name: '/acompanhamento', page: () => const AcompanhamentoScreen()),
+        GetPage(name: '/seguranca', page: () => const SegurancaHomeScreen()),
+        GetPage(name: '/seguranca/requisicao', page: () => const RequisicaoEpiScreen()),
+        GetPage(name: '/seguranca/minhas', page: () => const MinhasRequisicoesScreen()),
+        GetPage(name: '/seguranca/gestao', page: () => const GestaoRequisicoesScreen()),
+        GetPage(name: '/seguranca/perfil', page: () => const PerfilScreen()),
+        GetPage(name: '/seguranca/registro-manual', page: () => const RegistroManualEpiScreen()),
         GetPage(
           name: '/seguranca/relatorio-epi',
           page: () => const RelatorioEpiScreen(),
@@ -275,14 +228,15 @@ class MyApp extends StatelessWidget {
           middlewares: [AuthMiddleware()],
         ),
         GetPage(
-            name: '/seguranca/confirmar-recebimento',
-            page: () {
-              final args = Get.arguments as Map<String, dynamic>;
-              return ConfirmarRecebimentoScreen(
-                requisicaoId: args['id'] as int,
-                epis: List<String>.from(args['epis']),
-              );
-            }),
+          name: '/seguranca/confirmar-recebimento',
+          page: () {
+            final args = Get.arguments as Map<String, dynamic>;
+            return ConfirmarRecebimentoScreen(
+              requisicaoId: args['id'] as int,
+              epis: List<String>.from(args['epis']),
+            );
+          },
+        ),
       ],
     );
   }

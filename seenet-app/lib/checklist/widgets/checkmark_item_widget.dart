@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
-
-class ChecklistAppsWidget extends StatelessWidget {
+class CheckmarkItemWidget extends StatelessWidget {
   final String title;
   final bool isChecked;
   final ValueChanged<bool?>? onChanged;
 
-  const ChecklistAppsWidget({
+  const CheckmarkItemWidget({
     super.key,
     required this.title,
     required this.isChecked,
@@ -30,6 +29,7 @@ class ChecklistAppsWidget extends StatelessWidget {
           ],
         ),
         child: ListTile(
+          onTap: () => onChanged?.call(!isChecked),
           trailing: Checkbox(
             value: isChecked,
             onChanged: onChanged,

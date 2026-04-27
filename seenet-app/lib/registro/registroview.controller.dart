@@ -116,7 +116,7 @@ class RegistroController extends GetxController {
 
         Future.delayed(const Duration(milliseconds: 400), () {
           if (Get.context != null) {
-            Get.snackbar(
+            AppSnackbar.show(
               '🎉 Bem-vindo!',
               'Conta criada e login realizado com sucesso',
               snackPosition: SnackPosition.TOP,

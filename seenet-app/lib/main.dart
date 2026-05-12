@@ -36,6 +36,11 @@ import 'package:seenet/seguranca/screens/requisicao_epi_screen.dart';
 import 'package:seenet/seguranca/screens/minhas_requisicoes_screen.dart';
 import 'package:seenet/seguranca/screens/gestao_requisicoes_screen.dart';
 import 'package:seenet/seguranca/screens/perfil_screen.dart';
+import 'package:seenet/dds/services/dds_service.dart';
+import 'package:seenet/dds/controllers/dds_controller.dart';
+import 'package:seenet/dds/screens/dds_gestor_screen.dart';
+import 'package:seenet/dds/screens/dds_historico_screen.dart';
+import 'package:seenet/dds/screens/dds_calendario_tecnico_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -243,6 +248,18 @@ class MyApp extends StatelessWidget {
             return ConfirmarRecebimentoScreen(
               requisicaoId: args['id'] as int,
               epis: List<String>.from(args['epis']),
+            );
+          },
+        ),
+        GetPage(name: '/dds/gestor',    page: () => const DdsGestorScreen()),
+        GetPage(name: '/dds/historico', page: () => const DdsHistoricoScreen()),
+        GetPage(
+          name: '/dds/calendario-tecnico',
+          page: () {
+            final args = Get.arguments as Map<String, dynamic>;
+            return DdsCalendarioTecnicoScreen(
+              tecnicoId:   args['tecnicoId']   as int,
+              tecnicoNome: args['tecnicoNome'] as String,
             );
           },
         ),

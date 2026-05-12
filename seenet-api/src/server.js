@@ -304,6 +304,16 @@ try {
   console.error('❌ Erro ao carregar rotas segurança:', error.message);
 }
 
+// ========== DDS (DIÁLOGO DIÁRIO DE SEGURANÇA) ==========
+try {
+  console.log('=== CARREGANDO ROTAS DDS ===');
+  const ddsRoutes = require('./routes/dds');
+  app.use('/api/dds', ddsRoutes);
+  console.log('✅ Rotas /api/dds registradas');
+} catch (error) {
+  console.error('❌ Erro ao carregar rotas DDS:', error.message);
+}
+
 // ============================================
 // ROTA DE DEBUG: TESTAR ENDPOINTS IXC
 // ============================================

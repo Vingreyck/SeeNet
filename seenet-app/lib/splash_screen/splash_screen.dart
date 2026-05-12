@@ -19,6 +19,9 @@
   import '../controllers/transcricao_controller.dart';
   import '../seguranca/services/seguranca_service.dart';
   import '../seguranca/controllers/seguranca_controller.dart';
+  import '../dds/services/dds_service.dart';
+  import '../dds/controllers/dds_controller.dart';
+  import '../dds/widgets/dds_popup_assinatura.dart';
   
   class SplashScreen extends StatefulWidget {
     const SplashScreen({super.key});
@@ -100,13 +103,17 @@
         Get.put(SegurancaService(), permanent: true);
         print('📦 9 SegurancaController...');
         Get.put(SegurancaController(), permanent: true);
-        print('📦 10 TrackingService...');
+        print('📦 10 DdsService...');          // ← ADICIONAR
+        Get.put(DdsService(), permanent: true); // ← ADICIONAR
+        print('📦 11 DdsController...');        // ← ADICIONAR
+        Get.put(DdsController(), permanent: true); // ← ADICIONAR
+        print('📦 12 TrackingService...');
         Get.put(TrackingService(), permanent: true);
-        print('📦 11 SyncManager...');
+        print('📦 13 SyncManager...');
         Get.put(SyncManager(), permanent: true);
-        print('📦 12 ConnectivityService...');
+        print('📦 14 ConnectivityService...');
         Get.put(ConnectivityService(), permanent: true);
-        print('📦 13 NotificationService...');
+        print('📦 15 NotificationService...');
         Get.put(NotificationService(), permanent: true);
         print('✅ Todos registrados!');
 
@@ -135,21 +142,33 @@
         Get.offAllNamed('/login');
       }
     }
-  
+
     Future<void> _decidirRota() async {
       try {
         final authService = Get.find<AuthService>();
         final autoLoginOk = await authService.tryAutoLogin();
-  
+
         if (autoLoginOk) {
           final usuarioController = Get.find<UsuarioController>();
           final tipo = usuarioController.tipoUsuario;
           final isWeb = kIsWeb;
-  
+
           if (isWeb && (usuarioController.isAdmin || tipo == 'gestor' || tipo == 'gestor_seguranca')) {
             Get.offAllNamed('/web-admin');
           } else {
             Get.offAllNamed('/checklist');
+
+            // ✅ Verificar DDS ativo e mostrar popup
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              await Future.delayed(const Duration(milliseconds: 600));
+              try {
+                final ddsController = Get.find<DdsController>();
+                final temSessao = await ddsController.verificarSessaoAtiva();
+                if (temSessao && ddsController.sessaoAtiva.value?['ja_assinou'] != true) {
+                  DdsPopupAssinatura.mostrar();
+                }
+              } catch (_) {}
+            });
           }
         } else {
           Get.offAllNamed('/login');

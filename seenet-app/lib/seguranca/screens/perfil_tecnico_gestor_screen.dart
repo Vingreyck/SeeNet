@@ -119,6 +119,8 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
               const SizedBox(height: 12),
               _buildBotaoFichaEpi(),
               const SizedBox(height: 12),
+              _buildBotaoDDS(),
+              const SizedBox(height: 12),
               _buildBotaoAssinaturaAdmissao(),
               const SizedBox(height: 20),
               _buildHistoricoRequisicoes(),
@@ -978,6 +980,31 @@ class _PerfilTecnicoGestorScreenState extends State<PerfilTecnicoGestorScreen> {
   ),
   ),
   );
+  }
+
+  Widget _buildBotaoDDS() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => Get.toNamed(
+          '/dds/calendario-tecnico',
+          arguments: {
+            'tecnicoId': widget.tecnicoId,
+            'tecnicoNome': widget.tecnicoNome,
+          },
+        ),
+        icon: const Icon(Icons.health_and_safety_outlined,
+            color: Colors.blue, size: 20),
+        label: const Text('Histórico de Presença DDS',
+            style: TextStyle(color: Colors.blue, fontSize: 14,
+                fontWeight: FontWeight.bold)),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.blue),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
   }
 
   Future<void> _gerarFichaEpi() async {

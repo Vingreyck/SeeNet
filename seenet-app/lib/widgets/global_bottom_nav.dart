@@ -148,6 +148,26 @@ class GlobalBottomNav extends StatelessWidget {
                         _divider('Gestão'),
 
                         _menuItem(
+                          Icons.health_and_safety_outlined,
+                          'DDS',
+                              () {
+                            _fecharMenuENavegar(dialogContext, () {
+                              Get.toNamed('/dds/gestor');
+                            });
+                          },
+                        ),
+
+                        _menuItem(
+                          Icons.history_edu,
+                          'Histórico de DDS',
+                              () {
+                            _fecharMenuENavegar(dialogContext, () {
+                              Get.toNamed('/dds/historico');
+                            });
+                          },
+                        ),
+
+                        _menuItem(
                           Icons.inventory_2_outlined,
                           'Gestão de Requisições',
                               () {

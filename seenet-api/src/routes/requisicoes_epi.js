@@ -802,7 +802,7 @@ router.get('/tecnicos', authMiddleware, async (req, res) => {
   try {
     if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
     const lista = await db('usuarios').where('tenant_id', req.user.tenant_id).where('ativo', true)
-      .whereIn('tipo_usuario', ['tecnico', 'administrador']).select('id', 'nome', 'email', 'tipo_usuario').orderBy('nome');
+      .whereIn('tipo_usuario', ['tecnico', 'administrador', 'gestor', 'gestor_seguranca']).select('id', 'nome', 'email', 'tipo_usuario').orderBy('nome');
     res.json({ tecnicos: lista });
   } catch (err) { res.status(500).json({ error: 'Erro ao buscar técnicos' }); }
 });

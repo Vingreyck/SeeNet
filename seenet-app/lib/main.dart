@@ -42,6 +42,7 @@ import 'package:seenet/dds/controllers/dds_controller.dart';
 import 'package:seenet/dds/screens/dds_gestor_screen.dart';
 import 'package:seenet/dds/screens/dds_historico_screen.dart';
 import 'package:seenet/dds/screens/dds_calendario_tecnico_screen.dart';
+import 'package:seenet/seguranca/screens/usuarios_gestao_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -256,6 +257,7 @@ class MyApp extends StatelessWidget {
         GetPage(name: '/seguranca/minhas', page: () => const MinhasRequisicoesScreen()),
         GetPage(name: '/seguranca/gestao', page: () => const GestaoRequisicoesScreen()),
         GetPage(name: '/seguranca/perfil', page: () => const PerfilScreen()),
+        GetPage(name: '/usuarios-gestao', page: () => const UsuariosGestaoScreen()),
         GetPage(name: '/seguranca/registro-manual', page: () => const RegistroManualEpiScreen()),
         GetPage(
           name: '/seguranca/relatorio-epi',

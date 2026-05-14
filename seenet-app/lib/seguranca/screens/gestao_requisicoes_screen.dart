@@ -22,7 +22,9 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    final args = Get.arguments as Map<String, dynamic>?;
+    final initialTab = args?['initialTab'] as int? ?? 0;
+    _tabController = TabController(length: 5, vsync: this, initialIndex: initialTab);
     controller.carregarPendentes();
     controller.carregarDevolucoesPendentes();
     controller.carregarDevedores();

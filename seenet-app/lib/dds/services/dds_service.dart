@@ -19,14 +19,16 @@ class DdsService extends GetxService {
     required String tema,
     required int duracaoMinutos,
     String localDds = 'BBNet Up Provedor',
+    String? linkMeet,
   }) async {
     try {
-      final resp = await _api.post('/api/dds/sessao', {
+      final body = {
         'tema': tema,
         'duracao_minutos': duracaoMinutos,
         'local_dds': localDds,
-      });
-      return resp;
+        if (linkMeet != null && linkMeet.isNotEmpty) 'link_meet': linkMeet,
+      };
+      return await _api.post('/api/dds/sessao', body);
     } catch (e) {
       return {'error': 'Erro de conexão: $e'};
     }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'checklist/screen/checklist_items_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:seenet/dds/widgets/dds_popup_assinatura.dart';
 import 'package:flutter/services.dart';
 import 'widgets/global_bottom_nav.dart';
 import 'widgets/app_snackbar.dart';
@@ -185,7 +186,32 @@ class MyApp extends StatelessWidget {
       getPages: [
         GetPage(name: '/splash', page: () => const SplashScreen()),
         GetPage(name: '/login', page: () => const LoginView(), binding: LoginBindings()),
-        GetPage(name: '/checklist', page: () => const Checklistview()),
+        GetPage(
+          name: '/checklist',
+          page: () => const Checklistview(),
+          binding: BindingsBuilder(() {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              await Future.delayed(const Duration(milliseconds: 800));
+              try {
+                final usuario = Get.find<UsuarioController>();
+                // ✅ Só técnicos assinam — admins e gestor_seguranca não veem o popup
+                final tipo = usuario.tipoUsuario;
+                if (tipo == 'administrador' || tipo == 'gestor_seguranca') return;
+
+                final ddsController = Get.find<DdsController>();
+                ddsController.sessaoAtiva.value = null;
+                final temSessao = await ddsController.verificarSessaoAtiva();
+                print('🔍 [DDS] temSessao=$temSessao sessao=${ddsController.sessaoAtiva.value}');
+                if (temSessao &&
+                    ddsController.sessaoAtiva.value?['ja_assinou'] != true) {
+                  DdsPopupAssinatura.mostrar();
+                }
+              } catch (e) {
+                print('❌ [DDS] erro: $e');
+              }
+            });
+          }),
+        ),
         GetPage(name: '/registro', page: () => RegistrarView(), binding: RegistroBindings()),
         GetPage(name: '/checklist/items', page: () => const ChecklistItemsScreen()),
         GetPage(name: '/diagnostico', page: () => const DiagnosticoView()),

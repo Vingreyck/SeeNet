@@ -29,6 +29,7 @@ class DdsController extends GetxController {
     required String tema,
     required int duracaoMinutos,
     String localDds = 'BBNet Up Provedor',
+    String? linkMeet,                          // ← ADICIONAR
   }) async {
     isSending.value = true;
     try {
@@ -36,10 +37,9 @@ class DdsController extends GetxController {
         tema: tema,
         duracaoMinutos: duracaoMinutos,
         localDds: localDds,
+        linkMeet: linkMeet,                    // ← ADICIONAR
       );
-      if (result['success'] == true) {
-        sessaoAtiva.value = result['sessao'];
-      }
+      if (result['success'] == true) sessaoAtiva.value = result['sessao'];
       return result;
     } finally {
       isSending.value = false;

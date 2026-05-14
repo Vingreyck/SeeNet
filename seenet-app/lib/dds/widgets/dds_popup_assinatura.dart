@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/dds_controller.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ──────────────────────────────────────────────────────────────
 // Chamada externa: DdsPopupAssinatura.mostrar()
@@ -297,6 +298,45 @@ class _DdsPopupDialogState extends State<_DdsPopupDialog>
           ),
 
           const SizedBox(height: 18),
+
+          // Link do Meet
+          Builder(builder: (_) {
+            final link = _ctrl.sessaoAtiva.value?['link_meet'] as String?;
+            if (link == null || link.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: GestureDetector(
+                onTap: () async {
+                  final uri = Uri.tryParse(link);
+                  if (uri != null && await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A73E8).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF1A73E8).withOpacity(0.4)),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.video_call, color: Color(0xFF1A73E8), size: 20),
+                      SizedBox(width: 8),
+                      Text('Entrar no Google Meet',
+                          style: TextStyle(
+                            color: Color(0xFF1A73E8),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          )),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
 
           // Pad de assinatura
           const Text('Sua assinatura:', style: TextStyle(color: Colors.white54, fontSize: 12)),

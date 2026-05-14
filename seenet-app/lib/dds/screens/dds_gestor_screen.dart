@@ -18,6 +18,8 @@ class _DdsGestorScreenState extends State<DdsGestorScreen>
     with SingleTickerProviderStateMixin {
   final _ctrl = Get.find<DdsController>();
   final _service = Get.find<DdsService>();
+  String? _linkMeet;
+  final _linkMeetCtrl = TextEditingController();
   late TabController _tabCtrl;
 
   // Formulário
@@ -71,8 +73,9 @@ class _DdsGestorScreenState extends State<DdsGestorScreen>
   void dispose() {
     _tabCtrl.dispose();
     _temaCtrl.dispose();
+    _linkMeetCtrl.dispose(); // ← mover para antes do super
     _timerLocal?.cancel();
-    super.dispose();
+    super.dispose();         // ← super sempre por último
   }
 
   String get _timerStr {
@@ -93,16 +96,18 @@ class _DdsGestorScreenState extends State<DdsGestorScreen>
       tema: _temaCtrl.text.trim(),
       duracaoMinutos: _duracaoMinutos,
       localDds: _localDds,
+      linkMeet: _linkMeetCtrl.text.trim().isEmpty
+          ? null
+          : _linkMeetCtrl.text.trim(),
     );
 
     if (result['success'] == true) {
       _temaCtrl.clear();
+      _linkMeetCtrl.clear();
       _segundosRestantes = _duracaoMinutos * 60;
       _iniciarTimerLocal();
-      Get.snackbar('DDS aberto!',
-          'Os técnicos já podem assinar a presença.',
-          backgroundColor: const Color(0xFF00FF88),
-          colorText: Colors.black);
+      Get.snackbar('DDS aberto!', 'Os técnicos já podem assinar a presença.',
+          backgroundColor: const Color(0xFF00FF88), colorText: Colors.black);
     } else {
       Get.snackbar('Erro', result['error'] ?? 'Falha ao abrir DDS',
           backgroundColor: Colors.red, colorText: Colors.white);
@@ -261,6 +266,27 @@ class _DdsGestorScreenState extends State<DdsGestorScreen>
         ),
 
         const SizedBox(height: 16),
+
+        const SizedBox(height: 16),
+        const Text('Link do Google Meet (opcional)',
+            style: TextStyle(color: Colors.white54, fontSize: 13)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _linkMeetCtrl,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          onChanged: (v) => _linkMeet = v,
+          decoration: InputDecoration(
+            hintText: 'https://meet.google.com/xxx-xxxx-xxx',
+            hintStyle: const TextStyle(color: Colors.white24),
+            prefixIcon: const Icon(Icons.video_call, color: Colors.white38),
+            filled: true,
+            fillColor: const Color(0xFF2A2A2A),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
 
         // Duração
         const Text('Tempo de assinatura', style: TextStyle(color: Colors.white54, fontSize: 13)),

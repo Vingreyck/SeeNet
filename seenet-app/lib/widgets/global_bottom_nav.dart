@@ -186,6 +186,15 @@ class GlobalBottomNav extends StatelessWidget {
                             });
                           },
                         ),
+                        _menuItem(
+                          Icons.people_outline,
+                          'Usuários (Gestão)',
+                              () {
+                            _fecharMenuENavegar(dialogContext, () {
+                              Get.toNamed('/seguranca/gestao', arguments: {'initialTab': 2});
+                            });
+                          },
+                        ),
                       ],
 
                       if (usuario.isAdmin) ...[

@@ -158,16 +158,24 @@
           } else {
             Get.offAllNamed('/checklist');
 
-            // ✅ Verificar DDS ativo e mostrar popup
             WidgetsBinding.instance.addPostFrameCallback((_) async {
               await Future.delayed(const Duration(milliseconds: 600));
               try {
+                print('🔍 [DDS] Verificando sessão ativa...');
                 final ddsController = Get.find<DdsController>();
+                print('🔍 [DDS] DdsController encontrado');
                 final temSessao = await ddsController.verificarSessaoAtiva();
+                print('🔍 [DDS] temSessao=$temSessao');
+                print('🔍 [DDS] sessaoAtiva=${ddsController.sessaoAtiva.value}');
                 if (temSessao && ddsController.sessaoAtiva.value?['ja_assinou'] != true) {
+                  print('🔍 [DDS] Mostrando popup...');
                   DdsPopupAssinatura.mostrar();
+                } else {
+                  print('🔍 [DDS] Popup NÃO mostrado — temSessao=$temSessao, ja_assinou=${ddsController.sessaoAtiva.value?['ja_assinou']}');
                 }
-              } catch (_) {}
+              } catch (e) {
+                print('❌ [DDS] ERRO: $e');
+              }
             });
           }
         } else {

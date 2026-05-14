@@ -191,7 +191,7 @@ class GlobalBottomNav extends StatelessWidget {
                           'Usuários (Gestão)',
                               () {
                             _fecharMenuENavegar(dialogContext, () {
-                              Get.toNamed('/seguranca/gestao', arguments: {'initialTab': 2});
+                              Get.toNamed('/usuarios-gestao');
                             });
                           },
                         ),

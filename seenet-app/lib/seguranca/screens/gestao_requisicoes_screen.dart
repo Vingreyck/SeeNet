@@ -24,7 +24,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
     super.initState();
     final args = Get.arguments as Map<String, dynamic>?;
     final initialTab = args?['initialTab'] as int? ?? 0;
-    _tabController = TabController(length: 5, vsync: this, initialIndex: initialTab);
+    _tabController = TabController(length: 4, vsync: this, initialIndex: initialTab);
     controller.carregarPendentes();
     controller.carregarDevolucoesPendentes();
     controller.carregarDevedores();
@@ -68,7 +68,6 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
           tabs: [
             Obx(() => Tab(text: 'Pendentes (${controller.requisicoesPendentes.length})')),
             Obx(() => Tab(text: 'Devoluções (${controller.devolucoesPendentes.length})')),
-            const Tab(text: 'Técnicos'),
             const Tab(text: 'Produtos'),
             Obx(() => Tab(text: 'Devedores (${controller.devedores.length})')),
           ],
@@ -79,7 +78,6 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
         children: [
           _buildListaPendentes(),
           _buildListaDevolucoes(),
-          _buildListaTecnicos(),
           const AbaProdutosEpi(),
           _buildListaDevedores(),
         ],
@@ -234,115 +232,6 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-
-
-  // ══════════════════════════════════════════════════════════════
-  // ABA 2: TÉCNICOS
-  // ══════════════════════════════════════════════════════════════
-  Widget _buildListaTecnicos() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: Get.find<SegurancaService>().buscarTecnicos(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF00FF88)));
-        }
-
-        final tecnicos = snapshot.data ?? [];
-
-        if (tecnicos.isEmpty) {
-          return _buildVazio('Nenhum técnico cadastrado', Icons.people_outline);
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: tecnicos.length,
-          itemBuilder: (context, index) {
-            final tec = tecnicos[index];
-            return _buildCardTecnico(tec);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildCardTecnico(Map<String, dynamic> tec) {
-    final tipo = tec['tipo_usuario'] as String? ?? 'tecnico';
-    Color tipoColor;
-    String tipoLabel;
-    switch (tipo) {
-      case 'administrador':
-        tipoColor = Colors.orange;
-        tipoLabel = 'Admin';
-        break;
-      case 'gestor_seguranca':
-        tipoColor = Colors.blue;
-        tipoLabel = 'Gestor';
-        break;
-      default:
-        tipoColor = const Color(0xFF00FF88);
-        tipoLabel = 'Técnico';
-    }
-
-    return InkWell(
-      onTap: () => Get.to(() => PerfilTecnicoGestorScreen(
-        tecnicoId: tec['id'] as int,
-        tecnicoNome: tec['nome'] as String,
-      )),
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF242424),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: tipoColor.withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: tipoColor.withOpacity(0.15),
-              child: Icon(Icons.person, color: tipoColor, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tec['nome'] as String? ?? '',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text(tec['email'] as String? ?? '',
-                      style:
-                      const TextStyle(color: Colors.white38, fontSize: 12)),
-                ],
-              ),
-            ),
-            Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: tipoColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(tipoLabel,
-                  style: TextStyle(
-                      color: tipoColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.chevron_right, color: tipoColor, size: 20),
-          ],
-        ),
       ),
     );
   }

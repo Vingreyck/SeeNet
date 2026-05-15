@@ -45,54 +45,35 @@ class IXCService {
    */
   async buscarOSs(filtros = {}) {
     try {
-      // Busca por id_tecnico
-      const params1 = new URLSearchParams({
+      const params = new URLSearchParams({
         qtype: 'id_tecnico',
         query: filtros.tecnicoId?.toString() || '',
         oper: '=',
         page: '1',
-        rp: '50',
+        rp: '200',
         sortname: 'su_oss_chamado.id',
-        sortorder: 'desc'
+        sortorder: 'asc',
+        grid_param: JSON.stringify([
+          { TB: 'su_oss_chamado.status', OP: '!=', P: 'F' },
+          { TB: 'su_oss_chamado.status', OP: '!=', P: 'C' }
+        ])
       });
 
-      // Busca por id_responsavel (colaborador responsável)
-      const params2 = new URLSearchParams({
-        qtype: 'id_responsavel',
-        query: filtros.tecnicoId?.toString() || '',
-        oper: '=',
-        page: '1',
-        rp: '50',
-        sortname: 'su_oss_chamado.id',
-        sortorder: 'desc'
-      });
+      const response = await this.clientListar.post('/su_oss_chamado', params.toString());
 
-      const [resp1, resp2] = await Promise.all([
-        this.clientListar.post('/su_oss_chamado', params1.toString()),
-        this.clientListar.post('/su_oss_chamado', params2.toString()),
-      ]);
-
-      if (resp1.data?.type === 'error' || resp2.data?.type === 'error') {
-        console.error('❌ Erro retornado pelo IXC');
+      if (response.data?.type === 'error') {
+        console.error('❌ Erro retornado pelo IXC:', response.data.message);
         return [];
       }
 
-      // Unir resultados e remover duplicatas pelo ID
-      const todos = [
-        ...(resp1.data?.registros || []),
-        ...(resp2.data?.registros || []),
-      ];
-      const semDuplicatas = todos.filter(
-        (os, idx, arr) => arr.findIndex(o => o.id === os.id) === idx
-      );
+      const registros = response.data?.registros || [];
 
-      // Filtrar apenas OSs ativas
-      const registrosFiltrados = semDuplicatas.filter(os =>
+      const registrosFiltrados = registros.filter(os =>
         os.status === 'A' || os.status === 'AG' ||
         os.status === 'EA' || os.status === 'EX'
       );
 
-      console.log(`✅ ${registrosFiltrados.length}/${semDuplicatas.length} OSs ativas (técnico: ${filtros.tecnicoId})`);
+      console.log(`✅ ${registrosFiltrados.length}/${registros.length} OSs ativas (técnico: ${filtros.tecnicoId})`);
       return registrosFiltrados;
 
     } catch (error) {

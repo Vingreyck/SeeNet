@@ -1,3 +1,4 @@
+// lib/seguranca/screens/relatorio_epi_screen.dart — REDESIGN
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -23,6 +24,8 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
   bool _gerando = false;
   int? _tecnicoSelecionado;
   String? _tecnicoNome;
+
+  // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
 
   Map<String, String> get _headers {
     final auth = Get.find<AuthService>();
@@ -50,7 +53,8 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
         if (mounted) {
           setState(() {
             _tecnicos = List<Map<String, dynamic>>.from(
-              (lista as List).where((u) => u['tipo_usuario'] == 'tecnico'),
+              (lista as List).where(
+                      (u) => u['tipo_usuario'] == 'tecnico'),
             );
             _carregando = false;
           });
@@ -69,12 +73,12 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
       ));
       return;
     }
-
     setState(() => _gerando = true);
     try {
       final auth = Get.find<AuthService>();
       final response = await http.get(
-        Uri.parse('$baseUrl/seguranca/relatorio-epi/$_tecnicoSelecionado'),
+        Uri.parse(
+            '$baseUrl/seguranca/relatorio-epi/$_tecnicoSelecionado'),
         headers: {
           'Authorization': 'Bearer ${auth.token}',
           'X-Tenant-Code': auth.tenantCode ?? '',
@@ -82,13 +86,13 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        // Salvar PDF em arquivo temporário
         if (kIsWeb) {
           abrirPdfNoNavegador(response.bodyBytes);
           return;
         }
         final dir = await getTemporaryDirectory();
-        final nomeArquivo = 'EPI_${_tecnicoNome?.replaceAll(' ', '_') ?? 'tecnico'}.pdf';
+        final nomeArquivo =
+            'EPI_${_tecnicoNome?.replaceAll(' ', '_') ?? 'tecnico'}.pdf';
         final arquivo = File('${dir.path}/$nomeArquivo');
         await arquivo.writeAsBytes(response.bodyBytes);
         if (mounted) {
@@ -117,293 +121,306 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
     }
   }
 
-  void _mostrarOpcoesDownload(String base64Pdf, int tamanhoBytes) {
-    final kb = (tamanhoBytes / 1024).toStringAsFixed(1);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF232323),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('PDF Gerado!',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.picture_as_pdf, color: Color(0xFF00FF88), size: 60),
-            const SizedBox(height: 12),
-            Text(
-              'Relatório de EPI — $_tecnicoNome',
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text('Tamanho: $kb KB',
-                style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-            const Text('Fechar', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              _compartilharPDF(base64Pdf);
-            },
-            icon: const Icon(Icons.share, size: 18, color: Colors.black),
-            label: const Text('Compartilhar',
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF88),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ],
-      ),
-    );
+  String _iniciais(String nome) {
+    final p = nome.trim().split(' ').where((s) => s.isNotEmpty).toList();
+    if (p.isEmpty) return '?';
+    if (p.length == 1) return p[0][0].toUpperCase();
+    return '${p[0][0]}${p[p.length - 1][0]}'.toUpperCase();
   }
 
-  Future<void> _compartilharPDF(String base64Pdf) async {
-    // Usa share_plus (já no pubspec) para compartilhar o PDF
-    try {
-      final bytes = base64Decode(base64Pdf);
-      final tempDir = await _getTempDir();
-      final file = await _salvarTemp(
-          bytes, '$tempDir/EPI_${_tecnicoNome?.replaceAll(' ', '_')}.pdf');
-
-      // share_plus já está no pubspec
-      // ignore: depend_on_referenced_packages
-      final share = await _tryShare(file);
-      if (!share && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('PDF salvo na pasta de downloads'),
-          backgroundColor: Color(0xFF00FF88),
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erro ao compartilhar: $e'),
-          backgroundColor: Colors.red,
-        ));
-      }
-    }
-  }
-
-  Future<String> _getTempDir() async {
-    // path_provider já está no pubspec
-    final pathProvider =
-    await _invokePathProvider();
-    return pathProvider;
-  }
-
-  Future<String> _invokePathProvider() async {
-    // Importação dinâmica para evitar dependência circular
-    final dir = await _getTemporaryDirectory();
-    return dir;
-  }
-
-  Future<String> _getTemporaryDirectory() async {
-    try {
-      // path_provider está no pubspec
-      return '/data/user/0/com.seenet.diagnostico/cache';
-    } catch (_) {
-      return '/tmp';
-    }
-  }
-
-  Future<String> _salvarTemp(List<int> bytes, String path) async {
-    // Salva o arquivo
-    return path;
-  }
-
-  Future<bool> _tryShare(String filePath) async {
-    try {
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
+  // ── BUILD ────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        title: const Text('Relatório de EPI'),
-        backgroundColor: const Color(0xFF00FF88),
-        foregroundColor: Colors.black,
-      ),
-      body: _carregando
-          ? const Center(
-          child: CircularProgressIndicator(color: Color(0xFF00FF88)))
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Cabeçalho
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF232323),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white12),
+      backgroundColor: const Color(0xFF111111),
+      body: Column(
+        children: [
+          // ── Header ──────────────────────────────────────────
+          Container(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 12,
+              bottom: 16, left: 8, right: 16,
+            ),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF1A2A1A), Color(0xFF111111)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              child: const Row(
-                children: [
-                  Icon(Icons.picture_as_pdf,
-                      color: Color(0xFF00FF88), size: 40),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Ficha de Controle de EPI',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold)),
-                        SizedBox(height: 4),
-                        Text(
-                          'Gera o histórico completo de EPIs recebidos pelo técnico, com CA e fornecedor',
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded,
+                      color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00FF88).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: const Color(0xFF00FF88).withOpacity(0.2)),
+                  ),
+                  child: const Icon(Icons.picture_as_pdf_rounded,
+                      color: Color(0xFF00FF88), size: 18),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Relatório de EPI',
                           style: TextStyle(
-                              color: Colors.white54, fontSize: 12),
+                              color: Colors.white,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3)),
+                      Text('Ficha de Controle Individual',
+                          style: TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: _carregando
+                ? const Center(
+                child: CircularProgressIndicator(
+                    color: Color(0xFF00FF88), strokeWidth: 2.5))
+                : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Info banner
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF181818),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.06)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.description_outlined,
+                            color: Color(0xFF00FF88), size: 20),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                            children: [
+                              Text('Ficha de Controle de EPI',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight:
+                                      FontWeight.w600)),
+                              SizedBox(height: 3),
+                              Text(
+                                'Histórico completo com CA e fornecedor',
+                                style: TextStyle(
+                                    color: Colors.white38,
+                                    fontSize: 11),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Text('Selecione o Técnico',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3)),
+                  const SizedBox(height: 10),
+
+                  // Lista de técnicos
+                  if (_tecnicos.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF181818),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                          'Nenhum técnico encontrado',
+                          style: TextStyle(
+                              color: Colors.white54)),
+                    )
+                  else
+                    ...List.generate(_tecnicos.length, (i) {
+                      final tec = _tecnicos[i];
+                      final id = tec['id'] as int;
+                      final nome = tec['nome'] as String;
+                      final sel = _tecnicoSelecionado == id;
+
+                      return TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: Duration(
+                            milliseconds: 200 + i * 40),
+                        curve: Curves.easeOutCubic,
+                        builder: (_, v, child) => Opacity(
+                          opacity: v,
+                          child: Transform.translate(
+                            offset: Offset(0, 12 * (1 - v)),
+                            child: child,
+                          ),
+                        ),
+                        child: GestureDetector(
+                          onTap: () => setState(() {
+                            _tecnicoSelecionado = id;
+                            _tecnicoNome = nome;
+                          }),
+                          child: AnimatedContainer(
+                            duration:
+                            const Duration(milliseconds: 180),
+                            margin: const EdgeInsets.only(
+                                bottom: 8),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: sel
+                                  ? const Color(0xFF00FF88)
+                                  .withOpacity(0.08)
+                                  : const Color(0xFF181818),
+                              borderRadius:
+                              BorderRadius.circular(14),
+                              border: Border.all(
+                                color: sel
+                                    ? const Color(0xFF00FF88)
+                                    : Colors.white
+                                    .withOpacity(0.07),
+                                width: sel ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40, height: 40,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      colors: sel
+                                          ? [
+                                        const Color(
+                                            0xFF00FF88)
+                                            .withOpacity(0.3),
+                                        const Color(
+                                            0xFF00FF88)
+                                            .withOpacity(0.1),
+                                      ]
+                                          : [
+                                        Colors.white
+                                            .withOpacity(0.08),
+                                        Colors.white
+                                            .withOpacity(0.04),
+                                      ],
+                                    ),
+                                    border: Border.all(
+                                      color: sel
+                                          ? const Color(0xFF00FF88)
+                                          .withOpacity(0.4)
+                                          : Colors.white12,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      _iniciais(nome),
+                                      style: TextStyle(
+                                        color: sel
+                                            ? const Color(
+                                            0xFF00FF88)
+                                            : Colors.white38,
+                                        fontWeight:
+                                        FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(nome,
+                                      style: TextStyle(
+                                        color: sel
+                                            ? Colors.white
+                                            : Colors.white60,
+                                        fontSize: 14,
+                                        fontWeight: sel
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                      )),
+                                ),
+                                if (sel)
+                                  const Icon(
+                                      Icons
+                                          .check_circle_rounded,
+                                      color: Color(0xFF00FF88),
+                                      size: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+
+                  const SizedBox(height: 24),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _gerando ||
+                          _tecnicoSelecionado == null
+                          ? null
+                          : _gerarPDF,
+                      icon: _gerando
+                          ? const SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.black))
+                          : const Icon(Icons.download_rounded,
+                          color: Colors.black),
+                      label: Text(
+                        _gerando
+                            ? 'Gerando PDF...'
+                            : 'Gerar Relatório PDF',
+                        style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                        _tecnicoSelecionado == null
+                            ? Colors.white12
+                            : const Color(0xFF00FF88),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                            BorderRadius.circular(14)),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            const Text('Selecione o Técnico',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-
-            // Lista de técnicos
-            if (_tecnicos.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF232323),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text('Nenhum técnico encontrado',
-                    style: TextStyle(color: Colors.white54)),
-              )
-            else
-              ..._tecnicos.map((tecnico) {
-                final id = tecnico['id'] as int;
-                final nome = tecnico['nome'] as String;
-                final selecionado = _tecnicoSelecionado == id;
-
-                return GestureDetector(
-                  onTap: () => setState(() {
-                    _tecnicoSelecionado = id;
-                    _tecnicoNome = nome;
-                  }),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: selecionado
-                          ? const Color(0xFF00FF88).withOpacity(0.1)
-                          : const Color(0xFF232323),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: selecionado
-                            ? const Color(0xFF00FF88)
-                            : Colors.white12,
-                        width: selecionado ? 2 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor: selecionado
-                              ? const Color(0xFF00FF88).withOpacity(0.3)
-                              : Colors.white10,
-                          child: Text(
-                            nome.isNotEmpty
-                                ? nome[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              color: selecionado
-                                  ? const Color(0xFF00FF88)
-                                  : Colors.white54,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(nome,
-                              style: TextStyle(
-                                color: selecionado
-                                    ? Colors.white
-                                    : Colors.white70,
-                                fontSize: 15,
-                                fontWeight: selecionado
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              )),
-                        ),
-                        if (selecionado)
-                          const Icon(Icons.check_circle,
-                              color: Color(0xFF00FF88), size: 22),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-
-            const SizedBox(height: 32),
-
-            // Botão gerar
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _gerando || _tecnicoSelecionado == null
-                    ? null
-                    : _gerarPDF,
-                icon: _gerando
-                    ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.black),
-                )
-                    : const Icon(Icons.download, color: Colors.black),
-                label: Text(
-                  _gerando ? 'Gerando PDF...' : 'Gerar Relatório PDF',
-                  style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _tecnicoSelecionado == null
-                      ? Colors.grey.shade700
-                      : const Color(0xFF00FF88),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30)),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

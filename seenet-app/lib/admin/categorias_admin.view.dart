@@ -1,3 +1,4 @@
+// lib/admin/categorias_admin.view.dart — REDESIGN
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/categoria_admin_controller.dart';
@@ -11,422 +12,494 @@ class CategoriasAdminView extends StatelessWidget {
     final controller = Get.put(CategoriaAdminController());
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gerenciar Categorias'),
-        backgroundColor: const Color(0xFF00FF88),
-        foregroundColor: Colors.black,
-      ),
-      backgroundColor: const Color(0xFF1A1A1A),
-      body: Obx(() {
-        if (controller.isLoading.value && controller.categorias.isEmpty) {
-          return const Center(
-            child: CircularProgressIndicator(
-              color: Color(0xFF00FF88),
-            ),
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: controller.carregarCategorias,
-          color: const Color(0xFF00FF88),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _buildHeader(controller),
-              const SizedBox(height: 20),
-              ...controller.categorias.map((cat) => _buildCategoriaCard(cat, controller)),
-            ],
-          ),
-        );
-      }),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _mostrarDialogNovaCategoria(context, controller),
-        backgroundColor: const Color(0xFF00FF88),
-        foregroundColor: Colors.black,
-        icon: const Icon(Icons.add),
-        label: const Text('Nova Categoria'),
-      ),
-    );
-  }
-
-  Widget _buildHeader(CategoriaAdminController controller) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: const Color(0xFF111111),
+      body: Column(
         children: [
-          const Text(
-            'Categorias de Checklist',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+          // ── Header ──────────────────────────────────────────
+          Container(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 12,
+              bottom: 16,
+              left: 8,
+              right: 16,
+            ),
+            color: const Color(0xFF111111),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded,
+                      color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00FF88).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: const Color(0xFF00FF88).withOpacity(0.2)),
+                  ),
+                  child: const Icon(Icons.category_outlined,
+                      color: Color(0xFF00FF88), size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Obx(() => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Categorias',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700)),
+                      Text(
+                        '${controller.categorias.length} categoria(s)',
+                        style: const TextStyle(
+                            color: Colors.white38, fontSize: 11),
+                      ),
+                    ],
+                  )),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Total: ${controller.categorias.length} categorias',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
+
+          // ── Lista ────────────────────────────────────────────
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value &&
+                  controller.categorias.isEmpty) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                      color: Color(0xFF00FF88), strokeWidth: 2.5),
+                );
+              }
+
+              return RefreshIndicator(
+                onRefresh: controller.carregarCategorias,
+                color: const Color(0xFF00FF88),
+                child: controller.categorias.isEmpty
+                    ? _buildVazio(context, controller)
+                    : ListView.builder(
+                  padding:
+                  const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                  itemCount: controller.categorias.length,
+                  itemBuilder: (context, index) {
+                    final cat = controller.categorias[index];
+                    return _buildCategoriaCard(
+                        context, cat, controller, index);
+                  },
+                ),
+              );
+            }),
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () =>
+            _mostrarDialogNovaCategoria(context, controller),
+        backgroundColor: const Color(0xFF00FF88),
+        icon: const Icon(Icons.add_rounded, color: Colors.black),
+        label: const Text('Nova Categoria',
+            style: TextStyle(
+                color: Colors.black, fontWeight: FontWeight.bold)),
+      ),
     );
   }
 
+  // ── Cards ────────────────────────────────────────────────────
+
   Widget _buildCategoriaCard(
-    Map<String, dynamic> categoria,
-    CategoriaAdminController controller,
-  ) {
+      BuildContext context,
+      Map<String, dynamic> categoria,
+      CategoriaAdminController controller,
+      int index,
+      ) {
     final isAtivo = categoria['ativo'] == true || categoria['ativo'] == 1;
     final totalCheckmarks = categoria['total_checkmarks'] ?? 0;
+    final cores = [
+      const Color(0xFF00FF88), const Color(0xFF00BFFF),
+      Colors.orange, Colors.purple, Colors.pink, Colors.teal,
+    ];
+    final cor = cores[index % cores.length];
+    final nome = categoria['nome'] as String? ?? '';
+    final inicial = nome.isNotEmpty ? nome.substring(0, 1).toUpperCase() : '?';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFF181818),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isAtivo
-              ? const Color(0xFF00FF88).withOpacity(0.3)
-              : Colors.grey.withOpacity(0.3),
+          color: isAtivo ? cor.withOpacity(0.2) : Colors.white.withOpacity(0.06),
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          categoria['nome'] ?? '',
-                          style: TextStyle(
-                            color: isAtivo ? Colors.white : Colors.white54,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (!isAtivo)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text(
-                              'INATIVO',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (categoria['descricao'] != null &&
-                        categoria['descricao'].isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          categoria['descricao'],
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$totalCheckmarks checkmarks',
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+          // Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            decoration: BoxDecoration(
+              color: isAtivo ? cor.withOpacity(0.06) : Colors.white.withOpacity(0.02),
+              borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isAtivo ? cor.withOpacity(0.12) : Colors.white.withOpacity(0.05),
+                    border: Border.all(
+                        color: isAtivo ? cor.withOpacity(0.3) : Colors.white12),
+                  ),
+                  child: Center(
+                    child: Text(inicial,
+                        style: TextStyle(
+                            color: isAtivo ? cor : Colors.white24,
+                            fontSize: 15, fontWeight: FontWeight.bold)),
+                  ),
                 ),
-              ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, color: Colors.white),
-                color: const Color(0xFF2A2A2A),
-                onSelected: (value) {
-                  switch (value) {
-                    case 'editar':
-                      _mostrarDialogEditarCategoria(
-                        Get.context!,
-                        controller,
-                        categoria,
-                      );
-                      break;
-                    case 'toggle':
-                      controller.atualizarCategoria(
-                        id: categoria['id'],
-                        ativo: !isAtivo,
-                      );
-                      break;
-                    case 'deletar':
-                      controller.deletarCategoria(
-                        categoria['id'],
-                        categoria['nome'],
-                      );
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'editar',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, color: Colors.blue, size: 20),
-                        SizedBox(width: 8),
-                        Text('Editar', style: TextStyle(color: Colors.white)),
-                      ],
-                    ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(                              // ← Expanded no nome
+                            child: Text(nome,
+                                style: TextStyle(
+                                    color: isAtivo ? Colors.white : Colors.white38,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          if (!isAtivo) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('INATIVO',
+                                  style: TextStyle(color: Colors.grey,
+                                      fontSize: 8, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (categoria['descricao'] != null &&
+                          categoria['descricao'].toString().isNotEmpty)
+                        Text(categoria['descricao'],
+                            style: const TextStyle(
+                                color: Colors.white38, fontSize: 11),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ],
                   ),
-                  PopupMenuItem(
-                    value: 'toggle',
-                    child: Row(
-                      children: [
-                        Icon(
-                          isAtivo ? Icons.visibility_off : Icons.visibility,
-                          color: Colors.orange,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          isAtivo ? 'Desativar' : 'Ativar',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ],
-                    ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isAtivo ? cor.withOpacity(0.1) : Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  const PopupMenuItem(
-                    value: 'deletar',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, color: Colors.red, size: 20),
-                        SizedBox(width: 8),
-                        Text('Deletar', style: TextStyle(color: Colors.white)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                  child: Text('$totalCheckmarks',
+                      style: TextStyle(
+                          color: isAtivo ? cor : Colors.white24,
+                          fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+          // Botões
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _iconBtn(Icons.edit_rounded, 'Editar', Colors.blue,
+                        () => _mostrarDialogEditarCategoria(context, controller, categoria)),
+                const SizedBox(width: 8),
+                _iconBtn(
+                  isAtivo ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                  isAtivo ? 'Desativar' : 'Ativar',
+                  Colors.orange,
+                      () => controller.atualizarCategoria(
+                      id: categoria['id'], ativo: !isAtivo),
+                ),
+                const SizedBox(width: 8),
+                _iconBtn(Icons.delete_outline_rounded, 'Deletar', Colors.red,
+                        () => controller.deletarCategoria(
+                        categoria['id'], categoria['nome'])),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ✅ ADICIONAR controller COMO PARÂMETRO
-  void _mostrarDialogNovaCategoria(
-    BuildContext context,
-    CategoriaAdminController controller, // ← ADICIONADO
-  ) {
-    final nomeController = TextEditingController();
-    final descricaoController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF2A2A2A),
-          title: const Text(
-            'Nova Categoria',
-            style: TextStyle(color: Colors.white),
+  Widget _iconBtn(IconData icon, String tooltip, Color cor, VoidCallback onTap) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: cor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: cor.withOpacity(0.3)),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nomeController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Nome da Categoria',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white30),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF00FF88)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descricaoController,
-                style: const TextStyle(color: Colors.white),
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white30),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF00FF88)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text(
-                'Cancelar',
-                style: TextStyle(color: Colors.white54),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final nome = nomeController.text.trim();
-                final descricao = descricaoController.text.trim();
-
-                if (nome.isEmpty) {
-                  AppSnackbar.show(
-                    'Erro',
-                    'Nome da categoria é obrigatório',
-                    backgroundColor: Colors.red,
-                    colorText: Colors.white,
-                  );
-                  return;
-                }
-
-                // ✅ FECHAR DIALOG ANTES
-                Navigator.of(dialogContext).pop();
-
-                // ✅ AGORA controller EXISTE
-                await controller.criarCategoria(
-                  nome: nome,
-                  descricao: descricao.isEmpty ? null : descricao,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00FF88),
-                foregroundColor: Colors.black,
-              ),
-              child: const Text('Criar'),
-            ),
-          ],
-        );
-      },
+          child: Icon(icon, color: cor, size: 17),
+        ),
+      ),
     );
   }
 
-  // ✅ CORRIGIR TAMBÉM O DIALOG DE EDITAR
-  void _mostrarDialogEditarCategoria(
-    BuildContext context,
-    CategoriaAdminController controller,
-    Map<String, dynamic> categoria,
-  ) {
-    final nomeController = TextEditingController(text: categoria['nome']);
-    final descricaoController =
-        TextEditingController(text: categoria['descricao'] ?? '');
+  Widget _botaoAcao(
+      IconData icon, String label, Color cor, VoidCallback onTap) {
+    return Expanded(
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 13, color: cor),
+        label: Text(label,
+            style: TextStyle(color: cor, fontSize: 10)),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: cor.withOpacity(0.4)),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(9)),
+        ),
+      ),
+    );
+  }
 
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF2A2A2A),
-          title: const Text(
-            'Editar Categoria',
-            style: TextStyle(color: Colors.white),
+  Widget _buildVazio(
+      BuildContext context, CategoriaAdminController controller) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.category_outlined,
+              size: 52, color: Colors.white.withOpacity(0.06)),
+          const SizedBox(height: 12),
+          const Text('Nenhuma categoria cadastrada',
+              style: TextStyle(color: Colors.white38, fontSize: 15)),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () =>
+                _mostrarDialogNovaCategoria(context, controller),
+            icon: const Icon(Icons.add_rounded, color: Colors.black),
+            label: const Text('Criar Categoria',
+                style: TextStyle(
+                    color: Colors.black, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00FF88),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
+            ),
           ),
-          content: Column(
+        ],
+      ),
+    );
+  }
+
+  // ── Dialogs (lógica inalterada, visual atualizado) ────────────
+
+  void _mostrarDialogNovaCategoria(
+      BuildContext context,
+      CategoriaAdminController controller,
+      ) {
+    final nomeCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding:
+        EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius:
+            BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: nomeController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Nome da Categoria',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white30),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF00FF88)),
-                  ),
-                ),
+              Center(
+                child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2))),
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: descricaoController,
-                style: const TextStyle(color: Colors.white),
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white30),
+              const Text('Nova Categoria',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              _campo(nomeCtrl, 'Nome da Categoria *'),
+              const SizedBox(height: 10),
+              _campo(descCtrl, 'Descrição (opcional)', maxLines: 3),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final nome = nomeCtrl.text.trim();
+                    final desc = descCtrl.text.trim();
+                    if (nome.isEmpty) {
+                      AppSnackbar.show(
+                          'Erro', 'Nome é obrigatório',
+                          backgroundColor: Colors.red,
+                          colorText: Colors.white);
+                      return;
+                    }
+                    Navigator.pop(context);
+                    await controller.criarCategoria(
+                        nome: nome,
+                        descricao: desc.isEmpty ? null : desc);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF88),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF00FF88)),
-                  ),
+                  child: const Text('Criar Categoria',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold)),
                 ),
               ),
+              const SizedBox(height: 8),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(), // ✅ CORRIGIDO
-              child: const Text(
-                'Cancelar',
-                style: TextStyle(color: Colors.white54),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (nomeController.text.trim().isEmpty) {
-                  AppSnackbar.show(
-                    'Erro',
-                    'Nome da categoria é obrigatório',
-                    backgroundColor: Colors.red,
-                    colorText: Colors.white,
-                  );
-                  return;
-                }
+        ),
+      ),
+    );
+  }
 
-                Navigator.of(dialogContext).pop(); // ✅ CORRIGIDO
-                
-                controller.atualizarCategoria(
-                  id: categoria['id'],
-                  nome: nomeController.text.trim(),
-                  descricao: descricaoController.text.trim().isEmpty
-                      ? null
-                      : descricaoController.text.trim(),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00FF88),
-                foregroundColor: Colors.black,
+  void _mostrarDialogEditarCategoria(
+      BuildContext context,
+      CategoriaAdminController controller,
+      Map<String, dynamic> categoria,
+      ) {
+    final nomeCtrl =
+    TextEditingController(text: categoria['nome']);
+    final descCtrl =
+    TextEditingController(text: categoria['descricao'] ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding:
+        EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius:
+            BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2))),
               ),
-              child: const Text('Salvar'),
-            ),
-          ],
-        );
-      },
+              const SizedBox(height: 16),
+              const Text('Editar Categoria',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              _campo(nomeCtrl, 'Nome da Categoria *'),
+              const SizedBox(height: 10),
+              _campo(descCtrl, 'Descrição', maxLines: 3),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (nomeCtrl.text.trim().isEmpty) {
+                      AppSnackbar.show(
+                          'Erro', 'Nome é obrigatório',
+                          backgroundColor: Colors.red,
+                          colorText: Colors.white);
+                      return;
+                    }
+                    Navigator.pop(context);
+                    controller.atualizarCategoria(
+                      id: categoria['id'],
+                      nome: nomeCtrl.text.trim(),
+                      descricao:
+                      descCtrl.text.trim().isEmpty
+                          ? null
+                          : descCtrl.text.trim(),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF88),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Salvar',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _campo(TextEditingController ctrl, String label,
+      {int maxLines = 1}) {
+    return TextField(
+      controller: ctrl,
+      style: const TextStyle(color: Colors.white),
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white54),
+        filled: true,
+        fillColor: const Color(0xFF111111),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+                color: Color(0xFF00FF88), width: 1.5)),
+      ),
     );
   }
 }

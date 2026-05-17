@@ -22,7 +22,6 @@ class NavController extends GetxController {
     '/seguranca/confirmar-recebimento',
     '/web-admin',
     '/acompanhamento',
-    '/transcricao',
   ];
 
   // ✅ ValueNotifier nativo do Flutter para a visibilidade do nav.

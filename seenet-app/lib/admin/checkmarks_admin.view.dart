@@ -1,4 +1,4 @@
-// lib/admin/checkmarks_admin.view.dart
+// lib/admin/checkmarks_admin.view.dart — REDESIGN
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/categoria_checkmark.dart';
@@ -13,16 +13,18 @@ class CheckmarksAdminView extends StatefulWidget {
   State<CheckmarksAdminView> createState() => _CheckmarksAdminViewState();
 }
 
-class _CheckmarksAdminViewState extends State<CheckmarksAdminView> 
-    with TickerProviderStateMixin {  // ✅ MUDOU: Removeu "Single"
-  
+class _CheckmarksAdminViewState extends State<CheckmarksAdminView>
+    with TickerProviderStateMixin {
+
   final ApiService _api = ApiService.instance;
-  
+
   List<CategoriaCheckmark> categorias = [];
   Map<int, List<Checkmark>> checkmarksPorCategoria = {};
   bool isLoading = true;
-  
+
   TabController? _tabController;
+
+  // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
 
   @override
   void initState() {
@@ -36,512 +38,75 @@ class _CheckmarksAdminViewState extends State<CheckmarksAdminView>
     super.dispose();
   }
 
-Future<void> recarregarCheckmarks() async {
-  try {
-    checkmarksPorCategoria.clear();
-    
-    for (var categoria in categorias) {
-      // ✅ REMOVER ?incluir_inativos=true
-      final responseCheckmarks = await _api.get(
-        '/checkmark/categoria/${categoria.id}'  // Sem query param
-      );
-      
-      if (responseCheckmarks['success']) {
-        final List<dynamic> checkmarksData = responseCheckmarks['data']['checkmarks'];
-        checkmarksPorCategoria[categoria.id!] = 
-            checkmarksData.map((json) => Checkmark.fromMap(json)).toList();
-      }
-    }
-
-    if (mounted) {
-      setState(() {});
-    }
-    
-    print('♻️ Checkmarks recarregados');
-  } catch (e) {
-    print('❌ Erro ao recarregar checkmarks: $e');
-  }
-}
-
-Future<void> carregarDados() async {
-  try {
-    setState(() => isLoading = true);
-
-    final responseCategorias = await _api.get('/checkmark/categorias');
-    
-    if (responseCategorias['success']) {
-      final List<dynamic> data = responseCategorias['data']['categorias'];
-      final novasCategorias = data.map((json) => CategoriaCheckmark.fromMap(json)).toList();
-      
-      final indiceAtual = _tabController?.index ?? 0;
-      
-      final precisaRecriarTabs = _tabController == null || 
-                                   _tabController!.length != novasCategorias.length;
-      
-      if (precisaRecriarTabs) {
-        _tabController?.dispose();
-        _tabController = TabController(
-          length: novasCategorias.length, 
-          vsync: this,
-          initialIndex: indiceAtual.clamp(0, novasCategorias.length - 1),
-        );
-        print('🔄 TabController recriado (${novasCategorias.length} tabs)');
-      }
-      
-      categorias = novasCategorias;
-
+  Future<void> recarregarCheckmarks() async {
+    try {
       checkmarksPorCategoria.clear();
       for (var categoria in categorias) {
-        // ✅ REMOVER ?incluir_inativos=true
         final responseCheckmarks = await _api.get(
-          '/checkmark/categoria/${categoria.id}'  // Sem query param
-        );
-        
+            '/checkmark/categoria/${categoria.id}');
         if (responseCheckmarks['success']) {
-          final List<dynamic> checkmarksData = responseCheckmarks['data']['checkmarks'];
-          checkmarksPorCategoria[categoria.id!] = 
+          final List<dynamic> checkmarksData =
+          responseCheckmarks['data']['checkmarks'];
+          checkmarksPorCategoria[categoria.id!] =
               checkmarksData.map((json) => Checkmark.fromMap(json)).toList();
         }
       }
-
-      print('📊 ${categorias.length} categorias carregadas');
-    }
-  } catch (e) {
-    print('❌ Erro ao carregar dados: $e');
-    if (mounted) {
-      AppSnackbar.show('Erro', 'Erro ao carregar dados',
-        backgroundColor: Colors.red, colorText: Colors.white);
-    }
-  } finally {
-    if (mounted) {
-      setState(() => isLoading = false);
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('❌ Erro ao recarregar checkmarks: $e');
     }
   }
-}
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gerenciar Checkmarks'),
-        backgroundColor: const Color(0xFF00FF88),
-        foregroundColor: Colors.black,
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: carregarDados),
-          IconButton(icon: const Icon(Icons.add), onPressed: _adicionarCheckmark),
-        ],
-        bottom: isLoading || categorias.isEmpty || _tabController == null 
-            ? null 
-            : TabBar(
-                controller: _tabController,
-                labelColor: Colors.black,
-                unselectedLabelColor: Colors.black54,
-                indicatorColor: Colors.black,
-                isScrollable: true,
-                tabs: categorias.map((c) => Tab(text: c.nome)).toList(),
-              ),
-      ),
-      backgroundColor: const Color(0xFF1A1A1A),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF00FF88)))
-          : categorias.isEmpty
-              ? const Center(child: Text('Nenhuma categoria encontrada', 
-                  style: TextStyle(color: Colors.white, fontSize: 18)))
-              : _tabController == null
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF00FF88)))
-                  : TabBarView(
-                      controller: _tabController,
-                      children: categorias.map((cat) {
-                        final checks = checkmarksPorCategoria[cat.id!] ?? [];
-                        return _buildCategoriaTab(cat, checks);
-                      }).toList(),
-                    ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _adicionarCheckmark,
-        backgroundColor: const Color(0xFF00FF88),
-        child: const Icon(Icons.add, color: Colors.black),
-      ),
-    );
-  }
-
-  // ... resto do código continua igual ...
-  
-  Widget _buildCategoriaTab(CategoriaCheckmark categoria, List<Checkmark> checkmarks) {
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          color: const Color(0xFF2A2A2A),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(categoria.nome, style: const TextStyle(
-                      color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                    if (categoria.descricao != null)
-                      Text(categoria.descricao!, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    Text('${checkmarks.length} checkmarks', style: const TextStyle(
-                      color: Color(0xFF00FF88), fontSize: 12, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit, color: Color(0xFF00FF88)),
-                onPressed: () => _editarCategoria(categoria),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: checkmarks.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.checklist, size: 64, color: Colors.white54),
-                      const SizedBox(height: 16),
-                      const Text('Nenhum checkmark nesta categoria',
-                        style: TextStyle(color: Colors.white54, fontSize: 16)),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: () => _adicionarCheckmarkCategoria(categoria.id!),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Adicionar Checkmark'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00FF88),
-                          foregroundColor: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: checkmarks.length,
-                  itemBuilder: (context, index) => _buildCheckmarkCard(checkmarks[index], index),
-                ),
-        ),
-      ],
-    );
-  }
-
-Widget _buildCheckmarkCard(Checkmark checkmark, int index) {
-  return Card(
-    key: ValueKey(checkmark.id),
-    margin: const EdgeInsets.symmetric(vertical: 4),
-    color: const Color(0xFF2A2A2A),
-    child: ListTile(
-      leading: Container(
-        width: 30, 
-        height: 30,
-        decoration: BoxDecoration(
-          color: const Color(0xFF00FF88),
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Center(
-          child: Text(
-            '${index + 1}',
-            style: const TextStyle(
-              color: Colors.black, 
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-      title: Text(
-        checkmark.titulo,
-        style: const TextStyle(
-          color: Colors.white, 
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      subtitle: checkmark.descricao != null
-          ? Text(
-              checkmark.descricao!, 
-              style: const TextStyle(color: Colors.white70),
-              maxLines: 2, 
-              overflow: TextOverflow.ellipsis,
-            )
-          : null,
-      trailing: PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert, color: Colors.white),
-        color: const Color(0xFF3A3A3A),
-        onSelected: (value) {
-          switch (value) {
-            case 'detalhes': 
-              _mostrarDetalhesCheckmark(checkmark); 
-              break;
-            case 'editar': 
-              _editarCheckmark(checkmark); 
-              break;
-            case 'remover': 
-              _removerCheckmark(checkmark); 
-              break;
+  Future<void> carregarDados() async {
+    try {
+      setState(() => isLoading = true);
+      final responseCategorias = await _api.get('/checkmark/categorias');
+      if (responseCategorias['success']) {
+        final List<dynamic> data =
+        responseCategorias['data']['categorias'];
+        final novasCategorias =
+        data.map((json) => CategoriaCheckmark.fromMap(json)).toList();
+        final indiceAtual = _tabController?.index ?? 0;
+        final precisaRecriar = _tabController == null ||
+            _tabController!.length != novasCategorias.length;
+        if (precisaRecriar) {
+          _tabController?.dispose();
+          _tabController = TabController(
+            length: novasCategorias.length,
+            vsync: this,
+            initialIndex:
+            indiceAtual.clamp(0, novasCategorias.length - 1),
+          );
+        }
+        categorias = novasCategorias;
+        checkmarksPorCategoria.clear();
+        for (var categoria in categorias) {
+          final responseCheckmarks = await _api.get(
+              '/checkmark/categoria/${categoria.id}');
+          if (responseCheckmarks['success']) {
+            final List<dynamic> checkmarksData =
+            responseCheckmarks['data']['checkmarks'];
+            checkmarksPorCategoria[categoria.id!] = checkmarksData
+                .map((json) => Checkmark.fromMap(json))
+                .toList();
           }
-        },
-        itemBuilder: (context) => [
-          const PopupMenuItem(
-            value: 'detalhes',
-            child: Row(
-              children: [
-                Icon(Icons.info, color: Colors.blue), 
-                SizedBox(width: 8),
-                Text('Ver Detalhes', style: TextStyle(color: Colors.white)),
-              ],
-            ),
-          ),
-          const PopupMenuItem(
-            value: 'editar',
-            child: Row(
-              children: [
-                Icon(Icons.edit, color: Colors.orange), 
-                SizedBox(width: 8),
-                Text('Editar', style: TextStyle(color: Colors.white)),
-              ],
-            ),
-          ),
-          // ✅ REMOVER opção 'ativar_desativar'
-          const PopupMenuItem(
-            value: 'remover',
-            child: Row(
-              children: [
-                Icon(Icons.delete, color: Colors.red), 
-                SizedBox(width: 8),
-                Text('Remover', style: TextStyle(color: Colors.white)),
-              ],
-            ),
-          ),
-        ],
-      ),
-      onTap: () => _mostrarDetalhesCheckmark(checkmark),
-    ),
-  );
-}
-
-void _mostrarDetalhesCheckmark(Checkmark checkmark) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: const Color(0xFF2A2A2A),
-      title: const Text(
-        'Detalhes do Checkmark', 
-        style: TextStyle(color: Colors.white),
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailRow('ID', checkmark.id.toString()),
-            _buildDetailRow('Título', checkmark.titulo),
-            if (checkmark.descricao != null) 
-              _buildDetailRow('Descrição', checkmark.descricao!),
-            // ✅ REMOVER linha de Status
-            const SizedBox(height: 16),
-            const Text(
-              'Prompt Gemini:', 
-              style: TextStyle(
-                color: Colors.white, 
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white24),
-              ),
-              child: Text(
-                checkmark.promptGemini, 
-                style: const TextStyle(
-                  color: Colors.white70, 
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text(
-            'Fechar', 
-            style: TextStyle(color: Color(0xFF00FF88)),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 80, child: Text('$label:', 
-            style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold))),
-          Expanded(child: Text(value, style: const TextStyle(color: Colors.white))),
-        ],
-      ),
-    );
-  }
-
-void _editarCheckmark(Checkmark checkmark) {
-  final tituloCtrl = TextEditingController(text: checkmark.titulo);
-  final descCtrl = TextEditingController(text: checkmark.descricao ?? '');
-  final promptCtrl = TextEditingController(text: checkmark.promptGemini);
-
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: const Color(0xFF2A2A2A),
-      title: const Text('Editar Checkmark', style: TextStyle(color: Colors.white)),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: tituloCtrl, 
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Título *',
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descCtrl, 
-              style: const TextStyle(color: Colors.white), 
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Descrição',
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: promptCtrl, 
-              style: const TextStyle(color: Colors.white), 
-              maxLines: 5,
-              decoration: const InputDecoration(
-                labelText: 'Prompt Gemini *',
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))),
-                helperText: 'Este prompt será usado para gerar o diagnóstico com IA',
-                helperStyle: TextStyle(color: Colors.white38, fontSize: 11),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            await _salvarEdicaoCheckmark(
-              checkmark.id!, 
-              tituloCtrl.text.trim(),
-              descCtrl.text.trim(), 
-              promptCtrl.text.trim(),
-            );
-            Navigator.pop(context);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00FF88), 
-            foregroundColor: Colors.black,
-          ),
-          child: const Text('Salvar'),
-        ),
-      ],
-    ),
-  );
-}
-
-Future<void> _salvarEdicaoCheckmark(int id, String titulo, String desc, String prompt) async {
-  if (titulo.isEmpty || prompt.isEmpty) {
-    AppSnackbar.show('Erro', 'Título e Prompt obrigatórios',
-      backgroundColor: Colors.red, colorText: Colors.white);
-    return;
-  }
-  
-  try {
-    final res = await _api.put('/checkmark/checkmarks/$id', {
-      'titulo': titulo, 
-      'descricao': desc.isEmpty ? null : desc,
-      'prompt_gemini': prompt,
-      // ✅ Não enviar mais 'ativo'
-    });
-    
-    if (res['success']) {
-      AppSnackbar.show('Sucesso', 'Atualizado!',
-        backgroundColor: Colors.green, colorText: Colors.white);
-      await recarregarCheckmarks();
-    } else {
-      AppSnackbar.show('Erro', res['error'] ?? 'Falha ao atualizar',
-        backgroundColor: Colors.red, colorText: Colors.white);
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Erro ao carregar dados: $e');
+      if (mounted) {
+        AppSnackbar.show('Erro', 'Erro ao carregar dados',
+            backgroundColor: Colors.red, colorText: Colors.white);
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
-  } catch (e) {
-    AppSnackbar.show('Erro', 'Falha ao atualizar',
-      backgroundColor: Colors.red, colorText: Colors.white);
   }
-}
-
-  void _removerCheckmark(Checkmark checkmark) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text('Remover Checkmark', style: TextStyle(color: Colors.white)),
-        content: Text('Remover "${checkmark.titulo}"?\n⚠️ Ação irreversível!',
-          style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
-          ElevatedButton(
-            onPressed: () async {
-              await _confirmarRemocao(checkmark.id!);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Remover'),
-          ),
-        ],
-      ),
-    );
-  }
-
-Future<void> _confirmarRemocao(int id) async {
-  try {
-    final res = await _api.delete('/checkmark/checkmarks/$id');  // ✅ CORRIGIDO: plural
-    if (res['success']) {
-      AppSnackbar.show('Sucesso', 'Removido!', backgroundColor: Colors.green, colorText: Colors.white);
-        await recarregarCheckmarks();  // ✅ MUDOU: usa recarregarCheckmarks
-    }
-  } catch (e) {
-    AppSnackbar.show('Erro', 'Falha ao remover', backgroundColor: Colors.red, colorText: Colors.white);
-  }
-}
 
   void _adicionarCheckmark() {
     if (categorias.isEmpty) {
-      AppSnackbar.show('Erro', 'Nenhuma categoria', backgroundColor: Colors.red, colorText: Colors.white);
+      AppSnackbar.show('Erro', 'Nenhuma categoria',
+          backgroundColor: Colors.red, colorText: Colors.white);
       return;
     }
     _adicionarCheckmarkCategoria(categorias.first.id!);
@@ -553,243 +118,820 @@ Future<void> _confirmarRemocao(int id) async {
     final promptCtrl = TextEditingController();
     int catSel = catId;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: const Color(0xFF2A2A2A),
-          title: const Text('Novo Checkmark', style: TextStyle(color: Colors.white)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<int>(
-                  value: catSel, style: const TextStyle(color: Colors.white),
-                  dropdownColor: const Color(0xFF3A3A3A),
-                  decoration: const InputDecoration(labelText: 'Categoria',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88)))),
-                  items: categorias.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nome))).toList(),
-                  onChanged: (v) => setState(() => catSel = v!),
-                ),
-                const SizedBox(height: 16),
-                TextField(controller: tituloCtrl, style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(labelText: 'Título *',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))))),
-                const SizedBox(height: 16),
-                TextField(controller: descCtrl, style: const TextStyle(color: Colors.white), maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'Descrição',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))))),
-                const SizedBox(height: 16),
-                TextField(controller: promptCtrl, style: const TextStyle(color: Colors.white), maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Prompt Gemini *',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))))),
-              ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding:
+        EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: StatefulBuilder(
+          builder: (ctx, setModal) => Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A1A1A),
+              borderRadius:
+              BorderRadius.vertical(top: Radius.circular(24)),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
-            ElevatedButton(
-              onPressed: () async {
-                await _salvarNovo(catSel, tituloCtrl.text.trim(), descCtrl.text.trim(), promptCtrl.text.trim());
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF88), foregroundColor: Colors.black),
-              child: const Text('Criar'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-Future<void> _salvarNovo(int catId, String titulo, String desc, String prompt) async {
-  // ✅ VALIDAÇÃO: Título obrigatório
-  if (titulo.isEmpty) {
-    AppSnackbar.show('Erro', 'Título é obrigatório',
-      backgroundColor: Colors.red, colorText: Colors.white);
-    return;
-  }
-  
-  // ✅ VALIDAÇÃO: Prompt obrigatório
-  if (prompt.isEmpty) {
-    AppSnackbar.show('Erro', 'Prompt é obrigatório',
-      backgroundColor: Colors.red, colorText: Colors.white);
-    return;
-  }
-  
-  // ✅ VALIDAÇÃO: Prompt mínimo 10 caracteres
-  if (prompt.length < 10) {
-    await Get.dialog(
-      AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: Row(
-          children: const [
-            Icon(Icons.error_outline, color: Colors.red, size: 28),
-            SizedBox(width: 12),
-            Text('Prompt inválido', style: TextStyle(color: Colors.white)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'O prompt do Gemini deve conter no mínimo 10 caracteres para garantir uma análise adequada.',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                border: Border.all(color: Colors.red, width: 1),
-                borderRadius: BorderRadius.circular(8),
-              ),
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.info_outline, color: Colors.red, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Caracteres atuais: ${prompt.length}',
-                        style: const TextStyle(
+                  Center(
+                    child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2))),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Novo Checkmark',
+                      style: TextStyle(
                           color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  // Categoria
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111111),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: catSel,
+                        dropdownColor: const Color(0xFF1A1A1A),
+                        isExpanded: true,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 14),
+                        onChanged: (v) =>
+                            setModal(() => catSel = v!),
+                        items: categorias
+                            .map((c) => DropdownMenuItem(
+                            value: c.id, child: Text(c.nome)))
+                            .toList(),
                       ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Mínimo necessário: 10 caracteres',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  const SizedBox(height: 10),
+                  _campoTexto(tituloCtrl, 'Título *'),
+                  const SizedBox(height: 10),
+                  _campoTexto(descCtrl, 'Descrição', maxLines: 2),
+                  const SizedBox(height: 10),
+                  _campoTexto(promptCtrl, 'Prompt Gemini *',
+                      maxLines: 3,
+                      hint: 'Mínimo 10 caracteres'),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await _salvarNovo(
+                            catSel,
+                            tituloCtrl.text.trim(),
+                            descCtrl.text.trim(),
+                            promptCtrl.text.trim());
+                        if (mounted) Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00FF88),
+                        padding:
+                        const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Criar',
+                          style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold)),
+                    ),
                   ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _salvarNovo(
+      int catId, String titulo, String desc, String prompt) async {
+    if (titulo.isEmpty) {
+      AppSnackbar.show('Erro', 'Título é obrigatório',
+          backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
+    if (prompt.isEmpty || prompt.length < 10) {
+      AppSnackbar.show('Erro', 'Prompt deve ter no mínimo 10 caracteres',
+          backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
+    try {
+      final res = await _api.post('/checkmark/checkmarks', {
+        'categoria_id': catId,
+        'titulo': titulo,
+        'descricao': desc.isEmpty ? null : desc,
+        'prompt_gemini': prompt,
+        'ativo': true,
+      });
+      if (res['success']) {
+        AppSnackbar.show('Sucesso', 'Criado!',
+            backgroundColor: Colors.green, colorText: Colors.white);
+        await recarregarCheckmarks();
+      } else {
+        AppSnackbar.show('Erro', res['error'] ?? 'Falha ao criar',
+            backgroundColor: Colors.red, colorText: Colors.white);
+      }
+    } catch (e) {
+      AppSnackbar.show('Erro', 'Falha ao criar',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    }
+  }
+
+  void _editarCheckmark(Checkmark checkmark) {
+    final tituloCtrl =
+    TextEditingController(text: checkmark.titulo);
+    final descCtrl =
+    TextEditingController(text: checkmark.descricao ?? '');
+    final promptCtrl =
+    TextEditingController(text: checkmark.promptGemini);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding:
+        EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius:
+            BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2))),
+                ),
+                const SizedBox(height: 16),
+                const Text('Editar Checkmark',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                _campoTexto(tituloCtrl, 'Título *'),
+                const SizedBox(height: 10),
+                _campoTexto(descCtrl, 'Descrição', maxLines: 2),
+                const SizedBox(height: 10),
+                _campoTexto(promptCtrl, 'Prompt Gemini *',
+                    maxLines: 4),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await _salvarEdicaoCheckmark(
+                          checkmark.id!,
+                          tituloCtrl.text.trim(),
+                          descCtrl.text.trim(),
+                          promptCtrl.text.trim());
+                      if (mounted) Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00FF88),
+                      padding:
+                      const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Salvar',
+                        style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _salvarEdicaoCheckmark(
+      int id, String titulo, String desc, String prompt) async {
+    if (titulo.isEmpty || prompt.isEmpty) {
+      AppSnackbar.show('Erro', 'Título e Prompt obrigatórios',
+          backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
+    try {
+      final res = await _api.put('/checkmark/checkmarks/$id', {
+        'titulo': titulo,
+        'descricao': desc.isEmpty ? null : desc,
+        'prompt_gemini': prompt,
+      });
+      if (res['success']) {
+        AppSnackbar.show('Sucesso', 'Atualizado!',
+            backgroundColor: Colors.green, colorText: Colors.white);
+        await recarregarCheckmarks();
+      } else {
+        AppSnackbar.show('Erro', res['error'] ?? 'Falha',
+            backgroundColor: Colors.red, colorText: Colors.white);
+      }
+    } catch (e) {
+      AppSnackbar.show('Erro', 'Falha ao atualizar',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    }
+  }
+
+  void _removerCheckmark(Checkmark checkmark) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: const Text('Remover Checkmark',
+            style: TextStyle(color: Colors.white)),
+        content: Text('Remover "${checkmark.titulo}"?\n⚠️ Ação irreversível!',
+            style: const TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
-            onPressed: () => Get.back(),
-            child: const Text(
-              'Entendi',
-              style: TextStyle(
-                color: Color(0xFF00FF88),
-                fontWeight: FontWeight.bold,
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar',
+                  style: TextStyle(color: Colors.white54))),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _confirmarRemocao(checkmark.id!);
+            },
+            style:
+            ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Remover',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmarRemocao(int id) async {
+    try {
+      final res = await _api.delete('/checkmark/checkmarks/$id');
+      if (res['success']) {
+        AppSnackbar.show('Sucesso', 'Removido!',
+            backgroundColor: Colors.green, colorText: Colors.white);
+        await recarregarCheckmarks();
+      }
+    } catch (e) {
+      AppSnackbar.show('Erro', 'Falha ao remover',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    }
+  }
+
+  void _mostrarDetalhesCheckmark(Checkmark checkmark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A1A),
+          borderRadius:
+          BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2))),
+            ),
+            const SizedBox(height: 16),
+            Text(checkmark.titulo,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            if (checkmark.descricao != null) ...[
+              Text(checkmark.descricao!,
+                  style: const TextStyle(
+                      color: Colors.white54, fontSize: 13)),
+              const SizedBox(height: 12),
+            ],
+            const Text('Prompt Gemini',
+                style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5)),
+            const SizedBox(height: 6),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white12),
               ),
+              child: Text(checkmark.promptGemini,
+                  style: const TextStyle(
+                      color: Colors.white70, fontSize: 12)),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _editarCategoria(CategoriaCheckmark categoria) {
+    final nomeCtrl = TextEditingController(text: categoria.nome);
+    final descCtrl =
+    TextEditingController(text: categoria.descricao ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding:
+        EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius:
+            BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2))),
+              ),
+              const SizedBox(height: 16),
+              const Text('Editar Categoria',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              _campoTexto(nomeCtrl, 'Nome *'),
+              const SizedBox(height: 10),
+              _campoTexto(descCtrl, 'Descrição', maxLines: 2),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await _salvarEdicaoCategoria(
+                        categoria.id!,
+                        nomeCtrl.text.trim(),
+                        descCtrl.text.trim());
+                    if (mounted) Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF88),
+                    padding:
+                    const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Salvar',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _salvarEdicaoCategoria(
+      int id, String nome, String desc) async {
+    if (nome.isEmpty) {
+      AppSnackbar.show('Erro', 'Nome obrigatório',
+          backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
+    try {
+      final res = await _api.put('/checkmark/categorias/$id',
+          {'nome': nome, 'descricao': desc.isEmpty ? null : desc});
+      if (res['success']) {
+        AppSnackbar.show('Sucesso', 'Categoria atualizada!',
+            backgroundColor: Colors.green, colorText: Colors.white);
+        await recarregarCheckmarks();
+      }
+    } catch (e) {
+      AppSnackbar.show('Erro', 'Falha',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    }
+  }
+
+  // ── BUILD ────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF111111),
+      body: Column(
+        children: [
+          // ── Header ──────────────────────────────────────────
+          Container(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 12,
+              bottom: 0,
+              left: 8,
+              right: 16,
+            ),
+            color: const Color(0xFF111111),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_rounded,
+                          color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00FF88).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: const Color(0xFF00FF88)
+                                .withOpacity(0.2)),
+                      ),
+                      child: const Icon(Icons.checklist_rounded,
+                          color: Color(0xFF00FF88), size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Checkmarks',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w700)),
+                          Text('Problemas por categoria',
+                              style: TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded,
+                          color: Colors.white38, size: 20),
+                      onPressed: carregarDados,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_rounded,
+                          color: Color(0xFF00FF88), size: 22),
+                      onPressed: _adicionarCheckmark,
+                    ),
+                  ],
+                ),
+
+                // ── Tabs por categoria ───────────────────────
+                if (!isLoading &&
+                    categorias.isNotEmpty &&
+                    _tabController != null)
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.06)),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      indicator: BoxDecoration(
+                        color: const Color(0xFF00FF88),
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      labelColor: Colors.black,
+                      unselectedLabelColor: Colors.white38,
+                      labelStyle: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 12),
+                      unselectedLabelStyle:
+                      const TextStyle(fontSize: 12),
+                      dividerColor: Colors.transparent,
+                      tabs: categorias
+                          .map((c) => Tab(text: c.nome))
+                          .toList(),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // ── Conteúdo ─────────────────────────────────────────
+          Expanded(
+            child: isLoading
+                ? const Center(
+                child: CircularProgressIndicator(
+                    color: Color(0xFF00FF88), strokeWidth: 2.5))
+                : categorias.isEmpty
+                ? _buildVazioCategoria()
+                : _tabController == null
+                ? const Center(
+                child: CircularProgressIndicator(
+                    color: Color(0xFF00FF88)))
+                : TabBarView(
+              controller: _tabController,
+              children: categorias.map((cat) {
+                final checks =
+                    checkmarksPorCategoria[cat.id!] ?? [];
+                return _buildCategoriaTab(cat, checks);
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _adicionarCheckmark,
+        backgroundColor: const Color(0xFF00FF88),
+        icon: const Icon(Icons.add_rounded, color: Colors.black),
+        label: const Text('Novo Checkmark',
+            style: TextStyle(
+                color: Colors.black, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  Widget _buildCategoriaTab(
+      CategoriaCheckmark categoria, List<Checkmark> checks) {
+    return Column(
+      children: [
+        // Header da aba
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.symmetric(
+              horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF181818),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: const Color(0xFF00FF88).withOpacity(0.15)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00FF88).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text('${checks.length} checks',
+                    style: const TextStyle(
+                        color: Color(0xFF00FF88),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold)),
+              ),
+              if (categoria.descricao != null) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(categoria.descricao!,
+                      style: const TextStyle(
+                          color: Colors.white38, fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ] else
+                const Spacer(),
+              GestureDetector(
+                onTap: () => _editarCategoria(categoria),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.edit_rounded,
+                      color: Colors.blue, size: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        Expanded(
+          child: checks.isEmpty
+              ? _buildVazioChecks(categoria.id!)
+              : ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+            itemCount: checks.length,
+            itemBuilder: (context, index) =>
+                _buildCheckmarkCard(checks[index], index),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCheckmarkCard(Checkmark checkmark, int index) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF181818),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Row(
+        children: [
+          // Número
+          Container(
+            width: 36,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00FF88).withOpacity(0.07),
+              borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12)),
+            ),
+            child: Center(
+              child: Text('${index + 1}',
+                  style: const TextStyle(
+                      color: Color(0xFF00FF88),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12)),
+            ),
+          ),
+          // Conteúdo
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(checkmark.titulo,
+                      style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500)),
+                  if (checkmark.descricao != null) ...[
+                    const SizedBox(height: 3),
+                    Text(checkmark.descricao!,
+                        style: const TextStyle(
+                            color: Colors.white38, fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          // Ações
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: () => _mostrarDetalhesCheckmark(checkmark),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.info_outline_rounded,
+                      color: Colors.white38, size: 15),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _editarCheckmark(checkmark),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.edit_rounded,
+                      color: Colors.blue, size: 15),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _removerCheckmark(checkmark),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.delete_outline_rounded,
+                      color: Colors.red, size: 15),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVazioChecks(int catId) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.checklist_outlined,
+              size: 52, color: Colors.white.withOpacity(0.06)),
+          const SizedBox(height: 12),
+          const Text('Nenhum checkmark nesta categoria',
+              style: TextStyle(color: Colors.white38, fontSize: 15)),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () => _adicionarCheckmarkCategoria(catId),
+            icon: const Icon(Icons.add_rounded, color: Colors.black),
+            label: const Text('Adicionar Checkmark',
+                style: TextStyle(
+                    color: Colors.black, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00FF88),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30)),
             ),
           ),
         ],
       ),
     );
-    return; // NÃO enviar para o servidor
   }
-  
-  try {
-    // ✅ ADICIONAR LOGS PARA DEBUG
-    final payload = {
-      'categoria_id': catId, 
-      'titulo': titulo,
-      'descricao': desc.isEmpty ? null : desc,
-      'prompt_gemini': prompt, 
-      'ativo': true,
-    };
-    
-    print('📤 Enviando para criar checkmark:');
-    print('   URL: /checkmark/checkmarks');
-    print('   Payload: $payload');
-    
-    final res = await _api.post('/checkmark/checkmarks', payload);
-    
-    print('📥 Resposta recebida:');
-    print('   Success: ${res['success']}');
-    print('   Response completa: $res');
-    
-    if (res['success']) {
-      AppSnackbar.show('Sucesso', 'Criado!',
-        backgroundColor: Colors.green, colorText: Colors.white);
-        await recarregarCheckmarks();  // ✅ MUDOU: usa recarregarCheckmarks
-    } else {
-      print('❌ Erro do servidor: ${res['error']}');
-      AppSnackbar.show('Erro', res['error'] ?? 'Falha ao criar',
-        backgroundColor: Colors.red, colorText: Colors.white);
-    }
-  } catch (e) {
-    print('❌ Exceção ao criar: $e');
-    AppSnackbar.show('Erro', 'Falha ao criar',
-      backgroundColor: Colors.red, colorText: Colors.white);
-  }
-}
 
-  void _editarCategoria(CategoriaCheckmark categoria) {
-    final nomeCtrl = TextEditingController(text: categoria.nome);
-    final descCtrl = TextEditingController(text: categoria.descricao ?? '');
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text('Editar Categoria', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nomeCtrl, style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(labelText: 'Nome *',
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))))),
-            const SizedBox(height: 16),
-            TextField(controller: descCtrl, style: const TextStyle(color: Colors.white), maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Descrição',
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF88))))),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
-          ElevatedButton(
-            onPressed: () async {
-              await _salvarEdicaoCategoria(categoria.id!, nomeCtrl.text.trim(), descCtrl.text.trim());
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00FF88), foregroundColor: Colors.black),
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
+  Widget _buildVazioCategoria() {
+    return const Center(
+      child: Text('Nenhuma categoria encontrada',
+          style: TextStyle(color: Colors.white38, fontSize: 15)),
     );
   }
 
-
-  Future<void> _salvarEdicaoCategoria(int id, String nome, String desc) async {
-    if (nome.isEmpty) {
-      AppSnackbar.show('Erro', 'Nome obrigatório', backgroundColor: Colors.red, colorText: Colors.white);
-      return;
-    }
-    try {
-      final res = await _api.put('/checkmark/categorias/$id', {
-        'nome': nome, 'descricao': desc.isEmpty ? null : desc,
-      });
-      if (res['success']) {
-        AppSnackbar.show('Sucesso', 'Categoria atualizada!', backgroundColor: Colors.green, colorText: Colors.white);
-        await recarregarCheckmarks();  // ✅ MUDOU: usa recarregarCheckmarks
-      }
-    } catch (e) {
-      AppSnackbar.show('Erro', 'Falha', backgroundColor: Colors.red, colorText: Colors.white);
-    }
+  Widget _campoTexto(TextEditingController ctrl, String label,
+      {int maxLines = 1, String? hint}) {
+    return TextField(
+      controller: ctrl,
+      style: const TextStyle(color: Colors.white),
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.white24, fontSize: 12),
+        labelStyle: const TextStyle(color: Colors.white54),
+        filled: true,
+        fillColor: const Color(0xFF111111),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+                color: Color(0xFF00FF88), width: 1.5)),
+      ),
+    );
   }
 }

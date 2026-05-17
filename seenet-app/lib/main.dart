@@ -19,9 +19,6 @@ import 'ordem_de_servico/screens/ordens_servico_screen.dart';
 import 'ordem_de_servico/screens/executar_os_screen.dart';
 import 'package:seenet/admin/checkmarks_admin.view.dart';
 import 'splash_screen/splash_screen.dart';
-import 'package:seenet/transcricao/transcricao.view.dart';
-import 'package:seenet/transcricao/historico_transcricao.view.dart';
-import 'controllers/transcricao_controller.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'seguranca/screens/relatorio_epi_screen.dart';
@@ -241,16 +238,8 @@ class MyApp extends StatelessWidget {
           page: () => const DashboardAdminView(),
           middlewares: [AuthMiddleware()],
         ),
-        GetPage(
-          name: '/transcricao',
-          page: () => const TranscricaoView(),
-          binding: BindingsBuilder(() {
-            Get.lazyPut(() => TranscricaoController());
-          }),
-        ),
         GetPage(name: '/ordens-servico', page: () => const OrdensServicoScreen()),
         GetPage(name: '/ordens-servico/executar', page: () => const ExecutarOSScreen()),
-        GetPage(name: '/transcricao/historico', page: () => const HistoricoTranscricaoView()),
         GetPage(name: '/acompanhamento', page: () => const AcompanhamentoScreen()),
         GetPage(name: '/seguranca', page: () => const SegurancaHomeScreen()),
         GetPage(name: '/seguranca/requisicao', page: () => const RequisicaoEpiScreen()),

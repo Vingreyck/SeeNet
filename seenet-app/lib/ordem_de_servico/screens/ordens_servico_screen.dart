@@ -1,3 +1,4 @@
+// lib/ordem_de_servico/screens/ordens_servico_screen.dart — REDESIGN
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/ordem_servico_controller.dart';
@@ -14,23 +15,22 @@ class OrdensServicoScreen extends StatefulWidget {
   State<OrdensServicoScreen> createState() => _OrdensServicoScreenState();
 }
 
-class _OrdensServicoScreenState extends State<OrdensServicoScreen> with SingleTickerProviderStateMixin {
+class _OrdensServicoScreenState extends State<OrdensServicoScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final OrdemServicoController controller = Get.put(OrdemServicoController());
 
-  // ✅ Controller para busca nas concluídas
   final TextEditingController _buscaController = TextEditingController();
   final RxString _termoBusca = ''.obs;
+
+  // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-
-    // Listener para atualizar busca com debounce
     _buscaController.addListener(() {
       _termoBusca.value = _buscaController.text;
-      // Debounce de 500ms para não fazer muitas requisições
       Future.delayed(const Duration(milliseconds: 500), () {
         if (_buscaController.text == _termoBusca.value) {
           controller.carregarOSsConcluidas(busca: _termoBusca.value);
@@ -46,130 +46,394 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen> with SingleTi
     super.dispose();
   }
 
+  void _mostrarDetalhesOSConcluida(OrdemServico os) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 14),
+                      SizedBox(width: 5),
+                      Text('CONCLUÍDA',
+                          style: TextStyle(color: Colors.green,
+                              fontWeight: FontWeight.bold, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white38),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text('OS #${os.numeroOs}',
+                style: const TextStyle(color: Colors.white, fontSize: 20,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            _detalheRow(Icons.person_outline_rounded, os.clienteNome),
+            if (os.clienteEndereco != null && os.clienteEndereco!.isNotEmpty)
+              _detalheRow(Icons.location_on_outlined, os.clienteEndereco!),
+            if (os.dataFim != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.06)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined,
+                        color: Color(0xFF00FF88), size: 18),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Concluída em',
+                            style: TextStyle(color: Colors.white38, fontSize: 11)),
+                        Text(_formatarData(os.dataFim!),
+                            style: const TextStyle(color: Colors.white,
+                                fontSize: 15, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detalheRow(IconData icon, String texto) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white38, size: 16),
+          const SizedBox(width: 10),
+          Expanded(child: Text(texto,
+              style: const TextStyle(color: Colors.white70, fontSize: 14))),
+        ],
+      ),
+    );
+  }
+
+  String _formatarData(DateTime data) =>
+      '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year} às ${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
+
+  Widget _buildListaOS(List<OrdemServico> ordens, String status) {
+    if (ordens.isEmpty) return _buildEmptyState(status);
+    return RefreshIndicator(
+      onRefresh: () => controller.carregarMinhasOSs(),
+      color: const Color(0xFF00FF88),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        itemCount: ordens.length,
+        itemBuilder: (context, index) {
+          final os = ordens[index];
+          return OSCardWidget(
+            os: os,
+            onTap: () => Get.to(() => const ExecutarOSWizardScreen(), arguments: os),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildListaConcluidas() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withOpacity(0.07)),
+            ),
+            child: TextField(
+              controller: _buscaController,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Buscar por nome do cliente...',
+                hintStyle: const TextStyle(color: Colors.white24),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    color: Colors.white38, size: 20),
+                suffixIcon: Obx(() => _termoBusca.value.isNotEmpty
+                    ? IconButton(
+                  icon: const Icon(Icons.close_rounded,
+                      color: Colors.white38, size: 18),
+                  onPressed: () {
+                    _buscaController.clear();
+                    controller.carregarOSsConcluidas();
+                  },
+                )
+                    : const SizedBox.shrink()),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Obx(() {
+            if (controller.isLoadingConcluidas.value) {
+              return const OSSkeleton(itemCount: 3);
+            }
+            final lista = controller.osConcluidas;
+            if (lista.isEmpty) {
+              if (_termoBusca.value.isNotEmpty) {
+                return _buildEmptySearch(_termoBusca.value);
+              }
+              return _buildEmptyState('concluida');
+            }
+            return RefreshIndicator(
+              onRefresh: () =>
+                  controller.carregarOSsConcluidas(busca: _termoBusca.value),
+              color: const Color(0xFF00FF88),
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                itemCount: lista.length,
+                itemBuilder: (context, index) => OSCardWidget(
+                  os: lista[index],
+                  onTap: () => _mostrarDetalhesOSConcluida(lista[index]),
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptySearch(String termo) {
+    return _buildVazio(
+      Icons.search_off_rounded,
+      'Nenhum resultado',
+      'Nenhuma OS encontrada para "$termo"',
+    );
+  }
+
+  Widget _buildEmptyState(String status) {
+    final configs = {
+      'pendente': [Icons.check_circle_outline_rounded, 'Nenhuma OS pendente',
+        'Você não tem ordens de serviço pendentes.'],
+      'em_execucao': [Icons.build_circle_outlined, 'Nenhuma OS em execução',
+        'Você não está executando nenhuma OS.'],
+      'concluida': [Icons.history_rounded, 'Nenhuma OS concluída',
+        'As OSs finalizadas por você aparecerão aqui.'],
+    };
+    final c = configs[status]!;
+    return _buildVazio(c[0] as IconData, c[1] as String, c[2] as String);
+  }
+
+  Widget _buildErrorState(String erro) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 56,
+                color: Colors.red.withOpacity(0.6)),
+            const SizedBox(height: 16),
+            const Text('Erro ao carregar OSs',
+                style: TextStyle(color: Colors.white, fontSize: 18,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(erro,
+                style: const TextStyle(color: Colors.white38, fontSize: 13),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => controller.carregarMinhasOSs(),
+              icon: const Icon(Icons.refresh_rounded, color: Colors.black),
+              label: const Text('Tentar novamente',
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF88),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVazio(IconData icon, String titulo, String msg) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 56, color: Colors.white.withOpacity(0.06)),
+            const SizedBox(height: 14),
+            Text(titulo,
+                style: const TextStyle(color: Colors.white, fontSize: 17,
+                    fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(msg,
+                style: const TextStyle(color: Colors.white38, fontSize: 13),
+                textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── BUILD ────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      body: Stack(
+      backgroundColor: const Color(0xFF111111),
+      body: Column(
         children: [
-          // ✅ HEADER VERDE
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.of(context).padding.top + 100,
-            child: Container(
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 10,
-                bottom: 15,
-                left: 24,
-                right: 24,
+          // ── Header ──────────────────────────────────────────
+          Container(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 12,
+              bottom: 16,
+              left: 16,
+              right: 16,
+            ),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1A1A2E), Color(0xFF111111)],
               ),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  stops: [0.32, 1.0],
-                  colors: [
-                    Color.fromARGB(255, 0, 232, 124),
-                    Color.fromARGB(255, 0, 176, 91),
-                  ],
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded,
+                      color: Colors.white, size: 24),
+                  onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
                 ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Ordens de Serviço',
+                          style: TextStyle(
+                              color: Colors.white, fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3)),
+                      Text('Campo • IXC Sync',
+                          style: TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                    ],
+                  ),
                 ),
-              ),
-              child: Row(
-                children: [
+                if (Get.find<UsuarioController>().isAdmin)
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.gps_fixed,
+                        color: Color(0xFF00FF88), size: 20),
+                    tooltip: 'Acompanhar Técnicos',
+                    onPressed: () =>
+                        Get.toNamed('/ordens-servico/acompanhamento'),
                   ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Ordens de Serviço',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (Get.find<UsuarioController>().isAdmin)
-                    IconButton(
-                      icon: const Icon(Icons.gps_fixed, color: Colors.white, size: 24),
-                      tooltip: 'Acompanhar Técnicos',
-                      onPressed: () => Get.toNamed('/ordens-servico/acompanhamento'),
-                    ),
-                  IconButton(
-                    icon: const Icon(Icons.refresh, color: Colors.white, size: 24),
-                    onPressed: () {
-                      controller.carregarMinhasOSs();
-                      controller.carregarOSsConcluidas();
-                    },
-                  ),
-                ],
-              ),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded,
+                      color: Colors.white54, size: 20),
+                  onPressed: () {
+                    controller.carregarMinhasOSs();
+                    controller.carregarOSsConcluidas();
+                  },
+                ),
+              ],
             ),
           ),
 
-          // ✅ TABS
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 110,
-            left: 0,
-            right: 0,
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              decoration: BoxDecoration(
-                color: const Color(0xFF232323),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TabBar(
-                controller: _tabController,
-                indicator: BoxDecoration(
-                  color: const Color(0xFF00FF88),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                labelColor: Colors.black,
-                unselectedLabelColor: Colors.white70,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-                tabs: const [
-                  Tab(text: 'Pendentes'),
-                  Tab(text: 'Em Execução'),
-                  Tab(text: 'Concluídas'),
-                ],
-              ),
+          // ── Tab bar custom ─────────────────────────────────
+          Obx(() => Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withOpacity(0.06)),
             ),
-          ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: const Color(0xFF00FF88),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              labelColor: Colors.black,
+              unselectedLabelColor: Colors.white38,
+              labelStyle: const TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 13),
+              unselectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
+              dividerColor: Colors.transparent,
+              // Substitua os tabs por:
+              tabs: const [
+                Tab(text: 'Pendentes'),
+                Tab(text: 'Em Campo'),
+                Tab(text: 'Concluídas'),
+              ],
+            ),
+          )),
 
-          // ✅ CONTEÚDO DAS TABS
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 170,
-            left: 0,
-            right: 0,
-            bottom: 0,
+          // ── Conteúdo ────────────────────────────────────────
+          Expanded(
             child: Obx(() {
               if (controller.isLoading.value) {
                 return const OSSkeleton(itemCount: 3);
               }
-
               if (controller.erro.value.isNotEmpty) {
                 return _buildErrorState(controller.erro.value);
               }
-
               return TabBarView(
                 controller: _tabController,
                 children: [
                   _buildListaOS(controller.osPendentes, 'pendente'),
                   _buildListaOS(controller.osEmExecucao, 'em_execucao'),
-                  _buildListaConcluidas(), // ✅ Lista com busca
+                  _buildListaConcluidas(),
                 ],
               );
             }),
@@ -179,396 +443,35 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen> with SingleTi
     );
   }
 
-  // ✅ Lista de concluídas com campo de busca
-  Widget _buildListaConcluidas() {
-    return Column(
-      children: [
-        // Campo de busca
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: TextField(
-            controller: _buscaController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              hintText: 'Buscar por nome do cliente...',
-              hintStyle: const TextStyle(color: Colors.white38),
-              prefixIcon: const Icon(Icons.search, color: Colors.white38),
-              suffixIcon: Obx(() => _termoBusca.value.isNotEmpty
-                  ? IconButton(
-                icon: const Icon(Icons.clear, color: Colors.white38),
-                onPressed: () {
-                  _buscaController.clear();
-                  controller.carregarOSsConcluidas();
-                },
-              )
-                  : const SizedBox.shrink()
+  Widget _buildTab(String label, int count) {
+    return Tab(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          if (count > 0) ...[
+            const SizedBox(width: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
               ),
-              filled: true,
-              fillColor: const Color(0xFF232323),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.white12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF00FF88)),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-          ),
-        ),
-
-        // Lista de concluídas
-        Expanded(
-          child: Obx(() {
-            if (controller.isLoadingConcluidas.value) {
-              return const OSSkeleton(itemCount: 3);
-            }
-
-            final lista = controller.osConcluidas;
-
-            if (lista.isEmpty) {
-              if (_termoBusca.value.isNotEmpty) {
-                return _buildEmptySearchState(_termoBusca.value);
-              }
-              return _buildEmptyState('concluida');
-            }
-
-            return RefreshIndicator(
-              onRefresh: () => controller.carregarOSsConcluidas(busca: _termoBusca.value),
-              color: const Color(0xFF00FF88),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: lista.length,
-                itemBuilder: (context, index) {
-                  final os = lista[index];
-                  return OSCardWidget(
-                    os: os,
-                    onTap: () => _mostrarDetalhesOSConcluida(os),
-                  );
-                },
-              ),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  // ✅ Estado vazio para busca
-  Widget _buildEmptySearchState(String termo) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(40),
-        padding: const EdgeInsets.all(30),
-        decoration: BoxDecoration(
-          color: const Color(0xFF232323),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.search_off, size: 80, color: Colors.white24),
-            const SizedBox(height: 20),
-            const Text(
-              'Nenhum resultado',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Nenhuma OS encontrada para "$termo"',
-              style: const TextStyle(color: Colors.white60, fontSize: 14),
-              textAlign: TextAlign.center,
+              child: Text('$count',
+                  style: const TextStyle(fontSize: 10)),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // ✅ Mostrar detalhes da OS concluída
-  void _mostrarDetalhesOSConcluida(OrdemServico os) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF232323),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.green, size: 16),
-                      SizedBox(width: 4),
-                      Text(
-                        'CONCLUÍDA',
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white54),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Número da OS
-            Text(
-              'OS #${os.numeroOs}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Cliente
-            Row(
-              children: [
-                const Icon(Icons.person, color: Colors.white54, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    os.clienteNome,
-                    style: const TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Endereço
-            if (os.clienteEndereco != null && os.clienteEndereco!.isNotEmpty)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.location_on, color: Colors.white54, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      os.clienteEndereco!,
-                      style: const TextStyle(color: Colors.white54, fontSize: 14),
-                    ),
-                  ),
-                ],
-              ),
-            const SizedBox(height: 16),
-
-            // Data de conclusão
-            if (os.dataFim != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_today, color: Color(0xFF00FF88), size: 20),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Concluída em',
-                          style: TextStyle(color: Colors.white54, fontSize: 12),
-                        ),
-                        Text(
-                          _formatarData(os.dataFim!),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatarData(DateTime data) {
-    return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year} às ${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
-  }
-
-  Widget _buildListaOS(List<OrdemServico> ordens, String status) {
-    if (ordens.isEmpty) {
-      return _buildEmptyState(status);
-    }
-
-    return RefreshIndicator(
-      onRefresh: () => controller.carregarMinhasOSs(),
-      color: const Color(0xFF00FF88),
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: ordens.length,
-        itemBuilder: (context, index) {
-          final os = ordens[index];
-          return OSCardWidget(
-            os: os,
-            onTap: () {
-              // ✅ Abre wizard direto
-              Get.to(() => const ExecutarOSWizardScreen(), arguments: os);
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(String status) {
-    String titulo = '';
-    String mensagem = '';
-    IconData icone = Icons.assignment;
-
-    switch (status) {
-      case 'pendente':
-        titulo = 'Nenhuma OS pendente';
-        mensagem = 'Você não tem ordens de serviço pendentes no momento.';
-        icone = Icons.check_circle_outline;
-        break;
-      case 'em_execucao':
-        titulo = 'Nenhuma OS em execução';
-        mensagem = 'Você não está executando nenhuma OS no momento.';
-        icone = Icons.build_circle_outlined;
-        break;
-      case 'concluida':
-        titulo = 'Nenhuma OS concluída';
-        mensagem = 'As OSs finalizadas por você aparecerão aqui.';
-        icone = Icons.history;
-        break;
-    }
-
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(40),
-        padding: const EdgeInsets.all(30),
-        decoration: BoxDecoration(
-          color: const Color(0xFF232323),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icone, size: 80, color: Colors.white24),
-            const SizedBox(height: 20),
-            Text(
-              titulo,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              mensagem,
-              style: const TextStyle(color: Colors.white60, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState(String erro) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(40),
-        padding: const EdgeInsets.all(30),
-        decoration: BoxDecoration(
-          color: const Color(0xFF232323),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.red.withOpacity(0.3)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 80, color: Colors.red),
-            const SizedBox(height: 20),
-            const Text(
-              'Erro ao carregar OSs',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              erro,
-              style: const TextStyle(color: Colors.white60, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 30),
-            ElevatedButton.icon(
-              onPressed: () => controller.carregarMinhasOSs(),
-              icon: const Icon(Icons.refresh, color: Colors.black),
-              label: const Text(
-                'Tentar Novamente',
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00FF88),
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
 }
 
+// OSSkeleton inalterado
 class OSSkeleton extends StatelessWidget {
   final int itemCount;
-
   const OSSkeleton({super.key, this.itemCount = 3});
 
   @override
@@ -576,64 +479,32 @@ class OSSkeleton extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: itemCount,
-      itemBuilder: (context, index) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF232323),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  SkeletonLoader(
-                    width: 50,
-                    height: 20,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  const Spacer(),
-                  SkeletonLoader(
-                    width: 80,
-                    height: 24,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SkeletonLoader(
-                width: double.infinity,
-                height: 20,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              const SizedBox(height: 8),
-              SkeletonLoader(
-                width: 200,
-                height: 16,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  SkeletonLoader(
-                    width: 100,
-                    height: 16,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  const SizedBox(width: 20),
-                  SkeletonLoader(
-                    width: 120,
-                    height: 16,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+      itemBuilder: (context, index) => Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              SkeletonLoader(width: 50, height: 20,
+                  borderRadius: BorderRadius.circular(8)),
+              const Spacer(),
+              SkeletonLoader(width: 80, height: 24,
+                  borderRadius: BorderRadius.circular(12)),
+            ]),
+            const SizedBox(height: 12),
+            SkeletonLoader(width: double.infinity, height: 20,
+                borderRadius: BorderRadius.circular(8)),
+            const SizedBox(height: 8),
+            SkeletonLoader(width: 200, height: 16,
+                borderRadius: BorderRadius.circular(8)),
+          ],
+        ),
+      ),
     );
   }
 }

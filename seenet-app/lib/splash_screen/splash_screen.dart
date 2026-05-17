@@ -16,7 +16,6 @@
   import '../services/tracking_service.dart';
   import '../controllers/checkmark_controller.dart';
   import '../controllers/diagnostico_controller.dart';
-  import '../controllers/transcricao_controller.dart';
   import '../seguranca/services/seguranca_service.dart';
   import '../seguranca/controllers/seguranca_controller.dart';
   import '../dds/services/dds_service.dart';
@@ -97,8 +96,6 @@
         Get.put(CheckmarkController(), permanent: true);
         print('📦 6 DiagnosticoController...');
         Get.lazyPut<DiagnosticoController>(() => DiagnosticoController(), fenix: true);
-        print('📦 7 TranscricaoController...');
-        Get.put(TranscricaoController(), permanent: true);
         print('📦 8 SegurancaService...');
         Get.put(SegurancaService(), permanent: true);
         print('📦 9 SegurancaController...');

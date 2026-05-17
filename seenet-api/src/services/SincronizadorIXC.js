@@ -4,7 +4,7 @@ const IXCService = require('./IXCService');
 
 class SincronizadorIXC {
   constructor() {
-    this.intervalo = 300000; // 5 minutos
+    this.intervalo = 120000; // 5 minutos
     this.sincronizacaoAtiva = false;
     this.intervalId = null;
     this.cacheClientes = new Map();

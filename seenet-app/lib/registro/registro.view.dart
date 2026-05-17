@@ -1,9 +1,9 @@
-// lib/registro/registro.view.dart
+// lib/registro/registro.view.dart — REDESIGN PREMIUM
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'widgets/loginbutton.widget.dart';
-import 'package:flutter/services.dart';
 import 'registroview.controller.dart';
 
 class RegistrarView extends GetView<RegistroController> {
@@ -33,6 +33,22 @@ class RegistrarView extends GetView<RegistroController> {
     {'id': 5,   'nome': 'PINHÃO'},
   ];
 
+  // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
+
+  String _getButtonText() {
+    if (controller.nomeInput.text.trim().isEmpty) return 'Digite seu nome';
+    if (controller.senhaInput.text.length < 6) return 'Senha muito curta';
+    if (controller.confirmarSenhaInput.text.isEmpty) return 'Confirme a senha';
+    if (controller.senhaInput.text != controller.confirmarSenhaInput.text) {
+      return 'Senhas não coincidem';
+    }
+    if (controller.tokenEmpresaController.text.trim().isEmpty) return 'Digite o token';
+    if (!controller.tokenValido.value) return 'Token inválido';
+    return 'CRIAR CONTA';
+  }
+
+  // ── BUILD ────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -42,168 +58,184 @@ class RegistrarView extends GetView<RegistroController> {
         statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF6B7280),
-                Color(0xFF4B5563),
-                Color(0xFF374151),
-                Color(0xFF1F2937),
-                Color(0xFF111827),
-                Color(0xFF0F0F0F),
-              ],
-              stops: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        onPressed: () => Get.back(),
-                      ),
-                      const Expanded(
-                        child: Text(
-                          'Criar Conta',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 48),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
+        backgroundColor: const Color(0xFF0A0A0A),
+        body: Stack(
+          children: [
+            // Fundo
+            Positioned.fill(child: _buildFundo()),
+
+            SafeArea(
+              child: Column(
+                children: [
+                  // ── Top bar ───────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+                    child: Row(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SvgPicture.asset(
-                              'assets/images/logo.svg',
-                              width: 60,
-                              height: 60,
+                        GestureDetector(
+                          onTap: () => Get.back(),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.07),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'SeeNet',
-                              style: TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF00FF99),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 30),
-
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: const Color(0xFF00FF99).withOpacity(0.2),
-                              width: 1,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              const Text(
-                                '📝 Dados do Novo Usuário',
-                                style: TextStyle(
-                                  color: Color(0xFF00FF99),
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-
-                              const SizedBox(height: 30),
-
-                              _buildTextField(
-                                controller: controller.nomeInput,
-                                label: 'Nome Completo',
-                                hint: 'Digite seu nome completo',
-                                icon: Icons.person,
-                                textCapitalization: TextCapitalization.words,
-                              ),
-
-                              const SizedBox(height: 20),
-
-                              _buildPasswordField(
-                                controller: controller.senhaInput,
-                                label: 'Senha',
-                                hint: 'Mínimo 6 caracteres',
-                                obscureObs: _obscurePassword,
-                                onToggle: () => _obscurePassword.toggle(),
-                              ),
-
-                              const SizedBox(height: 20),
-
-                              _buildPasswordField(
-                                controller: controller.confirmarSenhaInput,
-                                label: 'Confirmar Senha',
-                                hint: 'Repita a senha',
-                                obscureObs: _obscureConfirmPassword,
-                                onToggle: () => _obscureConfirmPassword.toggle(),
-                              ),
-
-                              const SizedBox(height: 20),
-
-                              _buildTokenField(),
-                              const SizedBox(height: 20),
-                              _buildCidadeField(),   // ✅ NOVO
-                              const SizedBox(height: 20),
-                              _buildTokenStatus(),
-
-                              const SizedBox(height: 30),
-
-                              _buildRegisterButton(),
-                            ],
+                            child: const Icon(Icons.arrow_back_rounded,
+                                color: Colors.white, size: 20),
                           ),
                         ),
-
-                        const SizedBox(height: 30),
-
-                        const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Já tem uma conta?',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            LoginButton(),
-                          ],
-                        ),
+                        const SizedBox(width: 12),
+                        const Text('Criar Conta',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700)),
+                        const Spacer(),
+                        // Logo pequena
+                        SvgPicture.asset('assets/images/logo.svg',
+                            width: 28, height: 28),
                       ],
                     ),
                   ),
-                ),
-              ],
+
+                  // ── Formulário ────────────────────────────
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Headline
+                          ShaderMask(
+                            shaderCallback: (bounds) =>
+                                const LinearGradient(
+                                  colors: [Colors.white, Color(0xFF00FF88)],
+                                ).createShader(bounds),
+                            child: const Text('Nova conta',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -0.8)),
+                          ),
+                          const SizedBox(height: 4),
+                          Text('Preencha os dados abaixo para começar',
+                              style: TextStyle(
+                                  color: Colors.white.withOpacity(0.3),
+                                  fontSize: 13)),
+
+                          const SizedBox(height: 28),
+
+                          // ── Seção: Dados pessoais ──────────
+                          _secaoLabel('IDENTIFICAÇÃO',
+                              Icons.person_outline_rounded),
+                          const SizedBox(height: 12),
+
+                          _buildTextField(
+                            controller: controller.nomeInput,
+                            label: 'Nome Completo',
+                            hint: 'Ex: João Silva',
+                            icon: Icons.badge_outlined,
+                            textCapitalization: TextCapitalization.words,
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          _buildPasswordField(
+                            controller: controller.senhaInput,
+                            label: 'Senha',
+                            hint: 'Mínimo 6 caracteres',
+                            obscureObs: _obscurePassword,
+                            onToggle: () => _obscurePassword.toggle(),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          _buildPasswordField(
+                            controller: controller.confirmarSenhaInput,
+                            label: 'Confirmar Senha',
+                            hint: 'Repita a senha',
+                            obscureObs: _obscureConfirmPassword,
+                            onToggle: () => _obscureConfirmPassword.toggle(),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // ── Seção: Empresa ─────────────────
+                          _secaoLabel('EMPRESA', Icons.business_outlined),
+                          const SizedBox(height: 12),
+
+                          _buildTokenField(),
+                          const SizedBox(height: 8),
+                          _buildTokenStatus(),
+
+                          const SizedBox(height: 12),
+                          _buildCidadeField(),
+
+                          const SizedBox(height: 32),
+
+                          // ── Botão criar ────────────────────
+                          _buildRegisterButton(),
+
+                          const SizedBox(height: 24),
+
+                          // ── Já tem conta ───────────────────
+                          Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('Já tem uma conta? ',
+                                    style: TextStyle(
+                                        color:
+                                        Colors.white.withOpacity(0.35),
+                                        fontSize: 14)),
+                                const LoginButton(),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
+
+  Widget _buildFundo() {
+    return CustomPaint(
+      painter: _RegistroFundoPainter(),
+    );
+  }
+
+  Widget _secaoLabel(String label, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: const Color(0xFF00FF88), size: 14),
+        const SizedBox(width: 6),
+        Text(label,
+            style: TextStyle(
+                color: Colors.white.withOpacity(0.3),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.5)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(
+              height: 0.5,
+              color: Colors.white.withOpacity(0.08)),
+        ),
+      ],
+    );
+  }
+
+  // ── Campos ────────────────────────────────────────────────────
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -216,76 +248,14 @@ class RegistrarView extends GetView<RegistroController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Row(
-            children: [
-              Icon(icon, color: const Color(0xFF00FF99), size: 16),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Text(
-                ' *',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
+        _fieldLabel(label, icon),
+        const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
           textCapitalization: textCapitalization ?? TextCapitalization.none,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-              fontSize: 16,
-            ),
-            prefixIcon: Icon(
-              icon,
-              color: Colors.white.withOpacity(0.7),
-              size: 24,
-            ),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.3),
-                width: 1.5,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFF00FF99),
-                width: 2,
-              ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 15),
+          decoration: _inputDecoration(hint: hint, prefixIcon: icon),
         ),
       ],
     );
@@ -301,81 +271,26 @@ class RegistrarView extends GetView<RegistroController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Row(
-            children: [
-              const Icon(Icons.lock, color: Color(0xFF00FF99), size: 16),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Text(
-                ' *',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
+        _fieldLabel(label, Icons.lock_outline_rounded),
+        const SizedBox(height: 6),
         Obx(() => TextFormField(
           controller: controller,
           obscureText: obscureObs.value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-              fontSize: 16,
-            ),
-            prefixIcon: Icon(
-              Icons.lock_outline,
-              color: Colors.white.withOpacity(0.7),
-              size: 24,
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscureObs.value ? Icons.visibility_off : Icons.visibility,
-                color: Colors.white.withOpacity(0.7),
-                size: 24,
+          style: const TextStyle(color: Colors.white, fontSize: 15),
+          decoration: _inputDecoration(
+            hint: hint,
+            prefixIcon: Icons.lock_outline_rounded,
+            suffix: GestureDetector(
+              onTap: onToggle,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 14),
+                child: Icon(
+                  obscureObs.value
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: Colors.white38, size: 18,
+                ),
               ),
-              onPressed: onToggle,
-            ),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.3),
-                width: 1.5,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFF00FF99),
-                width: 2,
-              ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
             ),
           ),
         )),
@@ -387,259 +302,49 @@ class RegistrarView extends GetView<RegistroController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
-          child: Row(
-            children: [
-              Icon(Icons.key, color: Color(0xFF00FF99), size: 16),
-              SizedBox(width: 6),
-              Text(
-                'Token da Empresa',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                ' *',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
+        _fieldLabel('Token da Empresa', Icons.vpn_key_outlined),
+        const SizedBox(height: 6),
         TextFormField(
           controller: controller.tokenEmpresaController,
           textCapitalization: TextCapitalization.characters,
-          inputFormatters: [
-            UpperCaseTextFormatter(), // ← força maiúsculas
-          ],
+          inputFormatters: [UpperCaseTextFormatter()],
           style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 1.2,
-          ),
-          decoration: InputDecoration(
-            hintStyle: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-              fontSize: 16,
-              letterSpacing: 0.5,
-            ),
-            prefixIcon: Icon(
-              Icons.vpn_key,
-              color: Colors.white.withOpacity(0.7),
-              size: 24,
-            ),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.3),
-                width: 1.5,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color(0xFF00FF99),
-                width: 2,
-              ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
-          ),
+              color: Colors.white, fontSize: 15, letterSpacing: 1.5),
+          decoration: _inputDecoration(
+              hint: 'Ex: BBNET123',
+              prefixIcon: Icons.vpn_key_outlined),
         ),
       ],
     );
-  }
-
-  Widget _buildTokenStatus() {
-    return Obx(() {
-      if (controller.verificandoToken.value) {
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Row(
-            children: [
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              SizedBox(width: 12),
-              Text(
-                'Verificando token...',
-                style: TextStyle(color: Colors.blue, fontSize: 14),
-              ),
-            ],
-          ),
-        );
-      }
-
-      if (controller.tokenValido.value && controller.empresaInfo.value != null) {
-        final empresa = controller.empresaInfo.value!;
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF00FF99).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.verified, color: Color(0xFF00FF99), size: 20),
-              const SizedBox(width: 12),
-              Text(
-                'Token válido: ${empresa['nome']}',
-                style: const TextStyle(
-                  color: Color(0xFF00FF99),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-
-      if (controller.tokenEmpresa.isNotEmpty && !controller.tokenValido.value) {
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.red.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.error, color: Colors.red, size: 20),
-              SizedBox(width: 12),
-              Text(
-                'Token inválido',
-                style: TextStyle(color: Colors.red, fontSize: 14),
-              ),
-            ],
-          ),
-        );
-      }
-
-      return const SizedBox.shrink();
-    });
-  }
-
-  Widget _buildRegisterButton() {
-    return Obx(() {
-      final bool podeRegistrar = controller.podeRegistrar;
-
-      return SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton(
-          onPressed: podeRegistrar ? controller.tryToRegister : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: podeRegistrar
-                ? const Color(0xFF00FF99)
-                : const Color(0xFF4B5563),
-            foregroundColor: podeRegistrar ? Colors.black : Colors.white70,
-            elevation: podeRegistrar ? 4 : 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: controller.isLoading.value
-              ? const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-            ),
-          )
-              : Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                podeRegistrar ? Icons.person_add : Icons.lock,
-                size: 20,
-                color: podeRegistrar ? Colors.black : Colors.white70,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                _getButtonText(),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: podeRegistrar ? Colors.black : Colors.white70,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    });
   }
 
   Widget _buildCidadeField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
-          child: Row(
-            children: [
-              Icon(Icons.store, color: Color(0xFF00FF99), size: 16),
-              SizedBox(width: 6),
-              Text('Sua Cidade/Loja', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-              Text(' *', style: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
+        _fieldLabel('Cidade / Loja', Icons.location_city_outlined),
+        const SizedBox(height: 6),
         Obx(() => DropdownButtonFormField<int>(
           value: controller.almoxarifadoSelecionado.value == 0
               ? null
               : controller.almoxarifadoSelecionado.value,
-          dropdownColor: const Color(0xFF1F2937),
-          style: const TextStyle(color: Colors.white, fontSize: 16),
-          icon: Icon(Icons.keyboard_arrow_down, color: Colors.white.withOpacity(0.7)),
-          decoration: InputDecoration(
-            hintText: 'Selecione sua cidade',
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 16),
-            prefixIcon: Icon(Icons.location_city, color: Colors.white.withOpacity(0.7), size: 24),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.3), width: 1.5),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF00FF99), width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          ),
+          dropdownColor: const Color(0xFF1A1A1A),
+          style: const TextStyle(color: Colors.white, fontSize: 15),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: Colors.white38),
+          decoration: _inputDecoration(
+              hint: 'Selecione sua cidade',
+              prefixIcon: Icons.location_city_outlined),
           items: _almoxarifados.map((a) => DropdownMenuItem<int>(
             value: a['id'] as int,
-            child: Text(a['nome'] as String, style: const TextStyle(color: Colors.white)),
+            child: Text(a['nome'] as String,
+                style: const TextStyle(color: Colors.white)),
           )).toList(),
           onChanged: (val) {
             if (val != null) {
               controller.almoxarifadoSelecionado.value = val;
-              controller.almoxarifadoNome.value =
-              _almoxarifados.firstWhere((a) => a['id'] == val)['nome'] as String;
+              controller.almoxarifadoNome.value = _almoxarifados
+                  .firstWhere((a) => a['id'] == val)['nome'] as String;
             }
           },
         )),
@@ -647,26 +352,214 @@ class RegistrarView extends GetView<RegistroController> {
     );
   }
 
-  String _getButtonText() {
-    if (controller.nomeInput.text.trim().isEmpty) return 'Digite seu nome';
-    if (controller.senhaInput.text.length < 6) return 'Senha muito curta';
-    if (controller.confirmarSenhaInput.text.isEmpty) return 'Confirme a senha';
-    if (controller.senhaInput.text != controller.confirmarSenhaInput.text) {
-      return 'Senhas não coincidem';
-    }
-    if (controller.tokenEmpresaController.text.trim().isEmpty) return 'Digite o token';
-    if (!controller.tokenValido.value) return 'Token inválido';
-    return 'CRIAR CONTA';
+  Widget _buildTokenStatus() {
+    return Obx(() {
+      if (controller.verificandoToken.value) {
+        return _statusBanner(
+          icon: const SizedBox(
+              width: 14, height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2,
+                  color: Colors.blue)),
+          texto: 'Verificando token...',
+          cor: Colors.blue,
+        );
+      }
+      if (controller.tokenValido.value &&
+          controller.empresaInfo.value != null) {
+        return _statusBanner(
+          icon: const Icon(Icons.verified_rounded,
+              color: Color(0xFF00FF88), size: 15),
+          texto: 'Token válido: ${controller.empresaInfo.value!['nome']}',
+          cor: const Color(0xFF00FF88),
+        );
+      }
+      if (controller.tokenEmpresa.isNotEmpty &&
+          !controller.tokenValido.value) {
+        return _statusBanner(
+          icon: const Icon(Icons.error_outline_rounded,
+              color: Colors.red, size: 15),
+          texto: 'Token inválido',
+          cor: Colors.red,
+        );
+      }
+      return const SizedBox.shrink();
+    });
+  }
+
+  Widget _statusBanner({
+    required Widget icon,
+    required String texto,
+    required Color cor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: cor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cor.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          icon,
+          const SizedBox(width: 8),
+          Text(texto,
+              style: TextStyle(
+                  color: cor, fontSize: 12, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegisterButton() {
+    return Obx(() {
+      final bool podeRegistrar = controller.podeRegistrar;
+
+      return GestureDetector(
+        onTap: podeRegistrar ? controller.tryToRegister : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: podeRegistrar
+                ? const LinearGradient(
+              colors: [Color(0xFF00FF88), Color(0xFF00CC6A)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            )
+                : const LinearGradient(colors: [
+              Color(0xFF1E1E1E), Color(0xFF1E1E1E)]),
+            borderRadius: BorderRadius.circular(16),
+            border: podeRegistrar
+                ? null
+                : Border.all(color: Colors.white12),
+            boxShadow: podeRegistrar
+                ? [
+              BoxShadow(
+                color: const Color(0xFF00FF88).withOpacity(0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              )
+            ]
+                : null,
+          ),
+          child: Center(
+            child: controller.isLoading.value
+                ? const SizedBox(
+                width: 22, height: 22,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.5, color: Colors.black))
+                : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  podeRegistrar
+                      ? Icons.person_add_rounded
+                      : Icons.lock_rounded,
+                  color: podeRegistrar
+                      ? Colors.black
+                      : Colors.white24,
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Text(_getButtonText(),
+                    style: TextStyle(
+                        color: podeRegistrar
+                            ? Colors.black
+                            : Colors.white24,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3)),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────
+
+  Widget _fieldLabel(String label, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: const Color(0xFF00FF88), size: 12),
+        const SizedBox(width: 5),
+        Text(label,
+            style: TextStyle(
+                color: Colors.white.withOpacity(0.55),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3)),
+        const SizedBox(width: 3),
+        const Text('*',
+            style: TextStyle(
+                color: Color(0xFF00FF88), fontSize: 11)),
+      ],
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String hint,
+    required IconData prefixIcon,
+    Widget? suffix,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
+      prefixIcon: Icon(prefixIcon, color: Colors.white24, size: 18),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: const Color(0xFF141414),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+              color: Colors.white.withOpacity(0.07))),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+              color: Color(0xFF00FF88), width: 1.5)),
+      contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14, vertical: 14),
+    );
   }
 }
 
-// ✅ Fora da classe — força maiúsculas no campo de token
+// ── Fundo do registro ────────────────────────────────────────────
+class _RegistroFundoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p1 = Paint()
+      ..color = const Color(0xFF00FF88).withOpacity(0.05)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 90);
+    canvas.drawCircle(Offset(size.width, 0), 150, p1);
+
+    final p2 = Paint()
+      ..color = const Color(0xFF00FF88).withOpacity(0.03)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 80);
+    canvas.drawCircle(Offset(0, size.height), 120, p2);
+
+    final dotPaint = Paint()
+      ..color = Colors.white.withOpacity(0.02);
+    const spacing = 28.0;
+    for (double x = 0; x < size.width; x += spacing) {
+      for (double y = 0; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 1, dotPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+// ── Formatter ────────────────────────────────────────────────────
 class UpperCaseTextFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue,
-      TextEditingValue newValue,
-      ) {
+      TextEditingValue oldValue, TextEditingValue newValue) {
     return newValue.copyWith(
       text: newValue.text.toUpperCase(),
       selection: newValue.selection,

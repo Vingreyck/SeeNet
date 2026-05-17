@@ -8,6 +8,49 @@ const { db } = require('../config/database');
 const logger = require('../config/logger');
 const auditService = require('../services/auditService');
 
+// ── Auto-mapeamento IXC: funções de similaridade de nomes ──
+function normalizarNome(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+function tokenizar(str) {
+  const stopwords = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+  return normalizarNome(str).split(' ')
+    .filter(p => p.length > 1 && !stopwords.has(p));
+}
+
+function scoreSimilaridade(nomeA, nomeB) {
+  const tokA = tokenizar(nomeA);
+  const tokB = tokenizar(nomeB);
+  if (tokA.length === 0 || tokB.length === 0) return 0;
+  let matches = 0;
+  for (const ta of tokA) {
+    if (tokB.some(tb => tb === ta || tb.startsWith(ta) || ta.startsWith(tb))) matches++;
+  }
+  return matches / Math.min(tokA.length, tokB.length);
+}
+
+function encontrarMelhorMatch(nomeSeeNet, funcionariosIXC) {
+  const normalizado = normalizarNome(nomeSeeNet);
+  let melhor = null;
+  let melhorScore = 0;
+  for (const f of funcionariosIXC) {
+    const nomeIXC = f.funcionario || f.nome || '';
+    if (!nomeIXC) continue;
+    const normIXC = normalizarNome(nomeIXC);
+    if (normalizado === normIXC) return { funcionario: f, score: 1.0 };
+    if (normalizado.includes(normIXC) || normIXC.includes(normalizado)) {
+      if (0.95 > melhorScore) { melhorScore = 0.95; melhor = f; }
+      continue;
+    }
+    const score = scoreSimilaridade(nomeSeeNet, nomeIXC);
+    if (score > melhorScore) { melhorScore = score; melhor = f; }
+  }
+  return (melhorScore >= 0.6 && melhor) ? { funcionario: melhor, score: melhorScore } : null;
+}
+// ──────────────────────────────────────────────────────────
+
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 
@@ -153,37 +196,33 @@ router.post('/register', [
         let tecnicoIxcId = null;
         let tecnicoIxcNome = nome;
 
+        // DEPOIS:
         if (integracao) {
           const axios = require('axios');
-          const removerAcentos = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
           try {
-            const resp = await axios.get(`${integracao.url_api}/funcionarios`, {
-              headers: {
-                'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-                'Content-Type': 'application/json',
-                'ixcsoft': 'listar'
-              },
-              data: {
+            const resp = await axios.post(
+              `${integracao.url_api}/funcionario`,
+              new URLSearchParams({
                 qtype: 'funcionarios.id', query: '1', oper: '>=',
-                page: '1', rp: '1000', sortname: 'funcionarios.id', sortorder: 'desc'
-              },
-              timeout: 10000
-            });
-
+                page: '1', rp: '200', sortname: 'funcionarios.id', sortorder: 'desc'
+              }).toString(),
+              {
+                headers: {
+                  'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                  'ixcsoft': 'listar'
+                },
+                timeout: 10000
+              }
+            );
             const funcionarios = resp.data.registros || [];
-            const nomeNormalizado = removerAcentos(nome).toLowerCase().trim();
-            const match = funcionarios.find(f => {
-              if (!f.funcionario) return false;
-              return removerAcentos(f.funcionario).toLowerCase().trim() === nomeNormalizado;
-            });
-
-            if (match) {
-              tecnicoIxcId = match.id;
-              tecnicoIxcNome = match.funcionario;
-              console.log(`✅ Auto-mapeamento IXC no registro: ${nome} → IXC ID ${match.id}`);
+            const resultado = encontrarMelhorMatch(nome, funcionarios);
+            if (resultado) {
+              tecnicoIxcId = resultado.funcionario.id;
+              tecnicoIxcNome = resultado.funcionario.funcionario;
+              console.log(`✅ Auto-mapeamento IXC no registro: "${nome}" → "${tecnicoIxcNome}" (score: ${(resultado.score * 100).toFixed(0)}%)`);
             } else {
-              console.log(`⚠️ Nenhum match IXC para "${nome}" — mapeamento manual necessário`);
+              console.log(`⚠️ Nenhum match IXC para "${nome}"`);
             }
           } catch (ixcErr) {
             console.warn('⚠️ Erro ao buscar funcionários IXC:', ixcErr.message);
@@ -391,32 +430,18 @@ if (user.tipo_usuario === 'tecnico') {
 
       if (integracao) {
         const axios = require('axios');
-        const removerAcentos = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        // Busca TODOS os funcionários e filtra localmente
-        const params = new URLSearchParams({
-          qtype: 'id',
-          query: '0',
-          oper: '>',
-          page: '1',
-          rp: '200'  // busca em massa
-        });
-
-        const resp = await axios.get(
-          `${integracao.url_api}/funcionarios`,
+        // COLOCAR:
+        const resp = await axios.post(
+          `${integracao.url_api}/funcionario`,
+          new URLSearchParams({
+            qtype: 'funcionarios.id', query: '1', oper: '>=',
+            page: '1', rp: '200', sortname: 'funcionarios.id', sortorder: 'desc'
+          }).toString(),
           {
             headers: {
               'Authorization': `Basic ${Buffer.from(integracao.token_api).toString('base64')}`,
-              'Content-Type': 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded',
               'ixcsoft': 'listar'
-            },
-            data: {
-              qtype: 'funcionarios.id',
-              query: '1',
-              oper: '>=',
-              page: '1',
-              rp: '1000',
-              sortname: 'funcionarios.id',
-              sortorder: 'desc'
             },
             timeout: 10000
           }
@@ -425,24 +450,20 @@ if (user.tipo_usuario === 'tecnico') {
         const funcionarios = resp.data.registros || [];
         console.log(`🔍 ${funcionarios.length} funcionários carregados do IXC`);
 
-        const nomeNormalizado = removerAcentos(user.nome).toLowerCase().trim();
+        // DEPOIS — colocar isso:
+        const resultado = encontrarMelhorMatch(user.nome, funcionarios);
 
-        const match = funcionarios.find(f => {
-          const nomeFuncionario = f.funcionario;
-          if (!nomeFuncionario) return false;
-
-          const nomeIXC = removerAcentos(nomeFuncionario).toLowerCase().trim();
-
-          return nomeIXC === nomeNormalizado;
-        });
-
-        if (match) {
+        if (resultado) {
+          const { funcionario: match, score } = resultado;
+          console.log(`✅ Auto-mapeamento: "${user.nome}" → "${match.funcionario}" (score: ${(score * 100).toFixed(0)}%)`);
           await db('mapeamento_tecnicos_ixc').insert({
             usuario_id: user.id,
-            tecnico_ixc_id: match.id,  // ✅ id_tecnico no IXC
-            tenant_id: user.tenant_id
+            tecnico_ixc_id: match.id,
+            tecnico_ixc_nome: match.funcionario,
+            tecnico_seenet_id: user.id,
+            tenant_id: user.tenant_id,
+            ativo: true
           });
-          console.log(`✅ Auto-mapeamento: ${user.nome} → IXC ID ${match.id}`);
         } else {
           console.log(`⚠️ Auto-mapeamento falhou: nenhum match para "${user.nome}"`);
         }

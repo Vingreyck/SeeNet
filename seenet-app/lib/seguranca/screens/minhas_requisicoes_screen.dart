@@ -1,3 +1,4 @@
+// lib/seguranca/screens/minhas_requisicoes_screen.dart — REDESIGN
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:convert';
@@ -13,80 +14,176 @@ class MinhasRequisicoesScreen extends StatefulWidget {
       _MinhasRequisicoesScreenState();
 }
 
-class _MinhasRequisicoesScreenState extends State<MinhasRequisicoesScreen> {
+class _MinhasRequisicoesScreenState extends State<MinhasRequisicoesScreen>
+    with SingleTickerProviderStateMixin {
   final controller = Get.find<SegurancaController>();
+
+  late AnimationController _fadeCtrl;
+  late Animation<double> _fadeAnim;
+
+  // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
     controller.carregarMinhasRequisicoes();
+    _fadeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400));
+    _fadeAnim =
+        CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+    _fadeCtrl.forward();
   }
+
+  @override
+  void dispose() {
+    _fadeCtrl.dispose();
+    super.dispose();
+  }
+
+  Color _corStatus(String status) => controller.statusColor(status);
+  String _labelStatus(String status) => controller.statusLabel(status);
+
+  String _formatarData(String? data) {
+    if (data == null) return '--';
+    try {
+      final dt = DateTime.parse(data).toLocal();
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+    } catch (_) {
+      return '--';
+    }
+  }
+
+  // ── BUILD ────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text('Minhas Requisições',
-            style: TextStyle(color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white70),
-            onPressed: controller.carregarMinhasRequisicoes,
+      backgroundColor: const Color(0xFF111111),
+      body: Column(
+        children: [
+          // ── Header ──────────────────────────────────────────
+          Container(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 12,
+              bottom: 16,
+              left: 8,
+              right: 16,
+            ),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1A1A2A), Color(0xFF111111)],
+              ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded,
+                      color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Minhas Requisições',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3)),
+                      Text('Histórico de EPIs',
+                          style: TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded,
+                      color: Colors.white38, size: 20),
+                  onPressed: controller.carregarMinhasRequisicoes,
+                ),
+              ],
+            ),
+          ),
+
+          // ── Corpo ────────────────────────────────────────────
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                      color: Color(0xFF00FF88), strokeWidth: 2.5),
+                );
+              }
+
+              return Column(
+                children: [
+                  // Banner bloqueio
+                  if (controller.hasRequisicaoAguardando)
+                    _buildBannerBloqueio(),
+
+                  Expanded(
+                    child: controller.minhasRequisicoes.isEmpty
+                        ? _buildVazio()
+                        : RefreshIndicator(
+                      onRefresh: controller.carregarMinhasRequisicoes,
+                      color: const Color(0xFF00FF88),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                        itemCount: controller.minhasRequisicoes.length,
+                        itemBuilder: (context, i) {
+                          final req = controller.minhasRequisicoes[i];
+                          return TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0, end: 1),
+                            duration: Duration(
+                                milliseconds: 250 + i * 40),
+                            curve: Curves.easeOutCubic,
+                            builder: (_, v, child) => Opacity(
+                              opacity: v,
+                              child: Transform.translate(
+                                offset: Offset(0, 16 * (1 - v)),
+                                child: child,
+                              ),
+                            ),
+                            child: _buildCard(req),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }),
           ),
         ],
       ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF00FF88)));
-        }
 
-        return Column(
-          children: [
-            // Banner de bloqueio quando aguardando confirmação
-            if (controller.hasRequisicaoAguardando) _buildBannerBloqueio(),
-
-            Expanded(
-              child: controller.minhasRequisicoes.isEmpty
-                  ? _buildVazio()
-                  : RefreshIndicator(
-                onRefresh: controller.carregarMinhasRequisicoes,
-                color: const Color(0xFF00FF88),
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: controller.minhasRequisicoes.length,
-                  itemBuilder: (context, i) =>
-                      _buildCard(controller.minhasRequisicoes[i]),
-                ),
-              ),
-            ),
-          ],
-        );
-      }),
+      // ── FAB Nova Requisição ─────────────────────────────────
       floatingActionButton: Obx(() => FloatingActionButton.extended(
-        // Bloqueado se tiver aguardando confirmação
         onPressed: controller.hasRequisicaoAguardando
             ? null
             : () => Get.toNamed('/seguranca/requisicao'),
         backgroundColor: controller.hasRequisicaoAguardando
-            ? Colors.white24
+            ? const Color(0xFF2A2A2A)
             : const Color(0xFF00FF88),
         icon: Icon(
-          controller.hasRequisicaoAguardando ? Icons.lock_outline : Icons.add,
-          color: controller.hasRequisicaoAguardando ? Colors.white54 : Colors.black,
+          controller.hasRequisicaoAguardando
+              ? Icons.lock_outline_rounded
+              : Icons.add_rounded,
+          color: controller.hasRequisicaoAguardando
+              ? Colors.white38
+              : Colors.black,
         ),
         label: Text(
           controller.hasRequisicaoAguardando
               ? 'Confirmação pendente'
               : 'Nova Requisição',
           style: TextStyle(
-            color: controller.hasRequisicaoAguardando ? Colors.white54 : Colors.black,
+            color: controller.hasRequisicaoAguardando
+                ? Colors.white38
+                : Colors.black,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -97,7 +194,8 @@ class _MinhasRequisicoesScreenState extends State<MinhasRequisicoesScreen> {
   Widget _buildBannerBloqueio() {
     final req = controller.requisicaoAguardando!;
     final epis = req['epis_solicitados'];
-    final List<String> episLista = epis is List ? epis.cast<String>() : [];
+    final List<String> episLista =
+    epis is List ? epis.cast<String>() : [];
 
     return GestureDetector(
       onTap: () => Get.to(() => ConfirmarRecebimentoScreen(
@@ -105,17 +203,25 @@ class _MinhasRequisicoesScreenState extends State<MinhasRequisicoesScreen> {
         epis: episLista,
       )),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF00BFFF).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF00BFFF).withOpacity(0.4)),
+          color: const Color(0xFF00BFFF).withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: const Color(0xFF00BFFF).withOpacity(0.35)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.touch_app,
-                color: Color(0xFF00BFFF), size: 22),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00BFFF).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.touch_app_rounded,
+                  color: Color(0xFF00BFFF), size: 18),
+            ),
             const SizedBox(width: 12),
             const Expanded(
               child: Column(
@@ -127,15 +233,14 @@ class _MinhasRequisicoesScreenState extends State<MinhasRequisicoesScreen> {
                           fontSize: 13,
                           fontWeight: FontWeight.bold)),
                   SizedBox(height: 2),
-                  Text(
-                    'Seus EPIs chegaram. Toque para tirar foto e assinar.',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
+                  Text('Seus EPIs chegaram — toque para confirmar.',
+                      style: TextStyle(
+                          color: Colors.white54, fontSize: 12)),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right,
-                color: Color(0xFF00BFFF), size: 20),
+            const Icon(Icons.chevron_right_rounded,
+                color: Color(0xFF00BFFF), size: 18),
           ],
         ),
       ),
@@ -148,106 +253,150 @@ class _MinhasRequisicoesScreenState extends State<MinhasRequisicoesScreen> {
     final List<String> episLista = epis is List
         ? epis.cast<String>()
         : (epis is String ? [epis] : []);
-    final color = controller.statusColor(status);
-    final label = controller.statusLabel(status);
+    final cor = _corStatus(status);
+    final label = _labelStatus(status);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF242424),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.25)),
+        color: const Color(0xFF181818),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cor.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
+          // ── Header do card ────────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: cor.withOpacity(0.06),
+              borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: cor.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(label,
+                      style: TextStyle(
+                          color: cor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold)),
                 ),
-                child: Text(label,
-                    style: TextStyle(
-                        color: color,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-              ),
-              const Spacer(),
-              Text(_formatarData(req['data_criacao']),
-                  style: const TextStyle(color: Colors.white38, fontSize: 12)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text('Requisição #${req['id']}',
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          Text(
-            '${episLista.length} EPI(s): ${episLista.take(2).join(' • ')}${episLista.length > 2 ? ' +${episLista.length - 2} mais' : ''}',
-            style: const TextStyle(color: Colors.white54, fontSize: 12),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+                const Spacer(),
+                Text('Req. #${req['id']}',
+                    style: const TextStyle(
+                        color: Colors.white38, fontSize: 11)),
+                const SizedBox(width: 8),
+                Text(_formatarData(req['data_criacao']),
+                    style: const TextStyle(
+                        color: Colors.white24, fontSize: 11)),
+              ],
+            ),
           ),
 
-          if (status == 'recusada' && req['observacao_gestor'] != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.red, size: 14),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(req['observacao_gestor'],
-                        style: const TextStyle(color: Colors.red, fontSize: 11)),
+          // ── Corpo do card ────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // EPIs
+                Wrap(
+                  spacing: 5, runSpacing: 5,
+                  children: episLista.take(4).map((e) => Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111111),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Text(e,
+                        style: const TextStyle(
+                            color: Colors.white54, fontSize: 11)),
+                  )).toList(),
+                ),
+                if (episLista.length > 4)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text('+${episLista.length - 4} mais',
+                        style: const TextStyle(
+                            color: Colors.white24, fontSize: 10)),
+                  ),
+
+                // Motivo recusa
+                if (status == 'recusada' &&
+                    req['observacao_gestor'] != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: Colors.red.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            color: Colors.red, size: 14),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(req['observacao_gestor'],
+                              style: const TextStyle(
+                                  color: Colors.red, fontSize: 11)),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-            ),
-          ],
 
-          // PDF para concluídas
-          if (status == 'concluida') ...[
-            const SizedBox(height: 10),
-            BotaoPDF(
-              requisicaoId: req['id'] as int,
-              pdfBase64Cached: req['pdf_base64'],
-            ),
-          ],
+                // PDF
+                if (status == 'concluida') ...[
+                  const SizedBox(height: 10),
+                  BotaoPDF(
+                    requisicaoId: req['id'] as int,
+                    pdfBase64Cached: req['pdf_base64'],
+                  ),
+                ],
 
-          // Botão de confirmação para aguardando
-          if (status == 'aguardando_confirmacao') ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => Get.to(() => ConfirmarRecebimentoScreen(
-                  requisicaoId: req['id'] as int,
-                  epis: episLista,
-                )),
-                icon: const Icon(Icons.verified,
-                    color: Colors.black, size: 16),
-                label: const Text('Confirmar Recebimento',
-                    style: TextStyle(
-                        color: Colors.black, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00BFFF),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
+                // Botão confirmar
+                if (status == 'aguardando_confirmacao') ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Get.to(() =>
+                          ConfirmarRecebimentoScreen(
+                            requisicaoId: req['id'] as int,
+                            epis: episLista,
+                          )),
+                      icon: const Icon(Icons.verified_rounded,
+                          color: Colors.black, size: 16),
+                      label: const Text('Confirmar Recebimento',
+                          style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00BFFF),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -258,33 +407,31 @@ class _MinhasRequisicoesScreenState extends State<MinhasRequisicoesScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.assignment_outlined,
-              size: 70, color: Colors.white12),
-          const SizedBox(height: 16),
+          Icon(Icons.assignment_outlined,
+              size: 56,
+              color: Colors.white.withOpacity(0.06)),
+          const SizedBox(height: 14),
           const Text('Nenhuma requisição ainda',
-              style: TextStyle(color: Colors.white38, fontSize: 16)),
-          const SizedBox(height: 8),
+              style: TextStyle(
+                  color: Colors.white38, fontSize: 16)),
+          const SizedBox(height: 6),
           const Text('Faça sua primeira requisição de EPI',
-              style: TextStyle(color: Colors.white24, fontSize: 13)),
+              style: TextStyle(
+                  color: Colors.white24, fontSize: 13)),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () => Get.toNamed('/seguranca/requisicao'),
-            icon: const Icon(Icons.add, color: Colors.black),
+            icon: const Icon(Icons.add_rounded, color: Colors.black),
             label: const Text('Nova Requisição',
-                style: TextStyle(color: Colors.black)),
+                style: TextStyle(
+                    color: Colors.black, fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00FF88)),
+                backgroundColor: const Color(0xFF00FF88),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30))),
           ),
         ],
       ),
     );
-  }
-
-  String _formatarData(String? data) {
-    if (data == null) return '--';
-    try {
-      final dt = DateTime.parse(data).toLocal();
-      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-    } catch (_) { return '--'; }
   }
 }

@@ -7,7 +7,7 @@ import 'global_bottom_nav.dart';
 /// (Checklist, Seguranca, Perfil, etc.).
 ///
 /// Para telas que NÃO devem mostrar o bottom nav (ex: telas internas como
-/// /checklist/items, /diagnostico, /transcricao, /web-admin),
+/// /checklist/items, /diagnostico, /web-admin),
 /// continue usando Scaffold normal — ou passe `showBottomNav: false`.
 class AppScaffold extends StatelessWidget {
   final Widget body;

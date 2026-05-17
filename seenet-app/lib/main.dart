@@ -238,7 +238,6 @@ class MyApp extends StatelessWidget {
           middlewares: [AuthMiddleware()],
         ),
         GetPage(name: '/ordens-servico', page: () => const OrdensServicoScreen()),
-        GetPage(name: '/ordens-servico/executar', page: () => const ExecutarOSScreen()),
         GetPage(name: '/acompanhamento', page: () => const AcompanhamentoScreen()),
         GetPage(name: '/seguranca', page: () => const SegurancaHomeScreen()),
         GetPage(name: '/seguranca/requisicao', page: () => const RequisicaoEpiScreen()),

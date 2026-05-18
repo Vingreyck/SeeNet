@@ -491,6 +491,40 @@ try {
   console.error('⚠️ Erro ao gerar PDF APR:', aprError.message);
 }
 
+// ── PDF DA OS (Chamado Técnico) ─────────────────────────────
+let pdfOSBuffer = null;
+try {
+  const OSPdfService = require('../services/OSPdfService');
+  const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
+  pdfOSBuffer = await OSPdfService.gerarPdfOSDireto(
+    os,
+    dados,
+    tecnico?.nome || 'Técnico',
+    tenantId
+  );
+  console.log(`✅ PDF OS gerado (${pdfOSBuffer.length} bytes)`);
+} catch (osPdfError) {
+  console.warn('⚠️ Erro ao gerar PDF OS:', osPdfError.message);
+}
+
+// ── ENVIAR PDF DA OS para o IXC (dentro do bloco if (ixcService && os.id_externo)) ──
+// Logo após enviar o PDF do APR:
+
+if (pdfOSBuffer) {
+  console.log('📤 Enviando PDF da OS para o IXC...');
+  try {
+    await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+      buffer: pdfOSBuffer,
+      descricao: `Chamado Técnico - OS ${os.numero_os}`,
+      nome: `OS_${os.numero_os}_${Date.now()}.pdf`,
+      ext: 'pdf'
+    });
+    console.log('   ✅ PDF OS enviado ao IXC');
+  } catch (pdfOSError) {
+    console.error('   ❌ Erro ao enviar PDF OS:', pdfOSError.message);
+  }
+}
+
 // 5. Buscar configuração IXC e criar instância única
 console.log('🔄 Preparando sincronização com IXC...');
 let ixcService = null;

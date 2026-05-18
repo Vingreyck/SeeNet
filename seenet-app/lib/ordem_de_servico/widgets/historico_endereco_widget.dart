@@ -170,12 +170,16 @@ class _HistoricoEnderecoWidgetState extends State<HistoricoEnderecoWidget> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                item['tipo_servico'] ?? '',
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  item['tipo_servico'] ?? '',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 6),
               Text(
                 dataFormatada,
                 style: const TextStyle(color: Colors.white38, fontSize: 11),

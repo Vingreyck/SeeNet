@@ -140,27 +140,31 @@ class OSCardWidget extends StatelessWidget {
             // ✅ TIPO DE SERVIÇO E DATA
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00FF88).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    os.tipoServico.toUpperCase(),
-                    style: const TextStyle(
-                      color: Color(0xFF00FF88),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00FF88).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      os.tipoServico.toUpperCase(),
+                      style: const TextStyle(
+                        color: Color(0xFF00FF88),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Text(
                   os.dataAbertura != null
-                      ? DateFormat('dd/MM/yyyy HH:mm').format(os.dataAbertura!)
+                      ? DateFormat('dd/MM/yy HH:mm').format(os.dataAbertura!)
                       : 'Sem data',
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
                 ),
               ],
             ),

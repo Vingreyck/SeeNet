@@ -1,69 +1,61 @@
 // src/services/OSPdfService.js
-// Gera PDF de OS no padrão do relatório IXC (Chamado Técnico)
 const PDFDocument = require('pdfkit');
 const { db } = require('../config/database');
 
-const MARGEM   = 40;
-const LARGURA  = 515; // A4 595 - 2*40
-const COR_AZUL = '#1a3a5c';
+const MARGEM           = 40;
+const LARGURA          = 515;
+const COR_AZUL         = '#1a3a5c';
 const COR_CINZA_ESCURO = '#333333';
-const COR_CINZA = '#666666';
-const COR_CINZA_CLARO = '#eeeeee';
-const COR_LINHA = '#cccccc';
+const COR_CINZA        = '#666666';
+const COR_CINZA_CLARO  = '#eeeeee';
+const COR_LINHA        = '#cccccc';
 
 class OSPdfService {
 
-  static async gerarPdfOS(osId, tenantId) {
-    // ── 1. Buscar dados da OS ──────────────────────────────────
-    const os = await db('ordem_servico as o')
-      .join('usuarios as u', 'u.id', 'o.tecnico_id')
-      .where('o.id', osId)
-      .where('o.tenant_id', tenantId)
-      .select('o.*', 'u.nome as tecnico_nome')
-      .first();
-
-    if (!os) throw new Error('OS não encontrada');
-
-    // ── 2. Buscar tenant/empresa ───────────────────────────────
-    const tenant = await db('tenants').where('id', tenantId).first();
-
-    // ── 3. Buscar itens de estoque salvos na OS ────────────────
-    // Os itens ficam no campo dados_ixc ou podemos buscar do IXC
-    // Usamos os dados que foram enviados na finalização
-    const dadosIxc = os.dados_ixc ? JSON.parse(os.dados_ixc) : {};
-
-    return await this._criarPdf(os, tenant, dadosIxc);
-  }
-
-  // ── Gera PDF a partir de dados diretos (chamado durante finalização) ──
   static async gerarPdfOSDireto(os, dados, tecnicoNome, tenantId) {
     const tenant = await db('tenants').where('id', tenantId).first();
-    return await this._criarPdf(os, tenant, dados, tecnicoNome);
+
+    const dadosIxc = os.dados_ixc
+      ? (typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc)
+      : {};
+
+    let clienteIxc   = null;
+    let mensagensIxc = [];
+
+    try {
+      const integracao = await db('integracao_ixc')
+        .where('tenant_id', tenantId).where('ativo', true).first();
+
+      if (integracao) {
+        const IXCService = require('./IXCService');
+        const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+        if (os.cliente_id_externo) {
+          try { clienteIxc = await ixc.buscarCliente(os.cliente_id_externo); } catch (_) {}
+        }
+        if (os.id_externo) {
+          try { mensagensIxc = await ixc.buscarMensagensOS(os.id_externo); } catch (_) {}
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ PDF OS: erro ao buscar dados IXC:', e.message);
+    }
+
+    return await this._criarPdf(os, tenant, dados, tecnicoNome, dadosIxc, clienteIxc, mensagensIxc);
   }
 
-  static _linha(doc, y, cor = COR_LINHA, espessura = 0.5) {
+  static _linha(doc, y, cor = COR_LINHA, esp = 0.5) {
     doc.moveTo(MARGEM, y).lineTo(MARGEM + LARGURA, y)
-       .lineWidth(espessura).strokeColor(cor).stroke();
-    return y;
+       .lineWidth(esp).strokeColor(cor).stroke();
   }
 
-  static _caixaTexto(doc, label, valor, x, y, largLabel, largValor) {
-    doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA)
-       .text(label, x, y, { width: largLabel });
-    doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-       .text(valor || '', x + largLabel, y, { width: largValor });
-  }
-
-  static async _criarPdf(os, tenant, dados, tecnicoNome) {
+  static async _criarPdf(os, tenant, dados, tecnicoNome, dadosIxc, clienteIxc, mensagensIxc) {
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
           size: 'A4',
           margins: { top: MARGEM, bottom: MARGEM, left: MARGEM, right: MARGEM },
-          info: {
-            Title: `Chamado Técnico ${os.numero_os}`,
-            Author: tenant?.nome || 'SeeNet'
-          }
+          info: { Title: `Chamado Técnico ${os.numero_os}`, Author: tenant?.nome || 'SeeNet' }
         });
 
         const chunks = [];
@@ -71,322 +63,250 @@ class OSPdfService {
         doc.on('end',  () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
 
-        const tecnico = tecnicoNome || os.tecnico_nome || 'Técnico';
+        const tecnico     = tecnicoNome || os.tecnico_nome || 'Técnico';
         const nomeEmpresa = tenant?.nome || 'BBnet Up';
-        let y = MARGEM;
 
-        // ── CABEÇALHO ──────────────────────────────────────────
-        // Retângulo azul escuro no topo
-        doc.rect(MARGEM - 10, 25, LARGURA + 20, 55).fill(COR_AZUL);
+        // Campos extras do cliente
+        const cpfCnpj     = clienteIxc?.cnpj_cpf   || clienteIxc?.cpf_cnpj || '';
+        const complemento = dadosIxc?.complemento  || clienteIxc?.complemento || '';
+        const cidade      = dadosIxc?.cidade        || clienteIxc?.cidade || '';
+        const cep         = dadosIxc?.cep           || clienteIxc?.cep || '';
+        const email       = clienteIxc?.email       || '';
+        const login       = dadosIxc?.login         || clienteIxc?.login || '';
+        const senha1      = dadosIxc?.senha_acesso  || dadosIxc?.senha_1 || clienteIxc?.senha_acesso || '';
+        const senha2      = dadosIxc?.senha_acesso_2 || dadosIxc?.senha_2 || '';
+        const senhaWifi   = dadosIxc?.ssid          || dadosIxc?.senha_wifi || clienteIxc?.ssid || '';
 
-        // Nome da empresa (grande, branco)
-        doc.fontSize(16).font('Helvetica-Bold').fillColor('white')
-           .text(nomeEmpresa, MARGEM + 60, 32, { width: 260 });
+        // Assunto: usa descrição do IXC se existir, senão tipo_servico
+        const assuntoTexto = dadosIxc?.mensagem && String(dadosIxc.mensagem).trim() !== ''
+          ? String(dadosIxc.mensagem)
+          : (os.tipo_servico || '');
 
-        // Dados da empresa (pequeno, branco)
-        const endEmpresa = tenant?.endereco || 'Rua João Pessoa, 104 - Centro';
-        const telEmpresa = tenant?.telefone || '(79) 99976-4955';
-        const emailEmpresa = tenant?.email || 'financeirobbnet@gmail.com';
-
-        doc.fontSize(7).font('Helvetica').fillColor('#cce0ff')
-           .text(`${endEmpresa}`, MARGEM + 60, 51, { width: 260 })
-           .text(`Tel: ${telEmpresa}   E-mail: ${emailEmpresa}`, MARGEM + 60, 60, { width: 260 });
-
-        // Dados do lado direito
         const dataAbertura = os.data_abertura
           ? new Date(os.data_abertura).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' })
           : '';
         const dataAgenda = os.data_agendamento
           ? new Date(os.data_agendamento).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
           : '';
+        const agora = new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' });
 
-        doc.fontSize(7).font('Helvetica-Bold').fillColor('#90caf9')
-           .text('Atendente:', MARGEM + 330, 35, { width: 80 });
-        doc.fontSize(7).font('Helvetica').fillColor('white')
-           .text(tecnico, MARGEM + 375, 35, { width: 130 });
+        const _L = (txt, x, y, w = 45) =>
+          doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text(txt, x, y, { width: w });
+        const _V = (txt, x, y, w = 200) =>
+          doc.fontSize(7.5).font('Helvetica').fillColor(COR_CINZA_ESCURO).text(txt || '', x, y, { width: w });
 
-        doc.fontSize(7).font('Helvetica-Bold').fillColor('#90caf9')
-           .text('Data da abertura:', MARGEM + 330, 46, { width: 90 });
-        doc.fontSize(7).font('Helvetica').fillColor('white')
-           .text(dataAbertura, MARGEM + 420, 46, { width: 90 });
+        let y = MARGEM;
 
+        // ── CABEÇALHO ─────────────────────────────────────────
+        doc.rect(MARGEM - 10, 25, LARGURA + 20, 55).fill(COR_AZUL);
+        doc.fontSize(16).font('Helvetica-Bold').fillColor('white')
+           .text(nomeEmpresa, MARGEM + 60, 32, { width: 260 });
+        doc.fontSize(7).font('Helvetica').fillColor('#cce0ff')
+           .text(tenant?.endereco || 'Rua João Pessoa, 104 - Centro', MARGEM + 60, 51, { width: 260 })
+           .text(`Tel: ${tenant?.telefone || '(79) 99976-4955'}   E-mail: ${tenant?.email || 'financeirobbnet@gmail.com'}`, MARGEM + 60, 60, { width: 260 });
+
+        doc.fontSize(7).font('Helvetica-Bold').fillColor('#90caf9').text('Atendente:',       MARGEM + 330, 35, { width: 80 });
+        doc.fontSize(7).font('Helvetica').fillColor('white').text(tecnico,                   MARGEM + 382, 35, { width: 130 });
+        doc.fontSize(7).font('Helvetica-Bold').fillColor('#90caf9').text('Data da abertura:', MARGEM + 330, 46, { width: 90 });
+        doc.fontSize(7).font('Helvetica').fillColor('white').text(dataAbertura,               MARGEM + 422, 46, { width: 90 });
         if (dataAgenda) {
-          doc.fontSize(7).font('Helvetica-Bold').fillColor('#90caf9')
-             .text('Data agendada:', MARGEM + 330, 57, { width: 90 });
-          doc.fontSize(7).font('Helvetica').fillColor('white')
-             .text(dataAgenda, MARGEM + 420, 57, { width: 90 });
+          doc.fontSize(7).font('Helvetica-Bold').fillColor('#90caf9').text('Data agendada:', MARGEM + 330, 57, { width: 90 });
+          doc.fontSize(7).font('Helvetica').fillColor('white').text(dataAgenda,              MARGEM + 422, 57, { width: 90 });
         }
-
         y = 90;
 
-        // ── TÍTULO DA OS ──────────────────────────────────────
+        // ── TÍTULO ────────────────────────────────────────────
         doc.fontSize(12).font('Helvetica-Bold').fillColor(COR_AZUL)
-           .text(
-             `Chamado Técnico: N° ${os.numero_os || ''} - Protocolo Nº ${os.protocolo_ixc || os.numero_os || ''}`,
-             MARGEM, y, { width: LARGURA, align: 'center' }
-           );
-
+           .text(`Chamado Técnico: N° ${os.numero_os || ''} - Protocolo Nº ${os.protocolo_ixc || os.numero_os || ''}`,
+                 MARGEM, y, { width: LARGURA, align: 'center' });
         y += 18;
-        this._linha(doc, y, COR_AZUL, 1);
-        y += 6;
+        this._linha(doc, y, COR_AZUL, 1); y += 6;
 
         // ── DADOS DO CLIENTE ──────────────────────────────────
-        // Linha 1: Cliente + CPF
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text('Cliente:', MARGEM, y);
-        doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-           .text(os.cliente_nome || '', MARGEM + 38, y, { width: 270 });
+        _L('Cliente:', MARGEM, y, 42);      _V(os.cliente_nome, MARGEM + 44, y, 240);
+        _L('CNPJ/CPF:', MARGEM + 320, y, 50); _V(cpfCnpj, MARGEM + 372, y, 145);
+        y += 13;
 
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA)
-           .text('CNPJ/CPF:', MARGEM + 320, y);
-        doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-           .text('', MARGEM + 362, y);
+        _L('Endereço:', MARGEM, y, 46);
+        _V(os.cliente_endereco, MARGEM + 48, y, LARGURA - 48);
+        y += 13;
 
-        y += 14;
+        if (complemento) {
+          _L('Compl.:', MARGEM, y, 40);
+          _V(complemento, MARGEM + 42, y, LARGURA - 42);
+          y += 13;
+        }
 
-        // Linha 2: Endereço
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text('Endereço:', MARGEM, y);
-        doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-           .text(os.cliente_endereco || '', MARGEM + 42, y, { width: LARGURA - 42 });
-        y += 14;
+        _L('Fone:', MARGEM, y, 30);
+        _L('Celular:', MARGEM + 32, y, 38);
+        _V(os.cliente_telefone, MARGEM + 72, y, 120);
+        _L('Comercial:', MARGEM + 210, y, 55);
+        _L('Ramal:', MARGEM + 370, y, 40);
+        y += 13;
 
-        // Linha 3: Telefone
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text('Fone:', MARGEM, y);
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text('Celular:', MARGEM + 60, y);
-        doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-           .text(os.cliente_telefone || '', MARGEM + 90, y, { width: 120 });
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text('Comercial:', MARGEM + 230, y);
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text('Ramal:', MARGEM + 370, y);
-        y += 14;
+        if (cidade || cep || email) {
+          _L('Cidade:', MARGEM, y, 36);
+          _V(`${cidade}${cep ? '  CEP: ' + cep : ''}`, MARGEM + 38, y, 200);
+          if (email) { _L('E-mail:', MARGEM + 250, y, 36); _V(email, MARGEM + 288, y, 220); }
+          y += 13;
+        }
 
-        this._linha(doc, y);
-        y += 5;
+        this._linha(doc, y); y += 5;
 
         // ── INFO TÉCNICA ──────────────────────────────────────
-        // Consultor | Marcado por
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text('Consultor:', MARGEM, y);
-        doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-           .text(tecnico, MARGEM + 42, y, { width: 140 });
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA)
-           .text('Marcado Por:', MARGEM + 210, y);
-        doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-           .text(`${tecnico} ${dataAbertura}`, MARGEM + 262, y, { width: 200 });
-        y += 14;
+        _L('Consultor:', MARGEM, y, 52); _V(tecnico, MARGEM + 54, y, 130);
+        _L('Marcado Por:', MARGEM + 210, y, 65);
+        _V(`${tecnico} ${dataAbertura}`, MARGEM + 277, y, 230);
+        y += 13;
 
-        // Origem | Forma de pagamento
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text('Origem da Visita:', MARGEM, y);
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA)
-           .text('Forma de Pagamento:', MARGEM + 210, y);
-        y += 14;
+        _L('Origem da Visita:', MARGEM, y, 90);
+        _L('Forma de Pagamento:', MARGEM + 210, y, 110);
+        y += 13;
 
-        // Assunto | Colaborador
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text('Melhor horário:', MARGEM, y);
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA).text('Assunto:', MARGEM + 140, y);
-        doc.fontSize(7.5).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-           .text(os.tipo_servico || '', MARGEM + 170, y, { width: 200 });
-        doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA)
-           .text('Colaborador responsável:', MARGEM + 380, y);
-        doc.fontSize(7.5).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-           .text(tecnico, MARGEM + 383, y + 9, { width: 130 });
-        y += 22;
+        _L('Login:', MARGEM, y, 32);          _V(login, MARGEM + 34, y, 110);
+        _L('Senha router 1:', MARGEM + 150, y, 66); _V(senha1, MARGEM + 218, y, 90);
+        _L('Senha router 2:', MARGEM + 315, y, 66); _V(senha2, MARGEM + 383, y, 90);
+        y += 13;
 
-        this._linha(doc, y);
-        y += 6;
+        _L('Melhor horário:', MARGEM, y, 72);
+        _L('Assunto:', MARGEM + 140, y, 40);
+        _V(os.tipo_servico || '', MARGEM + 182, y, 140);
+        _L('Senha wifi:', MARGEM + 340, y, 50); _V(senhaWifi, MARGEM + 393, y, 120);
+        y += 13;
 
-        // ── ASSUNTO / OBSERVAÇÕES ─────────────────────────────
-        doc.rect(MARGEM - 5, y - 2, LARGURA + 10, 16).fill(COR_CINZA_CLARO);
-        this._linha(doc, y - 2, COR_LINHA);
-        this._linha(doc, y + 14, COR_LINHA);
-        doc.fontSize(8).font('Helvetica-Bold').fillColor(COR_CINZA_ESCURO)
-           .text('Assunto:', MARGEM, y + 2);
+        _L('Colaborador responsável:', MARGEM, y, 130);
+        _V(tecnico, MARGEM + 132, y, 200);
+        y += 16;
+
+        this._linha(doc, y); y += 6;
+
+        // ── ASSUNTO ───────────────────────────────────────────
+        doc.rect(MARGEM - 5, y - 2, LARGURA + 10, 15).fill(COR_CINZA_CLARO);
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(COR_CINZA_ESCURO).text('Assunto:', MARGEM, y + 2);
         y += 18;
-
-        const assunto = os.observacoes || os.tipo_servico || '';
-        if (assunto) {
-          doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-             .text(assunto, MARGEM, y, { width: LARGURA });
-          y += doc.heightOfString(assunto, { width: LARGURA, fontSize: 8 }) + 6;
+        if (assuntoTexto) {
+          doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO).text(assuntoTexto, MARGEM, y, { width: LARGURA });
+          y += doc.heightOfString(assuntoTexto, { width: LARGURA, fontSize: 8 }) + 6;
         }
-        y += 4;
-
-        this._linha(doc, y);
-        y += 6;
+        y += 4; this._linha(doc, y); y += 6;
 
         // ── OBS. DO TÉCNICO ───────────────────────────────────
-        doc.rect(MARGEM - 5, y - 2, LARGURA + 10, 16).fill(COR_CINZA_CLARO);
-        this._linha(doc, y - 2, COR_LINHA);
-        this._linha(doc, y + 14, COR_LINHA);
-        doc.fontSize(8).font('Helvetica-Bold').fillColor(COR_CINZA_ESCURO)
-           .text('Obs. do Técnico:', MARGEM, y + 2);
-        y += 20;
-
+        doc.rect(MARGEM - 5, y - 2, LARGURA + 10, 15).fill(COR_CINZA_CLARO);
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(COR_CINZA_ESCURO).text('Obs. do Técnico:', MARGEM, y + 2);
+        y += 18;
         const problema = dados.relato_problema || '';
         const solucao  = dados.relato_solucao  || '';
         const obsTexto = [
           problema ? `Problema: ${problema}` : '',
-          solucao  ? `Solução: ${solucao}`   : '',
+          solucao  ? `Solução: ${solucao}` : '',
           dados.observacoes ? `Observações: ${dados.observacoes}` : ''
         ].filter(Boolean).join('\n\n') || 'Sem observações';
-
-        doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-           .text(obsTexto, MARGEM, y, { width: LARGURA });
+        doc.fontSize(8).font('Helvetica').fillColor(COR_CINZA_ESCURO).text(obsTexto, MARGEM, y, { width: LARGURA });
         y += doc.heightOfString(obsTexto, { width: LARGURA, fontSize: 8 }) + 10;
 
         // ── PRODUTOS / COMODATOS ──────────────────────────────
         const itens = dados.itens_estoque || [];
         if (itens.length > 0) {
-          if (y > 650) { doc.addPage(); y = MARGEM; }
-
-          this._linha(doc, y, COR_AZUL, 1);
-          y += 5;
-
-          // Separa patrimônios de produtos normais
-          const patrimonios = itens.filter(i => i.isPatrimonio || i.tipo_produto === 'P');
-          const produtos     = itens.filter(i => !i.isPatrimonio && i.tipo_produto !== 'P');
-
-          if (patrimonios.length > 0) {
-            y = this._tabelaProdutos(doc, y, 'Comodatos', patrimonios);
-          }
-          if (produtos.length > 0) {
-            y = this._tabelaProdutos(doc, y, 'Produtos Utilizados', produtos);
-          }
+          if (y > 620) { doc.addPage(); y = MARGEM; }
+          this._linha(doc, y, COR_AZUL, 1); y += 5;
+          const pats = itens.filter(i => i.isPatrimonio || i.tipo_produto === 'P');
+          const prods = itens.filter(i => !i.isPatrimonio && i.tipo_produto !== 'P');
+          if (pats.length > 0)  y = this._tabelaProdutos(doc, y, 'Comodatos', pats);
+          if (prods.length > 0) y = this._tabelaProdutos(doc, y, 'Produtos Utilizados', prods);
         }
 
         // ── MENSAGENS / INTERAÇÕES ────────────────────────────
-        if (y > 600) { doc.addPage(); y = MARGEM; }
+        if (y > 560) { doc.addPage(); y = MARGEM; }
+        this._linha(doc, y, COR_AZUL, 1); y += 5;
 
-        this._linha(doc, y, COR_AZUL, 1);
-        y += 5;
-
-        // Cabeçalho tabela
         doc.rect(MARGEM - 5, y, LARGURA + 10, 16).fill('#dce8f5');
         doc.fontSize(7.5).font('Helvetica-Bold').fillColor(COR_AZUL)
            .text('Mensagens/Interações', MARGEM, y + 4, { width: LARGURA, align: 'center' });
         y += 18;
 
-        // Header das colunas
-        doc.rect(MARGEM - 5, y, LARGURA + 10, 14).fill(COR_CINZA_CLARO);
-        this._linha(doc, y, COR_LINHA);
-        this._linha(doc, y + 14, COR_LINHA);
+        const c1 = 95, c2 = 95, c3 = 75, c4 = LARGURA - 95 - 95 - 75;
 
-        const c1 = 100, c2 = 90, c3 = 80;
-        const c4 = LARGURA - c1 - c2 - c3;
+        doc.rect(MARGEM - 5, y, LARGURA + 10, 14).fill(COR_CINZA_CLARO);
+        this._linha(doc, y + 14, COR_LINHA, 0.5);
         doc.fontSize(7).font('Helvetica-Bold').fillColor(COR_CINZA_ESCURO)
-           .text('Data/Hora',   MARGEM,            y + 3, { width: c1 })
-           .text('Operador',    MARGEM + c1,        y + 3, { width: c2 })
-           .text('Evento',      MARGEM + c1 + c2,   y + 3, { width: c3 })
-           .text('Mensagem',    MARGEM + c1+c2+c3,  y + 3, { width: c4 });
+           .text('Data/Hora', MARGEM,          y + 3, { width: c1 })
+           .text('Operador',  MARGEM + c1,      y + 3, { width: c2 })
+           .text('Evento',    MARGEM + c1 + c2, y + 3, { width: c3 })
+           .text('Mensagem',  MARGEM + c1+c2+c3, y + 3, { width: c4 });
         y += 16;
 
-        // Linhas de mensagens
-        const agora = new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' });
-        const mensagens = [
-          {
-            data: new Date(os.data_abertura || Date.now()).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }),
-            operador: 'Sistema',
-            evento: 'Abertura',
-            mensagem: os.tipo_servico || 'OS criada'
-          },
-          {
-            data: agora,
-            operador: tecnico,
-            evento: 'Execução',
-            mensagem: problema ? `Problema: ${problema.substring(0, 100)}` : 'OS executada'
-          },
-          {
-            data: agora,
-            operador: tecnico,
-            evento: 'Fechamento',
-            mensagem: solucao ? solucao.substring(0, 120) : 'OS finalizada'
-          }
-        ];
+        const eventoMap = {
+          'A': 'Abertura', 'AG': 'Agendamento', 'RAG': 'Reagendamento',
+          'EX': 'Execução', 'DS': 'Deslocamento', 'F': 'Fechamento', 'C': 'Cancelamento'
+        };
 
-        mensagens.forEach((msg, idx) => {
+        const linhas = mensagensIxc && mensagensIxc.length > 0
+          ? mensagensIxc.map(m => {
+              const nomeOperador = m.historico
+                ? (m.historico.match(/Usuário ([^,]+),/)?.[1] || 'Sistema')
+                : 'Sistema';
+              return {
+                data:     m.data || '',
+                operador: nomeOperador,
+                evento:   eventoMap[m.status] || m.status || 'Mensagem',
+                mensagem: m.mensagem || ''
+              };
+            })
+          : [
+              { data: new Date(os.data_abertura || Date.now()).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }),
+                operador: 'Sistema', evento: 'Abertura', mensagem: assuntoTexto || os.tipo_servico || 'OS criada' },
+              { data: agora, operador: tecnico, evento: 'Execução',
+                mensagem: problema ? `Problema: ${problema.substring(0, 120)}` : 'OS executada' },
+              { data: agora, operador: tecnico, evento: 'Fechamento',
+                mensagem: solucao ? solucao.substring(0, 120) : 'OS finalizada' }
+            ];
+
+        linhas.forEach((msg, idx) => {
           if (y > 700) { doc.addPage(); y = MARGEM; }
-
-          const altMsg = Math.max(
-            doc.heightOfString(msg.mensagem, { width: c4, fontSize: 7 }) + 6,
-            14
-          );
-
-          if (idx % 2 === 1) {
-            doc.rect(MARGEM - 5, y, LARGURA + 10, altMsg).fill('#f9f9f9');
-          }
-          this._linha(doc, y + altMsg, COR_LINHA, 0.3);
-
+          const alt = Math.max(doc.heightOfString(String(msg.mensagem), { width: c4, fontSize: 7 }) + 6, 14);
+          if (idx % 2 === 1) doc.rect(MARGEM - 5, y, LARGURA + 10, alt).fill('#f9f9f9');
+          this._linha(doc, y + alt, COR_LINHA, 0.3);
           doc.fontSize(7).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-             .text(msg.data,      MARGEM,           y + 3, { width: c1 })
-             .text(msg.operador,  MARGEM + c1,       y + 3, { width: c2 })
-             .text(msg.evento,    MARGEM + c1 + c2,  y + 3, { width: c3 })
-             .text(msg.mensagem,  MARGEM + c1+c2+c3, y + 3, { width: c4 });
-
-          y += altMsg;
+             .text(String(msg.data).substring(0, 20),     MARGEM,            y + 3, { width: c1 })
+             .text(String(msg.operador).substring(0, 25), MARGEM + c1,       y + 3, { width: c2 })
+             .text(String(msg.evento).substring(0, 20),   MARGEM + c1 + c2,  y + 3, { width: c3 })
+             .text(String(msg.mensagem),                   MARGEM + c1+c2+c3, y + 3, { width: c4 });
+          y += alt;
         });
-
         y += 14;
 
         // ── ASSINATURAS ───────────────────────────────────────
         if (y > 680) { doc.addPage(); y = MARGEM; }
+        const assinLarg = 210, assinAlt = 60;
+        const xTec = MARGEM, xCli = MARGEM + LARGURA - assinLarg;
 
-        const assinLarg = 210;
-        const assinAlt  = 60;
-        const xTec     = MARGEM;
-        const xCli     = MARGEM + LARGURA - assinLarg;
-
-        // Box técnico
-        doc.rect(xTec, y, assinLarg, assinAlt)
-           .lineWidth(0.5).strokeColor(COR_LINHA).stroke();
-
-        // Assinatura do técnico (se houver)
-        if (os.assinatura_tecnico) {
-          try {
-            const buf = Buffer.from(os.assinatura_tecnico, 'base64');
-            doc.image(buf, xTec + 5, y + 4, {
-              fit: [assinLarg - 10, assinAlt - 8],
-              align: 'center', valign: 'center'
-            });
-          } catch (_) {}
-        }
-
-        // Box cliente com assinatura
-        doc.rect(xCli, y, assinLarg, assinAlt)
-           .lineWidth(0.5).strokeColor(COR_LINHA).stroke();
+        doc.rect(xTec, y, assinLarg, assinAlt).lineWidth(0.5).strokeColor(COR_LINHA).stroke();
+        doc.rect(xCli, y, assinLarg, assinAlt).lineWidth(0.5).strokeColor(COR_LINHA).stroke();
 
         if (dados.assinatura) {
           try {
             const buf = Buffer.from(dados.assinatura, 'base64');
             doc.rect(xCli + 1, y + 1, assinLarg - 2, assinAlt - 2).fill('white');
-            doc.image(buf, xCli + 5, y + 4, {
-              fit: [assinLarg - 10, assinAlt - 8],
-              align: 'center', valign: 'center'
-            });
+            doc.image(buf, xCli + 5, y + 4, { fit: [assinLarg - 10, assinAlt - 8], align: 'center', valign: 'center' });
           } catch (_) {}
         }
 
         const legY = y + assinAlt + 4;
-
-        // Labels
         doc.fontSize(8).font('Helvetica-Bold').fillColor(COR_CINZA_ESCURO)
-           .text(tecnico.toUpperCase(), xTec, legY,
-                 { width: assinLarg, align: 'center' });
+           .text(tecnico.toUpperCase(), xTec, legY, { width: assinLarg, align: 'center' });
         doc.fontSize(7).font('Helvetica').fillColor(COR_CINZA)
-           .text('COLABORADOR RESPONSÁVEL', xTec, legY + 10,
-                 { width: assinLarg, align: 'center' });
-
+           .text('COLABORADOR RESPONSÁVEL', xTec, legY + 10, { width: assinLarg, align: 'center' });
         doc.fontSize(8).font('Helvetica-Bold').fillColor(COR_CINZA_ESCURO)
-           .text((os.cliente_nome || 'CLIENTE').toUpperCase(), xCli, legY,
-                 { width: assinLarg, align: 'center' });
+           .text((os.cliente_nome || 'CLIENTE').toUpperCase(), xCli, legY, { width: assinLarg, align: 'center' });
         doc.fontSize(7).font('Helvetica').fillColor(COR_CINZA)
-           .text('CLIENTE', xCli, legY + 10,
-                 { width: assinLarg, align: 'center' });
+           .text('CLIENTE', xCli, legY + 10, { width: assinLarg, align: 'center' });
 
         // ── RODAPÉ ────────────────────────────────────────────
-        const rodapeY = doc.page.height - 30;
-        this._linha(doc, rodapeY - 6, COR_LINHA);
+        const rodapeY = doc.page.height - 28;
+        this._linha(doc, rodapeY - 5, COR_LINHA);
         doc.fontSize(6.5).font('Helvetica').fillColor(COR_CINZA)
-           .text(
-             `Documento gerado em ${agora} · SeeNet – Sistema de Gestão · ${nomeEmpresa}`,
-             MARGEM, rodapeY, { width: LARGURA, align: 'center' }
-           );
+           .text(`Documento gerado em ${agora} · SeeNet – Sistema de Gestão · ${nomeEmpresa}`,
+                 MARGEM, rodapeY, { width: LARGURA, align: 'center' });
 
         doc.end();
       } catch (err) {
@@ -395,20 +315,14 @@ class OSPdfService {
     });
   }
 
-  // ── Renderiza tabela de produtos/comodatos ──────────────────
   static _tabelaProdutos(doc, y, titulo, itens) {
-    // Título da seção
     doc.rect(MARGEM - 5, y, LARGURA + 10, 16).fill('#dce8f5');
     doc.fontSize(7.5).font('Helvetica-Bold').fillColor(COR_AZUL)
        .text(titulo, MARGEM, y + 4, { width: LARGURA, align: 'center' });
     y += 18;
 
-    // Header
-    const cID   = 40;
-    const cDesc = LARGURA - cID - 70 - 60 - 70;
-    const cUnit = 70;
-    const cQtd  = 60;
-    const cTot  = 70;
+    const cID = 40, cUnit = 70, cQtd = 55, cTot = 70;
+    const cDesc = LARGURA - cID - cUnit - cQtd - cTot;
 
     doc.rect(MARGEM - 5, y, LARGURA + 10, 14).fill(COR_CINZA_CLARO);
     this._linha(doc, y + 14, COR_LINHA, 0.5);
@@ -420,39 +334,28 @@ class OSPdfService {
        .text('Valor Total', MARGEM + cID + cDesc + cUnit + cQtd, y + 3, { width: cTot, align: 'right' });
     y += 16;
 
-    let totalGeral = 0;
-
+    let total = 0;
     itens.forEach((item, idx) => {
-      const alt = 14;
-      if (idx % 2 === 1) {
-        doc.rect(MARGEM - 5, y, LARGURA + 10, alt).fill('#f9f9f9');
-      }
-      this._linha(doc, y + alt, COR_LINHA, 0.3);
-
+      if (idx % 2 === 1) doc.rect(MARGEM - 5, y, LARGURA + 10, 14).fill('#f9f9f9');
+      this._linha(doc, y + 14, COR_LINHA, 0.3);
       const vUnit = parseFloat(item.valor_unitario || 0).toFixed(2);
       const qtd   = parseFloat(item.quantidade || 0).toFixed(2);
       const vTot  = parseFloat(item.valor_total || 0).toFixed(2);
-      totalGeral += parseFloat(vTot);
-
+      total += parseFloat(vTot);
       doc.fontSize(7.5).font('Helvetica').fillColor(COR_CINZA_ESCURO)
-         .text(item.id_produto || '',  MARGEM,                       y + 3, { width: cID })
-         .text(item.descricao  || '',  MARGEM + cID,                 y + 3, { width: cDesc })
-         .text(vUnit,                  MARGEM + cID + cDesc,         y + 3, { width: cUnit, align: 'right' })
-         .text(qtd,                    MARGEM + cID + cDesc + cUnit, y + 3, { width: cQtd,  align: 'right' })
-         .text(vTot,                   MARGEM + cID + cDesc + cUnit + cQtd, y + 3, { width: cTot, align: 'right' });
-      y += alt;
+         .text(String(item.id_produto || ''), MARGEM,                       y + 3, { width: cID })
+         .text(item.descricao || '',          MARGEM + cID,                 y + 3, { width: cDesc })
+         .text(vUnit,                         MARGEM + cID + cDesc,         y + 3, { width: cUnit, align: 'right' })
+         .text(qtd,                           MARGEM + cID + cDesc + cUnit, y + 3, { width: cQtd,  align: 'right' })
+         .text(vTot,                          MARGEM + cID + cDesc + cUnit + cQtd, y + 3, { width: cTot, align: 'right' });
+      y += 14;
     });
 
-    // Linha total
     doc.rect(MARGEM - 5, y, LARGURA + 10, 16).fill(COR_CINZA_CLARO);
     doc.fontSize(8).font('Helvetica-Bold').fillColor(COR_CINZA_ESCURO)
-       .text('Total:', MARGEM + cID + cDesc + cUnit, y + 4,
-             { width: cQtd, align: 'right' })
-       .text(totalGeral.toFixed(2), MARGEM + cID + cDesc + cUnit + cQtd, y + 4,
-             { width: cTot, align: 'right' });
-    y += 20;
-
-    return y;
+       .text('Total:', MARGEM + cID + cDesc + cUnit, y + 4, { width: cQtd, align: 'right' })
+       .text(total.toFixed(2), MARGEM + cID + cDesc + cUnit + cQtd, y + 4, { width: cTot, align: 'right' });
+    return y + 20;
   }
 }
 

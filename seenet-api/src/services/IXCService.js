@@ -974,6 +974,26 @@ async uploadFotoOS(osId, clienteId, fotoData) {
         throw error;
       }
     }
+    async buscarMensagensOS(osId) {
+      try {
+        const params = new URLSearchParams({
+          qtype: 'su_oss_chamado_mensagem.id_chamado',
+          query: osId.toString(),
+          oper: '=',
+          page: '1',
+          rp: '100',
+          sortname: 'su_oss_chamado_mensagem.id',
+          sortorder: 'asc'
+        });
+        const response = await this.clientListar.post(
+          '/su_oss_chamado_mensagem', params.toString()
+        );
+        return response.data?.registros || [];
+      } catch (error) {
+        console.error(`❌ Erro ao buscar mensagens OS ${osId}:`, error.message);
+        return [];
+      }
+    }
 }
 
 

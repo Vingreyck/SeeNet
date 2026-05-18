@@ -424,151 +424,101 @@ async finalizarExecucao(req, res) {
       .first();
 
     if (!os) {
-      return res.status(404).json({
-        success: false,
-        error: 'OS não encontrada'
-      });
+      return res.status(404).json({ success: false, error: 'OS não encontrada' });
     }
 
     if (os.status !== 'em_execucao') {
-      return res.status(400).json({
-        success: false,
-        error: 'OS não está em execução'
-      });
+      return res.status(400).json({ success: false, error: 'OS não está em execução' });
     }
 
     // 2. Atualizar dados da OS no banco
-await db('ordem_servico')
-  .where('id', id)
-  .update({
-    status: 'concluida',
-    data_conclusao: new Date(),  // ← CORRETO
-    onu_modelo: dados.onu_modelo,
-    onu_serial: dados.onu_serial,
-    onu_status: dados.onu_status,
-    onu_sinal_optico: dados.onu_sinal_optico,
-    relato_problema: dados.relato_problema,
-    relato_solucao: dados.relato_solucao,
-    materiais_utilizados: dados.materiais_utilizados,
-    observacoes: dados.observacoes,
-    assinatura_cliente: dados.assinatura,
-    data_atualizacao: new Date()  // ← CORRETO
-  });
+    await db('ordem_servico')
+      .where('id', id)
+      .update({
+        status: 'concluida',
+        data_conclusao: new Date(),
+        onu_modelo: dados.onu_modelo,
+        onu_serial: dados.onu_serial,
+        onu_status: dados.onu_status,
+        onu_sinal_optico: dados.onu_sinal_optico,
+        relato_problema: dados.relato_problema,
+        relato_solucao: dados.relato_solucao,
+        materiais_utilizados: dados.materiais_utilizados,
+        observacoes: dados.observacoes,
+        assinatura_cliente: dados.assinatura,
+        data_atualizacao: new Date()
+      });
 
-    // 4. Buscar mapeamento do técnico IXC
+    // 3. Buscar mapeamento do técnico IXC
     const mapeamentoTecnico = await db('mapeamento_tecnicos_ixc')
-          .where('usuario_id', os.tecnico_id)
-          .where('tenant_id', tenantId)
-          .first();
+      .where('usuario_id', os.tecnico_id)
+      .where('tenant_id', tenantId)
+      .first();
 
-        if (!mapeamentoTecnico) {
-          console.warn('⚠️ Técnico não mapeado no IXC — continuando sem sync de técnico');
-        }
+    if (!mapeamentoTecnico) {
+      console.warn('⚠️ Técnico não mapeado no IXC — continuando sem sync de técnico');
+    }
 
-        const tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
+    const tecnicoIdIxc = mapeamentoTecnico?.tecnico_ixc_id || null;
 
-    // 3. Processar fotos se houver
+    // 4. Processar fotos
     let fotosBase64 = [];
     if (dados.fotos && dados.fotos.length > 0) {
       console.log(`📸 Processando ${dados.fotos.length} foto(s)...`);
-
-      // Converter fotos para base64 (se necessário)
       fotosBase64 = dados.fotos.map((foto, index) => ({
         tipo: foto.tipo || 'Foto',
         descricao: foto.descricao || `Foto ${index + 1}`,
-        base64: foto.base64 || foto.data // Suporte para ambos formatos
+        base64: foto.base64 || foto.data
       }));
     }
 
-let pdfBuffer = null;
-let pdfAprBase64 = null;
-try {
-  const AprPdfService = require('../services/AprPdfService');
-  pdfBuffer = await AprPdfService.gerarPdfApr(id, tenantId);
-  pdfAprBase64 = pdfBuffer.toString('base64');
-  console.log(`✅ PDF APR gerado (${pdfBuffer.length} bytes)`);
-} catch (aprError) {
-  console.error('⚠️ Erro ao gerar PDF APR:', aprError.message);
-}
-
-// ── PDF DA OS (Chamado Técnico) ─────────────────────────────
-let pdfOSBuffer = null;
-try {
-  const OSPdfService = require('../services/OSPdfService');
-  const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
-  pdfOSBuffer = await OSPdfService.gerarPdfOSDireto(
-    os,
-    dados,
-    tecnico?.nome || 'Técnico',
-    tenantId
-  );
-  console.log(`✅ PDF OS gerado (${pdfOSBuffer.length} bytes)`);
-} catch (osPdfError) {
-  console.warn('⚠️ Erro ao gerar PDF OS:', osPdfError.message);
-}
-
-// ── ENVIAR PDF DA OS para o IXC (dentro do bloco if (ixcService && os.id_externo)) ──
-// Logo após enviar o PDF do APR:
-
-if (pdfOSBuffer) {
-  console.log('📤 Enviando PDF da OS para o IXC...');
-  try {
-    await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
-      buffer: pdfOSBuffer,
-      descricao: `Chamado Técnico - OS ${os.numero_os}`,
-      nome: `OS_${os.numero_os}_${Date.now()}.pdf`,
-      ext: 'pdf'
-    });
-    console.log('   ✅ PDF OS enviado ao IXC');
-  } catch (pdfOSError) {
-    console.error('   ❌ Erro ao enviar PDF OS:', pdfOSError.message);
-  }
-}
-
-// 5. Buscar configuração IXC e criar instância única
-console.log('🔄 Preparando sincronização com IXC...');
-let ixcService = null;
-let integracao = null;
-
-if (os.id_externo) {
-  try {
-    // Buscar configuração IXC
-    integracao = await db('integracao_ixc')
-      .where('tenant_id', tenantId)
-      .where('ativo', true)
-      .first();
-
-    if (!integracao) {
-      throw new Error('Integração IXC não configurada');
+    // 5. Gerar PDF do APR (opcional)
+    let pdfBuffer = null;
+    let pdfAprBase64 = null;
+    try {
+      const AprPdfService = require('../services/AprPdfService');
+      pdfBuffer = await AprPdfService.gerarPdfApr(id, tenantId);
+      pdfAprBase64 = pdfBuffer.toString('base64');
+      console.log(`✅ PDF APR gerado (${pdfBuffer.length} bytes)`);
+    } catch (aprError) {
+      console.warn('⚠️ Erro ao gerar PDF APR:', aprError.message);
     }
 
-    // Criar instância do IXCService
-    ixcService = new IXCService(integracao.url_api, integracao.token_api);
-    console.log('✅ Conexão IXC estabelecida');
-  } catch (error) {
-    console.error('⚠️ Erro ao conectar com IXC:', error.message);
-  }
-}
-
-/*
-// 6. Baixar PDF do IXC
-console.log('📥 Baixando PDF do IXC...');
-let pdfIxcBase64 = null;
-if (ixcService && os.id_externo) {
-  try {
-    const pdfBuffer = await ixcService.baixarPdfOS(os.id_externo);
-    if (pdfBuffer) {
-      pdfIxcBase64 = pdfBuffer.toString('base64');
-      console.log(`✅ PDF IXC baixado (${pdfBuffer.length} bytes)`);
+    // 6. Gerar PDF da OS (Chamado Técnico)
+    let pdfOSBuffer = null;
+    try {
+      const OSPdfService = require('../services/OSPdfService');
+      const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
+      pdfOSBuffer = await OSPdfService.gerarPdfOSDireto(
+        os, dados, tecnico?.nome || 'Técnico', tenantId
+      );
+      console.log(`✅ PDF OS gerado (${pdfOSBuffer.length} bytes)`);
+    } catch (osPdfError) {
+      console.warn('⚠️ Erro ao gerar PDF OS:', osPdfError.message);
     }
-  } catch (ixcError) {
-    console.error('⚠️ Erro ao baixar PDF IXC:', ixcError.message);
-    // Continua sem o PDF do IXC
-  }
-}
-*/
+
+    // 7. Conectar ao IXC
+    console.log('🔄 Preparando sincronização com IXC...');
+    let ixcService = null;
+
+    if (os.id_externo) {
+      try {
+        const integracao = await db('integracao_ixc')
+          .where('tenant_id', tenantId)
+          .where('ativo', true)
+          .first();
+
+        if (!integracao) throw new Error('Integração IXC não configurada');
+
+        ixcService = new IXCService(integracao.url_api, integracao.token_api);
+        console.log('✅ Conexão IXC estabelecida');
+      } catch (error) {
+        console.error('⚠️ Erro ao conectar com IXC:', error.message);
+      }
+    }
+
     // 8. Enviar itens de estoque para o IXC
-    if (dados.itens_estoque && dados.itens_estoque.length > 0) {
+    if (dados.itens_estoque && dados.itens_estoque.length > 0 && ixcService) {
       console.log(`📦 Enviando ${dados.itens_estoque.length} item(ns) de estoque para o IXC...`);
 
       const mapeamentoEstoque = await db('mapeamento_tecnicos_ixc')
@@ -580,27 +530,28 @@ if (ixcService && os.id_externo) {
       const hoje = new Date();
       const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
 
-    // ✅ Buscar id_contrato no IXC (necessário para comodato)
-    let idContratoIxc = os.id_contrato_ixc || '';
-    if (!idContratoIxc && ixcService && os.id_externo) {
-      try {
-        const osIxc = await ixcService.buscarDetalhesOS(os.id_externo);
-        idContratoIxc = osIxc?.id_contrato_kit || osIxc?.id_contrato || '';
-        console.log(`📋 id_contrato IXC: ${idContratoIxc}`);
-      } catch (e) {
-        console.warn('⚠️ Não foi possível buscar id_contrato do IXC:', e.message);
+      // Buscar id_contrato no IXC (necessário para comodato)
+      let idContratoIxc = os.id_contrato_ixc || '';
+      if (!idContratoIxc && os.id_externo) {
+        try {
+          const osIxc = await ixcService.buscarDetalhesOS(os.id_externo);
+          idContratoIxc = osIxc?.id_contrato_kit || osIxc?.id_contrato || '';
+          console.log(`📋 id_contrato IXC: ${idContratoIxc}`);
+        } catch (e) {
+          console.warn('⚠️ Não foi possível buscar id_contrato do IXC:', e.message);
+        }
       }
-    }
 
       for (const item of dados.itens_estoque) {
-        const ehPatrimonio = !!(item.id_patrimonio && item.id_patrimonio !== '' && item.id_patrimonio !== '0');
+        const ehPatrimonio = !!(item.id_patrimonio &&
+          item.id_patrimonio !== '' &&
+          item.id_patrimonio !== '0');
 
         try {
           if (ehPatrimonio) {
-            // ✅ Patrimônio → endpoint de COMODATO
             await ixcService.adicionarComodatoOS({
               id_oss_chamado:              os.id_externo,
-              id_contrato: idContratoIxc,
+              id_contrato:                 idContratoIxc,
               id_login:                    '',
               id_patrimonio:               String(item.id_patrimonio),
               id_produto:                  item.id_produto,
@@ -611,7 +562,7 @@ if (ixcService && os.id_externo) {
               filial_id:                   '1',
               qtde_saida:                  item.quantidade.toString(),
               valor_unitario:              parseFloat(item.valor_unitario) > 0 ? item.valor_unitario.toString() : '0.10',
-              valor_total:                 parseFloat(item.valor_total) > 0 ? item.valor_total.toString() : '0.10',
+              valor_total:                 parseFloat(item.valor_total)    > 0 ? item.valor_total.toString()    : '0.10',
               patrimonio:                  item.numero_serie || '',
               mac:                         '',
               numero_serie:                item.numero_serie || '',
@@ -636,7 +587,6 @@ if (ixcService && os.id_externo) {
               vdesconto:                   '',
             });
           } else {
-            // ✅ Produto comum → endpoint de PRODUTOS (como estava)
             await ixcService.adicionarProdutoOS({
               id_oss_chamado:              os.id_externo,
               id_produto:                  item.id_produto,
@@ -670,7 +620,6 @@ if (ixcService && os.id_externo) {
               id_pedido_os:                '',
             });
           }
-
           console.log(`   ✅ ${ehPatrimonio ? '[COMODATO]' : '[PRODUTO]'} ${item.descricao} x${item.quantidade}`);
         } catch (estoqueError) {
           console.error(`   ❌ Erro ao enviar item ${item.descricao}:`, estoqueError.message);
@@ -678,83 +627,109 @@ if (ixcService && os.id_externo) {
       }
     }
 
-// 7. Sincronizar com IXC
-if (ixcService && os.id_externo) {
-  try {
-    console.log('🔄 Sincronizando com IXC...');
-
-    // Finalizar OS no IXC
-    const mensagemFinal = `Serviço finalizado via SeeNet\n\n` +
-      `PROBLEMA: ${dados.relato_problema || 'N/A'}\n` +
-      `SOLUÇÃO: ${dados.relato_solucao || 'N/A'}\n` +
-      `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
-      `OBS: ${dados.observacoes || 'Nenhuma'}`;
-
-    await ixcService.finalizarOS(os.id_externo, {
-      mensagem_resposta: mensagemFinal,  // ← mensagem_resposta (conforme método espera)
-      id_tecnico_ixc: tecnicoIdIxc  // ← CORRETO
-    });
-    console.log('✅ OS finalizada no IXC');
-
-
-
-    // 9. Enviar fotos para o IXC
-    if (fotosBase64.length > 0) {
-      console.log(`📤 Enviando ${fotosBase64.length} foto(s) para o IXC...`);
-
-      for (const foto of fotosBase64) {
-        try {
-          await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
-            base64: foto.base64,
-            descricao: foto.descricao,
-            nome: `foto_${Date.now()}.jpg`,
-            ext: 'jpg'
-          });
-          console.log(`   ✅ ${foto.descricao} enviada`);
-        } catch (fotoError) {
-          console.error(`   ❌ Erro ao enviar ${foto.descricao}:`, fotoError.message);
-        }
-      }
-    }
-
-    // 10. Enviar PDF do APR para o IXC
-    if (pdfBuffer) {
-      console.log('📤 Enviando PDF do APR para o IXC...');
+    // 9. Sincronizar finalização com IXC
+    if (ixcService && os.id_externo) {
       try {
-        await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
-          buffer: pdfBuffer,  // ← buffer direto!
-          descricao: `APR - Análise Preliminar de Risco - OS ${os.numero_os}`,
-          nome: `APR_OS_${os.numero_os}.pdf`,
-          ext: 'pdf'
+        console.log('🔄 Sincronizando com IXC...');
+
+        // 9a. Garantir status EX no IXC antes de fechar
+        try {
+          await ixcService.executarOS(parseInt(os.id_externo), {
+            id_tecnico_ixc: tecnicoIdIxc,
+            mensagem: 'Técnico em execução',
+          });
+          console.log('✅ OS marcada como EX no IXC');
+        } catch (exErr) {
+          console.warn('⚠️ Não foi possível marcar como EX, tentando fechar direto:', exErr.message);
+        }
+
+        // 9b. Finalizar OS no IXC
+        const mensagemFinal =
+          `Serviço finalizado via SeeNet\n\n` +
+          `PROBLEMA: ${dados.relato_problema || 'N/A'}\n` +
+          `SOLUÇÃO: ${dados.relato_solucao   || 'N/A'}\n` +
+          `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
+          `OBS: ${dados.observacoes || 'Nenhuma'}`;
+
+        await ixcService.finalizarOS(os.id_externo, {
+          mensagem_resposta: mensagemFinal,
+          id_tecnico_ixc: tecnicoIdIxc
         });
-        console.log('   ✅ PDF APR enviado ao IXC');
-      } catch (pdfError) {
-        console.error('   ❌ Erro ao enviar PDF APR:', pdfError.message);
+        console.log('✅ OS finalizada no IXC');
+
+        // 9c. Enviar fotos
+        if (fotosBase64.length > 0) {
+          console.log(`📤 Enviando ${fotosBase64.length} foto(s) para o IXC...`);
+          for (const foto of fotosBase64) {
+            try {
+              await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+                base64: foto.base64,
+                descricao: foto.descricao,
+                nome: `foto_${Date.now()}.jpg`,
+                ext: 'jpg'
+              });
+              console.log(`   ✅ ${foto.descricao} enviada`);
+            } catch (fotoError) {
+              console.error(`   ❌ Erro ao enviar ${foto.descricao}:`, fotoError.message);
+            }
+          }
+        }
+
+        // 9d. Enviar PDF do APR
+        if (pdfBuffer) {
+          console.log('📤 Enviando PDF do APR para o IXC...');
+          try {
+            await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+              buffer: pdfBuffer,
+              descricao: `APR - Análise Preliminar de Risco - OS ${os.numero_os}`,
+              nome: `APR_OS_${os.numero_os}.pdf`,
+              ext: 'pdf'
+            });
+            console.log('   ✅ PDF APR enviado ao IXC');
+          } catch (pdfError) {
+            console.error('   ❌ Erro ao enviar PDF APR:', pdfError.message);
+          }
+        }
+
+        // 9e. Enviar PDF da OS (Chamado Técnico)
+        if (pdfOSBuffer) {
+          console.log('📤 Enviando PDF da OS para o IXC...');
+          try {
+            await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+              buffer: pdfOSBuffer,
+              descricao: `Chamado Técnico - OS ${os.numero_os}`,
+              nome: `OS_${os.numero_os}_${Date.now()}.pdf`,
+              ext: 'pdf'
+            });
+            console.log('   ✅ PDF OS enviado ao IXC');
+          } catch (pdfOSError) {
+            console.error('   ❌ Erro ao enviar PDF OS:', pdfOSError.message);
+          }
+        }
+
+      } catch (ixcError) {
+        console.error('❌ Erro ao sincronizar com IXC:', ixcError.message);
+        // Não retorna erro — OS já foi finalizada no SeeNet
       }
     }
-  } catch (ixcError) {
-    console.error('❌ Erro ao sincronizar com IXC:', ixcError.message);
-    // Não retorna erro - OS foi finalizada no SeeNet
-  }
-}
 
     console.log(`✅ OS ${id} finalizada com sucesso`);
 
-    // ✅ NOTIFICAÇÃO: Avisar admin que OS foi finalizada
-        if (os.admin_responsavel_id) {
-          try {
-            const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
-            await notificationService.enviarParaUsuario(
-              db,
-              os.admin_responsavel_id,
-              '✅ OS Finalizada',
-              `${tecnico.nome} finalizou a OS #${os.numero_os} - ${os.cliente_nome}`,
-              { route: '/ordens-servico', tipo: 'os_finalizada', referencia_id: String(id) }
-            );
-          } catch (notifErr) {
-            console.warn('⚠️ Falha ao notificar admin:', notifErr.message);
-          }
-        }
+    // 10. Notificar admin
+    if (os.admin_responsavel_id) {
+      try {
+        const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
+        await notificationService.enviarParaUsuario(
+          db,
+          os.admin_responsavel_id,
+          '✅ OS Finalizada',
+          `${tecnico.nome} finalizou a OS #${os.numero_os} - ${os.cliente_nome}`,
+          { route: '/ordens-servico', tipo: 'os_finalizada', referencia_id: String(id) }
+        );
+      } catch (notifErr) {
+        console.warn('⚠️ Falha ao notificar admin:', notifErr.message);
+      }
+    }
 
     return res.json({
       success: true,
@@ -764,7 +739,7 @@ if (ixcService && os.id_externo) {
         numero_os: os.numero_os,
         status: 'finalizada',
         pdf_apr_gerado: pdfAprBase64 !== null,
-        pdf_ixc_baixado: false,
+        pdf_os_gerado: pdfOSBuffer !== null,
         fotos_enviadas: fotosBase64.length
       }
     });

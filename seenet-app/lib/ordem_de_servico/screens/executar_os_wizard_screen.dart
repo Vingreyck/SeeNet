@@ -61,7 +61,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     os = Get.arguments as OrdemServico;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final osAtualizada = controller.minhasOSs
+      final osAtualizada = controller.ordensServico
           .firstWhereOrNull((o) => o.id == os.id);
       if (osAtualizada != null && osAtualizada.status != os.status) {
         setState(() => os = osAtualizada);

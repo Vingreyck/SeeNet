@@ -60,6 +60,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     super.initState();
     os = Get.arguments as OrdemServico;
 
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final osAtualizada = controller.minhasOSs
+          .firstWhereOrNull((o) => o.id == os.id);
+      if (osAtualizada != null && osAtualizada.status != os.status) {
+        setState(() => os = osAtualizada);
+      }
+    });
+
     if (os.status == 'em_execucao') {
       osIniciada = true;
       _etapaAtual = 1;

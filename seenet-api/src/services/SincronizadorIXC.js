@@ -146,7 +146,7 @@ async sincronizarEmpresa(integracao) {
           .where('tenant_id', integracao.tenant_id)
           .where('tecnico_id', mapeamento.usuario_id)
           .where('origem', 'IXC')
-          .whereIn('status', ['pendente']) // Não cancelar as que estão em execução
+          .whereIn('status', ['pendente']) // em_deslocamento e em_execucao já protegidos acima
           .where(function() {
             if (idsExternosIXC.length > 0) {
               this.whereNotIn('id_externo', idsExternosIXC);
@@ -267,7 +267,10 @@ async sincronizarEmpresa(integracao) {
       };
 
       if (osExistente) {
-        if (osExistente.status !== 'concluida' && osExistente.status !== 'em_execucao') {
+        // CORRETO — protege os 3 status locais ativos:
+        const statusProtegidos = ['concluida', 'em_execucao', 'em_deslocamento'];
+
+        if (!statusProtegidos.includes(osExistente.status)) {
           await trx('ordem_servico')
             .where('id', osExistente.id)
             .update({

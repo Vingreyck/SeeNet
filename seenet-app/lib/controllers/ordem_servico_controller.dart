@@ -21,9 +21,21 @@ class OrdemServicoController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    carregarMinhasOSs();
+    carregarMinhasOSs().then((_) {
+      // Retomar tracking se tiver OS em deslocamento
+      final osAtiva = ordensServico.firstWhereOrNull(
+            (os) => os.status == 'em_deslocamento',
+      );
+      if (osAtiva != null) {
+        try {
+          final tracking = Get.find<TrackingService>();
+          tracking.iniciar(osAtiva.id);
+          print('🔄 Tracking retomado para OS ${osAtiva.numeroOs}');
+        } catch (_) {}
+      }
+    });
     carregarOSsConcluidas();
-    carregarAdmins(); // ✅ Carregar admins na inicialização
+    carregarAdmins();
   }
 
   // ✅ NOVO: Carregar lista de admins

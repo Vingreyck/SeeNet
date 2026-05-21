@@ -412,8 +412,18 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
               dividerColor: Colors.transparent,
               // Substitua os tabs por:
               tabs: [
-                Obx(() => _buildTab('Pendentes', controller.osPendentes.length)),
-                Obx(() => _buildTab('Em Campo',  controller.osEmExecucao.length)),
+                Tab(
+                  child: Obx(() {
+                    final count = controller.osPendentes.length;
+                    return Text(count > 0 ? 'Pendentes ($count)' : 'Pendentes');
+                  }),
+                ),
+                Tab(
+                  child: Obx(() {
+                    final count = controller.osEmExecucao.length;
+                    return Text(count > 0 ? 'Em Campo ($count)' : 'Em Campo');
+                  }),
+                ),
                 const Tab(text: 'Concluídas'),
               ],
             ),
@@ -443,7 +453,7 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
     );
   }
 
-  Widget _buildTab(String label, int count) {
+  Widget _buildTa(String label, int count) {
     return Tab(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

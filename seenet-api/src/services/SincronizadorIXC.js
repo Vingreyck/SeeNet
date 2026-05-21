@@ -253,7 +253,7 @@ async sincronizarEmpresa(integracao) {
           oper: '=', page: '1', rp: '1'
         });
         const resp = await ixcService.clientListar.post('/estrutura', params.toString());
-        nomeEstrutura = resp.data?.registros?.[0]?.estrutura || null;
+        nomeEstrutura = resp.data?.registros?.[0]?.descricao || null;
         if (nomeEstrutura) console.log(`   🏗️ Estrutura ${osIXC.id_estrutura} → "${nomeEstrutura}"`);
       } catch (_) {}
     }

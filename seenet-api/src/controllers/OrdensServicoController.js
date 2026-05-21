@@ -551,7 +551,7 @@ async finalizarExecucao(req, res) {
           if (ehPatrimonio) {
             await ixcService.adicionarComodatoOS({
               id_oss_chamado:              os.id_externo,
-              id_contrato:                 idContratoIxc,
+              id_contrato:                 String(idContratoIxc || ''),
               id_login:                    '',
               id_patrimonio:               String(item.id_patrimonio),
               id_produto:                  item.id_produto,
@@ -585,6 +585,7 @@ async finalizarExecucao(req, res) {
               pcomissao:                   '',
               pdesconto:                   '',
               vdesconto:                   '',
+              id_estrutura: os.tipo_os === 'E' ? (os.id_estrutura || '') : '',
             });
           } else {
             await ixcService.adicionarProdutoOS({
@@ -616,7 +617,7 @@ async finalizarExecucao(req, res) {
               id_saida:                    '',
               id_terceiro_oss:             '',
               id_su_oss_kit_equipamento:   '',
-              id_estrutura:                '',
+              id_estrutura: os.tipo_os === 'E' ? (os.id_estrutura || '') : '',
               id_pedido_os:                '',
             });
           }

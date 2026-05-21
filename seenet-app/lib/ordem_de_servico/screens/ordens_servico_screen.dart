@@ -389,45 +389,36 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
           ),
 
           // ── Tab bar custom ─────────────────────────────────
-          Obx(() => Container(
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.06)),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              indicator: BoxDecoration(
-                color: const Color(0xFF00FF88),
-                borderRadius: BorderRadius.circular(11),
+          Obx(() {
+            final p = controller.osPendentes.length;
+            final e = controller.osEmExecucao.length;
+            return Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withOpacity(0.06)),
               ),
-              labelColor: Colors.black,
-              unselectedLabelColor: Colors.white38,
-              labelStyle: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13),
-              unselectedLabelStyle:
-              const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
-              dividerColor: Colors.transparent,
-              // Substitua os tabs por:
-              tabs: [
-                Tab(
-                  child: Obx(() {
-                    final count = controller.osPendentes.length;
-                    return Text(count > 0 ? 'Pendentes ($count)' : 'Pendentes');
-                  }),
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  color: const Color(0xFF00FF88),
+                  borderRadius: BorderRadius.circular(11),
                 ),
-                Tab(
-                  child: Obx(() {
-                    final count = controller.osEmExecucao.length;
-                    return Text(count > 0 ? 'Em Campo ($count)' : 'Em Campo');
-                  }),
-                ),
-                const Tab(text: 'Concluídas'),
-              ],
-            ),
-          )),
+                labelColor: Colors.black,
+                unselectedLabelColor: Colors.white38,
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
+                dividerColor: Colors.transparent,
+                tabs: [
+                  Tab(text: p > 0 ? 'Pendentes ($p)' : 'Pendentes'),
+                  Tab(text: e > 0 ? 'Em Campo ($e)' : 'Em Campo'),
+                  const Tab(text: 'Concluídas'),
+                ],
+              ),
+            );
+          }),
 
           // ── Conteúdo ────────────────────────────────────────
           Expanded(

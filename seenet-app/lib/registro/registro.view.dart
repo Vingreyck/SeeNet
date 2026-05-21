@@ -16,7 +16,7 @@ class RegistrarView extends GetView<RegistroController> {
   late final RxBool _obscureConfirmPassword;
 
   static const List<Map<String, dynamic>> _almoxarifados = [
-    {'id': 108, 'nome': 'ITABAIANA'},
+    {'id': 1, 'nome': 'ITABAIANA'},
     {'id': 91,  'nome': 'CAPELA'},
     {'id': 71,  'nome': 'CAMPO DO BRITO'},
     {'id': 69,  'nome': 'MACAMBIRA'},

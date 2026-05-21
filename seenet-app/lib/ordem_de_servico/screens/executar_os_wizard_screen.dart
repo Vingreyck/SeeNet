@@ -104,13 +104,6 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       latitude = os.latitude;
       longitude = os.longitude;
     }
-
-    if (os.status == 'pendente') {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await controller.carregarAdmins();
-        if (mounted) await _selecionarAdmin();
-      });
-    }
   }
 
   @override

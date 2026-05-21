@@ -30,17 +30,13 @@ class OSCardWidget extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ✅ HEADER: Número da OS + Prioridade
+            // HEADER: Número da OS + Prioridade
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    Icon(
-                      os.iconeStatus,
-                      color: os.corPrioridade,
-                      size: 20,
-                    ),
+                    Icon(os.iconeStatus, color: os.corPrioridade, size: 20),
                     const SizedBox(width: 8),
                     Text(
                       'OS #${os.numeroOs}',
@@ -73,18 +69,21 @@ class OSCardWidget extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            // ✅ CLIENTE
-            // ✅ ASSUNTO (título principal) + CLIENTE (subtítulo)
+            // ASSUNTO + CLIENTE/ESTRUTURA
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.build_outlined, color: Colors.white70, size: 18),
+                    Icon(
+                      os.tipoOs == 'E' ? Icons.cell_tower : Icons.build_outlined,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        os.tipoServico.toUpperCase(), // ✅ nome do assunto do IXC
+                        os.tipoServico.toUpperCase(),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -99,25 +98,47 @@ class OSCardWidget extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.person_outline, color: Colors.white54, size: 16),
+                    Icon(
+                      os.tipoOs == 'E' ? Icons.router : Icons.person_outline,
+                      color: Colors.white54,
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        os.clienteNome, // ✅ cliente fica como subtítulo
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 13,
-                        ),
+                        os.tipoOs == 'E'
+                            ? (os.nomeEstrutura ?? 'Estrutura #${os.idEstrutura}')
+                            : os.clienteNome,
+                        style: const TextStyle(color: Colors.white60, fontSize: 13),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (os.tipoOs == 'E')
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.blueAccent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.blueAccent.withOpacity(0.5)),
+                        ),
+                        child: const Text(
+                          'ESTRUTURA',
+                          style: TextStyle(
+                            color: Colors.blueAccent,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ],
             ),
 
-            if (os.clienteEndereco != null) ...[
+            // ENDEREÇO
+            if (os.clienteEndereco != null && os.tipoOs != 'E') ...[
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -137,7 +158,7 @@ class OSCardWidget extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            // ✅ TIPO DE SERVIÇO E DATA
+            // BADGE TIPO + DATA
             Row(
               children: [
                 Flexible(
@@ -169,7 +190,7 @@ class OSCardWidget extends StatelessWidget {
               ],
             ),
 
-            // ✅ SE EM EXECUÇÃO, MOSTRAR TEMPO DECORRIDO
+            // TIMER EM EXECUÇÃO
             if (os.status == 'em_execucao' && os.dataInicio != null) ...[
               const SizedBox(height: 12),
               Container(
@@ -192,7 +213,7 @@ class OSCardWidget extends StatelessWidget {
               ),
             ],
 
-            // ✅ SE CONCLUÍDA, MOSTRAR DURAÇÃO
+            // DURAÇÃO CONCLUÍDA
             if (os.status == 'concluida' && os.dataInicio != null && os.dataFim != null) ...[
               const SizedBox(height: 12),
               Container(
@@ -221,17 +242,13 @@ class OSCardWidget extends StatelessWidget {
 
   String _calcularTempo(DateTime inicio) {
     final duracao = DateTime.now().difference(inicio);
-    if (duracao.inHours > 0) {
-      return '${duracao.inHours}h ${duracao.inMinutes % 60}min';
-    }
+    if (duracao.inHours > 0) return '${duracao.inHours}h ${duracao.inMinutes % 60}min';
     return '${duracao.inMinutes}min';
   }
 
   String _calcularDuracao(DateTime inicio, DateTime fim) {
     final duracao = fim.difference(inicio);
-    if (duracao.inHours > 0) {
-      return '${duracao.inHours}h ${duracao.inMinutes % 60}min';
-    }
+    if (duracao.inHours > 0) return '${duracao.inHours}h ${duracao.inMinutes % 60}min';
     return '${duracao.inMinutes}min';
   }
 }

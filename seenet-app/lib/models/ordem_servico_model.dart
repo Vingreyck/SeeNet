@@ -3,45 +3,41 @@ import 'package:flutter/material.dart';
 class OrdemServico {
   final String id;
   final String numeroOs;
-  final String origem; // 'IXC' ou 'SEENET'
-  final String? idExterno; // ID no IXC
+  final String origem;
+  final String? idExterno;
   final String empresaId;
   final String tecnicoId;
-  
-  // Dados do cliente
+  final String tipoOs;
+  final String? idEstrutura;
+  final String? nomeEstrutura;
+
   final String clienteNome;
   final String? clienteEndereco;
   final String? clienteTelefone;
-  
-  // Dados da OS
+
   final String tipoServico;
-  final String prioridade; // 'baixa', 'media', 'alta', 'urgente'
-  final String status; // 'pendente', 'em_execucao', 'concluida'
-  
-  // Dados da execução
+  final String prioridade;
+  final String status;
+
   final DateTime? dataAbertura;
   final DateTime? dataInicio;
   final DateTime? dataFim;
   final double? latitude;
   final double? longitude;
-  
-  // ONU (se aplicável)
+
   final String? onuModelo;
   final String? onuSerial;
   final String? onuStatus;
   final double? onuSinalOptico;
-  
-  // Relato/APR
+
   final String? relatoProblema;
   final String? relatoSolucao;
   final String? materiaisUtilizados;
   final String? observacoes;
-  
-  // Metadados
+
   final DateTime createdAt;
   final DateTime updatedAt;
-  
-  // Anexos (lista de URLs)
+
   final List<AnexoOS>? anexos;
 
   OrdemServico({
@@ -51,6 +47,9 @@ class OrdemServico {
     this.idExterno,
     required this.empresaId,
     required this.tecnicoId,
+    this.tipoOs = 'C',
+    this.idEstrutura,
+    this.nomeEstrutura,
     required this.clienteNome,
     this.clienteEndereco,
     this.clienteTelefone,
@@ -75,60 +74,63 @@ class OrdemServico {
     this.anexos,
   });
 
-factory OrdemServico.fromJson(Map<String, dynamic> json) {
-  return OrdemServico(
-    id: (json['id'] ?? 0).toString(),
-    numeroOs: json['numero_os']?.toString() ?? 
-              json['numero_os_ixc']?.toString() ?? 
-              'S/N',
-    origem: json['origem']?.toString() ?? 'SEENET',
-    idExterno: json['id_externo']?.toString(),
-    empresaId: (json['tenant_id'] ?? 0).toString(),
-    tecnicoId: (json['tecnico_id'] ?? 0).toString(),
-    clienteNome: json['cliente_nome']?.toString() ?? 'Cliente não identificado',
-    clienteEndereco: json['cliente_endereco']?.toString(),
-    clienteTelefone: json['cliente_telefone']?.toString(),
-    tipoServico: json['tipo_servico']?.toString() ?? 'Manutenção',
-    prioridade: json['prioridade']?.toString() ?? 'media',
-    status: json['status']?.toString() ?? 'pendente',
-    dataAbertura: json['data_abertura'] != null   // ✅ ADICIONAR!
-        ? DateTime.parse(json['data_abertura']) 
-        : null,
-    dataInicio: json['data_inicio'] != null 
-        ? DateTime.parse(json['data_inicio']) 
-        : null,
-    dataFim: json['data_conclusao'] != null 
-        ? DateTime.parse(json['data_conclusao']) 
-        : null,
-    latitude: json['latitude'] != null 
-        ? double.tryParse(json['latitude'].toString()) 
-        : null,
-    longitude: json['longitude'] != null 
-        ? double.tryParse(json['longitude'].toString()) 
-        : null,
-    onuModelo: json['onu_modelo']?.toString(),
-    onuSerial: json['onu_serial']?.toString(),
-    onuStatus: json['onu_status']?.toString(),
-    onuSinalOptico: json['onu_sinal_optico'] != null
-        ? double.tryParse(json['onu_sinal_optico'].toString())
-        : null,
-    relatoProblema: json['relato_problema']?.toString(),
-    relatoSolucao: json['relato_solucao']?.toString(),
-    materiaisUtilizados: json['materiais_utilizados']?.toString(),
-    observacoes: json['observacoes']?.toString(),
-    createdAt: json['data_criacao'] != null 
-        ? DateTime.parse(json['data_criacao'])
-        : DateTime.now(),
-    updatedAt: json['data_atualizacao'] != null 
-        ? DateTime.parse(json['data_atualizacao'])
-        : DateTime.now(),
-    anexos: json['anexos'] != null
-        ? (json['anexos'] as List)
-            .map((a) => AnexoOS.fromJson(a))
-            .toList()
-        : null,
-  );
-}
+  factory OrdemServico.fromJson(Map<String, dynamic> json) {
+    return OrdemServico(
+      id: (json['id'] ?? 0).toString(),
+      numeroOs: json['numero_os']?.toString() ??
+          json['numero_os_ixc']?.toString() ??
+          'S/N',
+      origem: json['origem']?.toString() ?? 'SEENET',
+      idExterno: json['id_externo']?.toString(),
+      empresaId: (json['tenant_id'] ?? 0).toString(),
+      tecnicoId: (json['tecnico_id'] ?? 0).toString(),
+      tipoOs: json['tipo_os']?.toString() ?? 'C',
+      idEstrutura: json['id_estrutura']?.toString(),
+      nomeEstrutura: json['nome_estrutura']?.toString(),
+      clienteNome: json['cliente_nome']?.toString() ?? 'Cliente não identificado',
+      clienteEndereco: json['cliente_endereco']?.toString(),
+      clienteTelefone: json['cliente_telefone']?.toString(),
+      tipoServico: json['tipo_servico']?.toString() ?? 'Manutenção',
+      prioridade: json['prioridade']?.toString() ?? 'media',
+      status: json['status']?.toString() ?? 'pendente',
+      dataAbertura: json['data_abertura'] != null
+          ? DateTime.parse(json['data_abertura'])
+          : null,
+      dataInicio: json['data_inicio'] != null
+          ? DateTime.parse(json['data_inicio'])
+          : null,
+      dataFim: json['data_conclusao'] != null
+          ? DateTime.parse(json['data_conclusao'])
+          : null,
+      latitude: json['latitude'] != null
+          ? double.tryParse(json['latitude'].toString())
+          : null,
+      longitude: json['longitude'] != null
+          ? double.tryParse(json['longitude'].toString())
+          : null,
+      onuModelo: json['onu_modelo']?.toString(),
+      onuSerial: json['onu_serial']?.toString(),
+      onuStatus: json['onu_status']?.toString(),
+      onuSinalOptico: json['onu_sinal_optico'] != null
+          ? double.tryParse(json['onu_sinal_optico'].toString())
+          : null,
+      relatoProblema: json['relato_problema']?.toString(),
+      relatoSolucao: json['relato_solucao']?.toString(),
+      materiaisUtilizados: json['materiais_utilizados']?.toString(),
+      observacoes: json['observacoes']?.toString(),
+      createdAt: json['data_criacao'] != null
+          ? DateTime.parse(json['data_criacao'])
+          : DateTime.now(),
+      updatedAt: json['data_atualizacao'] != null
+          ? DateTime.parse(json['data_atualizacao'])
+          : DateTime.now(),
+      anexos: json['anexos'] != null
+          ? (json['anexos'] as List)
+          .map((a) => AnexoOS.fromJson(a))
+          .toList()
+          : null,
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -138,6 +140,9 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
       'id_externo': idExterno,
       'empresa_id': empresaId,
       'tecnico_id': tecnicoId,
+      'tipo_os': tipoOs,
+      'id_estrutura': idEstrutura,
+      'nome_estrutura': nomeEstrutura,
       'cliente_nome': clienteNome,
       'cliente_endereco': clienteEndereco,
       'cliente_telefone': clienteTelefone,
@@ -163,33 +168,22 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
     };
   }
 
-  // Getter para cor da prioridade
   Color get corPrioridade {
     switch (prioridade) {
-      case 'urgente':
-        return const Color(0xFFFF0000);
-      case 'alta':
-        return const Color(0xFFFF6B00);
-      case 'media':
-        return const Color(0xFFFFB800);
-      case 'baixa':
-        return const Color(0xFF00FF88);
-      default:
-        return const Color(0xFF888888);
+      case 'urgente': return const Color(0xFFFF0000);
+      case 'alta':    return const Color(0xFFFF6B00);
+      case 'media':   return const Color(0xFFFFB800);
+      case 'baixa':   return const Color(0xFF00FF88);
+      default:        return const Color(0xFF888888);
     }
   }
 
-  // Getter para ícone do status
   IconData get iconeStatus {
     switch (status) {
-      case 'pendente':
-        return Icons.schedule;
-      case 'em_execucao':
-        return Icons.build;
-      case 'concluida':
-        return Icons.check_circle;
-      default:
-        return Icons.info;
+      case 'pendente':    return Icons.schedule;
+      case 'em_execucao': return Icons.build;
+      case 'concluida':   return Icons.check_circle;
+      default:            return Icons.info;
     }
   }
 }
@@ -197,7 +191,7 @@ factory OrdemServico.fromJson(Map<String, dynamic> json) {
 class AnexoOS {
   final String id;
   final String osId;
-  final String tipo; // 'roteador', 'local', 'onu', 'antes', 'depois'
+  final String tipo;
   final String urlArquivo;
   final DateTime createdAt;
 
@@ -206,18 +200,18 @@ class AnexoOS {
     required this.osId,
     required this.tipo,
     required this.urlArquivo,
-    required this.createdAt,  
+    required this.createdAt,
   });
 
-factory AnexoOS.fromJson(Map<String, dynamic> json) {
-  return AnexoOS(
-    id: (json['id'] ?? '').toString(), // ✅ CONVERTER
-    osId: (json['ordem_servico_id'] ?? '').toString(), // ✅ CONVERTER
-    tipo: json['tipo'] ?? 'local',
-    urlArquivo: json['url_arquivo'] ?? '',
-    createdAt: DateTime.parse(json['data_upload']),
-  );
-}
+  factory AnexoOS.fromJson(Map<String, dynamic> json) {
+    return AnexoOS(
+      id: (json['id'] ?? '').toString(),
+      osId: (json['ordem_servico_id'] ?? '').toString(),
+      tipo: json['tipo'] ?? 'local',
+      urlArquivo: json['url_arquivo'] ?? '',
+      createdAt: DateTime.parse(json['data_upload']),
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {

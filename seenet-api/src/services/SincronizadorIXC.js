@@ -244,6 +244,20 @@ async sincronizarEmpresa(integracao) {
       };
       const status = statusMap[osIXC.status] || 'pendente';
 
+    // Buscar nome da estrutura se OS for do tipo E
+    let nomeEstrutura = null;
+    if (osIXC.tipo === 'E' && osIXC.id_estrutura && osIXC.id_estrutura !== '0') {
+      try {
+        const params = new URLSearchParams({
+          qtype: 'estrutura.id', query: osIXC.id_estrutura,
+          oper: '=', page: '1', rp: '1'
+        });
+        const resp = await ixcService.clientListar.post('/estrutura', params.toString());
+        nomeEstrutura = resp.data?.registros?.[0]?.estrutura || null;
+        if (nomeEstrutura) console.log(`   🏗️ Estrutura ${osIXC.id_estrutura} → "${nomeEstrutura}"`);
+      } catch (_) {}
+    }
+
       const dadosOS = {
         numero_os: osIXC.protocolo || `IXC-${osIXC.id}`,
         origem: 'IXC',
@@ -263,6 +277,9 @@ async sincronizarEmpresa(integracao) {
         data_inicio: this.parseDataIXC(osIXC.data_inicio),
         data_conclusao: this.parseDataIXC(osIXC.data_final),
         dados_ixc: JSON.stringify(osIXC),
+        tipo_os: osIXC.tipo || 'C',
+        id_estrutura: (osIXC.id_estrutura && osIXC.id_estrutura !== '0') ? osIXC.id_estrutura : null,
+        nome_estrutura: nomeEstrutura,
         id_contrato_ixc: osIXC.id_contrato_kit?.toString() || osIXC.id_contrato?.toString() || '' // ✅ NOVO
       };
 
@@ -283,6 +300,9 @@ async sincronizarEmpresa(integracao) {
               data_agendamento: dadosOS.data_agendamento,
               dados_ixc: dadosOS.dados_ixc,
               id_contrato_ixc: dadosOS.id_contrato_ixc,
+              tipo_os: dadosOS.tipo_os,
+              id_estrutura: dadosOS.id_estrutura,
+              nome_estrutura: dadosOS.nome_estrutura,
               data_atualizacao: db.fn.now()
             });
         }

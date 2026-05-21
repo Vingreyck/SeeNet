@@ -411,10 +411,10 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
               const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
               dividerColor: Colors.transparent,
               // Substitua os tabs por:
-              tabs: const [
-                Tab(text: 'Pendentes'),
-                Tab(text: 'Em Campo'),
-                Tab(text: 'Concluídas'),
+              tabs: [
+                Obx(() => _buildTab('Pendentes', controller.osPendentes.length)),
+                Obx(() => _buildTab('Em Campo',  controller.osEmExecucao.length)),
+                const Tab(text: 'Concluídas'),
               ],
             ),
           )),

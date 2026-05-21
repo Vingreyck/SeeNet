@@ -66,6 +66,25 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       if (osAtualizada != null && osAtualizada.status != os.status) {
         setState(() => os = osAtualizada);
       }
+
+      // Se em execução, checar se APR foi preenchido
+      if (os.status == 'em_execucao') {
+        final aprOk = await controller.verificarAPR(os.id);
+        if (!aprOk && mounted) {
+          final resultado = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (_) => AprScreen(os: os)),
+          );
+          if (resultado == true && mounted) {
+            setState(() { _etapaAtual = 1; });
+          }
+        }
+      }
+
+      if (os.status == 'pendente') {
+        await controller.carregarAdmins();
+        if (mounted) await _selecionarAdmin();
+      }
     });
 
     if (os.status == 'em_execucao') {

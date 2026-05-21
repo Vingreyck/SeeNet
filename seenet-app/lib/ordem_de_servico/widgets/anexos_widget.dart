@@ -300,7 +300,7 @@ class _AnexosWidgetState extends State<AnexosWidget> {
     if (opcao == 'camera') {
       await _capturarFoto(ImageSource.camera);
     } else if (opcao == 'galeria') {
-      await _capturarFoto(ImageSource.gallery);
+      await _capturarMultiplasFotos();
     }
   }
 
@@ -354,6 +354,38 @@ class _AnexosWidgetState extends State<AnexosWidget> {
     );
   }
 
+  Future<void> _capturarMultiplasFotos() async {
+    try {
+      final List<XFile> fotos = await _picker.pickMultiImage(
+        imageQuality: 80,
+        maxWidth: 1920,
+        maxHeight: 1080,
+      );
+      if (fotos.isNotEmpty) {
+        setState(() {
+          for (final foto in fotos) {
+            _anexos.add(AnexoComDescricao(foto: foto));
+          }
+        });
+        widget.onAnexosAlterados(_anexos);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('📸 ${fotos.length} foto(s) adicionada(s)!'),
+            backgroundColor: const Color(0xFF00FF88),
+            duration: const Duration(seconds: 2),
+          ));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('❌ Erro ao capturar fotos: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
   Future<void> _capturarFoto(ImageSource source) async {
     try {
       final XFile? foto = await _picker.pickImage(
@@ -362,32 +394,23 @@ class _AnexosWidgetState extends State<AnexosWidget> {
         maxWidth: 1920,
         maxHeight: 1080,
       );
-
       if (foto != null) {
-        setState(() {
-          _anexos.add(AnexoComDescricao(foto: foto));
-        });
+        setState(() { _anexos.add(AnexoComDescricao(foto: foto)); });
         widget.onAnexosAlterados(_anexos);
-
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('📸 Foto adicionada! Não esqueça de adicionar a descrição.'),
-              backgroundColor: Color(0xFF00FF88),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('📸 Foto adicionada! Não esqueça de adicionar a descrição.'),
+            backgroundColor: Color(0xFF00FF88),
+            duration: Duration(seconds: 2),
+          ));
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Erro ao capturar foto: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('❌ Erro ao capturar foto: $e'),
+          backgroundColor: Colors.red,
+        ));
       }
     }
   }

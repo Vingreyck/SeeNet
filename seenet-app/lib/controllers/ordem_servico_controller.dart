@@ -151,6 +151,15 @@ class OrdemServicoController extends GetxController {
     }
   }
 
+  Future<bool> verificarAPR(String osId) async {
+    try {
+      return await _service.verificarAPR(osId);
+    } catch (e) {
+      print('⚠️ Erro ao verificar APR: $e');
+      return true; // em caso de erro não bloqueia
+    }
+  }
+
   List<OrdemServico> get osPendentes =>
       ordensServico.where((os) => os.status == 'pendente').toList();
 

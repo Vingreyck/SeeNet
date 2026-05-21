@@ -162,6 +162,23 @@ class OrdemServicoService {
     }
   }
 
+  Future<bool> verificarAPR(String osId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/apr/status/$osId'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['preenchido'] == true;
+      }
+      return true; // em caso de erro não bloqueia
+    } catch (e) {
+      print('⚠️ Erro ao verificar APR: $e');
+      return true;
+    }
+  }
+
   Future<bool> finalizarOS(String osId, Map<String, dynamic> dados) async {
     try {
       print('🏁 Finalizando OS $osId');

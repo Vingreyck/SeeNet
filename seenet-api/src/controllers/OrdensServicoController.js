@@ -548,44 +548,33 @@ async finalizarExecucao(req, res) {
           item.id_patrimonio !== '0');
 
         try {
-          if (ehPatrimonio) {
-            await ixcService.adicionarComodatoOS({
+          if (os.tipo_os === 'E') {
+            await ixcService.adicionarProdutoEstruturaOS({
               id_oss_chamado:              os.id_externo,
-              id_contrato:                 String(idContratoIxc || ''),
-              id_login:                    '',
-              id_patrimonio:               String(item.id_patrimonio),
               id_produto:                  item.id_produto,
               descricao:                   item.descricao || '',
+              qtde_saida:                  item.quantidade.toString(),
               data:                        dataFormatada,
               id_unidade:                  '1',
               id_almox:                    idAlmox.toString(),
-              filial_id:                   '1',
-              qtde_saida:                  item.quantidade.toString(),
-              valor_unitario:              parseFloat(item.valor_unitario) > 0 ? item.valor_unitario.toString() : '0.10',
-              valor_total:                 parseFloat(item.valor_total)    > 0 ? item.valor_total.toString()    : '0.10',
-              patrimonio:                  item.numero_serie || '',
-              mac:                         '',
-              numero_serie:                item.numero_serie || '',
-              numero_patrimonial:          item.numero_patrimonial || item.numero_serie || '',
-              garantia_oss:                '',
-              id_terceiro_oss:             '',
-              id_su_oss_kit_equipamento:   '',
               id_classificacao_tributaria: '1',
               tipo:                        'C',
               estoque:                     'S',
               unidade_sigla:               'UND',
-              fator_conversao:             '1',
-              tipo_produto:                '',
-              status_comodato:             'E',
-              status_patrimonio:           '',
-              ultima_situacao_patrimonio:  '',
-              id_pedido_os:                '',
+              fator_conversao:             '1.000000000',
+              valor_unitario:              item.valor_unitario.toFixed(2),
+              valor_total:                 item.valor_total.toFixed(2),
+              id_estrutura:                '',
               id_oss_mensagem:             '',
               id_saida:                    '',
+              id_su_oss_kit_equipamento:   '',
+              tipo_produto:                '',
+              saldo_produto:               '',
+              ultima_situacao_patrimonio:  '',
+              id_pedido_os:                '',
               pcomissao:                   '',
               pdesconto:                   '',
               vdesconto:                   '',
-              id_estrutura: os.tipo_os === 'E' ? (os.id_estrutura || '') : '',
             });
           } else {
             await ixcService.adicionarProdutoOS({

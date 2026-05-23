@@ -1,15 +1,12 @@
 // lib/services/tracking_service.dart
-import 'dart:async';
 import 'dart:convert';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
-/// Envia localização do técnico a cada 10s durante deslocamento.
-/// Inicia em "Iniciar Deslocamento", para em "Cheguei ao Local".
 class TrackingService extends GetxService {
-  Timer? _timer;
+  final _bgService = FlutterBackgroundService();
   String? _osId;
   final isTracking = false.obs;
 
@@ -24,66 +21,42 @@ class TrackingService extends GetxService {
     };
   }
 
-  /// Inicia envio de GPS a cada 10 segundos
-  void iniciar(String osId) {
-    if (_timer != null) parar(); // Garantir que não tem 2 timers
+  /// Inicia rastreamento GPS em background.
+  /// Continua funcionando mesmo com o app fechado.
+  Future<void> iniciar(String osId) async {
+    if (_osId != null) parar(); // Garante que não tem dois trackings simultâneos
 
     _osId = osId;
     isTracking.value = true;
 
-    print('📡 Tracking iniciado para OS $osId');
+    final auth = Get.find<AuthService>();
 
-    // Enviar imediatamente
-    _enviarLocalizacao();
+    await _bgService.startService();
 
-    // Depois a cada 10 segundos
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) {
-      _enviarLocalizacao();
+    _bgService.invoke('startTracking', {
+      'osId':       osId,
+      'token':      auth.token ?? '',
+      'tenantCode': auth.tenantCode ?? '',
     });
+
+    print('📡 Background tracking iniciado — OS $osId');
   }
 
-  /// Para o envio de GPS
+  /// Para o rastreamento e limpa a posição no backend.
   void parar() {
-    _timer?.cancel();
-    _timer = null;
-    isTracking.value = false;
-
     if (_osId != null) {
+      _bgService.invoke('stopTracking', {});
       _limparLocalizacao(_osId!);
-      print('📡 Tracking parado para OS $_osId');
+      print('📡 Tracking parado — OS $_osId');
     }
 
     _osId = null;
+    isTracking.value = false;
+
+    // Para o background service completamente
+    _bgService.invoke('stopService', {});
   }
 
-  /// Envia posição atual pro backend
-  Future<void> _enviarLocalizacao() async {
-    if (_osId == null) return;
-
-    try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      ).timeout(const Duration(seconds: 8));
-
-      await http.put(
-        Uri.parse('$baseUrl/ordens-servico/$_osId/location'),
-        headers: _headers,
-        body: json.encode({
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'velocidade': position.speed,
-          'precisao': position.accuracy,
-        }),
-      );
-
-      print('📍 GPS enviado: ${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}');
-    } catch (e) {
-      print('⚠️ Erro ao enviar GPS: $e');
-      // Não para o tracking por erro temporário (sem sinal, etc)
-    }
-  }
-
-  /// Limpa posição no backend ao chegar
   Future<void> _limparLocalizacao(String osId) async {
     try {
       await http.delete(

@@ -63,18 +63,25 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final osAtualizada = controller.ordensServico
           .firstWhereOrNull((o) => o.id == os.id);
-      if (osAtualizada != null && osAtualizada.status != os.status) {
-        setState(() => os = osAtualizada);
+      if (osAtualizada != null) {
+        setState(() {
+          os = osAtualizada;
+          // ✅ Sincroniza statusAtual com o status real do banco
+          if (os.status == 'em_deslocamento' && statusAtual == 'pendente') {
+            statusAtual = 'em_deslocamento';
+          } else if (os.status == 'em_execucao') {
+            statusAtual = 'em_execucao';
+            osIniciada = true;
+            _etapaAtual = 1;
+          }
+        });
       }
 
-      // Se em execução, checar se APR foi preenchido
       if (os.status == 'em_execucao') {
         final aprOk = await controller.verificarAPR(os.id);
         if (!aprOk && mounted) {
           final resultado = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(builder: (_) => AprScreen(os: os)),
-          );
+              context, MaterialPageRoute(builder: (_) => AprScreen(os: os)));
           if (resultado == true && mounted) {
             setState(() { _etapaAtual = 1; });
           }
@@ -418,7 +425,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!, adminId: adminSelecionadoId);
         }
         if (sucesso) {
-          setState(() { statusAtual = 'em_deslocamento'; osIniciada = false; });
+          // ✅ Atualiza os objeto local com dados frescos do controller
+          final osAtualizada = controller.ordensServico
+              .firstWhereOrNull((o) => o.id == os.id);
+          setState(() {
+            statusAtual = 'em_deslocamento';
+            osIniciada = false;
+            if (osAtualizada != null) os = osAtualizada;
+          });
           final tracking = Get.find<TrackingService>();
           tracking.iniciar(os.id);
           if (mounted) {

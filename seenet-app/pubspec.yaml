@@ -19,6 +19,7 @@ dependencies:
   connectivity_plus: ^6.0.3
   mobile_scanner: ^7.2.0
   firebase_messaging: ^15.2.5
+  flutter_background_service: ^5.0.5
   flutter_local_notifications: ^18.0.1
   signature: ^5.4.1
   get_storage: ^2.1.1

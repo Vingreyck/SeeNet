@@ -937,6 +937,20 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       } catch (_) { return 0; }
     }
 
+async adicionarProdutoEstruturaOS(dados) {
+  try {
+    console.log(`📦 Adicionando produto (estrutura) à OS ${dados.id_oss_chamado} no IXC...`);
+    const response = await this.clientAlterar.post('/su_oss_mov_produto_estrutura_consumo', dados);
+    if (response.data?.type === 'error') {
+      throw new Error(response.data.message || 'Erro ao adicionar produto estrutura');
+    }
+    console.log(`✅ Produto (estrutura) adicionado com sucesso`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Erro ao adicionar produto estrutura à OS no IXC:', error.message);
+    throw error;
+  }
+}
 
     async buscarAssunto(assuntoId) {
       try {

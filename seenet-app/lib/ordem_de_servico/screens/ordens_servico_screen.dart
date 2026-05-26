@@ -444,7 +444,7 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
     );
   }
 
-  Widget _buildTa(String label, int count) {
+  Widget _buildTab(String label, int count) {
     return Tab(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

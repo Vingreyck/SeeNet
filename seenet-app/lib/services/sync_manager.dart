@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'package:get/get.dart';
 import '../database/local_database.dart';
 import '../services/ordem_servico_service.dart';
+import '../services/api_service.dart';
 
 class SyncManager extends GetxService {
   final RxInt pendentes = 0.obs;
   bool _rodando = false;
+  final ApiService _api = ApiService.instance;
 
   @override
   void onInit() {
@@ -57,6 +59,13 @@ class SyncManager extends GetxService {
                 (payload['longitude'] as num).toDouble(),
               );
               break;
+            case 'SALVAR_APR':
+              await _api.post('/apr/respostas', {
+                'os_id': int.tryParse(payload['os_id'] as String) ?? payload['os_id'],
+                'respostas': payload['respostas'],
+                'epis_selecionados': payload['epis_selecionados'],
+              });
+              break;
           }
 
           await LocalDatabase.marcarSincronizado(id);
@@ -100,6 +109,21 @@ class SyncManager extends GetxService {
     await LocalDatabase.enfileirar(
       'CHEGAR_LOCAL',
       json.encode({'os_id': osId, 'latitude': lat, 'longitude': lng}),
+    );
+    await _atualizarContador();
+  }
+
+  Future<void> enfileirarSalvarAPR(
+      String osId,
+      List<Map<String, dynamic>> respostas,
+      List<int> episSelecionados) async {
+    await LocalDatabase.enfileirar(
+      'SALVAR_APR',
+      json.encode({
+        'os_id': osId,
+        'respostas': respostas,
+        'epis_selecionados': episSelecionados,
+      }),
     );
     await _atualizarContador();
   }

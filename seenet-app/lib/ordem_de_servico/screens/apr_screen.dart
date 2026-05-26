@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../services/api_service.dart';
 import '../../models/ordem_servico_model.dart';
+import 'package:get_storage/get_storage.dart';
+import '../../services/connectivity_service.dart';
+import '../../services/sync_manager.dart';
 
 // ── Modelos (inalterados) ────────────────────────────────────────
 
@@ -100,6 +103,8 @@ class _AprScreenState extends State<AprScreen> {
     try {
       final resp = await _api.get('/apr/checklist');
       if (resp['success'] == true) {
+        // ✅ Salva cache para uso offline
+        GetStorage().write('apr_checklist_cache', resp['data']);
         final lista = (resp['data'] as List)
             .map((c) => CategoriaApr.fromJson(c)).toList();
         for (final cat in lista) {
@@ -111,13 +116,39 @@ class _AprScreenState extends State<AprScreen> {
         }
         setState(() { _categorias = lista; _carregando = false; });
       } else {
-        setState(() {
-          _erro = resp['error'] ?? 'Erro ao carregar checklist';
-          _carregando = false;
-        });
+        _carregarDoCache();
       }
     } catch (e) {
-      setState(() { _erro = 'Erro de conexão: $e'; _carregando = false; });
+      _carregarDoCache();
+    }
+  }
+
+  void _carregarDoCache() {
+    final cache = GetStorage().read<List>('apr_checklist_cache');
+    if (cache != null) {
+      final lista = cache
+          .map((c) => CategoriaApr.fromJson(Map<String, dynamic>.from(c)))
+          .toList();
+      for (final cat in lista) {
+        for (final perg in cat.perguntas) {
+          if (perg.tipoResposta == 'texto')
+            _respostasTexto[perg.id] = TextEditingController();
+          _justificativas[perg.id] = TextEditingController();
+        }
+      }
+      if (mounted) {
+        setState(() { _categorias = lista; _carregando = false; });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('📶 Sem conexão — usando checklist salvo'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
+        ));
+      }
+    } else {
+      if (mounted) setState(() {
+        _erro = 'Sem conexão e sem checklist em cache.\nConecte-se à internet ao menos uma vez.';
+        _carregando = false;
+      });
     }
   }
 
@@ -159,6 +190,44 @@ class _AprScreenState extends State<AprScreen> {
     if (!_validarFormulario()) return;
     setState(() => _salvando = true);
     try {
+      // ✅ Offline: enfileira localmente
+      final connectivity = Get.find<ConnectivityService>();
+      if (connectivity.offline) {
+        final List<Map<String, dynamic>> respostasOffline = [];
+        for (final cat in _categorias) {
+          for (final perg in cat.perguntas) {
+            if (perg.tipoResposta == 'sim_nao') {
+              respostasOffline.add({
+                'pergunta_id': perg.id,
+                'resposta': _respostasSN[perg.id] ?? '',
+                'justificativa': _justificativas[perg.id]?.text.trim(),
+              });
+            } else if (perg.tipoResposta == 'multipla_escolha') {
+              respostasOffline.add({
+                'pergunta_id': perg.id,
+                'resposta': _episSelecionados.join(','),
+                'justificativa': null,
+              });
+            } else if (perg.tipoResposta == 'texto') {
+              respostasOffline.add({
+                'pergunta_id': perg.id,
+                'resposta': _respostasTexto[perg.id]?.text.trim() ?? '',
+                'justificativa': null,
+              });
+            }
+          }
+        }
+        await Get.find<SyncManager>().enfileirarSalvarAPR(
+            os.id.toString(), respostasOffline, _episSelecionados.toList());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('📥 APR salvo localmente — será enviado quando voltar o sinal'),
+            backgroundColor: Colors.orange,
+          ));
+          Navigator.pop(context, true);
+        }
+        return;
+      }
       final List<Map<String, dynamic>> respostas = [];
       for (final cat in _categorias) {
         for (final perg in cat.perguntas) {

@@ -472,30 +472,29 @@ async finalizarExecucao(req, res) {
       }));
     }
 
-    // 5. Gerar PDF do APR (opcional)
-    let pdfBuffer = null;
-    let pdfAprBase64 = null;
-    try {
-      const AprPdfService = require('../services/AprPdfService');
-      pdfBuffer = await AprPdfService.gerarPdfApr(id, tenantId);
-      pdfAprBase64 = pdfBuffer.toString('base64');
-      console.log(`✅ PDF APR gerado (${pdfBuffer.length} bytes)`);
-    } catch (aprError) {
-      console.warn('⚠️ Erro ao gerar PDF APR:', aprError.message);
-    }
+    // 5+6. Gerar PDFs em paralelo
+    console.log('📄 Gerando PDFs em paralelo...');
+    const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
 
-    // 6. Gerar PDF da OS (Chamado Técnico)
-    let pdfOSBuffer = null;
-    try {
-      const OSPdfService = require('../services/OSPdfService');
-      const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
-      pdfOSBuffer = await OSPdfService.gerarPdfOSDireto(
-        os, dados, tecnico?.nome || 'Técnico', tenantId
-      );
-      console.log(`✅ PDF OS gerado (${pdfOSBuffer.length} bytes)`);
-    } catch (osPdfError) {
-      console.warn('⚠️ Erro ao gerar PDF OS:', osPdfError.message);
-    }
+    const [aprResult, osResult] = await Promise.allSettled([
+      (async () => {
+        const AprPdfService = require('../services/AprPdfService');
+        return await AprPdfService.gerarPdfApr(id, tenantId);
+      })(),
+      (async () => {
+        const OSPdfService = require('../services/OSPdfService');
+        return await OSPdfService.gerarPdfOSDireto(os, dados, tecnico?.nome || 'Técnico', tenantId);
+      })(),
+    ]);
+
+    let pdfBuffer    = aprResult.status === 'fulfilled' ? aprResult.value : null;
+    let pdfAprBase64 = pdfBuffer ? pdfBuffer.toString('base64') : null;
+    if (pdfBuffer)   console.log(`✅ PDF APR gerado (${pdfBuffer.length} bytes)`);
+    else             console.warn('⚠️ Erro ao gerar PDF APR:', aprResult.reason?.message);
+
+    let pdfOSBuffer = osResult.status === 'fulfilled' ? osResult.value : null;
+    if (pdfOSBuffer) console.log(`✅ PDF OS gerado (${pdfOSBuffer.length} bytes)`);
+    else             console.warn('⚠️ Erro ao gerar PDF OS:', osResult.reason?.message);
 
     // 7. Conectar ao IXC
     console.log('🔄 Preparando sincronização com IXC...');
@@ -647,63 +646,49 @@ async finalizarExecucao(req, res) {
         });
         console.log('✅ OS finalizada no IXC');
 
-        // 9c. Enviar fotos
-        if (fotosBase64.length > 0) {
-          console.log(`📤 Enviando ${fotosBase64.length} foto(s) para o IXC...`);
-          for (const foto of fotosBase64) {
-            try {
-              await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
-                base64: foto.base64,
-                descricao: foto.descricao,
-                nome: `foto_${Date.now()}.jpg`,
-                ext: 'jpg'
-              });
-              console.log(`   ✅ ${foto.descricao} enviada`);
-            } catch (fotoError) {
-              console.error(`   ❌ Erro ao enviar ${foto.descricao}:`, fotoError.message);
-            }
-          }
+        // 9c+9d+9e. Uploads em paralelo
+        const uploads = [];
+
+        for (const foto of fotosBase64) {
+          uploads.push(
+            ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+              base64: foto.base64,
+              descricao: foto.descricao,
+              nome: `foto_${Date.now()}.jpg`,
+              ext: 'jpg'
+            }).then(() => console.log(`   ✅ ${foto.descricao} enviada`))
+              .catch(e  => console.error(`   ❌ ${foto.descricao}:`, e.message))
+          );
         }
 
-        // 9d. Enviar PDF do APR
         if (pdfBuffer) {
-          console.log('📤 Enviando PDF do APR para o IXC...');
-          try {
-            await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+          uploads.push(
+            ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
               buffer: pdfBuffer,
               descricao: `APR - Análise Preliminar de Risco - OS ${os.numero_os}`,
               nome: `APR_OS_${os.numero_os}.pdf`,
               ext: 'pdf'
-            });
-            console.log('   ✅ PDF APR enviado ao IXC');
-          } catch (pdfError) {
-            console.error('   ❌ Erro ao enviar PDF APR:', pdfError.message);
-          }
+            }).then(() => console.log('   ✅ PDF APR enviado'))
+              .catch(e  => console.error('   ❌ PDF APR:', e.message))
+          );
         }
 
-        // 9e. Enviar PDF da OS (Chamado Técnico)
         if (pdfOSBuffer) {
-          console.log('📤 Enviando PDF da OS para o IXC...');
-          try {
-            await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+          uploads.push(
+            ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
               buffer: pdfOSBuffer,
               descricao: `Chamado Técnico - OS ${os.numero_os}`,
               nome: `OS_${os.numero_os}_${Date.now()}.pdf`,
               ext: 'pdf'
-            });
-            console.log('   ✅ PDF OS enviado ao IXC');
-          } catch (pdfOSError) {
-            console.error('   ❌ Erro ao enviar PDF OS:', pdfOSError.message);
-          }
+            }).then(() => console.log('   ✅ PDF OS enviado'))
+              .catch(e  => console.error('   ❌ PDF OS:', e.message))
+          );
         }
 
-      } catch (ixcError) {
-        console.error('❌ Erro ao sincronizar com IXC:', ixcError.message);
-        // Não retorna erro — OS já foi finalizada no SeeNet
-      }
-    }
-
-    console.log(`✅ OS ${id} finalizada com sucesso`);
+        if (uploads.length > 0) {
+          console.log(`📤 Enviando ${uploads.length} arquivo(s) em paralelo...`);
+          await Promise.allSettled(uploads);
+        }
 
     // 10. Notificar admin
     if (os.admin_responsavel_id) {

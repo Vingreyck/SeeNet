@@ -40,7 +40,12 @@ const dbConfig = {
   seeds: {
     directory: path.join(__dirname, '../seeds')
   },
-  pool: { min: 0, max: 7 },
+  pool: {
+    min: 2,
+    max: 15,
+    acquireTimeoutMillis: 30000,
+    idleTimeoutMillis: 600000,
+  },
   acquireConnectionTimeout: 60000,
 };
 

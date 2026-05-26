@@ -686,12 +686,17 @@ async finalizarExecucao(req, res) {
         }
 
         if (uploads.length > 0) {
-          console.log(`📤 Enviando ${uploads.length} arquivo(s) em paralelo...`);
-          await Promise.allSettled(uploads);
-        }
+                  console.log(`📤 Enviando ${uploads.length} arquivo(s) em paralelo...`);
+                  await Promise.allSettled(uploads);
+                }
 
-    // 10. Notificar admin
-    if (os.admin_responsavel_id) {
+              } catch (ixcError) {
+                console.error('❌ Erro ao sincronizar com IXC:', ixcError.message);
+              }
+            }
+
+            // 10. Notificar admin
+            if (os.admin_responsavel_id) {
       try {
         const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
         await notificationService.enviarParaUsuario(

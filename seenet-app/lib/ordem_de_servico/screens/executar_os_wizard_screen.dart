@@ -11,11 +11,13 @@ import '../../controllers/ordem_servico_controller.dart';
 import '../../models/ordem_servico_model.dart';
 import '../widgets/localizacao_widget.dart';
 import '../widgets/qr_scanner_widget.dart';
+import 'package:get_storage/get_storage.dart';
 import '../widgets/anexos_widget.dart';
 import '../widgets/historico_endereco_widget.dart';
 import '../widgets/materiais_estoque_widget.dart';
 import '../widgets/assinatura_widget.dart';
 import '../widgets/campo_com_voz.dart';
+import 'dart:async';
 import 'apr_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -76,6 +78,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           }
         });
       }
+      _restaurarProgresso();
 
       if (os.status == 'em_execucao') {
         final aprOk = await controller.verificarAPR(os.id);
@@ -375,12 +378,65 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     );
   }
 
+  // ✅ Salvar progresso do wizard no GetStorage
+  void _salvarProgresso() {
+    if (_etapaAtual == 0) return; // Não salva etapa de localização
+    GetStorage().write('wizard_progress_${os.id}', {
+      'etapa':         _etapaAtual,
+      'statusAtual':   statusAtual,
+      'adminId':       adminSelecionadoId,
+      'adminNome':     adminSelecionadoNome,
+      'onuModelo':     onuModeloController.text,
+      'onuSerial':     onuSerialController.text,
+      'onuStatus':     onuStatusController.text,
+      'onuSinal':      onuSinalController.text,
+      'relatoProblema': relatoProblemaController.text,
+      'relatoSolucao':  relatoSolucaoController.text,
+      'materiais':     materiaisController.text,
+      'observacoes':   observacoesController.text,
+    });
+  }
+
+  // ✅ Restaurar progresso salvo
+  void _restaurarProgresso() {
+    final dados = GetStorage().read<Map>('wizard_progress_${os.id}');
+    if (dados == null) return;
+    if (os.status != 'em_execucao' && os.status != 'em_deslocamento') return;
+
+    setState(() {
+      final etapa = dados['etapa'] as int? ?? 0;
+      if (etapa > 0) _etapaAtual = etapa;
+
+      onuModeloController.text     = dados['onuModelo']     ?? '';
+      onuSerialController.text     = dados['onuSerial']     ?? '';
+      onuStatusController.text     = dados['onuStatus']     ?? '';
+      onuSinalController.text      = dados['onuSinal']      ?? '';
+      relatoProblemaController.text = dados['relatoProblema'] ?? '';
+      relatoSolucaoController.text  = dados['relatoSolucao']  ?? '';
+      materiaisController.text     = dados['materiais']     ?? '';
+      observacoesController.text   = dados['observacoes']   ?? '';
+
+      if (dados['adminId'] != null) {
+        adminSelecionadoId   = dados['adminId']   as int?;
+        adminSelecionadoNome = dados['adminNome'] as String?;
+      }
+    });
+
+    print('✅ Progresso do wizard restaurado — etapa ${_etapaAtual + 1}');
+  }
+
+  // ✅ Limpar progresso ao finalizar com sucesso
+  void _limparProgresso() {
+    GetStorage().remove('wizard_progress_${os.id}');
+  }
+
   void _proximaEtapa() {
     if (_isLoading) return;
     if (!_validarEtapaAtual()) return;
     if (_etapaAtual == 0 && !osIniciada) { _iniciarOS(); return; }
     if (_etapaAtual == _totalEtapas - 1) { _finalizarOS(); return; }
     setState(() => _etapaAtual++);
+    _salvarProgresso(); // ✅ Salva após cada avanço de etapa
   }
 
   bool _validarEtapaAtual() {
@@ -609,28 +665,39 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       ),
     );
     if (confirmar != true) return;
+
     setState(() => _isLoading = true);
+
+    // ✅ Mostrar dialog de progresso
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const _FinalizacaoProgressDialog(),
+      );
+    }
+
     try {
       final dados = {
         'latitude': latitude, 'longitude': longitude,
-        'onu_modelo': onuModeloController.text.trim(),
-        'onu_serial': onuSerialController.text.trim(),
-        'onu_status': onuStatusController.text.trim(),
+        'onu_modelo':    onuModeloController.text.trim(),
+        'onu_serial':    onuSerialController.text.trim(),
+        'onu_status':    onuStatusController.text.trim(),
         'onu_sinal_optico': onuSinalController.text.trim().isNotEmpty
             ? double.tryParse(onuSinalController.text.trim()) : null,
         'relato_problema': relatoProblemaController.text.trim(),
-        'relato_solucao': relatoSolucaoController.text.trim(),
+        'relato_solucao':  relatoSolucaoController.text.trim(),
         'materiais_utilizados': materiaisController.text.trim(),
         'itens_estoque': itensEstoque.map((item) => {
-          'id_produto': item.produto.id,
-          'descricao': item.produto.descricao,
-          'quantidade': item.quantidade,
-          'valor_unitario': item.valorUnitario,
-          'valor_total': item.valorTotal,
-          'id_patrimonio': item.patrimonio?.id ?? '0',
-          'numero_serie': item.patrimonio?.serial ?? '',
-          'numero_patrimonial': item.patrimonio?.numeroPatrimonial ?? '',
-          'tipo_produto': item.isPatrimonio ? 'P' : 'O',
+          'id_produto':          item.produto.id,
+          'descricao':           item.produto.descricao,
+          'quantidade':          item.quantidade,
+          'valor_unitario':      item.valorUnitario,
+          'valor_total':         item.valorTotal,
+          'id_patrimonio':       item.patrimonio?.id ?? '0',
+          'numero_serie':        item.patrimonio?.serial ?? '',
+          'numero_patrimonial':  item.patrimonio?.numeroPatrimonial ?? '',
+          'tipo_produto':        item.isPatrimonio ? 'P' : 'O',
         }).toList(),
         'observacoes': observacoesController.text.trim(),
         'fotos': fotosAnexadas.map((anexo) => {
@@ -638,8 +705,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
         }).toList(),
         'assinatura': base64Encode(assinaturaBytes!),
       };
+
       final connectivity = Get.find<ConnectivityService>();
       bool sucesso;
+
       if (connectivity.offline) {
         final sync = Get.find<SyncManager>();
         await sync.enfileirarFinalizarOS(os.id, dados);
@@ -647,7 +716,12 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
       } else {
         sucesso = await controller.finalizarExecucao(os.id, dados);
       }
+
+      // ✅ Fechar dialog de progresso
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+
       if (sucesso && mounted) {
+        _limparProgresso(); // ✅ Limpar progresso salvo
         final msg = connectivity.offline
             ? '📥 OS salva localmente — será enviada quando voltar o sinal'
             : '✓ OS finalizada com sucesso!';
@@ -661,6 +735,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
           content: Text('Erro ao finalizar OS'), backgroundColor: Colors.red,
         ));
       }
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1026,6 +1104,103 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
                     fontWeight: FontWeight.w500)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FinalizacaoProgressDialog extends StatefulWidget {
+  const _FinalizacaoProgressDialog();
+
+  @override
+  State<_FinalizacaoProgressDialog> createState() =>
+      _FinalizacaoProgressDialogState();
+}
+
+class _FinalizacaoProgressDialogState
+    extends State<_FinalizacaoProgressDialog> {
+  int _stepAtual = 0;
+  Timer? _timer;
+
+  static const _steps = [
+    (Icons.save_rounded,       '💾 Salvando dados...'),
+    (Icons.picture_as_pdf,     '📄 Gerando PDF APR...'),
+    (Icons.picture_as_pdf,     '📄 Gerando PDF OS...'),
+    (Icons.cloud_upload_rounded,'🔗 Conectando ao IXC...'),
+    (Icons.inventory_2_rounded, '📦 Enviando materiais...'),
+    (Icons.check_rounded,       '✅ Finalizando OS...'),
+    (Icons.photo_camera_rounded,'📸 Enviando fotos e PDFs...'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Avança um passo a cada ~3.5s (total ~24s para 7 etapas)
+    _timer = Timer.periodic(const Duration(milliseconds: 3500), (t) {
+      if (!mounted) { t.cancel(); return; }
+      if (_stepAtual < _steps.length - 1) {
+        setState(() => _stepAtual++);
+      } else {
+        t.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 52, height: 52,
+              child: CircularProgressIndicator(
+                  color: Color(0xFF00FF88), strokeWidth: 3),
+            ),
+            const SizedBox(height: 18),
+            const Text('Finalizando OS',
+                style: TextStyle(color: Colors.white, fontSize: 18,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            const Text('Aguarde, isso pode levar alguns segundos...',
+                style: TextStyle(color: Colors.white38, fontSize: 12),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            ...List.generate(_steps.length, (i) {
+              final done    = i < _stepAtual;
+              final current = i == _stepAtual;
+              final cor = done
+                  ? const Color(0xFF00FF88)
+                  : current ? Colors.orange : Colors.white24;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 9),
+                child: Row(children: [
+                  Icon(
+                    done
+                        ? Icons.check_circle_rounded
+                        : current
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off_rounded,
+                    color: cor, size: 17,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(_steps[i].$2,
+                      style: TextStyle(color: cor, fontSize: 13)),
+                ]),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }

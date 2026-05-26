@@ -186,7 +186,10 @@ try {
     }
 
     // ========== ROTAS PROTEGIDAS (COM AUTENTICAÇÃO) ==========
-    
+
+    const notifRoutes = require('./routes/notificacoes.routes');
+    app.use('/api/notificacoes', notifRoutes);
+
     try {
       const checkmarksRoutes = require('./routes/checkmark');
       app.use('/api/checkmark', require('./routes/checkmark'));
@@ -1371,9 +1374,3 @@ process.on('unhandledRejection', (reason) => {
 startServer();
 
 module.exports = app;
-
-try {
-  const resultado = JSON.parse("texto invalido");
-} catch (error) {
-  console.log("erro: " + error.message);
-}

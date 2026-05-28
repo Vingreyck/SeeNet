@@ -450,6 +450,13 @@ if (user.tipo_usuario === 'tecnico') {
         const funcionarios = resp.data.registros || [];
         console.log(`🔍 ${funcionarios.length} funcionários carregados do IXC`);
 
+        console.log('🔍 IXC /funcionario resposta:', {
+          total: resp.data.total,
+          registros: resp.data.registros?.length,
+          mensagem: resp.data.mensagem,
+          raw: JSON.stringify(resp.data).substring(0, 300)
+        });
+
         // DEPOIS — colocar isso:
         const resultado = encontrarMelhorMatch(user.nome, funcionarios);
 

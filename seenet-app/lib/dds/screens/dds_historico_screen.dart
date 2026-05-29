@@ -41,7 +41,7 @@ class _DdsHistoricoScreenState extends State<DdsHistoricoScreen> {
       final api = Get.find<ApiService>();
       if (kIsWeb) {
         final url = ApiConfig.getUrl(
-            '/api/dds/historico/pdf?ano=$_anoSelecionado&token=${api.token}');
+            '/api/dds/historico/pdf?ano=$_anoSelecionado&token=${api.token}&tenant=${api.tenantCode}');
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
         return;
       }
@@ -311,7 +311,7 @@ class _DdsHistoricoScreenState extends State<DdsHistoricoScreen> {
       final api = Get.find<ApiService>();
       if (kIsWeb) {
         final url = ApiConfig.getUrl(
-            '/api/dds/sessao/$sessaoId/pdf?token=${api.token}');
+            '/api/dds/sessao/$sessaoId/pdf?token=${api.token}&tenant=${api.tenantCode}');
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
         return;
       }

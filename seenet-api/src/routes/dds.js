@@ -350,6 +350,10 @@ router.put('/sessao/:id/encerrar', authMiddleware, async (req, res) => {
 router.get('/historico/pdf', (req, res, next) => {
   if (!req.headers.authorization && req.query.token) {
     req.headers.authorization = `Bearer ${req.query.token}`;
+    try {
+      const decoded = require('jsonwebtoken').decode(req.query.token);
+      if (decoded?.tenantCode) req.headers['x-tenant-code'] = decoded.tenantCode;
+    } catch (_) {}
   }
   next();
 }, authMiddleware, async (req, res) => {
@@ -400,6 +404,10 @@ router.get('/historico/pdf', (req, res, next) => {
 router.get('/sessao/:id/pdf', (req, res, next) => {
   if (!req.headers.authorization && req.query.token) {
     req.headers.authorization = `Bearer ${req.query.token}`;
+    try {
+      const decoded = require('jsonwebtoken').decode(req.query.token);
+      if (decoded?.tenantCode) req.headers['x-tenant-code'] = decoded.tenantCode;
+    } catch (_) {}
   }
   next();
 }, authMiddleware, async (req, res) => {

@@ -201,7 +201,7 @@ router.post('/register', [
           const axios = require('axios');
           try {
             const resp = await axios.post(
-              `${integracao.url_api}/funcionario`,
+              `${integracao.url_api}/funcionarios`,
               new URLSearchParams({
                 qtype: 'funcionarios.id', query: '1', oper: '>=',
                 page: '1', rp: '200', sortname: 'funcionarios.id', sortorder: 'desc'
@@ -432,7 +432,7 @@ if (user.tipo_usuario === 'tecnico') {
         const axios = require('axios');
         // COLOCAR:
         const resp = await axios.post(
-          `${integracao.url_api}/funcionario`,
+          `${integracao.url_api}/funcionarios`,
           new URLSearchParams({
             qtype: 'funcionarios.id', query: '1', oper: '>=',
             page: '1', rp: '200', sortname: 'funcionarios.id', sortorder: 'desc'

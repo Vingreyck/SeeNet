@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import '../controllers/dds_controller.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/dds_service.dart';
 import '../../services/api_service.dart';
 import '../../config/api_config.dart';
@@ -36,20 +37,24 @@ class _DdsHistoricoScreenState extends State<DdsHistoricoScreen> {
 
   // ── PDF histórico anual ────────────────────────────────────
   Future<void> _gerarPdfHistorico() async {
-    Get.snackbar('Gerando...', 'Aguarde o PDF do histórico.',
-        backgroundColor: const Color(0xFF2A2A2A),
-        colorText: Colors.white,
-        duration: const Duration(seconds: 10));
-
     try {
       final api = Get.find<ApiService>();
+      if (kIsWeb) {
+        final url = ApiConfig.getUrl(
+            '/api/dds/historico/pdf?ano=$_anoSelecionado&token=${api.token}');
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        return;
+      }
+      Get.snackbar('Gerando...', 'Aguarde o PDF do histórico.',
+          backgroundColor: const Color(0xFF2A2A2A),
+          colorText: Colors.white,
+          duration: const Duration(seconds: 10));
       final url = ApiConfig.getUrl('/api/dds/historico/pdf?ano=$_anoSelecionado');
       final response = await http.get(
         Uri.parse(url),
         headers: ApiConfig.getAuthHeaders(api.token!, api.tenantCode!),
       );
-
-      if (response.statusCode == 200 && !kIsWeb) {
+      if (response.statusCode == 200) {
         final bytes = response.bodyBytes;
         final dir = await getTemporaryDirectory();
         final file = File('${dir.path}/DDS_$_anoSelecionado.pdf');
@@ -304,18 +309,21 @@ class _DdsHistoricoScreenState extends State<DdsHistoricoScreen> {
   Future<void> _gerarPdfSessao(int sessaoId) async {
     try {
       final api = Get.find<ApiService>();
-      final url =
-      ApiConfig.getUrl('/api/dds/sessao/$sessaoId/pdf');
+      if (kIsWeb) {
+        final url = ApiConfig.getUrl(
+            '/api/dds/sessao/$sessaoId/pdf?token=${api.token}');
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        return;
+      }
+      final url = ApiConfig.getUrl('/api/dds/sessao/$sessaoId/pdf');
       final response = await http.get(
         Uri.parse(url),
         headers: ApiConfig.getAuthHeaders(api.token!, api.tenantCode!),
       );
-
-      if (response.statusCode == 200 && !kIsWeb) {
+      if (response.statusCode == 200) {
         final bytes = response.bodyBytes;
         final dir = await getTemporaryDirectory();
-        final file =
-        File('${dir.path}/DDS_Sessao_$sessaoId.pdf');
+        final file = File('${dir.path}/DDS_Sessao_$sessaoId.pdf');
         await file.writeAsBytes(bytes);
         await Share.shareXFiles(
           [XFile(file.path, mimeType: 'application/pdf')],

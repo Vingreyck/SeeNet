@@ -212,7 +212,7 @@ router.post('/register', [
                   'Content-Type': 'application/x-www-form-urlencoded',
                   'ixcsoft': 'listar'
                 },
-                timeout: 10000
+                timeout: 5000
               }
             );
             const funcionarios = resp.data.registros || [];
@@ -443,7 +443,7 @@ if (user.tipo_usuario === 'tecnico') {
               'Content-Type': 'application/x-www-form-urlencoded',
               'ixcsoft': 'listar'
             },
-            timeout: 10000
+            timeout: 5000
           }
         );
 

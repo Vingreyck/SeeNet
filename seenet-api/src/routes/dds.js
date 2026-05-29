@@ -347,7 +347,12 @@ router.put('/sessao/:id/encerrar', authMiddleware, async (req, res) => {
 // ================================================================
 // PDF — HISTÓRICO ANUAL
 // ================================================================
-router.get('/historico/pdf', authMiddleware, async (req, res) => {
+router.get('/historico/pdf', (req, res, next) => {
+  if (!req.headers.authorization && req.query.token) {
+    req.headers.authorization = `Bearer ${req.query.token}`;
+  }
+  next();
+}, authMiddleware, async (req, res) => {
   try {
     if (!isGestorOuAdmin(req.user.tipo_usuario))
       return res.status(403).json({ error: 'Sem permissão' });
@@ -392,7 +397,12 @@ router.get('/historico/pdf', authMiddleware, async (req, res) => {
 // ================================================================
 // PDF — SESSÃO INDIVIDUAL
 // ================================================================
-router.get('/sessao/:id/pdf', authMiddleware, async (req, res) => {
+router.get('/sessao/:id/pdf', (req, res, next) => {
+  if (!req.headers.authorization && req.query.token) {
+    req.headers.authorization = `Bearer ${req.query.token}`;
+  }
+  next();
+}, authMiddleware, async (req, res) => {
   try {
     if (!isGestorOuAdmin(req.user.tipo_usuario))
       return res.status(403).json({ error: 'Sem permissão' });

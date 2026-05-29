@@ -911,7 +911,8 @@ if (dados.fotos && dados.fotos.length > 0) {
               .where('tenant_id', tenantId)
               .where('ativo', true)
               .where('tipo_usuario', 'administrador')
-              .whereNot('id', req.user.id)  // ← ADICIONAR
+              .whereNot('id', req.user.id)
+              .where('visivel_como_responsavel', true)
               .select('id', 'nome', 'email', 'foto_perfil')
               .orderBy('nome');
 

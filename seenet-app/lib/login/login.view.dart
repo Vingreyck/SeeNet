@@ -2,6 +2,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'widgets/logarbutton.widget.dart';
@@ -16,6 +17,49 @@ class LoginView extends GetView<LoginController> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Disclosure localização — aparece só na primeira vez
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final jaViu = GetStorage().read<bool>('disclosure_location_visto') ?? false;
+      if (!jaViu && context.mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(children: [
+              Icon(Icons.location_on_rounded, color: Color(0xFF00FF88)),
+              SizedBox(width: 8),
+              Text('Acesso à localização',
+                  style: TextStyle(color: Colors.white, fontSize: 16)),
+            ]),
+            content: const Text(
+              'O SeeNet rastreia sua localização em tempo real durante o '
+                  'deslocamento até o cliente, mesmo com a tela desligada.\n\n'
+                  'Isso permite que o gestor acompanhe sua posição no mapa ao vivo.\n\n'
+                  'A localização é coletada somente durante ordens de serviço ativas.',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  GetStorage().write('disclosure_location_visto', true);
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00FF88),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Entendi',
+                    style: TextStyle(
+                        color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
+    });
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,

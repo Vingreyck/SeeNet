@@ -453,7 +453,7 @@ class _DetalhesDdsSheet extends StatelessWidget {
   }
 
   Widget _buildParticipanteCard(Map<String, dynamic> p) {
-    final sig = p['assinatura_base64'] as String?;
+    final imgBase64 = (p['foto_base64'] ?? p['assinatura_base64']) as String?;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -461,15 +461,28 @@ class _DetalhesDdsSheet extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF2A2A2A),
         borderRadius: BorderRadius.circular(12),
-        border:
-        Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 18,
-            backgroundColor: Color(0xFF00FF88),
-            child: Icon(Icons.person, color: Colors.black, size: 18),
+          // Foto ou avatar genérico
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: imgBase64 != null
+                ? Builder(builder: (_) {
+              try {
+                final clean = imgBase64.replaceFirst(
+                    RegExp(r'^data:image/\w+;base64,'), '');
+                return Image.memory(
+                  base64Decode(clean),
+                  width: 40, height: 40,
+                  fit: BoxFit.cover,
+                );
+              } catch (_) {
+                return _avatarGenerico();
+              }
+            })
+                : _avatarGenerico(),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -479,31 +492,16 @@ class _DetalhesDdsSheet extends StatelessWidget {
                     fontSize: 14,
                     fontWeight: FontWeight.w500)),
           ),
-          if (sig != null)
-            Builder(builder: (_) {
-              try {
-                final clean = sig.replaceFirst(
-                    RegExp(r'^data:image/\w+;base64,'), '');
-                return Container(
-                  width: 80,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.memory(base64Decode(clean),
-                        fit: BoxFit.contain),
-                  ),
-                );
-              } catch (_) {
-                return const Icon(Icons.draw,
-                    color: Color(0xFF00FF88), size: 20);
-              }
-            }),
         ],
       ),
+    );
+  }
+
+  Widget _avatarGenerico() {
+    return Container(
+      width: 40, height: 40,
+      color: const Color(0xFF00FF88),
+      child: const Icon(Icons.person, color: Colors.black, size: 20),
     );
   }
 }

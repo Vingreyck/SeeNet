@@ -132,6 +132,27 @@ class NotificationService {
       return 0;
     }
   }
+
+  async enviarParaTodos(db, tenantId, titulo, corpo, data = {}) {
+    try {
+      const usuarios = await db('usuarios')
+        .where('tenant_id', tenantId)
+        .where('ativo', true)
+        .whereNotNull('fcm_token')
+        .select('id', 'fcm_token', 'nome');
+
+      let enviados = 0;
+      for (const usuario of usuarios) {
+        const ok = await this.enviarPush(usuario.fcm_token, titulo, corpo, data);
+        if (ok) enviados++;
+      }
+      console.log(`📤 Push DDS: ${enviados}/${usuarios.length} usuários notificados`);
+      return enviados;
+    } catch (error) {
+      console.error('❌ Erro ao enviar para todos:', error.message);
+      return 0;
+    }
+  }
 }
 
 module.exports = new NotificationService();

@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { db } = require('../config/database');
+const notificationService = require('../services/NotificationService');
 const authMiddleware = require('../middleware/auth');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
@@ -143,6 +144,16 @@ router.post('/sessao', authMiddleware, async (req, res) => {
     }).returning('*');
 
     console.log(`✅ DDS criado: "${tema}" — expira em ${minutos}min`);
+    try {
+      await notificationService.enviarParaTodos(
+        db, req.user.tenant_id,
+        '🦺 DDS Iniciado!',
+        `Tema: ${tema.trim()} — Abra o app para registrar sua presença.`,
+        { route: '/checklist', tipo: 'dds_novo', referencia_id: String(sessao.id) }
+      );
+    } catch (notifErr) {
+      console.warn('⚠️ Falha ao notificar usuários do DDS:', notifErr.message);
+    }
     res.status(201).json({
       success: true, message: 'DDS aberto com sucesso!',
       sessao: {
@@ -197,8 +208,9 @@ router.get('/sessao/ativa', authMiddleware, async (req, res) => {
 router.post('/sessao/:id/assinar', authMiddleware, async (req, res) => {
   try {
     const sessaoId = parseInt(req.params.id);
-    const { assinatura_base64 } = req.body;
-    if (!assinatura_base64) return res.status(400).json({ error: 'Assinatura obrigatória' });
+    const { foto_base64, assinatura_base64 } = req.body;
+    if (!foto_base64 && !assinatura_base64)
+      return res.status(400).json({ error: 'Foto de validação obrigatória' });
 
     await expirarSessoesAntigas();
     const sessao = await db('dds_sessoes')
@@ -211,8 +223,11 @@ router.post('/sessao/:id/assinar', authMiddleware, async (req, res) => {
     if (existe) return res.status(400).json({ error: 'Você já assinou neste DDS' });
 
     await db('dds_assinaturas').insert({
-      dds_sessao_id: sessaoId, usuario_id: req.user.id,
-      assinatura_base64, assinado_em: new Date(),
+      dds_sessao_id: sessaoId,
+      usuario_id: req.user.id,
+      foto_base64: foto_base64 || null,
+      assinatura_base64: assinatura_base64 || null,
+      assinado_em: new Date(),
     });
 
     console.log(`✅ DDS ${sessaoId} — assinatura de ${req.user.nome || req.user.id}`);
@@ -273,7 +288,7 @@ router.get('/sessao/:id/participantes', authMiddleware, async (req, res) => {
     const participantes = await db('dds_assinaturas as a')
       .join('usuarios as u', 'u.id', 'a.usuario_id')
       .where('a.dds_sessao_id', sessaoId)
-      .select('u.id', 'u.nome', 'u.tipo_usuario', 'a.assinatura_base64', 'a.assinado_em')
+      .select('u.id', 'u.nome', 'u.tipo_usuario', 'a.assinatura_base64', 'a.foto_base64', 'a.assinado_em')
       .orderBy('a.assinado_em', 'asc');
 
     res.json({ sessao, participantes });
@@ -670,9 +685,10 @@ async function gerarPdfSessaoDDS(sessao, participantes, config) {
         doc.text(hora, colHora.x + 2, y + (rH - 9) / 2, { width: colHora.w, align: 'center' });
 
         // Assinatura centralizada na célula
-        if (p.assinatura_base64) {
+        const imgBase64 = p.foto_base64 || p.assinatura_base64;
+        if (imgBase64) {
           try {
-            const sigClean = p.assinatura_base64.replace(/^data:image\/\w+;base64,/, '');
+            const sigClean = imgBase64.replace(/^data:image\/\w+;base64,/, '');
             const sigBuf = Buffer.from(sigClean, 'base64');
             imagemCentralizada(doc, sigBuf, colSig.x, y, colSig.w, rH);
           } catch (_) {}

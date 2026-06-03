@@ -1316,8 +1316,10 @@ process.on('uncaughtException', (error) => {
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('💥 UNHANDLED REJECTION:', reason);
-  process.exit(1);
+  // Não derrubar o processo: uma promise rejeitada isolada (ex.: falha de
+  // notificação ou do IXC) não deve matar todas as requisições em andamento.
+  // Apenas registramos para investigação.
+  console.error('💥 UNHANDLED REJECTION (processo mantido vivo):', reason);
 });
 
 startServer();

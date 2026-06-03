@@ -1,4 +1,10 @@
-const bcrypt = require('bcryptjs');
+// bcrypt nativo com fallback automático para bcryptjs (hashes interoperáveis).
+let bcrypt;
+try {
+  bcrypt = require('bcrypt');
+} catch (_) {
+  bcrypt = require('bcryptjs');
+}
 
 exports.seed = async function(knex) {
   // Verificar se já existem dados

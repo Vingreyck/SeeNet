@@ -1,5 +1,14 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
+// bcrypt nativo (não bloqueia o event loop — roda no threadpool do libuv).
+// Fallback automático para bcryptjs se o módulo nativo não carregar no ambiente
+// de deploy. Os hashes são interoperáveis entre as duas libs, então senhas já
+// cadastradas continuam validando normalmente.
+let bcrypt;
+try {
+  bcrypt = require('bcrypt');
+} catch (_) {
+  bcrypt = require('bcryptjs');
+}
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
@@ -160,7 +169,7 @@ router.post('/register', [
     console.log('✅ Limite de usuários OK:', userCount.total, '/', maxUsers);
 
     // Hash da senha
-    const senhaHash = await bcrypt.hash(senha, 12);
+    const senhaHash = await bcrypt.hash(senha, 10);
     console.log('✅ Senha hasheada');
 
     // ✅ CORREÇÃO: Remover data_criacao (usar default do banco)
@@ -418,6 +427,10 @@ router.post('/login', loginLimiter, [
     );
 
 if (user.tipo_usuario === 'tecnico') {
+  // Auto-mapeamento IXC roda em BACKGROUND: não bloqueia a resposta do login.
+  // É best-effort e idempotente (protegido pela verificação de existência abaixo).
+  // O servidor é persistente (Railway), então conclui mesmo após o res.json().
+  (async () => {
   try {
     const jaExiste = await db('mapeamento_tecnicos_ixc')
       .where({ usuario_id: user.id, tenant_id: user.tenant_id })
@@ -479,6 +492,7 @@ if (user.tipo_usuario === 'tecnico') {
   } catch (e) {
     console.error('⚠️ Erro no auto-mapeamento:', e.message);
   }
+  })();
 }
 
     // Log de auditoria
@@ -653,7 +667,7 @@ router.put('/usuarios/:id', [
     
     // Se senha fornecida, fazer hash
     if (senha) {
-      updateData.senha = await bcrypt.hash(senha, 12);
+      updateData.senha = await bcrypt.hash(senha, 10);
     }
 
     await db('usuarios').where('id', id).update(updateData);
@@ -693,7 +707,7 @@ router.put('/usuarios/:id/resetar-senha', [
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    const senhaHash = await bcrypt.hash(nova_senha, 12);
+    const senhaHash = await bcrypt.hash(nova_senha, 10);
     
     await db('usuarios').where('id', id).update({
       senha: senhaHash,
@@ -909,5 +923,50 @@ router.put('/fcm-token', authMiddleware, async (req, res) => {
   }
 });
 
+// ========== CHECAGEM READ-ONLY: DUPLICADOS (pré-índice único) ==========
+// Só faz SELECT. Use para saber, ANTES de criar índices únicos, se a migração
+// quebraria. Se "pode_criar_indices" = true em ambos, é seguro criar os índices.
+//   curl https://SEU_HOST/api/auth/debug/check-duplicados
+router.get('/debug/check-duplicados', async (req, res) => {
+  try {
+    // Duplicados de usuários por (tenant_id, nome)
+    const usuariosDup = await db('usuarios')
+      .select('tenant_id', 'nome')
+      .count('id as qtd')
+      .groupBy('tenant_id', 'nome')
+      .havingRaw('count(id) > 1')
+      .orderByRaw('count(id) desc');
+
+    // Duplicados de mapeamento por (usuario_id, tenant_id) — tabela pode não existir
+    let mapeamentoDup = [];
+    let mapeamentoErro = null;
+    try {
+      mapeamentoDup = await db('mapeamento_tecnicos_ixc')
+        .select('usuario_id', 'tenant_id')
+        .count('id as qtd')
+        .groupBy('usuario_id', 'tenant_id')
+        .havingRaw('count(id) > 1')
+        .orderByRaw('count(id) desc');
+    } catch (e) {
+      mapeamentoErro = e.message;
+    }
+
+    res.json({
+      usuarios: {
+        grupos_duplicados: usuariosDup.length,
+        pode_criar_indice_unico: usuariosDup.length === 0,
+        detalhes: usuariosDup,
+      },
+      mapeamento_tecnicos_ixc: {
+        grupos_duplicados: mapeamentoDup.length,
+        pode_criar_indice_unico: mapeamentoErro ? null : mapeamentoDup.length === 0,
+        erro: mapeamentoErro,
+        detalhes: mapeamentoDup,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 module.exports = router;

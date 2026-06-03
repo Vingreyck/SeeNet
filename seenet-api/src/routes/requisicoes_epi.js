@@ -649,6 +649,18 @@ router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
     if (requisicao.status !== 'pendente')
       return res.status(400).json({ error: `Requisição já está com status: ${requisicao.status}` });
 
+    // TRAVA ANTI-DUPLO-CLIQUE: tira a requisição de 'pendente' de forma atômica.
+    // Só UMA chamada consegue fazer isso; uma 2ª chamada simultânea afeta 0 linhas
+    // e é recusada — evitando criar a requisição no IXC e baixar o estoque em dobro.
+    const travou = await db('requisicoes_epi')
+      .where('id', req.params.id)
+      .where('status', 'pendente')
+      .update({ status: 'aguardando_confirmacao' });
+
+    if (travou === 0) {
+      return res.status(409).json({ error: 'Esta requisição já está sendo aprovada.' });
+    }
+
     const { observacao, data_entrega, itens_ixc = [], devolucoes = [] } = req.body;
 
     // ── Integração IXC ─────────────────────────────────────────
@@ -662,7 +674,11 @@ router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
           const IXCService = require('../services/IXCService');
           const ixc = new IXCService(integracao.url_api, integracao.token_api);
           const mapeamento = await db('mapeamento_tecnicos_ixc').where('usuario_id', requisicao.tecnico_id).where('tenant_id', req.user.tenant_id).first();
-          if (!mapeamento) return res.status(400).json({ error: 'Técnico sem almoxarifado mapeado no IXC.' });
+          if (!mapeamento) {
+            // Aborta a aprovação: desfaz a trava, voltando o status para 'pendente'.
+            await db('requisicoes_epi').where('id', req.params.id).update({ status: 'pendente' });
+            return res.status(400).json({ error: 'Técnico sem almoxarifado mapeado no IXC.' });
+          }
 
           const { id: reqIxcId } = await ixc.criarRequisicaoMaterial({
             id_filial: integracao.id_filial || '1', id_almoxarifado: mapeamento.id_almoxarifado.toString(),

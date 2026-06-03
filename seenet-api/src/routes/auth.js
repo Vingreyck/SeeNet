@@ -273,6 +273,12 @@ router.post('/register', [
     });
 
   } catch (error) {
+    // Índice único (tenant_id, nome): se duas requisições simultâneas tentarem
+    // registrar o mesmo nome, o banco rejeita a segunda (código 23505).
+    // Retornamos a mensagem amigável em vez de 500.
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'Este nome já está cadastrado nesta empresa' });
+    }
     console.error('❌ ERRO CRÍTICO NO REGISTRO:', error);
     console.error('Stack trace:', error.stack);
     console.error('Detalhes do erro:', {

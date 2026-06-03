@@ -42,7 +42,11 @@ const dbConfig = {
   },
   pool: {
     min: 2,
-    max: 15,
+    // max 25: processo único no Railway = 1 pool só. max_connections do
+    // Postgres é 100, então sobra folga grande (~70) para sessões psql,
+    // sync do IXC e o reserved do superusuário. Ajuda no pico de 50 usuários
+    // (principalmente nas finalizações de OS, que são pesadas).
+    max: 25,
     acquireTimeoutMillis: 30000,
     idleTimeoutMillis: 600000,
   },

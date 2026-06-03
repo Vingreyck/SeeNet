@@ -188,16 +188,18 @@ async deslocarParaOS(req, res) {
         data_atualizacao: db.fn.now()
       });
 
-    // Sincronizar com IXC
+    await trx.commit();
+
+    // Sincronizar com IXC FORA da transação: o HTTP ao IXC não deve segurar a
+    // conexão do pool aberta durante a chamada externa. A falha do IXC já não
+    // causava rollback antes (continua sendo best-effort).
     if (os.origem === 'IXC' && os.id_externo) {
       try {
-        await this.sincronizarDeslocamentoComIXC(trx, os, { latitude, longitude });
+        await this.sincronizarDeslocamentoComIXC(db, os, { latitude, longitude });
       } catch (error) {
         console.error('⚠️ Erro ao sincronizar com IXC:', error.message);
       }
     }
-
-    await trx.commit();
 
     console.log(`✅ OS ${os.numero_os} - Técnico em deslocamento`);
 
@@ -219,7 +221,7 @@ async deslocarParaOS(req, res) {
 
     return res.json({ success: true, message: 'Deslocamento iniciado com sucesso' });
   } catch (error) {
-    await trx.rollback();
+    try { await trx.rollback(); } catch (_) {}
     console.error('❌ Erro ao iniciar deslocamento:', error);
     return res.status(500).json({ success: false, error: 'Erro ao iniciar deslocamento' });
   }
@@ -331,16 +333,18 @@ async chegarAoLocal(req, res) {
         data_atualizacao: db.fn.now()
       });
 
-    // Sincronizar com IXC
+    await trx.commit();
+
+    // Sincronizar com IXC FORA da transação: o HTTP ao IXC não deve segurar a
+    // conexão do pool aberta durante a chamada externa. A falha do IXC já não
+    // causava rollback antes (continua sendo best-effort).
     if (os.origem === 'IXC' && os.id_externo) {
       try {
-        await this.sincronizarExecucaoComIXC(trx, os, { latitude, longitude });
+        await this.sincronizarExecucaoComIXC(db, os, { latitude, longitude });
       } catch (error) {
         console.error('⚠️ Erro ao sincronizar execução com IXC:', error.message);
       }
     }
-
-    await trx.commit();
 
         // ✅ NOTIFICAÇÃO: Avisar admin que técnico chegou
         if (os.admin_responsavel_id) {
@@ -365,7 +369,7 @@ async chegarAoLocal(req, res) {
       message: 'Execução iniciada com sucesso'
     });
   } catch (error) {
-    await trx.rollback();
+    try { await trx.rollback(); } catch (_) {}
     console.error('❌ Erro ao iniciar execução:', error);
     return res.status(500).json({ success: false, error: 'Erro ao iniciar execução' });
   }

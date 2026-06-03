@@ -108,6 +108,82 @@ class NotificationService {
   }
 
   /**
+   * Envia o MESMO push para VÁRIOS usuários de uma vez (em lote), usando o
+   * multicast do FCM (sendEachForMulticast). Muito mais rápido que enviar um a
+   * um: 50 pessoas saem em 1 chamada em vez de 50 sequenciais.
+   * Também limpa do banco os tokens que o FCM reportar como definitivamente
+   * inválidos (celular trocado / app desinstalado).
+   *
+   * @param usuarios lista já filtrada, cada item com { id, fcm_token }
+   * @returns quantidade de pushes entregues com sucesso
+   */
+  async _enviarEmMassa(db, usuarios, titulo, corpo, data = {}) {
+    if (!this._initialized) {
+      console.warn('⚠️ Firebase não inicializado — push não enviado');
+      return 0;
+    }
+
+    const alvos = (usuarios || []).filter(u => u.fcm_token);
+    if (alvos.length === 0) return 0;
+
+    const dataStr = {
+      ...Object.fromEntries(
+        Object.entries(data).map(([k, v]) => [k, String(v)])
+      ),
+      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+    };
+    const android = {
+      priority: 'high',
+      notification: {
+        channelId: 'seenet_notifications',
+        priority: 'high',
+        defaultSound: true,
+      },
+    };
+
+    let enviados = 0;
+    const idsTokenInvalido = [];
+
+    // FCM aceita até 500 tokens por chamada — fatiamos por segurança.
+    for (let i = 0; i < alvos.length; i += 500) {
+      const lote = alvos.slice(i, i + 500);
+      try {
+        const resp = await admin.messaging().sendEachForMulticast({
+          tokens: lote.map(u => u.fcm_token),
+          notification: { title: titulo, body: corpo },
+          data: dataStr,
+          android,
+        });
+        enviados += resp.successCount;
+        resp.responses.forEach((r, idx) => {
+          if (!r.success) {
+            const code = r.error?.code;
+            if (code === 'messaging/registration-token-not-registered' ||
+                code === 'messaging/invalid-registration-token' ||
+                code === 'messaging/invalid-argument') {
+              idsTokenInvalido.push(lote[idx].id);
+            }
+          }
+        });
+      } catch (error) {
+        console.error('❌ Erro ao enviar push em massa:', error.message);
+      }
+    }
+
+    // Limpeza best-effort dos tokens inválidos (não trava o envio se falhar).
+    if (idsTokenInvalido.length > 0) {
+      try {
+        await db('usuarios').whereIn('id', idsTokenInvalido).update({ fcm_token: null });
+        console.log(`🧹 ${idsTokenInvalido.length} token(s) FCM inválido(s) limpo(s)`);
+      } catch (e) {
+        console.warn('⚠️ Falha ao limpar tokens inválidos:', e.message);
+      }
+    }
+
+    return enviados;
+  }
+
+  /**
    * Envia push APENAS para gestores de segurança (NÃO inclui administradores)
    */
   async enviarParaGestores(db, tenantId, titulo, corpo, data = {}) {
@@ -119,12 +195,7 @@ class NotificationService {
         .whereNotNull('fcm_token')
         .select('id', 'fcm_token', 'nome');
 
-      let enviados = 0;
-      for (const gestor of gestores) {
-        const ok = await this.enviarPush(gestor.fcm_token, titulo, corpo, data);
-        if (ok) enviados++;
-      }
-
+      const enviados = await this._enviarEmMassa(db, gestores, titulo, corpo, data);
       console.log(`📤 Push enviado para ${enviados}/${gestores.length} gestores de segurança`);
       return enviados;
     } catch (error) {
@@ -141,11 +212,7 @@ class NotificationService {
         .whereNotNull('fcm_token')
         .select('id', 'fcm_token', 'nome');
 
-      let enviados = 0;
-      for (const usuario of usuarios) {
-        const ok = await this.enviarPush(usuario.fcm_token, titulo, corpo, data);
-        if (ok) enviados++;
-      }
+      const enviados = await this._enviarEmMassa(db, usuarios, titulo, corpo, data);
       console.log(`📤 Push DDS: ${enviados}/${usuarios.length} usuários notificados`);
       return enviados;
     } catch (error) {

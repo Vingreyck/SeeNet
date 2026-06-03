@@ -164,6 +164,7 @@ async deslocarParaOS(req, res) {
       .where('id', id)
       .where('tenant_id', tenantId)
       .where('tecnico_id', userId)
+      .forUpdate() // trava a linha: 2 ações simultâneas na MESMA OS não passam juntas
       .first();
 
     if (!os) {
@@ -310,6 +311,7 @@ async chegarAoLocal(req, res) {
       .where('id', id)
       .where('tenant_id', tenantId)
       .where('tecnico_id', userId)
+      .forUpdate() // trava a linha: 2 ações simultâneas na MESMA OS não passam juntas
       .first();
 
     if (!os) {
@@ -499,6 +501,28 @@ async finalizarExecucao(req, res) {
     let pdfOSBuffer = osResult.status === 'fulfilled' ? osResult.value : null;
     if (pdfOSBuffer) console.log(`✅ PDF OS gerado (${pdfOSBuffer.length} bytes)`);
     else             console.warn('⚠️ Erro ao gerar PDF OS:', osResult.reason?.message);
+
+    // ✅ RESPONDER AO TÉCNICO AGORA: a OS já está salva como 'concluida' no banco
+    // e os PDFs já foram gerados. O técnico não precisa esperar a sincronização
+    // com o IXC (que é a parte lenta e cujo resultado não vai nesta resposta).
+    res.json({
+      success: true,
+      message: 'OS finalizada com sucesso',
+      data: {
+        os_id: id,
+        numero_os: os.numero_os,
+        status: 'finalizada',
+        pdf_apr_gerado: pdfAprBase64 !== null,
+        pdf_os_gerado: pdfOSBuffer !== null,
+        fotos_enviadas: fotosBase64.length
+      }
+    });
+
+    // ── A PARTIR DAQUI, RODA EM SEGUNDO PLANO (não trava o técnico) ──────────
+    // Falhas do IXC aqui já eram silenciosas antes (capturadas e logadas), então
+    // o que o técnico vê não muda — ele só para de esperar.
+    (async () => {
+     try {
 
     // 7. Conectar ao IXC
     console.log('🔄 Preparando sincronização com IXC...');
@@ -715,18 +739,10 @@ async finalizarExecucao(req, res) {
       }
     }
 
-    return res.json({
-      success: true,
-      message: 'OS finalizada com sucesso',
-      data: {
-        os_id: id,
-        numero_os: os.numero_os,
-        status: 'finalizada',
-        pdf_apr_gerado: pdfAprBase64 !== null,
-        pdf_os_gerado: pdfOSBuffer !== null,
-        fotos_enviadas: fotosBase64.length
-      }
-    });
+     } catch (bgErr) {
+       console.error('❌ Erro na sincronização em background da OS:', bgErr.message);
+     }
+    })();
 
   } catch (error) {
     console.error('❌ Erro ao finalizar OS:', error);

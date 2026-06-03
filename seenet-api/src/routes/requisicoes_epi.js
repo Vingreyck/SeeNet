@@ -878,7 +878,7 @@ router.put('/requisicoes/:id/devolucoes', authMiddleware, async (req, res) => {
     const { devolucoes } = req.body;
     await db('requisicoes_epi').where('id', req.params.id).where('tenant_id', req.user.tenant_id)
       .update({ devolucoes: devolucoes ? JSON.stringify(devolucoes) : null });
-    const requisicao = await db('requisicoes_epi').where('id', req.params.id).first();
+    const requisicao = await db('requisicoes_epi').where('id', req.params.id).where('tenant_id', req.user.tenant_id).first();
     if (requisicao && ['concluida', 'aprovada'].includes(requisicao.status)) {
       try {
         const tecnico = await db('usuarios').where('id', requisicao.tecnico_id).first();

@@ -75,14 +75,46 @@ class NotificationService {
     }
   }
 
+  /**
+   * Grava a notificação na tabela `notificacoes` (histórico/sininho do app).
+   * Best-effort: nunca lança erro (não atrapalha o envio do push).
+   * Grava para uma lista de usuários de uma vez (um INSERT só).
+   */
+  async _salvarHistorico(db, tenantId, usuarioIds, titulo, corpo, data = {}) {
+    if (!tenantId || !usuarioIds || usuarioIds.length === 0) return;
+    // referencia_id é INTEGER no banco; o push manda como texto. Converte com segurança.
+    const refNum = parseInt(data.referencia_id, 10);
+    const linhas = usuarioIds.map((uid) => ({
+      tenant_id: tenantId,
+      usuario_id: uid,
+      titulo,
+      corpo: corpo || null,
+      tipo: data.tipo || null,
+      referencia_id: Number.isNaN(refNum) ? null : refNum,
+    }));
+    try {
+      await db('notificacoes').insert(linhas);
+    } catch (e) {
+      console.warn('⚠️ Falha ao salvar histórico de notificação:', e.message);
+    }
+  }
+
   async enviarParaUsuario(db, usuarioId, titulo, corpo, data = {}) {
     try {
       const usuario = await db('usuarios')
         .where('id', usuarioId)
-        .select('fcm_token', 'nome')
+        .select('fcm_token', 'nome', 'tenant_id')
         .first();
 
-      if (!usuario || !usuario.fcm_token) {
+      if (!usuario) {
+        console.warn(`⚠️ Usuário ${usuarioId} não encontrado`);
+        return false;
+      }
+
+      // Salva no histórico SEMPRE (mesmo sem token) — aparece no sininho do app.
+      await this._salvarHistorico(db, usuario.tenant_id, [usuarioId], titulo, corpo, data);
+
+      if (!usuario.fcm_token) {
         console.warn(`⚠️ Usuário ${usuarioId} sem FCM token`);
         return false;
       }
@@ -192,8 +224,10 @@ class NotificationService {
         .where('tenant_id', tenantId)
         .where('ativo', true)
         .where('tipo_usuario', 'gestor_seguranca')  // ✅ SÓ GESTOR DE SEGURANÇA
-        .whereNotNull('fcm_token')
         .select('id', 'fcm_token', 'nome');
+
+      // Histórico para todos os gestores (mesmo sem token); push só pra quem tem.
+      await this._salvarHistorico(db, tenantId, gestores.map(g => g.id), titulo, corpo, data);
 
       const enviados = await this._enviarEmMassa(db, gestores, titulo, corpo, data);
       console.log(`📤 Push enviado para ${enviados}/${gestores.length} gestores de segurança`);
@@ -209,8 +243,10 @@ class NotificationService {
       const usuarios = await db('usuarios')
         .where('tenant_id', tenantId)
         .where('ativo', true)
-        .whereNotNull('fcm_token')
         .select('id', 'fcm_token', 'nome');
+
+      // Histórico para todos os usuários (mesmo sem token); push só pra quem tem.
+      await this._salvarHistorico(db, tenantId, usuarios.map(u => u.id), titulo, corpo, data);
 
       const enviados = await this._enviarEmMassa(db, usuarios, titulo, corpo, data);
       console.log(`📤 Push DDS: ${enviados}/${usuarios.length} usuários notificados`);

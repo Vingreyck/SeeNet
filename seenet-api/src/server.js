@@ -1234,13 +1234,13 @@ app.get('/api/debug/test-ixc-estoque-v3/:osIdIxc', async (req, res) => {
         timestamp: new Date().toISOString()
       };
 
-      // Log detalhado para erros não tratados
+      // Log detalhado para erros não tratados.
+      // ⚠️ NÃO logamos req.body / req.query / req.headers: continham dados
+      // pessoais (senhas, imagens base64, token JWT, IP). Minimização — LGPD Art. 6º.
+      // errorInfo já traz path, method, userId e tenantId, suficientes p/ diagnóstico.
       logger.error('Erro não tratado na aplicação', {
         ...errorInfo,
-        stack: error.stack,
-        body: req.body,
-        query: req.query,
-        headers: req.headers
+        stack: error.stack
       });
 
       // Determinar status HTTP apropriado

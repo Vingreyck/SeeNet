@@ -300,11 +300,15 @@ class EstoqueController {
       const ixc = await this._getIXCService(tenantId);
       const { almoxarifadoId, tecnicoIxcId } = await this._getAlmoxarifadoTecnico(userId, tenantId);
 
-      // Buscar a OS no banco local para pegar o id_externo
+      // Buscar a OS no banco local (validação leve, não bloqueante)
       const os = await db('ordem_servico')
         .where('id_externo', osIdExterno)
         .where('tenant_id', tenantId)
         .first();
+      if (!os) {
+        // Aviso apenas (mantém o comportamento atual de prosseguir com o id externo):
+        console.warn(`⚠️ OS ${osIdExterno} não encontrada localmente para o tenant ${tenantId} — prosseguindo`);
+      }
 
       // Buscar dados do produto se valor_unitario não foi informado
       let valorUnit = valor_unitario;

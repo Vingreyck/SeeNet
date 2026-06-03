@@ -121,6 +121,14 @@ class SincronizadorIXC {
   }
 
   async sincronizarTodasEmpresas() {
+    // 🔒 Evita ciclos sobrepostos: se o ciclo anterior ainda está rodando (IXC
+    // lento, demorou mais que o intervalo de 2min), pula este disparo em vez de
+    // empilhar dois ciclos ao mesmo tempo.
+    if (this._cicloRodando) {
+      console.log('⏭️ Sincronização anterior ainda em andamento — pulando este ciclo');
+      return;
+    }
+    this._cicloRodando = true;
     try {
       console.log('\n🔄 === INICIANDO CICLO DE SINCRONIZAÇÃO ===');
       console.log(`⏰ ${new Date().toLocaleString('pt-BR')}`);
@@ -144,6 +152,8 @@ class SincronizadorIXC {
       console.log('✅ Ciclo de sincronização concluído\n');
     } catch (error) {
       console.error('❌ Erro no ciclo de sincronização:', error.message);
+    } finally {
+      this._cicloRodando = false;
     }
   }
 
@@ -194,20 +204,21 @@ class SincronizadorIXC {
             totalOSsSincronizadas++;
           }
 
-          const ossCanceladas = await trx('ordem_servico')
-            .where('tenant_id', integracao.tenant_id)
-            .where('tecnico_id', mapeamento.usuario_id)
-            .where('origem', 'IXC')
-            .whereIn('status', ['pendente'])
-            .where(function () {
-              if (idsExternosIXC.length > 0) {
-                this.whereNotIn('id_externo', idsExternosIXC);
-              }
-            })
-            .update({ status: 'cancelada', data_atualizacao: db.fn.now() });
+          // 🔒 SÓ cancela se o IXC retornou ALGUMA OS. Lista vazia pode ser
+          // instabilidade do IXC (buscarOSs engole o erro e devolve []), e cancelar
+          // tudo nesse caso apagaria OSs reais. Na dúvida, não cancela nada.
+          if (idsExternosIXC.length > 0) {
+            const ossCanceladas = await trx('ordem_servico')
+              .where('tenant_id', integracao.tenant_id)
+              .where('tecnico_id', mapeamento.usuario_id)
+              .where('origem', 'IXC')
+              .whereIn('status', ['pendente'])
+              .whereNotIn('id_externo', idsExternosIXC)
+              .update({ status: 'cancelada', data_atualizacao: db.fn.now() });
 
-          if (ossCanceladas > 0) {
-            console.log(`   🗑️ ${ossCanceladas} OS(s) cancelada(s)`);
+            if (ossCanceladas > 0) {
+              console.log(`   🗑️ ${ossCanceladas} OS(s) cancelada(s)`);
+            }
           }
 
         } catch (error) {

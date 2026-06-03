@@ -9,3 +9,7 @@
 service-account.json
 google-service-account.json
 *service-account*.json
+
+# Logs (podem conter dados pessoais — nunca versionar) — LGPD
+logs/
+*.log

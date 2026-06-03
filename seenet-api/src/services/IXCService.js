@@ -644,17 +644,16 @@ async uploadFotoOS(osId, clienteId, fotoData) {
 
       const endpoint = `/get_relatorio_chamado`;
 
-      const response = await this.apiClient.post(
+      // Usa o cliente real da classe (this.clientListar já envia o header ixcsoft:listar).
+      // Antes referenciava this.apiClient/this.criarPayload, que não existem nesta classe.
+      const response = await this.clientListar.post(
         endpoint,
-        this.criarPayload({
+        JSON.stringify({
           id: osIdIxc,
           tipo_relatorio: 'pdf'
         }),
         {
-          responseType: 'arraybuffer',
-          headers: {
-            'ixcsoft': 'listar'
-          }
+          responseType: 'arraybuffer'
         }
       );
 

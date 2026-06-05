@@ -668,35 +668,51 @@ router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
     let itens_ixc_resultado = [];
 
     if (itens_ixc.length > 0) {
+      // ── Pré-validações da baixa de estoque ──────────────────────
+      // Se faltar qualquer pré-requisito, NÃO aprova em silêncio: devolve a
+      // requisição para 'pendente' e retorna um erro claro para o gestor.
+
+      // 1) Integração IXC ativa
+      const integracao = await db('integracao_ixc').where('tenant_id', req.user.tenant_id).where('ativo', true).first();
+      if (!integracao) {
+        await db('requisicoes_epi').where('id', req.params.id).update({ status: 'pendente' });
+        return res.status(400).json({ error: 'Integração IXC não configurada — a baixa de estoque não pode ser feita. Requisição mantida como pendente.' });
+      }
+
+      // 2) Técnico com almoxarifado E colaborador mapeados (sem isso a baixa falha)
+      const mapeamento = await db('mapeamento_tecnicos_ixc').where('usuario_id', requisicao.tecnico_id).where('tenant_id', req.user.tenant_id).first();
+      if (!mapeamento || !mapeamento.id_almoxarifado || !mapeamento.tecnico_ixc_id) {
+        await db('requisicoes_epi').where('id', req.params.id).update({ status: 'pendente' });
+        return res.status(400).json({ error: 'Técnico sem almoxarifado/colaborador mapeado no IXC. Configure o mapeamento antes de aprovar — a baixa de estoque não pode ser feita. Requisição mantida como pendente.' });
+      }
+
+      const IXCService = require('../services/IXCService');
+      const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+      // 3) Criar a requisição de material no IXC. Se falhar, aborta a aprovação
+      //    (mantém 'pendente') para o gestor tentar de novo — nunca aprova sem baixar.
       try {
-        const integracao = await db('integracao_ixc').where('tenant_id', req.user.tenant_id).where('ativo', true).first();
-        if (integracao) {
-          const IXCService = require('../services/IXCService');
-          const ixc = new IXCService(integracao.url_api, integracao.token_api);
-          const mapeamento = await db('mapeamento_tecnicos_ixc').where('usuario_id', requisicao.tecnico_id).where('tenant_id', req.user.tenant_id).first();
-          if (!mapeamento) {
-            // Aborta a aprovação: desfaz a trava, voltando o status para 'pendente'.
-            await db('requisicoes_epi').where('id', req.params.id).update({ status: 'pendente' });
-            return res.status(400).json({ error: 'Técnico sem almoxarifado mapeado no IXC.' });
-          }
+        const { id: reqIxcId } = await ixc.criarRequisicaoMaterial({
+          id_filial: integracao.id_filial || '1', id_almoxarifado: mapeamento.id_almoxarifado.toString(),
+          id_colaborador: mapeamento.tecnico_ixc_id.toString(), observacao: `Req. EPI #${requisicao.id} - SeeNet`,
+        });
+        id_requisicao_ixc = reqIxcId;
+      } catch (ixcErr) {
+        console.error('⚠️ Erro ao criar requisição de material no IXC:', ixcErr.message);
+        await db('requisicoes_epi').where('id', req.params.id).update({ status: 'pendente' });
+        return res.status(502).json({ error: 'Falha ao criar a baixa de estoque no IXC. Requisição mantida como pendente — tente novamente.' });
+      }
 
-          const { id: reqIxcId } = await ixc.criarRequisicaoMaterial({
-            id_filial: integracao.id_filial || '1', id_almoxarifado: mapeamento.id_almoxarifado.toString(),
-            id_colaborador: mapeamento.tecnico_ixc_id.toString(), observacao: `Req. EPI #${requisicao.id} - SeeNet`,
-          });
-          id_requisicao_ixc = reqIxcId;
-
-          for (const item of itens_ixc) {
-            try {
-              const resultado = await ixc.adicionarItemRequisicaoMaterial(reqIxcId, { id_produto: item.id_produto, quantidade: item.quantidade || 1 });
-              itens_ixc_resultado.push({ id_produto: item.id_produto, descricao: item.descricao || '', quantidade: item.quantidade || 1, id_item_ixc: resultado.id, qtde_saldo: resultado.qtde_saldo });
-            } catch (itemErr) {
-              console.error(`⚠️ Falha no item ${item.id_produto}:`, itemErr.message);
-              itens_ixc_resultado.push({ id_produto: item.id_produto, descricao: item.descricao || '', quantidade: item.quantidade || 1, erro: itemErr.message });
-            }
-          }
+      // 4) Adicionar cada item (best-effort por item; erros voltam em itens_com_erro)
+      for (const item of itens_ixc) {
+        try {
+          const resultado = await ixc.adicionarItemRequisicaoMaterial(id_requisicao_ixc, { id_produto: item.id_produto, quantidade: item.quantidade || 1 });
+          itens_ixc_resultado.push({ id_produto: item.id_produto, descricao: item.descricao || '', quantidade: item.quantidade || 1, id_item_ixc: resultado.id, qtde_saldo: resultado.qtde_saldo });
+        } catch (itemErr) {
+          console.error(`⚠️ Falha no item ${item.id_produto}:`, itemErr.message);
+          itens_ixc_resultado.push({ id_produto: item.id_produto, descricao: item.descricao || '', quantidade: item.quantidade || 1, erro: itemErr.message });
         }
-      } catch (ixcErr) { console.error('⚠️ Erro IXC:', ixcErr.message); }
+      }
     }
 
     // ── Atualizar banco ────────────────────────────────────────

@@ -24,6 +24,9 @@ package.json
 .env
 .env.local
 .env.production
+# Exceção: o .env do app Flutter é versionado de propósito (só URL pública,
+# sem segredos) porque é um asset necessário pro build iOS/Android.
+!seenet-app/.env
 lib/config/env_config.dart
 **/api_keys.dart
 **/secrets.dart

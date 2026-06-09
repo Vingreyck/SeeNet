@@ -49,7 +49,8 @@ lib/config/env.config_example.dart
 *.key
 *.pem
 *.p12
-.env
+# .env é versionado de propósito: contém só a URL pública da API (sem segredos),
+# necessário pro build (é um asset do app). NÃO coloque senhas/chaves aqui.
 .env.local
 .env.development
 .env.production

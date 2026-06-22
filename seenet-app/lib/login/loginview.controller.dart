@@ -88,12 +88,12 @@ class LoginController extends GetxController {
 
     bool hasError = false;
 
-    // Validar nome (era email)
+    // Validar identificador (telefone ou nome)
     if (loginInput.text.trim().isEmpty) {
-      emailError.value = 'Nome é obrigatório';
+      emailError.value = 'Telefone ou nome é obrigatório';
       hasError = true;
     } else if (loginInput.text.trim().length < 2) {
-      emailError.value = 'Nome muito curto';
+      emailError.value = 'Identificador muito curto';
       hasError = true;
     }
 

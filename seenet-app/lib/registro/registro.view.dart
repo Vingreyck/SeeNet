@@ -141,6 +141,16 @@ class RegistrarView extends GetView<RegistroController> {
 
                           const SizedBox(height: 12),
 
+                          _buildTextField(
+                            controller: controller.telefoneInput,
+                            label: 'Telefone (usado no login)',
+                            hint: 'Ex: (79) 99999-9999',
+                            icon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
+                          ),
+
+                          const SizedBox(height: 12),
+
                           _buildPasswordField(
                             controller: controller.senhaInput,
                             label: 'Senha',

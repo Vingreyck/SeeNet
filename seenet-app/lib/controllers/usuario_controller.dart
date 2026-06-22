@@ -102,6 +102,7 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       String nome,
       String senha,
       String codigoEmpresa, {
+        String telefone = '',
         int idAlmoxarifado = 0,
         String almoxarifadoNome = '',
       }) async {
@@ -110,6 +111,7 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
 
       bool registroSucesso = await _authService.register(
         nome, senha, codigoEmpresa,
+        telefone: telefone,
         idAlmoxarifado: idAlmoxarifado,
         almoxarifadoNome: almoxarifadoNome,
       );
@@ -122,8 +124,8 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       print('✅ Registro bem-sucedido, iniciando auto-login...');
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // Login agora usa nome em vez de email
-      bool loginSucesso = await login(nome, senha, codigoEmpresa);
+      // Auto-login pelo TELEFONE (novo identificador); usa o nome se não houver telefone.
+      bool loginSucesso = await login(telefone.isNotEmpty ? telefone : nome, senha, codigoEmpresa);
 
       if (loginSucesso) {
         print('✅ Auto-login bem-sucedido');

@@ -13,7 +13,7 @@ class LoginTextField extends GetView<LoginController> {
       keyboardType: TextInputType.name,
       textCapitalization: TextCapitalization.words,
       decoration: InputDecoration(
-        hintText: 'Nome Completo',
+        hintText: 'Telefone ou nome',
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(100),
           borderSide: const BorderSide(

@@ -9,6 +9,7 @@ import 'package:seenet/widgets/app_snackbar.dart';
 class RegistroController extends GetxController {
   // ========== TEXT CONTROLLERS ==========
   TextEditingController nomeInput = TextEditingController();
+  TextEditingController telefoneInput = TextEditingController();
   TextEditingController senhaInput = TextEditingController();
   TextEditingController confirmarSenhaInput = TextEditingController(); // ← NOVO
   TextEditingController tokenEmpresaController = TextEditingController();
@@ -16,6 +17,7 @@ class RegistroController extends GetxController {
   // ========== OBSERVÁVEIS ==========
   RxBool isLoading = false.obs;
   RxString nome = ''.obs;
+  RxString telefone = ''.obs;
   RxString senha = ''.obs;
   RxString confirmarSenha = ''.obs; // ← NOVO
   RxString tokenEmpresa = ''.obs;
@@ -36,6 +38,10 @@ class RegistroController extends GetxController {
 
     nomeInput.addListener(() {
       nome.value = nomeInput.text;
+    });
+
+    telefoneInput.addListener(() {
+      telefone.value = telefoneInput.text;
     });
 
     senhaInput.addListener(() {
@@ -104,6 +110,7 @@ class RegistroController extends GetxController {
         nomeInput.text.trim(),
         senhaInput.text,
         tokenEmpresaController.text.trim().toUpperCase(),
+        telefone: telefoneInput.text.replaceAll(RegExp(r'\D'), ''),
         idAlmoxarifado: almoxarifadoSelecionado.value,
         almoxarifadoNome: almoxarifadoNome.value,
       );
@@ -143,8 +150,15 @@ class RegistroController extends GetxController {
 
   // ========== VALIDAÇÕES ==========
   bool _validarCampos() {
-    if (nomeInput.text.trim().length < 2) {
-      _showError('Nome deve ter pelo menos 2 caracteres');
+    final nomeTrim = nomeInput.text.trim();
+    if (nomeTrim.length < 5 || !RegExp(r'^\S+(?:\s+\S+)+$').hasMatch(nomeTrim)) {
+      _showError('Informe seu nome completo (nome e sobrenome)');
+      return false;
+    }
+
+    final telDigitos = telefoneInput.text.replaceAll(RegExp(r'\D'), '');
+    if (telDigitos.length < 8) {
+      _showError('Informe um telefone válido (mínimo 8 dígitos)');
       return false;
     }
 
@@ -182,7 +196,9 @@ class RegistroController extends GetxController {
   }
 
   bool get podeRegistrar {
-    return nome.value.trim().length >= 2 &&
+    return nome.value.trim().length >= 5 &&
+        nome.value.trim().contains(' ') &&
+        telefone.value.replaceAll(RegExp(r'\D'), '').length >= 8 &&
         senha.value.length >= 6 &&
         confirmarSenha.value.isNotEmpty &&
         senha.value == confirmarSenha.value &&
@@ -195,11 +211,13 @@ class RegistroController extends GetxController {
   // ========== MÉTODOS AUXILIARES ==========
   void limparCampos() {
     nomeInput.clear();
+    telefoneInput.clear();
     senhaInput.clear();
     confirmarSenhaInput.clear(); // ← NOVO
     tokenEmpresaController.clear();
 
     nome.value = '';
+    telefone.value = '';
     senha.value = '';
     confirmarSenha.value = ''; // ← NOVO
     tokenEmpresa.value = '';
@@ -225,6 +243,7 @@ class RegistroController extends GetxController {
   @override
   void onClose() {
     nomeInput.dispose();
+    telefoneInput.dispose();
     senhaInput.dispose();
     confirmarSenhaInput.dispose(); // ← NOVO
     tokenEmpresaController.dispose();

@@ -26,8 +26,9 @@ class AuthService extends GetxService {
       _usuarioController.isLoading.value = true;
       clearSession();
 
+      // Envia como 'login' genérico: o backend decide se é TELEFONE (números) ou NOME.
       final response = await _api.post('/auth/login', {
-        'nome': nome,
+        'login': nome,
         'senha': senha,
         'codigoEmpresa': codigoEmpresa.toUpperCase(),
       }, requireAuth: false);
@@ -110,6 +111,7 @@ class AuthService extends GetxService {
       String nome,
       String senha,
       String codigoEmpresa, {
+        String telefone = '',
         int idAlmoxarifado = 0,
         String almoxarifadoNome = '',
       }) async {
@@ -118,6 +120,7 @@ class AuthService extends GetxService {
 
       final response = await _api.post('/auth/register', {
         'nome': nome,
+        'telefone': telefone,
         'senha': senha,
         'codigoEmpresa': codigoEmpresa.toUpperCase(),
         if (idAlmoxarifado != 0) 'id_almoxarifado': idAlmoxarifado,

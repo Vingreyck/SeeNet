@@ -75,8 +75,14 @@ const loginLimiter = rateLimit({
 
 // ========== REGISTRO DE USUÁRIO ========== (VERSÃO CORRIGIDA)
 router.post('/register', [
-  body('nome').trim().isLength({ min: 2, max: 100 }).withMessage('Nome deve ter entre 2 e 100 caracteres'),
+  body('nome').trim()
+    .isLength({ min: 5, max: 100 }).withMessage('Nome deve ter entre 5 e 100 caracteres')
+    .matches(/^\S+(?:\s+\S+)+$/).withMessage('Informe o nome completo (nome e sobrenome)'),
   body('senha').isLength({ min: 6, max: 128 }).withMessage('Senha deve ter entre 6 e 128 caracteres'),
+  // Telefone OBRIGATÓRIO: guardamos só os dígitos (ignora (), -, espaços).
+  body('telefone')
+    .customSanitizer((v) => (v == null ? '' : v.toString()).replace(/\D/g, ''))
+    .isLength({ min: 8, max: 15 }).withMessage('Telefone é obrigatório (somente números, mínimo 8 dígitos)'),
   body().custom((value, { req }) => {
     const codigo = req.body.codigoEmpresa || req.body.tenantCode;
     if (!codigo || codigo.trim().length < 3 || codigo.trim().length > 20) {
@@ -108,7 +114,7 @@ router.post('/register', [
       });
     }
 
-    const { nome, senha } = req.body;
+    const { nome, senha, telefone } = req.body; // telefone já vem só com dígitos (sanitizado)
     const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode;
 
     console.log('✅ Validação OK');
@@ -144,6 +150,21 @@ router.post('/register', [
 
     console.log('✅ Nome disponível');
 
+    // Telefone deve ser único dentro da empresa (é o que será usado no login)
+    const existingTelefone = await db('usuarios')
+      .where('telefone', telefone)
+      .where('tenant_id', tenant.id)
+      .first();
+
+    if (existingTelefone) {
+      console.log('❌ Telefone já existe:', telefone);
+      return res.status(400).json({
+        error: 'Este telefone já está cadastrado nesta empresa'
+      });
+    }
+
+    console.log('✅ Telefone disponível');
+
     // Verificar limite de usuários do plano
     const userCount = await db('usuarios')
       .where('tenant_id', tenant.id)
@@ -175,6 +196,7 @@ router.post('/register', [
     // ✅ CORREÇÃO: Remover data_criacao (usar default do banco)
     const novoUsuario = {
       nome,
+      telefone,
       senha: senhaHash,
       tenant_id: tenant.id,
       tipo_usuario: 'tecnico',
@@ -277,7 +299,10 @@ router.post('/register', [
     // registrar o mesmo nome, o banco rejeita a segunda (código 23505).
     // Retornamos a mensagem amigável em vez de 500.
     if (error.code === '23505') {
-      return res.status(400).json({ error: 'Este nome já está cadastrado nesta empresa' });
+      const msg = (error.constraint || '').includes('telefone')
+        ? 'Este telefone já está cadastrado nesta empresa'
+        : 'Este nome já está cadastrado nesta empresa';
+      return res.status(400).json({ error: msg });
     }
     console.error('❌ ERRO CRÍTICO NO REGISTRO:', error);
     console.error('Stack trace:', error.stack);
@@ -303,6 +328,14 @@ router.post('/login', loginLimiter, [
     const codigo = req.body.codigoEmpresa || req.body.tenantCode;
     if (!codigo || codigo.trim().length < 3 || codigo.trim().length > 20) {
       throw new Error('Código da empresa é obrigatório');
+    }
+    return true;
+  }),
+  body().custom((value, { req }) => {
+    // Identificador pode vir como telefone, login (genérico) ou nome (app antigo).
+    const id = req.body.telefone || req.body.login || req.body.nome;
+    if (!id || id.toString().trim().length < 2) {
+      throw new Error('Informe o telefone ou o nome de usuário');
     }
     return true;
   })
@@ -334,16 +367,22 @@ router.post('/login', loginLimiter, [
       });
     }
 
-    const { nome, senha } = req.body;
+    const senha = req.body.senha;
     const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode;
 
-    console.log('✅ Validação OK - Buscando usuário:', nome, codigoEmpresa);
+    // O identificador pode ser TELEFONE (números) ou NOME (compatível com o app antigo).
+    // Regra: se o que foi digitado é só dígitos/símbolos de telefone, busca por telefone;
+    // caso contrário, busca por nome (como era antes). Assim ninguém fica travado.
+    const identificador = (req.body.telefone ?? req.body.login ?? req.body.nome ?? '').toString().trim();
+    const digitos = identificador.replace(/\D/g, '');
+    const ehTelefone = digitos.length >= 8 && /^[\d\s()+-]+$/.test(identificador);
+    const nome = identificador; // usado nos logs e mensagens abaixo
 
+    console.log('✅ Validação OK - Buscando por', ehTelefone ? 'TELEFONE' : 'NOME', '-', codigoEmpresa);
 
-    // Buscar usuário com tenant
-    const user = await db('usuarios')
+    // Buscar usuário com tenant (por telefone OU por nome)
+    let loginQuery = db('usuarios')
       .join('tenants', 'usuarios.tenant_id', 'tenants.id')
-      .where('usuarios.nome', nome)
       .where('tenants.codigo', codigoEmpresa.toUpperCase())
       .whereRaw('usuarios.ativo = ?', [true])
       .whereRaw('tenants.ativo = ?', [true])
@@ -353,8 +392,15 @@ router.post('/login', loginLimiter, [
         'tenants.codigo as tenant_code',
         'tenants.nome as tenant_name',
         'tenants.plano as tenant_plan'
-      )
-      .first();
+      );
+
+    if (ehTelefone) {
+      loginQuery = loginQuery.where('usuarios.telefone', digitos);
+    } else {
+      loginQuery = loginQuery.where('usuarios.nome', identificador);
+    }
+
+    const user = await loginQuery.first();
 
     if (!user) {
       // Log de falha na autenticação

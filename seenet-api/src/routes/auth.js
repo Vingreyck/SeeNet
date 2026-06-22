@@ -79,10 +79,12 @@ router.post('/register', [
     .isLength({ min: 5, max: 100 }).withMessage('Nome deve ter entre 5 e 100 caracteres')
     .matches(/^\S+(?:\s+\S+)+$/).withMessage('Informe o nome completo (nome e sobrenome)'),
   body('senha').isLength({ min: 6, max: 128 }).withMessage('Senha deve ter entre 6 e 128 caracteres'),
-  // Telefone OBRIGATÓRIO: guardamos só os dígitos (ignora (), -, espaços).
+  // Telefone OPCIONAL durante a transição (apps antigos não enviam telefone).
+  // Se vier, validamos e guardamos só os dígitos (ignora (), -, espaços).
   body('telefone')
+    .optional({ checkFalsy: true })
     .customSanitizer((v) => (v == null ? '' : v.toString()).replace(/\D/g, ''))
-    .isLength({ min: 8, max: 15 }).withMessage('Telefone é obrigatório (somente números, mínimo 8 dígitos)'),
+    .isLength({ min: 8, max: 15 }).withMessage('Telefone inválido (somente números, mínimo 8 dígitos)'),
   body().custom((value, { req }) => {
     const codigo = req.body.codigoEmpresa || req.body.tenantCode;
     if (!codigo || codigo.trim().length < 3 || codigo.trim().length > 20) {
@@ -150,20 +152,21 @@ router.post('/register', [
 
     console.log('✅ Nome disponível');
 
-    // Telefone deve ser único dentro da empresa (é o que será usado no login)
-    const existingTelefone = await db('usuarios')
-      .where('telefone', telefone)
-      .where('tenant_id', tenant.id)
-      .first();
+    // Telefone único por empresa — só checa SE foi informado (apps antigos não mandam telefone)
+    if (telefone) {
+      const existingTelefone = await db('usuarios')
+        .where('telefone', telefone)
+        .where('tenant_id', tenant.id)
+        .first();
 
-    if (existingTelefone) {
-      console.log('❌ Telefone já existe:', telefone);
-      return res.status(400).json({
-        error: 'Este telefone já está cadastrado nesta empresa'
-      });
+      if (existingTelefone) {
+        console.log('❌ Telefone já existe:', telefone);
+        return res.status(400).json({
+          error: 'Este telefone já está cadastrado nesta empresa'
+        });
+      }
+      console.log('✅ Telefone disponível');
     }
-
-    console.log('✅ Telefone disponível');
 
     // Verificar limite de usuários do plano
     const userCount = await db('usuarios')
@@ -196,7 +199,7 @@ router.post('/register', [
     // ✅ CORREÇÃO: Remover data_criacao (usar default do banco)
     const novoUsuario = {
       nome,
-      telefone,
+      telefone: telefone || null, // app antigo manda vazio → grava NULL (índice único ignora NULL)
       senha: senhaHash,
       tenant_id: tenant.id,
       tipo_usuario: 'tecnico',

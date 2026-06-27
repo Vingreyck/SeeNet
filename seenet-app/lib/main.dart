@@ -166,11 +166,23 @@ class MyApp extends StatelessWidget {
         ),
       ),
       routingCallback: (routing) {
-        if (routing?.current != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Get.find<NavController>().atualizarRota(routing!.current);
-          });
+        final atual = routing?.current;
+        if (atual == null) return;
+
+        // 🔒 F5/recarregar direto numa tela interna: nesse caso o app NAO passou
+        // pelo splash, entao os controllers nao foram criados (tela em branco).
+        // Solucao: mandar pro /splash, que inicializa tudo, faz o auto-login
+        // (sessao ja salva) e leva pro /checklist. Em uso normal (clicando), o
+        // app JA esta inicializado -> este if e FALSO -> nada muda.
+        const publicas = ['/splash', '/login', '/registro'];
+        if (!publicas.contains(atual) && !Get.isRegistered<DdsController>()) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => Get.offAllNamed('/splash'));
+          return;
         }
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.find<NavController>().atualizarRota(atual);
+        });
       },
       builder: (context, child) {
         return Scaffold(

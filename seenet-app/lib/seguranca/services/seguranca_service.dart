@@ -255,6 +255,21 @@ class SegurancaService extends GetxService {
     return {'success': false, 'message': response.body['error'] ?? 'Erro ao recusar'};
   }
 
+  // ── Validar recebimento (gestor aceita/reprova a assinatura do técnico) ──
+  Future<Map<String, dynamic>> validarRecebimento(int id,
+      {required bool aprovar, String? observacao}) async {
+    final response = await GetConnect().post(
+      '$_base/requisicoes/$id/validar-recebimento',
+      {
+        'aprovar': aprovar,
+        if (observacao != null) 'observacao': observacao,
+      },
+      headers: _headers,
+    );
+    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
+    return {'success': false, 'message': response.body['error'] ?? 'Erro ao validar'};
+  }
+
   // ── Estoque IXC (para o gestor selecionar itens ao aprovar) ──
   Future<List<Map<String, dynamic>>> buscarProdutosEstoqueDoTecnico(int tecnicoId) async {
     try {

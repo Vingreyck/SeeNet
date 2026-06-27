@@ -239,47 +239,56 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
             letterSpacing: 0.3));
   }
 
-  // ── Dropdown Almoxarifado ─────────────────────────────────────
+  // ── Almoxarifado (campo com BUSCA: digite pra filtrar a lista) ──
   Widget _buildDropdownAlmoxarifado() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: _almoxSelecionadoId != null
-              ? const Color(0xFF00FF88).withOpacity(0.4)
-              : Colors.white12,
+    return DropdownMenu<String>(
+      initialSelection: _almoxSelecionadoId,
+      enableFilter: true,          // ← digita pra filtrar
+      requestFocusOnTap: true,     // ← abre o teclado ao tocar
+      expandedInsets: EdgeInsets.zero,
+      menuHeight: 300,
+      hintText: 'Digite ou selecione o almoxarifado',
+      textStyle: const TextStyle(color: Colors.white, fontSize: 13),
+      menuStyle: const MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(Color(0xFF2A2A2A)),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF1A1A1A),
+        hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(
+            color: _almoxSelecionadoId != null
+                ? const Color(0xFF00FF88).withOpacity(0.4)
+                : Colors.white12,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF00FF88), width: 1.5),
         ),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _almoxSelecionadoId,
-          hint: const Text('Selecione o almoxarifado',
-              style: TextStyle(color: Colors.white38, fontSize: 13)),
-          dropdownColor: const Color(0xFF2A2A2A),
-          style: const TextStyle(color: Colors.white, fontSize: 13),
-          isExpanded: true,
-          menuMaxHeight: 300,
-          onChanged: (v) {
-            final almox = _almoxarifados.firstWhere((a) => a['id'].toString() == v);
-            setState(() {
-              _almoxSelecionadoId = v;
-              _almoxSelecionadoNome = almox['descricao'];
-            });
-          },
-          items: _almoxarifados.map((a) {
-            return DropdownMenuItem<String>(
-              value: a['id'].toString(),
-              child: Text(
-                '${a['id']} - ${a['descricao']}',
-                style: const TextStyle(fontSize: 13),
-                overflow: TextOverflow.ellipsis,
-              ),
-            );
-          }).toList(),
-        ),
-      ),
+      onSelected: (v) {
+        if (v == null) return;
+        final almox = _almoxarifados.firstWhere((a) => a['id'].toString() == v);
+        setState(() {
+          _almoxSelecionadoId = v;
+          _almoxSelecionadoNome = almox['descricao'];
+        });
+      },
+      dropdownMenuEntries: _almoxarifados.map((a) {
+        return DropdownMenuEntry<String>(
+          value: a['id'].toString(),
+          label: '${a['id']} - ${a['descricao']}',
+          style: MenuItemButton.styleFrom(
+            foregroundColor: Colors.white,
+            textStyle: const TextStyle(fontSize: 13),
+          ),
+        );
+      }).toList(),
     );
   }
 

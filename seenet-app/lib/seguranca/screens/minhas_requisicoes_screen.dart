@@ -369,6 +369,46 @@ class _MinhasRequisicoesScreenState extends State<MinhasRequisicoesScreen>
                   ),
                 ],
 
+                // #2: Observação do gestor (inclui o MOTIVO se a assinatura foi reprovada)
+                if (status == 'aguardando_confirmacao' &&
+                    req['observacao_gestor'] != null &&
+                    req['observacao_gestor'].toString().trim().isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00BFFF).withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: const Color(0xFF00BFFF).withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            color: Color(0xFF00BFFF), size: 14),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Observação do gestor:',
+                                  style: TextStyle(
+                                      color: Color(0xFF00BFFF),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 2),
+                              Text(req['observacao_gestor'].toString(),
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 // Botão confirmar
                 if (status == 'aguardando_confirmacao') ...[
                   const SizedBox(height: 10),

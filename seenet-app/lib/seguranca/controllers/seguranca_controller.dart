@@ -19,6 +19,7 @@ class SegurancaController extends GetxController {
   final historicoRequisicoes = <Map<String, dynamic>>[].obs;
   final requisacoesAprovadas = <Map<String, dynamic>>[].obs;
   final requisacoesRecusadas = <Map<String, dynamic>>[].obs;
+  final requisicoesAguardandoValidacao = <Map<String, dynamic>>[].obs;
 
   final perfilData = Rxn<Map<String, dynamic>>();
   final statsData = Rxn<Map<String, dynamic>>();
@@ -29,7 +30,9 @@ class SegurancaController extends GetxController {
 
   // ── Bloqueio de nova requisição ───────────────────────────────
   bool get hasRequisicaoAguardando => minhasRequisicoes
-      .any((r) => r['status'] == 'aguardando_confirmacao' || r['status'] == 'pendente');
+      .any((r) => r['status'] == 'aguardando_confirmacao' ||
+          r['status'] == 'pendente' ||
+          r['status'] == 'aguardando_validacao');
 
   Map<String, dynamic>? get requisicaoAguardando => minhasRequisicoes
       .firstWhereOrNull((r) => r['status'] == 'aguardando_confirmacao');
@@ -253,6 +256,33 @@ class SegurancaController extends GetxController {
     }
   }
 
+  // ── #2: gestor valida (aceita/reprova) a assinatura do técnico ──
+  Future<void> carregarAguardandoValidacao() async {
+    isLoading.value = true;
+    try {
+      requisicoesAguardandoValidacao.value =
+          await _service.buscarTodas(status: 'aguardando_validacao');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<Map<String, dynamic>> validarRecebimento(int id,
+      {required bool aprovar, String? observacao}) async {
+    isSending.value = true;
+    try {
+      final result = await _service.validarRecebimento(id,
+          aprovar: aprovar, observacao: observacao);
+      if (result['success'] == true) {
+        carregarAguardandoValidacao();
+        carregarHistorico();
+      }
+      return result;
+    } finally {
+      isSending.value = false;
+    }
+  }
+
   final devolucoesPendentes = <Map<String, dynamic>>[].obs;
   final devedores = <Map<String, dynamic>>[].obs;
 
@@ -288,6 +318,7 @@ class SegurancaController extends GetxController {
       case 'aprovada':         return const Color(0xFF00FF88);
       case 'recusada':         return const Color(0xFFFF4444);
       case 'aguardando_confirmacao': return const Color(0xFF00BFFF);
+      case 'aguardando_validacao':   return const Color(0xFFB388FF);
       default:                 return const Color(0xFFFFAA00);
     }
   }
@@ -298,6 +329,7 @@ class SegurancaController extends GetxController {
       case 'aprovada':              return 'Aprovada';
       case 'recusada':              return 'Recusada';
       case 'aguardando_confirmacao': return 'Ag. Confirmação';
+      case 'aguardando_validacao':   return 'Aguardando validação';
       default:                      return 'Pendente';
     }
   }

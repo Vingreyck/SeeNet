@@ -197,12 +197,19 @@ class AuthService extends GetxService {
       print('🔄 Tentando auto-login...');
       _api.setAuth(savedToken, savedTenantCode);
 
-      final isValid = await verifyToken();
-      if (!isValid) {
-        print('⚠️ Token expirado ou inválido');
+      // Verifica o token no servidor — mas só DESLOGA se for rejeição REAL (401).
+      // Se o verify falhar por REDE/timeout (técnico com internet ruim), mantém a
+      // sessão: o token local já passou na checagem de validade (exp) acima.
+      final verif = await _api.get('/auth/verify',
+          timeout: const Duration(seconds: 5));
+      if (verif['success'] != true && verif['statusCode'] == 401) {
+        print('⚠️ Token rejeitado pelo servidor (401) — deslogando');
         await _clearPersistedSession();
         _api.clearAuth();
         return false;
+      }
+      if (verif['success'] != true) {
+        print('📶 Verify falhou por rede — mantendo sessão (token local válido)');
       }
 
       final userData = Map<String, dynamic>.from(savedUserData);

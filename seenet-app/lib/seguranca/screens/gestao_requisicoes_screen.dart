@@ -1,4 +1,5 @@
 // lib/seguranca/screens/gestao_requisicoes_screen.dart — REDESIGN
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/seguranca_service.dart';
@@ -28,10 +29,11 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
     final args = Get.arguments as Map<String, dynamic>?;
     final initialTab = args?['initialTab'] as int? ?? 0;
     _tabController =
-        TabController(length: 4, vsync: this, initialIndex: initialTab);
+        TabController(length: 5, vsync: this, initialIndex: initialTab);
     controller.carregarPendentes();
     controller.carregarDevolucoesPendentes();
     controller.carregarDevedores();
+    controller.carregarAguardandoValidacao();
   }
 
   @override
@@ -374,6 +376,9 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
                       Tab(
                           text:
                           'Devedores (${controller.devedores.length})'),
+                      Tab(
+                          text:
+                          'Validar (${controller.requisicoesAguardandoValidacao.length})'),
                     ],
                   )),
                 ),
@@ -390,6 +395,7 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
                 _buildListaDevolucoes(),
                 const AbaProdutosEpi(),
                 _buildListaDevedores(),
+                _buildListaValidacao(),
               ],
             ),
           ),
@@ -562,6 +568,283 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ════════════ #2: ABA "VALIDAR" (gestor confere assinatura) ════════════
+  Widget _buildListaValidacao() {
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return const Center(
+            child: CircularProgressIndicator(
+                color: Color(0xFFB388FF), strokeWidth: 2.5));
+      }
+      if (controller.requisicoesAguardandoValidacao.isEmpty) {
+        return _buildVazio(
+            'Nenhuma assinatura para validar', Icons.fact_check_outlined);
+      }
+      return RefreshIndicator(
+        onRefresh: controller.carregarAguardandoValidacao,
+        color: const Color(0xFFB388FF),
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          itemCount: controller.requisicoesAguardandoValidacao.length,
+          itemBuilder: (context, i) => _buildCardValidacao(
+              controller.requisicoesAguardandoValidacao[i]),
+        ),
+      );
+    });
+  }
+
+  Widget _buildImagemBase64(String? b64, String label, IconData icone) {
+    final temImg = b64 != null && b64.isNotEmpty;
+    return Expanded(
+      child: Column(
+        children: [
+          Text(label,
+              style: const TextStyle(color: Colors.white38, fontSize: 10)),
+          const SizedBox(height: 4),
+          Container(
+            height: 110,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: temImg ? Colors.white : const Color(0xFF111111),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white12),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: temImg
+                ? Builder(builder: (_) {
+                    try {
+                      return Image.memory(base64Decode(b64.split(',').last),
+                          fit: BoxFit.contain);
+                    } catch (_) {
+                      return const Center(
+                          child:
+                              Icon(Icons.broken_image, color: Colors.white24));
+                    }
+                  })
+                : Center(child: Icon(icone, color: Colors.white24, size: 22)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardValidacao(Map<String, dynamic> req) {
+    final epis = req['epis_solicitados'];
+    final List<String> episLista = epis is List ? epis.cast<String>() : [];
+    const roxo = Color(0xFFB388FF);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF181818),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: roxo.withOpacity(0.25)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            decoration: BoxDecoration(
+              color: roxo.withOpacity(0.06),
+              borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.fact_check_rounded, color: roxo, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(req['tecnico_nome'] ?? 'Técnico',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                      Text(
+                          'Assinou em ${_formatarData(req['data_confirmacao_recebimento']?.toString())}',
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${episLista.length} EPI(s):',
+                    style:
+                        const TextStyle(color: Colors.white38, fontSize: 11)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 5,
+                  runSpacing: 5,
+                  children: episLista
+                      .map((e) => Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF111111),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: Text(e,
+                                style: const TextStyle(
+                                    color: Colors.white54, fontSize: 11)),
+                          ))
+                      .toList(),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildImagemBase64(req['foto_recebimento_base64'] as String?,
+                        'Foto', Icons.photo_camera_outlined),
+                    const SizedBox(width: 10),
+                    _buildImagemBase64(
+                        req['assinatura_recebimento_base64'] as String?,
+                        'Assinatura',
+                        Icons.draw_outlined),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () =>
+                        _confirmarReprovacaoValidacao(req['id'] as int),
+                    icon: const Icon(Icons.close_rounded,
+                        size: 16, color: Colors.red),
+                    label: const Text('Reprovar',
+                        style: TextStyle(color: Colors.red)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Obx(() => ElevatedButton.icon(
+                        onPressed: controller.isSending.value
+                            ? null
+                            : () => _aceitarValidacao(req['id'] as int),
+                        icon: const Icon(Icons.check_rounded,
+                            size: 16, color: Colors.black),
+                        label: const Text('Aceitar',
+                            style: TextStyle(color: Colors.black)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00FF88),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      )),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _aceitarValidacao(int id) async {
+    final result = await controller.validarRecebimento(id, aprovar: true);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result['message'] ?? ''),
+        backgroundColor:
+            result['success'] == true ? const Color(0xFF00AA66) : Colors.red,
+      ));
+    }
+  }
+
+  void _confirmarReprovacaoValidacao(int id) {
+    final obsController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Reprovar assinatura',
+            style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+                'O técnico vai precisar assinar de novo. Informe o motivo:',
+                style: TextStyle(color: Colors.white70)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: obsController,
+              style: const TextStyle(color: Colors.white),
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Motivo da reprovação *',
+                hintStyle: const TextStyle(color: Colors.white38),
+                filled: true,
+                fillColor: const Color(0xFF111111),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                        color: Color(0xFF00FF88), width: 1.5)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar',
+                style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (obsController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Informe o motivo da reprovação'),
+                      backgroundColor: Colors.red),
+                );
+                return;
+              }
+              Navigator.pop(context);
+              final result = await controller.validarRecebimento(id,
+                  aprovar: false, observacao: obsController.text.trim());
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(result['message'] ?? ''),
+                  backgroundColor:
+                      result['success'] == true ? Colors.orange : Colors.red,
+                ));
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child:
+                const Text('Reprovar', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

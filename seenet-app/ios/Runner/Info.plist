@@ -2,6 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>fetch</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>O SeeNet usa a câmera para você fotografar a confirmação de recebimento de EPIs, registrar a presença nos Diálogos Diários de Segurança (DDS) e anexar fotos de problemas técnicos às ordens de serviço. Exemplo: ao concluir uma OS, você tira uma foto do equipamento instalado para comprovar o atendimento.</string>
 	<key>NSMicrophoneUsageDescription</key>

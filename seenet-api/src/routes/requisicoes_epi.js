@@ -803,9 +803,8 @@ router.post('/requisicoes/:id/confirmar-recebimento', authMiddleware, async (req
     if (!requisicao) return res.status(404).json({ error: 'Não encontrada' });
     if (requisicao.tecnico_id !== req.user.id) return res.status(403).json({ error: 'Sem permissão' });
     if (requisicao.status !== 'aguardando_confirmacao') return res.status(400).json({ error: 'Requisição não está aguardando confirmação' });
-    // ✅ Técnico assinou → vai para VALIDAÇÃO do gestor (não conclui direto).
     await db('requisicoes_epi').where('id', req.params.id).update({
-      status: 'aguardando_validacao', assinatura_recebimento_base64: assinatura_base64,
+      status: 'concluida', assinatura_recebimento_base64: assinatura_base64,
       foto_recebimento_base64: foto_base64, data_confirmacao_recebimento: new Date(),
     });
     const updated = await db('requisicoes_epi').where('id', req.params.id).first();
@@ -815,72 +814,20 @@ router.post('/requisicoes/:id/confirmar-recebimento', authMiddleware, async (req
       const pdfBuffer = await gerarPDF(updated, tecnico, gestor);
       await db('requisicoes_epi').where('id', req.params.id).update({ pdf_base64: `data:application/pdf;base64,${pdfBuffer.toString('base64')}` });
     } catch (e) { console.error('Erro ao gerar PDF na confirmação:', e); }
-    res.json({ success: true, message: 'Assinatura enviada! Aguardando validação do gestor.' });
+    res.json({ success: true, message: 'Recebimento confirmado! PDF gerado.' });
 
-        // ✅ NOTIFICAÇÃO: Avisar gestores que o técnico assinou (precisa VALIDAR)
+        // ✅ NOTIFICAÇÃO: Avisar gestores que técnico confirmou
         try {
           const tecConfirmou = await db('usuarios').where('id', req.user.id).first();
           await notificationService.enviarParaGestores(
             db, req.user.tenant_id,
-            '✍️ Assinatura para validar',
-            `${tecConfirmou.nome} assinou o recebimento. Valide a assinatura e a foto.`,
-            { route: '/seguranca/gestao', tipo: 'aguardando_validacao', referencia_id: String(req.params.id) }
+            '📦 Recebimento Confirmado',
+            `${tecConfirmou.nome} confirmou o recebimento dos EPIs.`,
+            { route: '/seguranca/gestao', tipo: 'recebimento_confirmado', referencia_id: String(req.params.id) }
           );
         } catch (notifErr) { console.warn('⚠️ Falha ao notificar gestores:', notifErr.message); }
 
       } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao confirmar recebimento' }); }
-});
-
-// POST /api/seguranca/requisicoes/:id/validar-recebimento
-// Gestor valida a assinatura/foto do técnico:
-//   aprovar=true  → status 'concluida'
-//   aprovar=false → volta para 'aguardando_confirmacao' (técnico assina de novo) + motivo
-router.post('/requisicoes/:id/validar-recebimento', authMiddleware, async (req, res) => {
-  try {
-    if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
-
-    const { aprovar, observacao } = req.body;
-    const requisicao = await db('requisicoes_epi').where('id', req.params.id).first();
-    if (!requisicao) return res.status(404).json({ error: 'Não encontrada' });
-    if (requisicao.status !== 'aguardando_validacao')
-      return res.status(400).json({ error: `Requisição não está aguardando validação (status atual: ${requisicao.status})` });
-
-    if (aprovar === true) {
-      // ── ACEITA → concluída ──────────────────────────────────────
-      await db('requisicoes_epi').where('id', req.params.id).update({
-        status: 'concluida', gestor_id: req.user.id,
-      });
-      res.json({ success: true, message: 'Assinatura validada! Requisição concluída.' });
-
-      try {
-        await notificationService.enviarParaUsuario(
-          db, requisicao.tecnico_id,
-          '✅ Recebimento validado',
-          'O gestor validou sua assinatura. Requisição concluída!',
-          { route: '/seguranca/minhas', tipo: 'recebimento_validado', referencia_id: String(req.params.id) }
-        );
-      } catch (notifErr) { console.warn('⚠️ Falha ao notificar técnico:', notifErr.message); }
-    } else {
-      // ── REPROVA → volta pro técnico assinar de novo ─────────────
-      if (!observacao || !observacao.trim()) return res.status(400).json({ error: 'Informe o motivo da reprovação' });
-
-      await db('requisicoes_epi').where('id', req.params.id).update({
-        status: 'aguardando_confirmacao', gestor_id: req.user.id, observacao_gestor: observacao,
-        // limpa a assinatura/foto reprovadas para o técnico refazer
-        assinatura_recebimento_base64: null, foto_recebimento_base64: null, data_confirmacao_recebimento: null,
-      });
-      res.json({ success: true, message: 'Recebimento reprovado. O técnico deverá assinar novamente.' });
-
-      try {
-        await notificationService.enviarParaUsuario(
-          db, requisicao.tecnico_id,
-          '⚠️ Assinatura reprovada',
-          `O gestor pediu para refazer: ${observacao}`,
-          { route: '/seguranca', tipo: 'recebimento_reprovado', referencia_id: String(req.params.id) }
-        );
-      } catch (notifErr) { console.warn('⚠️ Falha ao notificar técnico:', notifErr.message); }
-    }
-  } catch (err) { console.error('❌ Erro ao validar recebimento:', err); res.status(500).json({ error: 'Erro ao validar recebimento' }); }
 });
 
 router.get('/tecnicos', authMiddleware, async (req, res) => {
@@ -1142,16 +1089,6 @@ router.post('/devolucoes/:id/aprovar', authMiddleware, async (req, res) => {
     }
 
     res.json({ success: true, message: 'Devolução aprovada!' });
-
-    // ✅ NOTIFICAÇÃO: avisar o técnico que a devolução foi confirmada
-    try {
-      await notificationService.enviarParaUsuario(
-        db, devolucao.tecnico_id,
-        '✅ Devolução confirmada',
-        `Sua devolução de "${devolucao.epi_nome}" foi confirmada pelo gestor.`,
-        { route: '/seguranca/minhas', tipo: 'devolucao_aprovada', referencia_id: String(req.params.id) }
-      );
-    } catch (notifErr) { console.warn('⚠️ Falha ao notificar técnico:', notifErr.message); }
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao aprovar devolução' }); }
 });
 
@@ -1169,19 +1106,6 @@ router.post('/devolucoes/:id/recusar', authMiddleware, async (req, res) => {
     });
 
     res.json({ success: true, message: 'Devolução recusada. Técnico marcado como devedor.' });
-
-    // ✅ NOTIFICAÇÃO: avisar o técnico que a devolução foi recusada (virou devedor)
-    try {
-      const dev = await db('devolucoes_epi').where('id', req.params.id).first();
-      if (dev) {
-        await notificationService.enviarParaUsuario(
-          db, dev.tecnico_id,
-          '⚠️ Devolução recusada',
-          `Sua devolução de "${dev.epi_nome}" não foi confirmada.${observacao ? ' Motivo: ' + observacao : ''}`,
-          { route: '/seguranca/minhas', tipo: 'devolucao_recusada', referencia_id: String(req.params.id) }
-        );
-      }
-    } catch (notifErr) { console.warn('⚠️ Falha ao notificar técnico:', notifErr.message); }
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao recusar' }); }
 });
 

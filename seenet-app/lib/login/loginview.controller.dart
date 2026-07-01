@@ -88,17 +88,12 @@ class LoginController extends GetxController {
 
     bool hasError = false;
 
-    // Validar identificador (telefone ou nome)
+    // Validar identificador (CPF)
     if (loginInput.text.trim().isEmpty) {
-      emailError.value = 'Telefone ou nome é obrigatório';
+      emailError.value = 'CPF é obrigatório';
       hasError = true;
     } else if (loginInput.text.trim().length < 2) {
-      emailError.value = 'Identificador muito curto';
-      hasError = true;
-    }
-
-    if (senhaInput.text.isEmpty) {
-      senhaError.value = 'Senha é obrigatória';
+      emailError.value = 'CPF muito curto';
       hasError = true;
     }
 
@@ -152,7 +147,6 @@ class LoginController extends GetxController {
 
   bool get podeLogar {
     return email.value.trim().isNotEmpty &&
-        senha.value.isNotEmpty &&
         codigoEmpresa.value.isNotEmpty &&
         empresaValida.value &&
         !isLoading.value;

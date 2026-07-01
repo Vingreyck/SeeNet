@@ -1,6 +1,7 @@
 // lib/services/background_location_service.dart
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:ui';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -61,30 +62,16 @@ void _onStart(ServiceInstance service) async {
   String? osId;
   String? token;
   String? tenantCode;
+  StreamSubscription<Position>? posSub;
+  DateTime ultimoEnvio = DateTime.fromMillisecondsSinceEpoch(0);
 
-  service.on('startTracking').listen((event) {
-    osId        = event?['osId']        as String?;
-    token       = event?['token']       as String?;
-    tenantCode  = event?['tenantCode']  as String?;
-    print('📡 [BG] Tracking iniciado — OS $osId');
-  });
-
-  service.on('stopTracking').listen((_) {
-    print('📡 [BG] Tracking parado — OS $osId');
-    osId = null; token = null;
-  });
-
-  service.on('stopService').listen((_) => service.stopSelf());
-
-  // Enviar GPS a cada 10 segundos
-  Timer.periodic(const Duration(seconds: 10), (_) async {
+  // Envia a posição pro servidor — no máximo ~1x a cada 10s (mesma cadência de antes).
+  Future<void> enviarPosicao(Position pos) async {
     if (osId == null || token == null) return;
+    if (DateTime.now().difference(ultimoEnvio).inSeconds < 10) return;
+    ultimoEnvio = DateTime.now();
 
     try {
-      final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      ).timeout(const Duration(seconds: 8));
-
       await http.put(
         Uri.parse(
           'https://seenet-production.up.railway.app/api/ordens-servico/$osId/location',
@@ -102,7 +89,7 @@ void _onStart(ServiceInstance service) async {
         }),
       );
 
-      // Atualizar texto da notificação foreground
+      // Atualizar texto da notificação foreground (Android)
       if (service is AndroidServiceInstance) {
         final h = DateTime.now();
         final hStr =
@@ -123,8 +110,54 @@ void _onStart(ServiceInstance service) async {
 
       print('📍 [BG] ${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}');
     } catch (e) {
-      print('⚠️ [BG] Erro GPS: $e');
+      print('⚠️ [BG] Erro ao enviar GPS: $e');
     }
+  }
+
+  // Abre o stream de localização. No iOS, allowBackgroundLocationUpdates:true
+  // mantém o app recebendo posição com ele minimizado (o Timer NÃO roda em 2º
+  // plano no iOS — por isso a troca). No Android segue pelo foreground service.
+  void iniciarStream() {
+    posSub?.cancel();
+    final LocationSettings settings = Platform.isIOS
+        ? AppleSettings(
+            accuracy: LocationAccuracy.high,
+            activityType: ActivityType.automotiveNavigation,
+            distanceFilter: 0,
+            pauseLocationUpdatesAutomatically: false,
+            showBackgroundLocationIndicator: true,
+            allowBackgroundLocationUpdates: true,
+          )
+        : AndroidSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 0,
+            intervalDuration: const Duration(seconds: 10),
+          );
+    posSub = Geolocator.getPositionStream(locationSettings: settings).listen(
+      enviarPosicao,
+      onError: (e) => print('⚠️ [BG] Stream GPS: $e'),
+    );
+  }
+
+  service.on('startTracking').listen((event) {
+    osId        = event?['osId']        as String?;
+    token       = event?['token']       as String?;
+    tenantCode  = event?['tenantCode']  as String?;
+    print('📡 [BG] Tracking iniciado — OS $osId');
+    iniciarStream();
+  });
+
+  service.on('stopTracking').listen((_) {
+    print('📡 [BG] Tracking parado — OS $osId');
+    posSub?.cancel();
+    posSub = null;
+    osId = null;
+    token = null;
+  });
+
+  service.on('stopService').listen((_) {
+    posSub?.cancel();
+    service.stopSelf();
   });
 }
 

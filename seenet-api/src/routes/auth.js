@@ -78,7 +78,12 @@ router.post('/register', [
   body('nome').trim()
     .isLength({ min: 5, max: 100 }).withMessage('Nome deve ter entre 5 e 100 caracteres')
     .matches(/^\S+(?:\s+\S+)+$/).withMessage('Informe o nome completo (nome e sobrenome)'),
-  body('senha').isLength({ min: 6, max: 128 }).withMessage('Senha deve ter entre 6 e 128 caracteres'),
+  // Senha REMOVIDA: login agora é por CPF (sem senha).
+  // CPF OPCIONAL no backend (apps antigos não enviam) — se vier, valida e guarda só os 11 dígitos.
+  body('cpf')
+    .optional({ checkFalsy: true })
+    .customSanitizer((v) => (v == null ? '' : v.toString()).replace(/\D/g, ''))
+    .isLength({ min: 11, max: 11 }).withMessage('CPF deve ter 11 dígitos'),
   // Telefone OPCIONAL durante a transição (apps antigos não enviam telefone).
   // Se vier, validamos e guardamos só os dígitos (ignora (), -, espaços).
   body('telefone')
@@ -116,7 +121,7 @@ router.post('/register', [
       });
     }
 
-    const { nome, senha, telefone } = req.body; // telefone já vem só com dígitos (sanitizado)
+    const { nome, senha, telefone, cpf } = req.body; // telefone e cpf já vêm só com dígitos (sanitizados)
     const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode;
 
     console.log('✅ Validação OK');
@@ -168,6 +173,21 @@ router.post('/register', [
       console.log('✅ Telefone disponível');
     }
 
+    // CPF único por empresa — só checa SE foi informado.
+    if (cpf) {
+      const existingCpf = await db('usuarios')
+        .where('cpf', cpf)
+        .where('tenant_id', tenant.id)
+        .first();
+      if (existingCpf) {
+        console.log('❌ CPF já existe:', cpf);
+        return res.status(400).json({
+          error: 'Este CPF já está cadastrado nesta empresa'
+        });
+      }
+      console.log('✅ CPF disponível');
+    }
+
     // Verificar limite de usuários do plano
     const userCount = await db('usuarios')
       .where('tenant_id', tenant.id)
@@ -192,15 +212,15 @@ router.post('/register', [
 
     console.log('✅ Limite de usuários OK:', userCount.total, '/', maxUsers);
 
-    // Hash da senha
-    const senhaHash = await bcrypt.hash(senha, 10);
-    console.log('✅ Senha hasheada');
+    // Senha agora é OPCIONAL (login por CPF). Só hasheia se vier (app antigo).
+    const senhaHash = senha ? await bcrypt.hash(senha, 10) : null;
 
     // ✅ CORREÇÃO: Remover data_criacao (usar default do banco)
     const novoUsuario = {
       nome,
+      cpf: cpf || null, // login por CPF; índice único ignora NULL
       telefone: telefone || null, // app antigo manda vazio → grava NULL (índice único ignora NULL)
-      senha: senhaHash,
+      senha: senhaHash, // pode ser null (cadastro novo não tem senha)
       tenant_id: tenant.id,
       tipo_usuario: 'tecnico',
       ativo: true,
@@ -326,7 +346,7 @@ router.post('/register', [
 
 // ========== LOGIN ==========
 router.post('/login', loginLimiter, [
-  body('senha').notEmpty().withMessage('Senha é obrigatória'),
+  // Senha REMOVIDA: login agora é por CPF (sem senha).
   body().custom((value, { req }) => {
     const codigo = req.body.codigoEmpresa || req.body.tenantCode;
     if (!codigo || codigo.trim().length < 3 || codigo.trim().length > 20) {
@@ -335,10 +355,10 @@ router.post('/login', loginLimiter, [
     return true;
   }),
   body().custom((value, { req }) => {
-    // Identificador pode vir como telefone, login (genérico) ou nome (app antigo).
-    const id = req.body.telefone || req.body.login || req.body.nome;
+    // Identificador: CPF, telefone, login (genérico) ou nome (app antigo).
+    const id = req.body.cpf || req.body.telefone || req.body.login || req.body.nome;
     if (!id || id.toString().trim().length < 2) {
-      throw new Error('Informe o telefone ou o nome de usuário');
+      throw new Error('Informe o CPF');
     }
     return true;
   })
@@ -370,40 +390,37 @@ router.post('/login', loginLimiter, [
       });
     }
 
-    const senha = req.body.senha;
     const codigoEmpresa = req.body.codigoEmpresa || req.body.tenantCode;
 
-    // O identificador pode ser TELEFONE (números) ou NOME (compatível com o app antigo).
-    // Regra: se o que foi digitado é só dígitos/símbolos de telefone, busca por telefone;
-    // caso contrário, busca por nome (como era antes). Assim ninguém fica travado.
-    const identificador = (req.body.telefone ?? req.body.login ?? req.body.nome ?? '').toString().trim();
+    // Login por CPF (sem senha). O identificador pode vir como CPF, telefone,
+    // login (genérico) ou nome (app antigo). Buscamos por qualquer um: CPF/telefone
+    // batem pelos dígitos; nome bate pelo texto. Assim ninguém fica travado.
+    const identificador = (req.body.cpf ?? req.body.telefone ?? req.body.login ?? req.body.nome ?? '').toString().trim();
     const digitos = identificador.replace(/\D/g, '');
-    const ehTelefone = digitos.length >= 8 && /^[\d\s()+-]+$/.test(identificador);
     const nome = identificador; // usado nos logs e mensagens abaixo
 
-    console.log('✅ Validação OK - Buscando por', ehTelefone ? 'TELEFONE' : 'NOME', '-', codigoEmpresa);
+    console.log('✅ Validação OK - Buscando usuário -', codigoEmpresa);
 
-    // Buscar usuário com tenant (por telefone OU por nome)
-    let loginQuery = db('usuarios')
+    // Buscar usuário com tenant (por CPF OU telefone OU nome)
+    const user = await db('usuarios')
       .join('tenants', 'usuarios.tenant_id', 'tenants.id')
       .where('tenants.codigo', codigoEmpresa.toUpperCase())
       .whereRaw('usuarios.ativo = ?', [true])
       .whereRaw('tenants.ativo = ?', [true])
+      .where(function () {
+        this.where('usuarios.nome', identificador);
+        if (digitos.length >= 8) {
+          this.orWhere('usuarios.cpf', digitos).orWhere('usuarios.telefone', digitos);
+        }
+      })
       .select(
         'usuarios.*',
         'tenants.id as tenant_id',
         'tenants.codigo as tenant_code',
         'tenants.nome as tenant_name',
         'tenants.plano as tenant_plan'
-      );
-
-    if (ehTelefone) {
-      loginQuery = loginQuery.where('usuarios.telefone', digitos);
-    } else {
-      loginQuery = loginQuery.where('usuarios.nome', identificador);
-    }
-
-    const user = await loginQuery.first();
+      )
+      .first();
 
     if (!user) {
       // Log de falha na autenticação
@@ -425,37 +442,7 @@ router.post('/login', loginLimiter, [
       });
     }
 
-    // Verificar senha
-    const senhaValida = await bcrypt.compare(senha, user.senha);
-    if (!senhaValida) {
-      // Log de falha na autenticação
-      logger.warn('Tentativa de login falhou - senha incorreta', {
-        ...requestContext,
-        userId: user.id,
-        tenantId: user.tenant_id,
-        reason: 'INVALID_PASSWORD',
-        loginAttempts: (user.tentativas_login || 0) + 1
-      });
-
-      await auditService.log({
-        action: 'LOGIN_FAILED',
-        usuario_id: user.id,
-        tenant_id: user.tenant_id,
-        details: `Senha incorreta: ${nome}`,
-        ip_address: req.ip,
-        reason: 'INVALID_PASSWORD'
-      });
-
-      // Incrementar tentativas de login
-      await db('usuarios')
-        .where('id', user.id)
-        .increment('tentativas_login', 1);
-
-      return res.status(401).json({ 
-        error: 'Senha incorreta',
-        type: 'INVALID_PASSWORD'
-      });
-    }
+    // Senha REMOVIDA: login por CPF — sem verificação de senha.
 
     // Atualizar último login
     await db('usuarios')

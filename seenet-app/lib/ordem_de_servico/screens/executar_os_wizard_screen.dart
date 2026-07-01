@@ -28,7 +28,8 @@ class ExecutarOSWizardScreen extends StatefulWidget {
   State<ExecutarOSWizardScreen> createState() => _ExecutarOSWizardScreenState();
 }
 
-class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
+class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
+    with WidgetsBindingObserver {
   final OrdemServicoController controller = Get.find<OrdemServicoController>();
   late OrdemServico os;
 
@@ -61,6 +62,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
   void initState() {
     super.initState();
     os = Get.arguments as OrdemServico;
+    WidgetsBinding.instance.addObserver(this); // salva progresso ao minimizar/fechar
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final osAtualizada = controller.ordensServico
@@ -126,7 +128,20 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen> {
     relatoSolucaoController.dispose();
     materiaisController.dispose();
     observacoesController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  // ✅ Salva o progresso quando o app vai pro fundo (minimizar/fechar/trocar de app)
+  // — assim o técnico NÃO perde MAC/serial/relato se sair no meio da OS.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _salvarProgresso();
+    }
+    super.didChangeAppLifecycleState(state);
   }
 
   String _getNomeEtapa(int etapa) {

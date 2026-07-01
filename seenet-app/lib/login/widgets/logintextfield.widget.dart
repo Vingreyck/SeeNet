@@ -10,10 +10,9 @@ class LoginTextField extends GetView<LoginController> {
   Widget build(BuildContext context) {
     return Obx(() => TextField(
       controller: controller.loginInput,
-      keyboardType: TextInputType.name,
-      textCapitalization: TextCapitalization.words,
+      keyboardType: TextInputType.number,
       decoration: InputDecoration(
-        hintText: 'Telefone ou nome',
+        hintText: 'CPF',
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(100),
           borderSide: const BorderSide(

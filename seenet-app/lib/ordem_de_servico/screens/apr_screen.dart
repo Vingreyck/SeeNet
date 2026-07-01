@@ -68,7 +68,8 @@ class AprScreen extends StatefulWidget {
   State<AprScreen> createState() => _AprScreenState();
 }
 
-class _AprScreenState extends State<AprScreen> {
+class _AprScreenState extends State<AprScreen>
+    with WidgetsBindingObserver {
   final ApiService _api = ApiService.instance;
   late OrdemServico os;
 
@@ -89,15 +90,75 @@ class _AprScreenState extends State<AprScreen> {
   void initState() {
     super.initState();
     os = widget.os;
+    WidgetsBinding.instance.addObserver(this); // salva rascunho ao minimizar/fechar
     _carregarChecklist();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final c in _justificativas.values) c.dispose();
     for (final c in _respostasTexto.values) c.dispose();
     super.dispose();
   }
+
+  // ✅ Salva o rascunho do APR quando o app vai pro fundo (minimizar/fechar) —
+  // assim o técnico NÃO precisa refazer o APR se sair no meio.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _salvarRascunho();
+    }
+    super.didChangeAppLifecycleState(state);
+  }
+
+  String get _rascunhoKey => 'apr_rascunho_${os.id}';
+
+  void _salvarRascunho() {
+    if (_categorias.isEmpty) return; // nada carregado ainda
+    GetStorage().write(_rascunhoKey, {
+      'sn': _respostasSN.map((k, v) => MapEntry(k.toString(), v)),
+      'just': {
+        for (final e in _justificativas.entries) e.key.toString(): e.value.text
+      },
+      'texto': {
+        for (final e in _respostasTexto.entries) e.key.toString(): e.value.text
+      },
+      'epis': _episSelecionados.toList(),
+      'termo': _termoConcordo,
+    });
+  }
+
+  // Restaura o rascunho (chamar DEPOIS de criar os controllers do checklist).
+  void _restaurarRascunho() {
+    final d = GetStorage().read<Map>(_rascunhoKey);
+    if (d == null) return;
+    (d['sn'] as Map?)?.forEach((k, v) {
+      final id = int.tryParse(k.toString());
+      if (id != null) _respostasSN[id] = v.toString();
+    });
+    (d['just'] as Map?)?.forEach((k, v) {
+      final id = int.tryParse(k.toString());
+      if (id != null && _justificativas[id] != null) {
+        _justificativas[id]!.text = v.toString();
+      }
+    });
+    (d['texto'] as Map?)?.forEach((k, v) {
+      final id = int.tryParse(k.toString());
+      if (id != null && _respostasTexto[id] != null) {
+        _respostasTexto[id]!.text = v.toString();
+      }
+    });
+    for (final e in (d['epis'] as List?) ?? const []) {
+      final id = int.tryParse(e.toString());
+      if (id != null) _episSelecionados.add(id);
+    }
+    _termoConcordo = (d['termo'] as bool?) ?? false;
+  }
+
+  void _limparRascunho() => GetStorage().remove(_rascunhoKey);
 
   Future<void> _carregarChecklist() async {
     try {
@@ -114,6 +175,7 @@ class _AprScreenState extends State<AprScreen> {
             _justificativas[perg.id] = TextEditingController();
           }
         }
+        _restaurarRascunho(); // ✅ traz de volta o que o técnico já preencheu
         setState(() { _categorias = lista; _carregando = false; });
       } else {
         _carregarDoCache();
@@ -137,6 +199,7 @@ class _AprScreenState extends State<AprScreen> {
         }
       }
       if (mounted) {
+        _restaurarRascunho(); // ✅ traz de volta o que o técnico já preencheu
         setState(() { _categorias = lista; _carregando = false; });
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('📶 Sem conexão — usando checklist salvo'),
@@ -224,6 +287,7 @@ class _AprScreenState extends State<AprScreen> {
             content: Text('📥 APR salvo localmente — será enviado quando voltar o sinal'),
             backgroundColor: Colors.orange,
           ));
+          _limparRascunho();
           Navigator.pop(context, true);
         }
         return;
@@ -258,6 +322,7 @@ class _AprScreenState extends State<AprScreen> {
         'epis_selecionados': _episSelecionados.toList(),
       });
       if (resp['success'] == true) {
+        _limparRascunho();
         if (mounted) Navigator.pop(context, true);
       } else {
         _mostrarErro(resp['error'] ?? 'Erro ao salvar APR');

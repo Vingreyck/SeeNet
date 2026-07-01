@@ -9,6 +9,7 @@ import 'package:seenet/widgets/app_snackbar.dart';
 class RegistroController extends GetxController {
   // ========== TEXT CONTROLLERS ==========
   TextEditingController nomeInput = TextEditingController();
+  TextEditingController cpfInput = TextEditingController();
   TextEditingController telefoneInput = TextEditingController();
   TextEditingController senhaInput = TextEditingController();
   TextEditingController confirmarSenhaInput = TextEditingController(); // ← NOVO
@@ -17,6 +18,7 @@ class RegistroController extends GetxController {
   // ========== OBSERVÁVEIS ==========
   RxBool isLoading = false.obs;
   RxString nome = ''.obs;
+  RxString cpf = ''.obs;
   RxString telefone = ''.obs;
   RxString senha = ''.obs;
   RxString confirmarSenha = ''.obs; // ← NOVO
@@ -38,6 +40,10 @@ class RegistroController extends GetxController {
 
     nomeInput.addListener(() {
       nome.value = nomeInput.text;
+    });
+
+    cpfInput.addListener(() {
+      cpf.value = cpfInput.text;
     });
 
     telefoneInput.addListener(() {
@@ -108,9 +114,9 @@ class RegistroController extends GetxController {
 
       bool sucesso = await usuarioController.registrarComAutoLogin(
         nomeInput.text.trim(),
-        senhaInput.text,
+        senhaInput.text, // vazio (sem campo senha) — backend ignora
         tokenEmpresaController.text.trim().toUpperCase(),
-        telefone: telefoneInput.text.replaceAll(RegExp(r'\D'), ''),
+        cpf: cpfInput.text.replaceAll(RegExp(r'\D'), ''),
         idAlmoxarifado: almoxarifadoSelecionado.value,
         almoxarifadoNome: almoxarifadoNome.value,
       );
@@ -156,25 +162,9 @@ class RegistroController extends GetxController {
       return false;
     }
 
-    final telDigitos = telefoneInput.text.replaceAll(RegExp(r'\D'), '');
-    if (telDigitos.length < 8) {
-      _showError('Informe um telefone válido (mínimo 8 dígitos)');
-      return false;
-    }
-
-    if (senhaInput.text.length < 6) {
-      _showError('Senha deve ter pelo menos 6 caracteres');
-      return false;
-    }
-
-    // ← VALIDAÇÃO DAS SENHAS
-    if (confirmarSenhaInput.text.isEmpty) {
-      _showError('Confirme sua senha');
-      return false;
-    }
-
-    if (senhaInput.text != confirmarSenhaInput.text) {
-      _showError('As senhas não coincidem');
+    final cpfDigitos = cpfInput.text.replaceAll(RegExp(r'\D'), '');
+    if (cpfDigitos.length != 11) {
+      _showError('Informe um CPF válido (11 dígitos)');
       return false;
     }
 
@@ -198,25 +188,24 @@ class RegistroController extends GetxController {
   bool get podeRegistrar {
     return nome.value.trim().length >= 5 &&
         nome.value.trim().contains(' ') &&
-        telefone.value.replaceAll(RegExp(r'\D'), '').length >= 8 &&
-        senha.value.length >= 6 &&
-        confirmarSenha.value.isNotEmpty &&
-        senha.value == confirmarSenha.value &&
+        cpf.value.replaceAll(RegExp(r'\D'), '').length == 11 &&
         tokenEmpresa.value.length >= 4 &&
         tokenValido.value &&
-        almoxarifadoSelecionado.value != 0 && // ✅ NOVO
+        almoxarifadoSelecionado.value != 0 &&
         !isLoading.value;
   }
 
   // ========== MÉTODOS AUXILIARES ==========
   void limparCampos() {
     nomeInput.clear();
+    cpfInput.clear();
     telefoneInput.clear();
     senhaInput.clear();
     confirmarSenhaInput.clear(); // ← NOVO
     tokenEmpresaController.clear();
 
     nome.value = '';
+    cpf.value = '';
     telefone.value = '';
     senha.value = '';
     confirmarSenha.value = ''; // ← NOVO
@@ -243,6 +232,7 @@ class RegistroController extends GetxController {
   @override
   void onClose() {
     nomeInput.dispose();
+    cpfInput.dispose();
     telefoneInput.dispose();
     senhaInput.dispose();
     confirmarSenhaInput.dispose(); // ← NOVO

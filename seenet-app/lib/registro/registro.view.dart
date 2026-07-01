@@ -37,10 +37,8 @@ class RegistrarView extends GetView<RegistroController> {
 
   String _getButtonText() {
     if (controller.nomeInput.text.trim().isEmpty) return 'Digite seu nome';
-    if (controller.senhaInput.text.length < 6) return 'Senha muito curta';
-    if (controller.confirmarSenhaInput.text.isEmpty) return 'Confirme a senha';
-    if (controller.senhaInput.text != controller.confirmarSenhaInput.text) {
-      return 'Senhas não coincidem';
+    if (controller.cpfInput.text.replaceAll(RegExp(r'\D'), '').length < 11) {
+      return 'CPF incompleto';
     }
     if (controller.tokenEmpresaController.text.trim().isEmpty) return 'Digite o token';
     if (!controller.tokenValido.value) return 'Token inválido';
@@ -142,31 +140,11 @@ class RegistrarView extends GetView<RegistroController> {
                           const SizedBox(height: 12),
 
                           _buildTextField(
-                            controller: controller.telefoneInput,
-                            label: 'Telefone (usado no login)',
-                            hint: 'Ex: (79) 99999-9999',
-                            icon: Icons.phone_outlined,
-                            keyboardType: TextInputType.phone,
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          _buildPasswordField(
-                            controller: controller.senhaInput,
-                            label: 'Senha',
-                            hint: 'Mínimo 6 caracteres',
-                            obscureObs: _obscurePassword,
-                            onToggle: () => _obscurePassword.toggle(),
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          _buildPasswordField(
-                            controller: controller.confirmarSenhaInput,
-                            label: 'Confirmar Senha',
-                            hint: 'Repita a senha',
-                            obscureObs: _obscureConfirmPassword,
-                            onToggle: () => _obscureConfirmPassword.toggle(),
+                            controller: controller.cpfInput,
+                            label: 'CPF (usado no login)',
+                            hint: 'Somente números',
+                            icon: Icons.badge_outlined,
+                            keyboardType: TextInputType.number,
                           ),
 
                           const SizedBox(height: 24),

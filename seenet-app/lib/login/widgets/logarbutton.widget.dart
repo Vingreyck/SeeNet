@@ -64,7 +64,7 @@ class LogarButton extends GetView<LoginController> {
   }
 
   String _getButtonText() {
-    if (controller.email.isEmpty || controller.senha.isEmpty) {
+    if (controller.email.isEmpty) {
       return 'Preencha os campos';
     }
     

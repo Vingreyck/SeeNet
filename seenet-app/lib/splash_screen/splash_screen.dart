@@ -3,6 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:flutter/foundation.dart';
 import '../controllers/usuario_controller.dart';
+import '../controllers/ordem_servico_controller.dart';
+import '../ordem_de_servico/screens/executar_os_wizard_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../config/environment.dart';
 import 'dart:async';
@@ -163,9 +165,28 @@ class _SplashScreenState extends State<SplashScreen>
         } else {
           Get.offAllNamed('/checklist');
 
-          // ✅ Retomar tracking se OS em deslocamento ativa
+          // ✅ Retomar tracking + auto-abrir OS em andamento
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             await Future.delayed(const Duration(milliseconds: 600));
+
+            // Auto-abrir a OS em andamento: o técnico cai direto na OS que estava
+            // executando (o wizard restaura o passo + os dados já preenchidos).
+            try {
+              final osCtrl = Get.isRegistered<OrdemServicoController>()
+                  ? Get.find<OrdemServicoController>()
+                  : Get.put(OrdemServicoController());
+              await osCtrl.carregarMinhasOSs();
+              final emAndamento = osCtrl.ordensServico.firstWhereOrNull(
+                  (o) => o.status == 'em_execucao' ||
+                      o.status == 'em_deslocamento');
+              if (emAndamento != null) {
+                Get.to(() => const ExecutarOSWizardScreen(),
+                    arguments: emAndamento);
+              }
+            } catch (e) {
+              print('⚠️ Auto-abrir OS em andamento: $e');
+            }
+
             try {
               final ddsController = Get.find<DdsController>();
               final temSessao = await ddsController.verificarSessaoAtiva();

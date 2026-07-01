@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class LocalizacaoWidget extends StatefulWidget {
   final Function(double lat, double lng) onLocalizacaoCapturada;
@@ -40,23 +39,25 @@ class _LocalizacaoWidgetState extends State<LocalizacaoWidget> {
     });
 
     try {
-      // 1. Verificar permissão
-      var status = await Permission.location.status;
-
-      if (status.isDenied) {
-        status = await Permission.location.request();
+      // 1. Verificar permissão (via geolocator — usa a chave do Info.plist e
+      //    mostra o prompt NATIVO do iOS; não depende de macro do Podfile, que
+      //    é o que faltava e por isso o iPhone não mostrava a opção de localização).
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
 
-      if (status.isPermanentlyDenied) {
+      if (permission == LocationPermission.deniedForever) {
         setState(() {
           erro = 'Permissão negada. Habilite nas configurações.';
           carregando = false;
         });
-        await openAppSettings();
+        await Geolocator.openAppSettings();
         return;
       }
 
-      if (!status.isGranted) {
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
         setState(() {
           erro = 'Permissão de localização necessária.';
           carregando = false;

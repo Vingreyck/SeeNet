@@ -4,6 +4,7 @@
 <dict>
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>location</string>
 		<string>remote-notification</string>
 		<string>fetch</string>
 	</array>
@@ -15,6 +16,8 @@
 	<string>O SeeNet usa reconhecimento de voz para você ditar relatos e observações técnicas ao preencher uma ordem de serviço, em vez de digitar.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>O SeeNet usa sua localização para registrar o deslocamento e a chegada do técnico ao local da ordem de serviço e associar o atendimento ao local correto. Exemplo: ao iniciar o deslocamento para uma OS, o app registra o ponto de partida.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>O SeeNet usa sua localização em segundo plano para registrar o deslocamento do técnico durante a ordem de serviço, mesmo com o app minimizado, e comprovar o trajeto e a chegada ao local do atendimento.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

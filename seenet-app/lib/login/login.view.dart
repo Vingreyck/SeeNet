@@ -113,8 +113,6 @@ class LoginView extends GetView<LoginController> {
                         // ── Campos ────────────────────────
                         _wrapField(const LoginTextField()),
                         const SizedBox(height: 14),
-                        _wrapField(const SenhaTextField()),
-                        const SizedBox(height: 14),
                         _wrapField(const CodigoEmpresaTextField()),
 
                         const SizedBox(height: 32),

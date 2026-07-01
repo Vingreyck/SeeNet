@@ -112,6 +112,7 @@ class AuthService extends GetxService {
       String senha,
       String codigoEmpresa, {
         String telefone = '',
+        String cpf = '',
         int idAlmoxarifado = 0,
         String almoxarifadoNome = '',
       }) async {
@@ -120,8 +121,9 @@ class AuthService extends GetxService {
 
       final response = await _api.post('/auth/register', {
         'nome': nome,
-        'telefone': telefone,
-        'senha': senha,
+        if (cpf.isNotEmpty) 'cpf': cpf,
+        if (telefone.isNotEmpty) 'telefone': telefone,
+        if (senha.isNotEmpty) 'senha': senha,
         'codigoEmpresa': codigoEmpresa.toUpperCase(),
         if (idAlmoxarifado != 0) 'id_almoxarifado': idAlmoxarifado,
         if (almoxarifadoNome.isNotEmpty) 'almoxarifado_nome': almoxarifadoNome,
@@ -194,24 +196,12 @@ class AuthService extends GetxService {
         // se falhar a verificação local, continua para verificação remota
       }
 
-      print('🔄 Tentando auto-login...');
+      print('🔄 Auto-login: token local válido, entrando...');
       _api.setAuth(savedToken, savedTenantCode);
 
-      // Verifica o token no servidor — mas só DESLOGA se for rejeição REAL (401).
-      // Se o verify falhar por REDE/timeout (técnico com internet ruim), mantém a
-      // sessão: o token local já passou na checagem de validade (exp) acima.
-      final verif = await _api.get('/auth/verify',
-          timeout: const Duration(seconds: 5));
-      if (verif['success'] != true && verif['statusCode'] == 401) {
-        print('⚠️ Token rejeitado pelo servidor (401) — deslogando');
-        await _clearPersistedSession();
-        _api.clearAuth();
-        return false;
-      }
-      if (verif['success'] != true) {
-        print('📶 Verify falhou por rede — mantendo sessão (token local válido)');
-      }
-
+      // ✅ Token local válido → LOGA JÁ, sem esperar a rede (funciona até offline).
+      // Assim o técnico NÃO cai mais no login toda vez por causa de internet ruim
+      // ou de uma verificação que demora/falha.
       final userData = Map<String, dynamic>.from(savedUserData);
       _usuarioController.usuarioLogado.value = Usuario(
         id: userData['id'],
@@ -223,8 +213,12 @@ class AuthService extends GetxService {
         dataCriacao: DateTime.now(),
       );
 
-      // ✅ NOVO: Enviar FCM token após auto-login também
+      // Enviar FCM token
       _enviarFcmToken();
+
+      // Confere o token no servidor EM BACKGROUND. Só encerra a sessão se o
+      // servidor REJEITAR de verdade (401). Falha de rede NÃO desloga.
+      _verificarTokenEmBackground();
 
       print('✅ Auto-login bem-sucedido: ${userData['nome']}');
       return true;
@@ -234,6 +228,23 @@ class AuthService extends GetxService {
       _api.clearAuth();
       return false;
     }
+  }
+
+  /// Confere o token no servidor SEM bloquear o auto-login. Só encerra a sessão
+  /// se o servidor responder 401 (token realmente rejeitado/expirado no servidor).
+  /// Falha de rede é ignorada (mantém a sessão — o token local já é válido).
+  void _verificarTokenEmBackground() {
+    _api.get('/auth/verify', timeout: const Duration(seconds: 8)).then((verif) {
+      if (verif is Map && verif['success'] != true && verif['statusCode'] == 401) {
+        print('⚠️ Token rejeitado pelo servidor (401) — encerrando sessão');
+        _clearPersistedSession();
+        _api.clearAuth();
+        _usuarioController.usuarioLogado.value = null;
+        Get.offAllNamed('/login');
+      }
+    }).catchError((e) {
+      print('📶 Verify em background falhou (rede) — sessão mantida: $e');
+    });
   }
 
   // ========== LOGOUT ==========

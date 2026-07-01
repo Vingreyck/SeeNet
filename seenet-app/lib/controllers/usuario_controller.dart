@@ -37,8 +37,8 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
   try {
     isLoading.value = true;
     
-    // Validações básicas
-    if (email.trim().isEmpty || senha.isEmpty || codigoEmpresa.trim().isEmpty) {
+    // Validações básicas (login por CPF — sem senha)
+    if (email.trim().isEmpty || codigoEmpresa.trim().isEmpty) {
       ErrorHandler.handleValidationError('Preencha todos os campos');
       return false;
     }
@@ -103,6 +103,7 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       String senha,
       String codigoEmpresa, {
         String telefone = '',
+        String cpf = '',
         int idAlmoxarifado = 0,
         String almoxarifadoNome = '',
       }) async {
@@ -112,6 +113,7 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       bool registroSucesso = await _authService.register(
         nome, senha, codigoEmpresa,
         telefone: telefone,
+        cpf: cpf,
         idAlmoxarifado: idAlmoxarifado,
         almoxarifadoNome: almoxarifadoNome,
       );
@@ -124,8 +126,8 @@ Future<bool> login(String email, String senha, String codigoEmpresa) async {
       print('✅ Registro bem-sucedido, iniciando auto-login...');
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // Auto-login pelo TELEFONE (novo identificador); usa o nome se não houver telefone.
-      bool loginSucesso = await login(telefone.isNotEmpty ? telefone : nome, senha, codigoEmpresa);
+      // Auto-login pelo CPF (novo identificador); usa o nome se não houver CPF.
+      bool loginSucesso = await login(cpf.isNotEmpty ? cpf : nome, senha, codigoEmpresa);
 
       if (loginSucesso) {
         print('✅ Auto-login bem-sucedido');

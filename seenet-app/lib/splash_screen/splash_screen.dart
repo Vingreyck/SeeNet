@@ -112,7 +112,16 @@ class _SplashScreenState extends State<SplashScreen>
       print('📦 14 ConnectivityService...');
       Get.put(ConnectivityService(), permanent: true);
       print('📦 15 NotificationService...');
-      Get.put(NotificationService(), permanent: true);
+      // ⚠️ No WEB o NotificationService (Firebase Messaging + local notifications)
+      // estoura JÁ na criação e, sem proteção, esse erro ABORTAVA todo o arranque
+      // -> o app caía direto no /login SEM NUNCA tentar o auto-login. Protegido:
+      // se falhar, o app segue (push pode não funcionar no web, mas o auto-login
+      // volta a funcionar). No Android/iOS o Get.put roda normal (não cai no catch).
+      try {
+        Get.put(NotificationService(), permanent: true);
+      } catch (e) {
+        print('⚠️ NotificationService não registrado (web/plugin): $e');
+      }
       print('✅ Todos registrados!');
 
       try {
@@ -161,9 +170,11 @@ class _SplashScreenState extends State<SplashScreen>
         if (isWeb && (usuarioController.isAdmin ||
             tipo == 'gestor' ||
             tipo == 'gestor_seguranca')) {
-          Get.offAllNamed('/web-admin');
+          // Auto-login cai no /checklist (mesma tela do login manual), NÃO no
+          // /web-admin (painel com dados de exemplo, que o Vinícius não usa).
+          Get.offAllNamed('/ordens-servico');
         } else {
-          Get.offAllNamed('/checklist');
+          Get.offAllNamed('/ordens-servico');
 
           // ✅ Retomar tracking + auto-abrir OS em andamento
           WidgetsBinding.instance.addPostFrameCallback((_) async {

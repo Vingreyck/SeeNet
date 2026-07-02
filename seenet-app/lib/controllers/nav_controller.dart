@@ -31,7 +31,7 @@ class NavController extends GetxController {
   //    do frame de build, sem warnings.
   final ValueNotifier<bool> mostrarNavNotifier = ValueNotifier<bool>(true);
 
-  String _rotaAtual = '/checklist';
+  String _rotaAtual = '/ordens-servico';
 
   /// Atualiza a rota atual e o índice da tab — sempre adiado para
   /// fora do frame atual, evitando "setState during build".
@@ -40,7 +40,7 @@ class NavController extends GetxController {
       _rotaAtual = rota;
       mostrarNavNotifier.value = !_rotasOcultas.any((r) => rota.startsWith(r));
 
-      if (rota == '/checklist') {
+      if (rota == '/ordens-servico') {
         selectedIndex.value = 1;
       } else if (rota == '/seguranca') {
         selectedIndex.value = 2;

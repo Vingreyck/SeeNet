@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 import 'package:seenet/services/auth_service.dart';
 
 class SegurancaService extends GetxService {
@@ -12,6 +14,28 @@ class SegurancaService extends GetxService {
 
   String get _base => 'https://seenet-production.up.railway.app/api/seguranca';
   String get _baseEstoque => 'https://seenet-production.up.railway.app/api/estoque';
+
+  // ── Helper HTTP (web-safe) ─────────────────────────────────────
+  // O GetConnect QUEBRA POST/PUT no WEB (tenta setar 'content-length', o navegador
+  // bloqueia e o corpo não vai → backend recebe vazio). O http funciona em TODAS as
+  // plataformas (mobile inclusive). Devolve { 'status', 'body' (já parseado) }.
+  Future<Map<String, dynamic>> _http(
+      String metodo, String url, [Map<String, dynamic>? corpo]) async {
+    final uri = Uri.parse(url);
+    final String? corpoJson = corpo == null ? null : json.encode(corpo);
+    final http.Response r;
+    if (metodo == 'PUT') {
+      r = await http.put(uri, headers: _headers, body: corpoJson);
+    } else if (metodo == 'DELETE') {
+      r = await http.delete(uri, headers: _headers);
+    } else {
+      r = await http.post(uri, headers: _headers, body: corpoJson);
+    }
+    return {
+      'status': r.statusCode,
+      'body': r.body.isNotEmpty ? json.decode(r.body) : null,
+    };
+  }
 
   // ── EPIs disponíveis ──────────────────────────────────────────
   Future<List<String>> buscarEpis() async {
@@ -38,15 +62,11 @@ class SegurancaService extends GetxService {
   // ── Criar requisição ──────────────────────────────────────────
   Future<Map<String, dynamic>> criarRequisicao({required List<String> episSolicitados}) async {
     try {
-      final response = await GetConnect().post(
-        '$_base/requisicoes',
-        {'epis_solicitados': episSolicitados},
-        headers: _headers,
-      );
-      if (response.statusCode == 201) {
-        return {'success': true, 'message': response.body?['message'] ?? 'Enviado'};
+      final r = await _http('POST', '$_base/requisicoes', {'epis_solicitados': episSolicitados});
+      if (r['status'] == 201) {
+        return {'success': true, 'message': r['body']?['message'] ?? 'Enviado'};
       }
-      return {'success': false, 'message': response.body?['error'] ?? 'Erro (${response.statusCode})'};
+      return {'success': false, 'message': r['body']?['error'] ?? 'Erro (${r['status']})'};
     } catch (e) { return {'success': false, 'message': 'Erro de conexão: $e'}; }
   }
 
@@ -72,13 +92,10 @@ class SegurancaService extends GetxService {
     required String assinaturaBase64,
     required String fotoBase64,
   }) async {
-    final response = await GetConnect().post(
-      '$_base/requisicoes/$id/confirmar-recebimento',
-      {'assinatura_base64': assinaturaBase64, 'foto_base64': fotoBase64},
-      headers: _headers,
-    );
-    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
-    return {'success': false, 'message': response.body['error'] ?? 'Erro ao confirmar'};
+    final r = await _http('POST', '$_base/requisicoes/$id/confirmar-recebimento',
+        {'assinatura_base64': assinaturaBase64, 'foto_base64': fotoBase64});
+    if (r['status'] == 200) return {'success': true, 'message': r['body']?['message']};
+    return {'success': false, 'message': r['body']?['error'] ?? 'Erro ao confirmar'};
   }
 
   // ── Minhas requisições ────────────────────────────────────────
@@ -129,22 +146,18 @@ class SegurancaService extends GetxService {
           'foto_documento_base64': fotoDocumentoBase64,
       };
 
-      final response = await GetConnect().post(
-        '$_base/requisicoes/manual',
-        body,
-        headers: _headers,
-      );
+      final r = await _http('POST', '$_base/requisicoes/manual', body);
 
-      if (response.statusCode == 201) {
+      if (r['status'] == 201) {
         return {
           'success': true,
-          'message': response.body['message']
+          'message': r['body']?['message']
         };
       }
 
       return {
         'success': false,
-        'message': response.body['error'] ?? 'Erro ao criar registro'
+        'message': r['body']?['error'] ?? 'Erro ao criar registro'
       };
     } catch (e) {
       return {
@@ -224,50 +237,52 @@ class SegurancaService extends GetxService {
         List<Map<String, dynamic>>? itensIxc,
         // itensIxc: [{'id_produto': '525', 'descricao': 'Luva', 'quantidade': 2}]
       }) async {
-    final response = await GetConnect().post(
-      '$_base/requisicoes/$id/aprovar',
-      {
-        'observacao': observacao ?? '',
-        if (dataEntrega != null) 'data_entrega': dataEntrega,
-        if (itensIxc != null && itensIxc.isNotEmpty) 'itens_ixc': itensIxc,
-      },
-      headers: _headers,
-    );
-    if (response.statusCode == 200) {
+    final r = await _http('POST', '$_base/requisicoes/$id/aprovar', {
+      'observacao': observacao ?? '',
+      if (dataEntrega != null) 'data_entrega': dataEntrega,
+      if (itensIxc != null && itensIxc.isNotEmpty) 'itens_ixc': itensIxc,
+    });
+    if (r['status'] == 200) {
       return {
         'success': true,
-        'message': response.body['message'],
-        'id_requisicao_ixc': response.body['id_requisicao_ixc'],
-        'itens_descontados': response.body['itens_descontados'],
+        'message': r['body']?['message'],
+        'id_requisicao_ixc': r['body']?['id_requisicao_ixc'],
+        'itens_descontados': r['body']?['itens_descontados'],
       };
     }
-    return {'success': false, 'message': response.body['error'] ?? 'Erro ao aprovar'};
+    return {'success': false, 'message': r['body']?['error'] ?? 'Erro ao aprovar'};
   }
 
   // ── Recusar ───────────────────────────────────────────────────
   Future<Map<String, dynamic>> recusar(int id, {required String observacao}) async {
-    final response = await GetConnect().post(
-      '$_base/requisicoes/$id/recusar',
-      {'observacao': observacao},
-      headers: _headers,
-    );
-    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
-    return {'success': false, 'message': response.body['error'] ?? 'Erro ao recusar'};
+    try {
+      // ✅ http (NÃO GetConnect): no WEB o GetConnect tenta setar 'content-length'
+      // (o navegador bloqueia) e o CORPO não vai → o backend recebe vazio →
+      // 400 "Motivo obrigatório". Com http o corpo vai certo.
+      final response = await http.post(
+        Uri.parse('$_base/requisicoes/$id/recusar'),
+        headers: _headers,
+        body: json.encode({'observacao': observacao}),
+      );
+      final body = response.body.isNotEmpty ? json.decode(response.body) : {};
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': body['message']};
+      }
+      return {'success': false, 'message': body['error'] ?? 'Erro ao recusar'};
+    } catch (e) {
+      return {'success': false, 'message': 'Erro ao recusar: $e'};
+    }
   }
 
   // ── Validar recebimento (gestor aceita/reprova a assinatura do técnico) ──
   Future<Map<String, dynamic>> validarRecebimento(int id,
       {required bool aprovar, String? observacao}) async {
-    final response = await GetConnect().post(
-      '$_base/requisicoes/$id/validar-recebimento',
-      {
-        'aprovar': aprovar,
-        if (observacao != null) 'observacao': observacao,
-      },
-      headers: _headers,
-    );
-    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
-    return {'success': false, 'message': response.body['error'] ?? 'Erro ao validar'};
+    final r = await _http('POST', '$_base/requisicoes/$id/validar-recebimento', {
+      'aprovar': aprovar,
+      if (observacao != null) 'observacao': observacao,
+    });
+    if (r['status'] == 200) return {'success': true, 'message': r['body']?['message']};
+    return {'success': false, 'message': r['body']?['error'] ?? 'Erro ao validar'};
   }
 
   // ── Estoque IXC (para o gestor selecionar itens ao aprovar) ──
@@ -301,12 +316,8 @@ class SegurancaService extends GetxService {
   }
 
   Future<bool> atualizarFotoPerfil(String fotoBase64) async {
-    final response = await GetConnect().put(
-      '$_base/perfil/foto',
-      {'foto_base64': fotoBase64},
-      headers: _headers,
-    );
-    return response.statusCode == 200;
+    final r = await _http('PUT', '$_base/perfil/foto', {'foto_base64': fotoBase64});
+    return r['status'] == 200;
   }
 
   // ── Almoxarifados de colaboradores (para aprovação) ───────────
@@ -354,13 +365,10 @@ class SegurancaService extends GetxService {
   }
   // ── Upload assinatura de admissão ─────────────────────────────
   Future<Map<String, dynamic>> uploadAssinaturaAdmissao(int tecnicoId, String assinaturaBase64) async {
-    final response = await GetConnect().put(
-      '$_base/tecnicos/$tecnicoId/assinatura-admissao',
-      {'assinatura_base64': assinaturaBase64},
-      headers: _headers,
-    );
-    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
-    return {'success': false, 'message': response.body['error'] ?? 'Erro'};
+    final r = await _http('PUT', '$_base/tecnicos/$tecnicoId/assinatura-admissao',
+        {'assinatura_base64': assinaturaBase64});
+    if (r['status'] == 200) return {'success': true, 'message': r['body']?['message']};
+    return {'success': false, 'message': r['body']?['error'] ?? 'Erro'};
   }
 
   // ── Devoluções ────────────────────────────────────────────────
@@ -383,17 +391,13 @@ class SegurancaService extends GetxService {
     required String epiNome,
     required String assinaturaBase64,
   }) async {
-    final response = await GetConnect().post(
-      '$_base/devolucoes',
-      {
-        'requisicao_original_id': requisicaoOriginalId,
-        'epi_nome': epiNome,
-        'assinatura_base64': assinaturaBase64,
-      },
-      headers: _headers,
-    );
-    if (response.statusCode == 201) return {'success': true, 'message': response.body['message']};
-    return {'success': false, 'message': response.body['error'] ?? 'Erro'};
+    final r = await _http('POST', '$_base/devolucoes', {
+      'requisicao_original_id': requisicaoOriginalId,
+      'epi_nome': epiNome,
+      'assinatura_base64': assinaturaBase64,
+    });
+    if (r['status'] == 201) return {'success': true, 'message': r['body']?['message']};
+    return {'success': false, 'message': r['body']?['error'] ?? 'Erro'};
   }
 
   Future<List<Map<String, dynamic>>> buscarDevolucoesPendentes() async {
@@ -408,23 +412,15 @@ class SegurancaService extends GetxService {
   }
 
   Future<Map<String, dynamic>> aprovarDevolucao(int id, String codigoSubst) async {
-    final response = await GetConnect().post(
-      '$_base/devolucoes/$id/aprovar',
-      {'codigo_subst': codigoSubst},
-      headers: _headers,
-    );
-    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
-    return {'success': false, 'message': response.body['error'] ?? 'Erro'};
+    final r = await _http('POST', '$_base/devolucoes/$id/aprovar', {'codigo_subst': codigoSubst});
+    if (r['status'] == 200) return {'success': true, 'message': r['body']?['message']};
+    return {'success': false, 'message': r['body']?['error'] ?? 'Erro'};
   }
 
   Future<Map<String, dynamic>> recusarDevolucao(int id, {String? observacao}) async {
-    final response = await GetConnect().post(
-      '$_base/devolucoes/$id/recusar',
-      {'observacao': observacao ?? ''},
-      headers: _headers,
-    );
-    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
-    return {'success': false, 'message': response.body['error'] ?? 'Erro'};
+    final r = await _http('POST', '$_base/devolucoes/$id/recusar', {'observacao': observacao ?? ''});
+    if (r['status'] == 200) return {'success': true, 'message': r['body']?['message']};
+    return {'success': false, 'message': r['body']?['error'] ?? 'Erro'};
   }
 
   Future<List<Map<String, dynamic>>> buscarDevedores() async {
@@ -465,16 +461,12 @@ class SegurancaService extends GetxService {
   }
 
   Future<Map<String, dynamic>> atualizarProdutoEpi(int id, {String? ca, String? fornecedor}) async {
-    final response = await GetConnect().put(
-      '$_base/produtos-epi-cadastro/$id',
-      {
-        if (ca != null) 'ca': ca,
-        if (fornecedor != null) 'fornecedor': fornecedor,
-      },
-      headers: _headers,
-    );
-    if (response.statusCode == 200) return {'success': true, 'message': response.body['message']};
-    return {'success': false, 'message': response.body['error'] ?? 'Erro ao atualizar'};
+    final r = await _http('PUT', '$_base/produtos-epi-cadastro/$id', {
+      if (ca != null) 'ca': ca,
+      if (fornecedor != null) 'fornecedor': fornecedor,
+    });
+    if (r['status'] == 200) return {'success': true, 'message': r['body']?['message']};
+    return {'success': false, 'message': r['body']?['error'] ?? 'Erro ao atualizar'};
   }
 
   Future<Map<String, dynamic>> criarProdutoEpi({
@@ -484,27 +476,20 @@ class SegurancaService extends GetxService {
     String? ca,
     String? fornecedor,
   }) async {
-    final response = await GetConnect().post(
-      '$_base/produtos-epi-cadastro',
-      {
-        'nome': nome,
-        if (idProdutoIxc != null) 'id_produto_ixc': idProdutoIxc,
-        if (descricaoIxc != null) 'descricao_ixc': descricaoIxc,
-        'ca': ca ?? 'N/A',
-        'fornecedor': fornecedor ?? '',
-      },
-      headers: _headers,
-    );
-    if (response.statusCode == 201) return {'success': true, 'message': response.body['message']};
-    return {'success': false, 'message': response.body['error'] ?? 'Erro ao cadastrar'};
+    final r = await _http('POST', '$_base/produtos-epi-cadastro', {
+      'nome': nome,
+      if (idProdutoIxc != null) 'id_produto_ixc': idProdutoIxc,
+      if (descricaoIxc != null) 'descricao_ixc': descricaoIxc,
+      'ca': ca ?? 'N/A',
+      'fornecedor': fornecedor ?? '',
+    });
+    if (r['status'] == 201) return {'success': true, 'message': r['body']?['message']};
+    return {'success': false, 'message': r['body']?['error'] ?? 'Erro ao cadastrar'};
   }
 
   Future<Map<String, dynamic>> removerProdutoEpi(int id) async {
-    final response = await GetConnect().delete(
-      '$_base/produtos-epi-cadastro/$id',
-      headers: _headers,
-    );
-    if (response.statusCode == 200) return {'success': true};
+    final r = await _http('DELETE', '$_base/produtos-epi-cadastro/$id');
+    if (r['status'] == 200) return {'success': true};
     return {'success': false};
   }
 

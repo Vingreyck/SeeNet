@@ -126,7 +126,7 @@ class RegistroController extends GetxController {
         limparCampos();
 
         await Future.delayed(const Duration(milliseconds: 150));
-        Get.offAllNamed('/checklist');
+        Get.offAllNamed('/ordens-servico');
 
         Future.delayed(const Duration(milliseconds: 400), () {
           if (Get.context != null) {

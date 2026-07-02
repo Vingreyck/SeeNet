@@ -117,7 +117,7 @@ class LoginController extends GetxController {
       );
 
       if (loginSucesso) {
-        Get.offAllNamed('/checklist');
+        Get.offAllNamed('/ordens-servico');
       }
     } catch (e) {
       emailError.value = 'Erro de conexão';

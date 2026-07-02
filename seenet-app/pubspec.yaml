@@ -28,6 +28,8 @@ dependencies:
   get: ^4.7.3
   url_launcher: ^6.2.0
   google_maps_flutter: ^2.9.0
+  flutter_map: ^6.2.1        # ✅ mapa via OpenStreetMap (grátis, sem chave/billing)
+  latlong2: ^0.9.1
   intl: ^0.20.2
   pdfkit: 0.0.1
   encrypt: ^5.0.1

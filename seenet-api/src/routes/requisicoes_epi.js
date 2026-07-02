@@ -772,7 +772,7 @@ router.post('/requisicoes/:id/recusar', authMiddleware, async (req, res) => {
           );
         } catch (notifErr) { console.warn('⚠️ Falha ao notificar técnico:', notifErr.message); }
 
-      } catch (err) { res.status(500).json({ error: 'Erro ao recusar' }); }
+      } catch (err) { console.error('❌ Erro ao recusar:', err); res.status(500).json({ error: 'Erro ao recusar' }); }
 });
 
 router.get('/requisicoes/:id/pdf', authMiddleware, async (req, res) => {

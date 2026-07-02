@@ -43,22 +43,27 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
 
   Future<void> _carregarTecnicos() async {
     try {
+      // ✅ /seguranca/tecnicos: o gestor_seguranca PODE acessar (isGestorOuAdmin).
+      // ANTES usava /admin/users (SÓ admin) → o gestor tomava 403 e a tela travava.
       final response = await http.get(
-        Uri.parse('$baseUrl/admin/users'),
+        Uri.parse('$baseUrl/seguranca/tecnicos'),
         headers: _headers,
       );
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final lista = data is List ? data : (data['data'] ?? []);
+        final body = json.decode(response.body);
+        final root = (body is Map ? (body['data'] ?? body) : body);
+        final lista = (root is Map ? (root['tecnicos'] ?? []) : []) as List;
         if (mounted) {
           setState(() {
             _tecnicos = List<Map<String, dynamic>>.from(
-              (lista as List).where(
-                      (u) => u['tipo_usuario'] == 'tecnico'),
+              lista.where((u) => u['tipo_usuario'] == 'tecnico'),
             );
             _carregando = false;
           });
         }
+      } else {
+        // ✅ 403/erro NÃO pode deixar a tela "carregando" pra sempre.
+        if (mounted) setState(() => _carregando = false);
       }
     } catch (e) {
       if (mounted) setState(() => _carregando = false);

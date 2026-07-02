@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -22,6 +23,7 @@ class _LocalizacaoWidgetState extends State<LocalizacaoWidget> {
   double? longitude;
   bool carregando = false;
   String? erro;
+  Timer? _timerAtualizacao; // ✅ atualização automática enquanto a tela está aberta
 
   @override
   void initState() {
@@ -30,6 +32,54 @@ class _LocalizacaoWidgetState extends State<LocalizacaoWidget> {
       latitude = widget.latitudeInicial;
       longitude = widget.longitudeInicial;
     }
+    // ✅ Se a permissão JÁ está liberada, captura sozinho e segue atualizando
+    // (não precisa clicar em "Capturar" toda vez que abre a tela).
+    _autoIniciarSeLiberado();
+  }
+
+  @override
+  void dispose() {
+    _timerAtualizacao?.cancel();
+    super.dispose();
+  }
+
+  // Liga a captura + atualização automática SE a permissão já foi concedida antes
+  // (usa checkPermission, que NÃO abre o prompt — só verifica).
+  Future<void> _autoIniciarSeLiberado() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      final liberada = permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always;
+      if (liberada && await Geolocator.isLocationServiceEnabled()) {
+        await _atualizarPosicaoSilenciosa(); // primeira captura na hora
+        _iniciarAtualizacaoAutomatica();     // e segue atualizando
+      }
+    } catch (_) {}
+  }
+
+  void _iniciarAtualizacaoAutomatica() {
+    _timerAtualizacao?.cancel();
+    _timerAtualizacao = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _atualizarPosicaoSilenciosa(),
+    );
+  }
+
+  // Atualiza a posição SEM mostrar "carregando" (fluido; erro de fundo é ignorado).
+  Future<void> _atualizarPosicaoSilenciosa() async {
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (mounted) {
+        setState(() {
+          latitude = position.latitude;
+          longitude = position.longitude;
+          erro = null;
+        });
+        widget.onLocalizacaoCapturada(position.latitude, position.longitude);
+      }
+    } catch (_) {}
   }
 
   Future<void> _capturarLocalizacao() async {
@@ -87,6 +137,7 @@ class _LocalizacaoWidgetState extends State<LocalizacaoWidget> {
       });
 
       widget.onLocalizacaoCapturada(position.latitude, position.longitude);
+      _iniciarAtualizacaoAutomatica(); // ✅ liberou → segue atualizando sozinha
 
       print('📍 Localização capturada: $latitude, $longitude');
       print('📍 Precisão: ${position.accuracy}m');

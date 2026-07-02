@@ -117,7 +117,7 @@ class AuthMiddleware extends GetMiddleware {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           AppSnackbar.error('Acesso Negado', 'Apenas administradores podem acessar esta área');
         });
-        return const RouteSettings(name: '/checklist');
+        return const RouteSettings(name: '/ordens-servico');
       }
 
       if (route.startsWith('/web-admin')) {
@@ -126,7 +126,7 @@ class AuthMiddleware extends GetMiddleware {
             tipo == 'gestor' ||
             tipo == 'gestor_seguranca';
         if (!permitido) {
-          return const RouteSettings(name: '/checklist');
+          return const RouteSettings(name: '/ordens-servico');
         }
       }
 

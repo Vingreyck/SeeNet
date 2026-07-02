@@ -46,6 +46,12 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
     super.dispose();
   }
 
+  // Primeiro nome do usuário (pra saudação no header da home).
+  String _primeiroNome() {
+    final nome = Get.find<UsuarioController>().nomeUsuario.trim();
+    return nome.isEmpty ? 'técnico' : nome.split(' ').first;
+  }
+
   void _mostrarDetalhesOSConcluida(OrdemServico os) {
     showModalBottomSheet(
       context: context,
@@ -346,25 +352,29 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
             ),
             child: Row(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded,
-                      color: Colors.white, size: 24),
-                  onPressed: () => Navigator.of(context).pop(),
-                  padding: EdgeInsets.zero,
-                ),
-                const SizedBox(width: 6),
-                const Expanded(
+                if (Navigator.canPop(context)) ...[
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded,
+                        color: Colors.white, size: 24),
+                    onPressed: () => Navigator.of(context).pop(),
+                    padding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Ordens de Serviço',
+                      Text('Olá, ${_primeiroNome()} 👋',
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12,
+                              fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 2),
+                      const Text('Ordens de Serviço',
                           style: TextStyle(
                               color: Colors.white, fontSize: 20,
                               fontWeight: FontWeight.w700,
                               letterSpacing: -0.3)),
-                      Text('Campo • IXC Sync',
-                          style: TextStyle(
-                              color: Colors.white38, fontSize: 11)),
                     ],
                   ),
                 ),

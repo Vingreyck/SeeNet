@@ -48,6 +48,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
   double? latitude;
   double? longitude;
+  double? latitudeFinal;  // ✅ localização capturada NA FINALIZAÇÃO (prova de conclusão no local)
+  double? longitudeFinal;
   List<AnexoComDescricao> fotosAnexadas = [];
   Uint8List? assinaturaBytes;
   bool osIniciada = false;
@@ -83,11 +85,17 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       _restaurarProgresso();
 
       if (os.status == 'em_execucao') {
-        final aprOk = await controller.verificarAPR(os.id);
+        // ✅ Se o APR já foi CONCLUÍDO nesta OS (marca local), NÃO re-força ao reabrir —
+        // volta pro passo do wizard onde parou. Antes, o verificarAPR só olhava o
+        // SERVIDOR; um APR concluído OFFLINE (ainda não sincronizado) reabria o APR
+        // toda vez (e vazio, pois o rascunho é limpo ao concluir).
+        final aprLocalOk = GetStorage().read('apr_concluido_${os.id}') == true;
+        final aprOk = aprLocalOk || await controller.verificarAPR(os.id);
         if (!aprOk && mounted) {
           final resultado = await Navigator.push<bool>(
               context, MaterialPageRoute(builder: (_) => AprScreen(os: os)));
           if (resultado == true && mounted) {
+            GetStorage().write('apr_concluido_${os.id}', true);
             setState(() { _etapaAtual = 1; });
           }
         }
@@ -388,6 +396,21 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
                   : 'Nenhum material adicionado', editarEtapa: 4),
           _buildResumoCard(titulo: 'Assinatura', icone: Icons.draw_rounded,
               conteudo: assinaturaBytes != null ? '✓ Confirmada' : '✗ Não assinada', editarEtapa: 6),
+          const SizedBox(height: 20),
+          // ✅ Localização de FINALIZAÇÃO: captura o GPS na hora de finalizar
+          // (prova de que o técnico terminou no local do cliente). Auto-captura
+          // ao abrir esta etapa se a permissão já estiver liberada.
+          _buildTituloEtapa(icone: Icons.where_to_vote_rounded,
+              titulo: 'Localização de finalização',
+              descricao: 'Confirme onde você está terminando o atendimento'),
+          const SizedBox(height: 12),
+          _buildCard(child: LocalizacaoWidget(
+            onLocalizacaoCapturada: (lat, lng) {
+              setState(() { latitudeFinal = lat; longitudeFinal = lng; });
+            },
+            latitudeInicial: latitudeFinal,
+            longitudeInicial: longitudeFinal,
+          )),
         ],
       ),
     );
@@ -395,12 +418,15 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
   // ✅ Salvar progresso do wizard no GetStorage
   void _salvarProgresso() {
-    if (_etapaAtual == 0) return; // Não salva etapa de localização
     GetStorage().write('wizard_progress_${os.id}', {
       'etapa':         _etapaAtual,
       'statusAtual':   statusAtual,
       'adminId':       adminSelecionadoId,
       'adminNome':     adminSelecionadoNome,
+      'latitude':      latitude,   // ✅ persiste a localização capturada (não perde ao reabrir)
+      'longitude':     longitude,
+      'latitudeFinal':  latitudeFinal,
+      'longitudeFinal': longitudeFinal,
       'onuModelo':     onuModeloController.text,
       'onuSerial':     onuSerialController.text,
       'onuStatus':     onuStatusController.text,
@@ -435,6 +461,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         adminSelecionadoId   = dados['adminId']   as int?;
         adminSelecionadoNome = dados['adminNome'] as String?;
       }
+      // ✅ restaura a localização já capturada (mostra "Localização Capturada" ao voltar)
+      if (dados['latitude'] != null) latitude = (dados['latitude'] as num).toDouble();
+      if (dados['longitude'] != null) longitude = (dados['longitude'] as num).toDouble();
+      if (dados['latitudeFinal'] != null) latitudeFinal = (dados['latitudeFinal'] as num).toDouble();
+      if (dados['longitudeFinal'] != null) longitudeFinal = (dados['longitudeFinal'] as num).toDouble();
     });
 
     print('✅ Progresso do wizard restaurado — etapa ${_etapaAtual + 1}');
@@ -533,6 +564,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         if (!mounted) return;
         final aprConcluido = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => AprScreen(os: os)));
         if (aprConcluido == true) {
+          GetStorage().write('apr_concluido_${os.id}', true); // ✅ não re-força ao reabrir
           setState(() { statusAtual = 'em_execucao'; osIniciada = true; _etapaAtual = 1; });
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('✅ APR concluído! Preencha os dados do atendimento.'),
@@ -695,6 +727,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     try {
       final dados = {
         'latitude': latitude, 'longitude': longitude,
+        'latitude_final': latitudeFinal, 'longitude_final': longitudeFinal,
         'onu_modelo':    onuModeloController.text.trim(),
         'onu_serial':    onuSerialController.text.trim(),
         'onu_status':    onuStatusController.text.trim(),

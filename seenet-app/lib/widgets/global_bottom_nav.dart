@@ -216,14 +216,14 @@ class GlobalBottomNav extends StatelessWidget {
                               'Início',
                                   () => _fecharMenuENavegar(dialogContext, () {
                                 nav.selecionarTabSafe(1);
-                                Get.toNamed('/checklist');
+                                Get.toNamed('/ordens-servico');
                               }),
                             ),
                             _menuItem(
-                              Icons.assignment_outlined,
-                              'Ordens de Serviço',
+                              Icons.troubleshoot,
+                              'Diagnóstico',
                                   () => _fecharMenuENavegar(dialogContext,
-                                      () => Get.toNamed('/ordens-servico')),
+                                      () => Get.toNamed('/checklist')),
                             ),
                             _menuItem(
                               Icons.health_and_safety_outlined,
@@ -453,7 +453,7 @@ class GlobalBottomNav extends StatelessWidget {
                       labelColor: selected ? const Color(0xFF00FF88) : const Color(0xFF888888),
                       isSelected: selected,
                       onTap: () {
-                        Get.toNamed('/checklist');
+                        Get.toNamed('/ordens-servico');
                         nav.selecionarTabSafe(1);
                       },
                     );

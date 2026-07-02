@@ -3,7 +3,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
 
@@ -29,7 +30,7 @@ class RastreamentoMapaScreen extends StatefulWidget {
 class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
   final String baseUrl = 'https://seenet-production.up.railway.app/api';
 
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
   Timer? _timer;
   LatLng? _posicaoAtual;
   String _statusOS = '';
@@ -100,11 +101,11 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
             }
           });
 
-          // Mover câmera na primeira vez
-          if (_primeiraVez && _mapController != null) {
-            _mapController!.animateCamera(
-              CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16),
-            );
+          // Centraliza na primeira posição recebida (depois use "Centralizar")
+          if (_primeiraVez) {
+            try {
+              _mapController.move(LatLng(lat, lng), 16);
+            } catch (_) {}
             _primeiraVez = false;
           }
         }
@@ -238,36 +239,37 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
                 ],
               ),
             )
-                : GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: _posicaoAtual!,
-                zoom: 16,
+                : FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _posicaoAtual!,
+                initialZoom: 16,
               ),
-              onMapCreated: (controller) {
-                _mapController = controller;
-                // Dark mode no mapa
-                controller.setMapStyle(_darkMapStyle);
-              },
-              markers: {
-                Marker(
-                  markerId: const MarkerId('tecnico'),
-                  position: _posicaoAtual!,
-                  infoWindow: InfoWindow(
-                    title: widget.tecnicoNome,
-                    snippet: _tecnicoChegou
-                        ? 'Chegou ao local'
-                        : 'Em deslocamento',
-                  ),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                    _tecnicoChegou
-                        ? BitmapDescriptor.hueGreen
-                        : BitmapDescriptor.hueOrange,
-                  ),
+              children: [
+                // Tiles do OpenStreetMap (grátis, sem chave)
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.seenet.diagnostico',
                 ),
-              },
-              myLocationEnabled: false,
-              zoomControlsEnabled: true,
-              mapToolbarEnabled: false,
+                // Marcador do técnico
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _posicaoAtual!,
+                      width: 46,
+                      height: 46,
+                      child: Icon(
+                        Icons.location_on,
+                        size: 46,
+                        color: _tecnicoChegou
+                            ? const Color(0xFF00FF88)
+                            : Colors.orange,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
 
@@ -280,9 +282,7 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    _mapController?.animateCamera(
-                      CameraUpdate.newLatLngZoom(_posicaoAtual!, 16),
-                    );
+                    _mapController.move(_posicaoAtual!, 16);
                   },
                   icon: const Icon(Icons.my_location, size: 18, color: Colors.black),
                   label: const Text('Centralizar no Técnico',
@@ -300,27 +300,5 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
     );
   }
 
-  // Estilo dark pro mapa (combina com o tema do app)
-  static const String _darkMapStyle = '''
-[
-  {"elementType": "geometry", "stylers": [{"color": "#242f3e"}]},
-  {"elementType": "labels.text.stroke", "stylers": [{"color": "#242f3e"}]},
-  {"elementType": "labels.text.fill", "stylers": [{"color": "#746855"}]},
-  {"featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [{"color": "#d59563"}]},
-  {"featureType": "poi", "elementType": "labels.text.fill", "stylers": [{"color": "#d59563"}]},
-  {"featureType": "poi.park", "elementType": "geometry", "stylers": [{"color": "#263c3f"}]},
-  {"featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{"color": "#6b9a76"}]},
-  {"featureType": "road", "elementType": "geometry", "stylers": [{"color": "#38414e"}]},
-  {"featureType": "road", "elementType": "geometry.stroke", "stylers": [{"color": "#212a37"}]},
-  {"featureType": "road", "elementType": "labels.text.fill", "stylers": [{"color": "#9ca5b3"}]},
-  {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#746855"}]},
-  {"featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [{"color": "#1f2835"}]},
-  {"featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{"color": "#f3d19c"}]},
-  {"featureType": "transit", "elementType": "geometry", "stylers": [{"color": "#2f3948"}]},
-  {"featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [{"color": "#d59563"}]},
-  {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#17263c"}]},
-  {"featureType": "water", "elementType": "labels.text.fill", "stylers": [{"color": "#515c6d"}]},
-  {"featureType": "water", "elementType": "labels.text.stroke", "stylers": [{"color": "#17263c"}]}
-]
-''';
+// (OpenStreetMap não usa estilo JSON como o Google Maps)
 }

@@ -527,6 +527,142 @@ async sincronizarReagendamentoComIXC(trx, os, dados) {
 }
 
 /**
+ * Encaminhar OS para outro técnico
+ * POST /api/ordens-servico/:id/encaminhar   body: { tecnico_id }
+ * → some pra mim (troca o tecnico_id local) e aparece pro técnico destino.
+ *   No IXC troca o técnico responsável (pro sync não reverter).
+ */
+async encaminharOS(req, res) {
+  const trx = await db.transaction();
+
+  try {
+    const { id } = req.params;
+    const { tecnico_id } = req.body; // usuário SeeNet de destino
+    const userId = req.user.id;
+    const tenantId = req.tenantId;
+
+    if (!tecnico_id || parseInt(tecnico_id) === userId) {
+      await trx.rollback();
+      return res.status(400).json({ success: false, error: 'Técnico de destino inválido' });
+    }
+
+    const os = await trx('ordem_servico')
+      .where('id', id)
+      .where('tenant_id', tenantId)
+      .where('tecnico_id', userId)
+      .forUpdate() // trava a linha
+      .first();
+
+    if (!os) {
+      await trx.rollback();
+      return res.status(404).json({ success: false, error: 'OS não encontrada' });
+    }
+
+    // Técnico de destino (mesma empresa, ativo)
+    const alvo = await trx('usuarios')
+      .where('id', tecnico_id)
+      .where('tenant_id', tenantId)
+      .where('ativo', true)
+      .first();
+
+    if (!alvo) {
+      await trx.rollback();
+      return res.status(404).json({ success: false, error: 'Técnico de destino não encontrado' });
+    }
+
+    // Reatribui: troca o dono (some pra mim, aparece pro outro) e volta a
+    // 'pendente' (o novo técnico começa do zero: deslocar → chegar → etc.).
+    await trx('ordem_servico')
+      .where('id', id)
+      .update({
+        tecnico_id: tecnico_id,
+        status: 'pendente',
+        data_atualizacao: db.fn.now()
+      });
+
+    await trx.commit();
+
+    // IXC FORA da transação (best-effort): troca o técnico responsável no IXC
+    // pra sincronização não reverter o encaminhamento.
+    if (os.origem === 'IXC' && os.id_externo) {
+      try {
+        await this.sincronizarEncaminhamentoComIXC(db, os, alvo);
+      } catch (error) {
+        console.error('⚠️ Erro ao sincronizar encaminhamento com IXC:', error.message);
+      }
+    }
+
+    // Avisa o técnico que RECEBEU a OS.
+    try {
+      const remetente = await db('usuarios').where('id', userId).first();
+      await notificationService.enviarParaUsuario(
+        db,
+        tecnico_id,
+        '📨 Nova OS encaminhada',
+        `${remetente?.nome || 'Um técnico'} encaminhou a OS #${os.numero_os} para você`,
+        { route: '/ordens-servico', tipo: 'os_encaminhada', referencia_id: String(id) }
+      );
+    } catch (notifErr) {
+      console.warn('⚠️ Falha ao notificar técnico destino:', notifErr.message);
+    }
+
+    console.log(`✅ OS ${os.numero_os} encaminhada para ${alvo.nome}`);
+
+    return res.json({ success: true, message: 'OS encaminhada com sucesso' });
+  } catch (error) {
+    try { await trx.rollback(); } catch (_) {}
+    console.error('❌ Erro ao encaminhar OS:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao encaminhar OS' });
+  }
+}
+
+/**
+ * Sincronizar encaminhamento com IXC (troca o técnico responsável)
+ */
+async sincronizarEncaminhamentoComIXC(trx, os, alvo) {
+  console.log(`🔄 Encaminhando OS ${os.numero_os} no IXC para ${alvo.nome}...`);
+
+  const integracao = await trx('integracao_ixc')
+    .where('tenant_id', os.tenant_id)
+    .where('ativo', true)
+    .first();
+
+  if (!integracao) {
+    throw new Error('Integração IXC não configurada');
+  }
+
+  const mapeamentoAlvo = await trx('mapeamento_tecnicos_ixc')
+    .where('usuario_id', alvo.id)
+    .where('tenant_id', os.tenant_id)
+    .where('ativo', true)
+    .first();
+
+  if (!mapeamentoAlvo?.tecnico_ixc_id) {
+    throw new Error('Técnico de destino não está mapeado no IXC');
+  }
+
+  // Mantém o status atual do IXC, só troca o técnico responsável.
+  let statusIxc = 'A';
+  try {
+    if (os.dados_ixc) {
+      const parsed = typeof os.dados_ixc === 'string'
+        ? JSON.parse(os.dados_ixc) : os.dados_ixc;
+      if (parsed && parsed.status) statusIxc = parsed.status;
+    }
+  } catch (_) {}
+
+  const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+  await ixc.atualizarStatusOS(parseInt(os.id_externo), {
+    status: statusIxc,
+    id_tecnico: mapeamentoAlvo.tecnico_ixc_id,
+    mensagem: `OS encaminhada para ${alvo.nome} via SeeNet`
+  });
+
+  console.log(`✅ OS ${os.numero_os} - técnico trocado no IXC (id_tecnico ${mapeamentoAlvo.tecnico_ixc_id})`);
+}
+
+/**
  * Finalizar execução de OS
  * POST /api/ordens-servico/:id/finalizar
  */
@@ -1059,6 +1195,33 @@ if (dados.fotos && dados.fotos.length > 0) {
     } catch (error) {
       console.error('❌ Erro ao listar admins:', error);
       return res.status(500).json({ success: false, error: 'Erro ao listar administradores' });
+    }
+  }
+
+  /**
+   * Listar técnicos da empresa (pra encaminhar OS). Só técnicos ATIVOS e
+   * MAPEADOS no IXC (senão a OS encaminhada não sincroniza), menos o próprio.
+   */
+  async listarTecnicos(req, res) {
+    try {
+      const tenantId = req.tenantId;
+
+      const tecnicos = await db('usuarios as u')
+        .join('mapeamento_tecnicos_ixc as m', function () {
+          this.on('m.usuario_id', 'u.id').andOn('m.tenant_id', 'u.tenant_id');
+        })
+        .where('u.tenant_id', tenantId)
+        .where('u.ativo', true)
+        .where('u.tipo_usuario', 'tecnico')
+        .where('m.ativo', true)
+        .whereNot('u.id', req.user.id)
+        .select('u.id', 'u.nome', 'u.email', 'u.foto_perfil')
+        .orderBy('u.nome');
+
+      return res.json({ success: true, tecnicos });
+    } catch (error) {
+      console.error('❌ Erro ao listar técnicos:', error);
+      return res.status(500).json({ success: false, error: 'Erro ao listar técnicos' });
     }
   }
 

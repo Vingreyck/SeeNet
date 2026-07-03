@@ -686,6 +686,131 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     return true;
   }
 
+  // Encaminhar: escolhe um técnico da empresa e passa a OS pra ele.
+  // A OS some da minha lista e aparece pra ele.
+  Future<void> _encaminharOS() async {
+    setState(() => _isLoading = true);
+    List<Map<String, dynamic>> tecnicos;
+    try {
+      tecnicos = await controller.buscarTecnicos();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+    if (!mounted) return;
+    if (tecnicos.isEmpty) {
+      _mostrarErro('Nenhum técnico disponível para encaminhar');
+      return;
+    }
+
+    final escolhido = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text('Encaminhar para',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            const Text('A OS sai da sua lista e vai para o técnico escolhido.',
+                style: TextStyle(color: Colors.white54, fontSize: 12)),
+            const SizedBox(height: 14),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: tecnicos.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (_, i) {
+                  final t = tecnicos[i];
+                  final nome = (t['nome'] ?? 'Técnico').toString();
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => Navigator.pop(ctx, t),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111111),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor:
+                                const Color(0xFF3B9EFF).withOpacity(0.15),
+                            child: Text(
+                              nome.isNotEmpty ? nome[0].toUpperCase() : '?',
+                              style: const TextStyle(
+                                  color: Color(0xFF3B9EFF),
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(nome,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500)),
+                          ),
+                          const Icon(Icons.chevron_right_rounded,
+                              color: Colors.white24),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (escolhido == null || escolhido['id'] == null) return;
+    final tecnicoId = escolhido['id'];
+
+    setState(() => _isLoading = true);
+    try {
+      // Para o rastreamento — não é mais a minha OS.
+      if (Get.isRegistered<TrackingService>()) {
+        Get.find<TrackingService>().parar();
+      }
+      final sucesso = await controller.encaminharOS(
+        os.id,
+        tecnicoId is int ? tecnicoId : int.parse(tecnicoId.toString()),
+      );
+      if (sucesso) {
+        if (mounted) Get.back(); // volta pra lista de OS
+      } else {
+        if (mounted) _mostrarErro('Erro ao encaminhar');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   // Reagendar: cliente não estava no local. Confirma (+ motivo opcional),
   // para o tracking, manda pro backend (IXC vira RAG) e volta pra lista.
   Future<void> _reagendarOS() async {
@@ -1018,22 +1143,43 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
                   statusAtual == 'em_execucao'))
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _reagendarOS,
-                  icon: const Icon(Icons.event_busy_rounded, size: 18),
-                  label: const Text('Reagendar (cliente ausente)',
-                      style: TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.orange,
-                    side: const BorderSide(color: Colors.orange),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _reagendarOS,
+                      icon: const Icon(Icons.event_busy_rounded, size: 18),
+                      label: const Text('Reagendar',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orange,
+                        side: const BorderSide(color: Colors.orange),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _encaminharOS,
+                      icon: const Icon(Icons.forward_to_inbox_rounded,
+                          size: 18),
+                      label: const Text('Encaminhar',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF3B9EFF),
+                        side: const BorderSide(color: Color(0xFF3B9EFF)),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           Row(

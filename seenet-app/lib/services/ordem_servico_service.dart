@@ -44,6 +44,27 @@ class OrdemServicoService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> buscarTecnicos() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ordens-servico/tecnicos'),
+        headers: _headers,
+      );
+
+      print('📥 buscarTecnicos - Status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> tecnicos = data['tecnicos'] ?? [];
+        return tecnicos.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      print('❌ Erro em buscarTecnicos: $e');
+      return [];
+    }
+  }
+
   Future<List<OrdemServico>> buscarMinhasOSs() async {
     try {
       final token = _authService.token;
@@ -179,6 +200,22 @@ class OrdemServicoService {
       return response.statusCode == 200;
     } catch (e) {
       print('❌ Erro em reagendarOS: $e');
+      return false;
+    }
+  }
+
+  Future<bool> encaminharOS(String osId, int tecnicoId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/ordens-servico/$osId/encaminhar'),
+        headers: _headers,
+        body: json.encode({'tecnico_id': tecnicoId}),
+      );
+
+      print('📥 encaminharOS - Status: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('❌ Erro em encaminharOS: $e');
       return false;
     }
   }

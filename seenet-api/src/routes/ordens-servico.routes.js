@@ -24,6 +24,9 @@ router.get('/:id/detalhes', OrdensServicoController.buscarDetalhesOS.bind(Ordens
 // Listar admins para seleção
 router.get('/admins', OrdensServicoController.listarAdmins.bind(OrdensServicoController));
 
+// Listar técnicos da empresa (para encaminhar OS)
+router.get('/tecnicos', OrdensServicoController.listarTecnicos.bind(OrdensServicoController));
+
 // 1️⃣ Deslocamento (técnico saindo)
 router.post('/:id/deslocar', OrdensServicoController.deslocarParaOS.bind(OrdensServicoController));
 
@@ -35,6 +38,9 @@ router.post('/:id/finalizar', OrdensServicoController.finalizarExecucao.bind(Ord
 
 // 4️⃣ Reagendar OS (cliente não estava → volta pra "Aguardando Agendamento" no IXC)
 router.post('/:id/reagendar', OrdensServicoController.reagendarOS.bind(OrdensServicoController));
+
+// 5️⃣ Encaminhar OS para outro técnico
+router.post('/:id/encaminhar', OrdensServicoController.encaminharOS.bind(OrdensServicoController));
 
 router.get('/:id/historico-endereco', OrdensServicoController.buscarHistoricoEndereco.bind(OrdensServicoController));
 

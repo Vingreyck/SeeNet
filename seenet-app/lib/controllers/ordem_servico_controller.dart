@@ -166,6 +166,31 @@ class OrdemServicoController extends GetxController {
     }
   }
 
+  // Lista de técnicos da empresa (pra encaminhar OS).
+  Future<List<Map<String, dynamic>>> buscarTecnicos() =>
+      _service.buscarTecnicos();
+
+  // Encaminha a OS para outro técnico: some da minha lista, aparece pra ele.
+  Future<bool> encaminharOS(String osId, int tecnicoId) async {
+    try {
+      final sucesso = await _service.encaminharOS(osId, tecnicoId);
+      if (sucesso) {
+        await carregarMinhasOSs();
+        AppSnackbar.show(
+          'Encaminhada',
+          'OS enviada para o outro técnico.',
+          backgroundColor: const Color(0xFF00FF88),
+          colorText: Colors.black,
+        );
+      }
+      return sucesso;
+    } catch (e) {
+      AppSnackbar.show('Erro', 'Falha ao encaminhar: $e',
+          backgroundColor: Colors.red, colorText: Colors.white);
+      return false;
+    }
+  }
+
   Future<bool> finalizarExecucao(String osId, Map<String, dynamic> dados) async {
     try {
       final sucesso = await _service.finalizarOS(osId, dados);

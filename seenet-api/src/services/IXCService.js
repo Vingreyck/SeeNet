@@ -31,13 +31,20 @@ class IXCService {
    * Formatar data para o padrão IXC (YYYY-MM-DD HH:MM:SS)
    */
   formatarDataIXC(data = new Date()) {
-    const ano = data.getFullYear();
-    const mes = String(data.getMonth() + 1).padStart(2, '0');
-    const dia = String(data.getDate()).padStart(2, '0');
-    const hora = String(data.getHours()).padStart(2, '0');
-    const minuto = String(data.getMinutes()).padStart(2, '0');
-    const segundo = String(data.getSeconds()).padStart(2, '0');
-    return `${ano}-${mes}-${dia} ${hora}:${minuto}:${segundo}`;
+    // ⚠️ O IXC espera horário do BRASIL (America/Sao_Paulo, UTC-3). O servidor
+    // (Railway) roda em UTC → usar getHours() mandava a hora 3h adiantada e o IXC
+    // recusava ("A data/hora ultrapassou o limite de -03:00 horas"). Aqui a data
+    // é SEMPRE convertida pro fuso do Brasil, não importa o fuso do servidor.
+    const fmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+    const p = {};
+    for (const parte of fmt.formatToParts(data)) p[parte.type] = parte.value;
+    const hora = p.hour === '24' ? '00' : p.hour; // meia-noite pode vir como '24'
+    return `${p.year}-${p.month}-${p.day} ${hora}:${p.minute}:${p.second}`;
   }
 
   /**

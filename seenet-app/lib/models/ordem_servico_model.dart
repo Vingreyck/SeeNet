@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 
 class OrdemServico {
   final String id;
@@ -14,6 +15,7 @@ class OrdemServico {
   final String clienteNome;
   final String? clienteEndereco;
   final String? clienteTelefone;
+  final String? clienteLogin;
 
   final String tipoServico;
   final String prioridade;
@@ -53,6 +55,7 @@ class OrdemServico {
     required this.clienteNome,
     this.clienteEndereco,
     this.clienteTelefone,
+    this.clienteLogin,
     required this.tipoServico,
     this.prioridade = 'media',
     this.status = 'pendente',
@@ -75,7 +78,20 @@ class OrdemServico {
   });
 
   factory OrdemServico.fromJson(Map<String, dynamic> json) {
+    // Login do cliente vem dentro do dados_ixc (JSON do IXC), se disponível.
+    String? clienteLogin;
+    final dadosIxc = json['dados_ixc'];
+    if (dadosIxc != null) {
+      try {
+        final d = dadosIxc is String ? jsonDecode(dadosIxc) : dadosIxc;
+        if (d is Map) {
+          final l = d['login']?.toString();
+          if (l != null && l.trim().isNotEmpty) clienteLogin = l.trim();
+        }
+      } catch (_) {}
+    }
     return OrdemServico(
+      clienteLogin: clienteLogin,
       id: (json['id'] ?? 0).toString(),
       numeroOs: json['numero_os']?.toString() ??
           json['numero_os_ixc']?.toString() ??

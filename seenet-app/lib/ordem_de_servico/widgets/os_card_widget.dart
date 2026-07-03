@@ -137,6 +137,21 @@ class OSCardWidget extends StatelessWidget {
               ],
             ),
 
+            // LOGIN do cliente
+            if (os.tipoOs != 'E' && os.clienteLogin != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.wifi_rounded, color: Colors.white38, size: 15),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Login: ${os.clienteLogin}',
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+
             // ENDEREÇO
             if (os.clienteEndereco != null && os.tipoOs != 'E') ...[
               const SizedBox(height: 8),

@@ -1,6 +1,7 @@
 // lib/ordem_de_servico/screens/executar_os_wizard_screen.dart — REDESIGN
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:typed_data';
 import '../../services/connectivity_service.dart';
 import '../../services/sync_manager.dart';
@@ -196,6 +197,47 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
               if (os.clienteTelefone != null) _buildInfoRow('Telefone', os.clienteTelefone!),
             ],
           )),
+          // Atalhos: ligar pro cliente + abrir a localização no Google Maps.
+          if (_temTelefone || _temEndereco) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (_temTelefone)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _ligarCliente(os.clienteTelefone!),
+                      icon: const Icon(Icons.phone_rounded, size: 18),
+                      label: const Text('Ligar',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF00FF88),
+                        side: const BorderSide(color: Color(0xFF00FF88)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                if (_temTelefone && _temEndereco) const SizedBox(width: 10),
+                if (_temEndereco)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _abrirMapa(os.clienteEndereco!),
+                      icon: const Icon(Icons.map_rounded, size: 18),
+                      label: const Text('Localização',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF3B9EFF),
+                        side: const BorderSide(color: Color(0xFF3B9EFF)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           HistoricoEnderecoWidget(osId: os.id),
           const SizedBox(height: 12),
@@ -684,6 +726,40 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       adminSelecionadoNome = resultado['nome'];
     }
     return true;
+  }
+
+  // Tem telefone/endereço do cliente? (pros atalhos Ligar/Localização)
+  bool get _temTelefone =>
+      os.clienteTelefone != null && os.clienteTelefone!.trim().isNotEmpty;
+  bool get _temEndereco =>
+      os.clienteEndereco != null && os.clienteEndereco!.trim().isNotEmpty;
+
+  // Abre o discador do celular com o número do cliente já preenchido
+  // (funciona no Android e no iPhone, sem copiar/colar).
+  Future<void> _ligarCliente(String telefone) async {
+    final numero = telefone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (numero.isEmpty) {
+      _mostrarErro('Telefone inválido');
+      return;
+    }
+    final uri = Uri.parse('tel:$numero');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (mounted) _mostrarErro('Não foi possível abrir o discador');
+    }
+  }
+
+  // Abre o Google Maps buscando pelo endereço do cliente (iOS e Android).
+  Future<void> _abrirMapa(String endereco) async {
+    final query = Uri.encodeComponent(endereco);
+    final uri =
+        Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) _mostrarErro('Não foi possível abrir o mapa');
+    }
   }
 
   // Encaminhar: escolhe um técnico da empresa e passa a OS pra ele.

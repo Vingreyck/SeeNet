@@ -69,6 +69,31 @@ class OSCardWidget extends StatelessWidget {
 
             const SizedBox(height: 12),
 
+            // REABERTA (admin reabriu a OS direto no IXC)
+            if (os.status == 'reaberta') ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_open_rounded, color: Colors.orange, size: 13),
+                    SizedBox(width: 5),
+                    Text('REABERTA',
+                        style: TextStyle(
+                            color: Colors.orange,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ],
+
             // ASSUNTO + CLIENTE/ESTRUTURA
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,6 +172,31 @@ class OSCardWidget extends StatelessWidget {
                   Text(
                     'Login: ${os.clienteLogin}',
                     style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+
+            // CTO (Caixa FTTH) + Porta FTTH
+            if (os.tipoOs != 'E' &&
+                (os.caixaFtth != null || os.portaFtth != null)) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.hub_outlined,
+                      color: Colors.white38, size: 15),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      [
+                        if (os.caixaFtth != null) 'CTO: ${os.caixaFtth}',
+                        if (os.portaFtth != null) 'Porta: ${os.portaFtth}',
+                      ].join('   •   '),
+                      style:
+                          const TextStyle(color: Colors.white54, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),

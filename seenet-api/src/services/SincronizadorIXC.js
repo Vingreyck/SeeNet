@@ -9,6 +9,7 @@ class SincronizadorIXC {
     this.intervalId = null;
     this.cacheClientes = new Map();
     this.cacheAssuntos = new Map();
+    this.cacheFibra = new Map(); // login → dados de fibra (Caixa FTTH / Porta FTTH)
     this.maxOSsPorSync = 10;
 
     // ✅ Circuit breaker — para de tentar quando IXC está fora
@@ -148,6 +149,7 @@ class SincronizadorIXC {
       }
 
       this.cacheClientes.clear();
+      this.cacheFibra.clear();
       console.log('🧹 Cache de clientes limpo');
       console.log('✅ Ciclo de sincronização concluído\n');
     } catch (error) {
@@ -243,11 +245,12 @@ class SincronizadorIXC {
                 let novoStatus = null;
                 if (osReal.status === 'F') novoStatus = 'concluida';
                 else if (osReal.status === 'C') novoStatus = 'cancelada';
+                else if (osReal.status === 'RAG') novoStatus = 'reagendada'; // "Necessário reagendar" no IXC
                 if (novoStatus) {
                   const upd = { status: novoStatus, data_atualizacao: db.fn.now() };
                   if (novoStatus === 'concluida') upd.data_conclusao = db.fn.now();
                   await trx('ordem_servico').where('id', osTravada.id).update(upd);
-                  console.log(`   🔄 OS ${osTravada.numero_os} → ${novoStatus} (fechada no IXC)`);
+                  console.log(`   🔄 OS ${osTravada.numero_os} → ${novoStatus} (mudou no IXC)`);
                 }
               } catch (e) {
                 // erro ao consultar o IXC → não mexe nessa OS
@@ -338,6 +341,23 @@ class SincronizadorIXC {
         } catch (_) {}
       }
 
+      // 🔌 FIBRA (Caixa FTTH / Porta FTTH) pro card — busca por login, com cache.
+      // Merge no osIXC ANTES do JSON.stringify (o dados_ixc leva junto → o app lê).
+      if (osIXC.login) {
+        let fibra = this.cacheFibra.get(osIXC.login);
+        if (fibra === undefined) {
+          fibra = await ixcService.buscarClienteFibra(osIXC.login);
+          this.cacheFibra.set(osIXC.login, fibra);
+        }
+        if (fibra) {
+          // fallbacks — o log 🔎 [FIBRA] mostra os nomes reais; ajusto depois.
+          osIXC.caixa_ftth = fibra.caixa_ftth || fibra.id_caixa_ftth ||
+              fibra.caixa || fibra.caixa_hermetica || fibra.nome_caixa || '';
+          osIXC.porta_ftth = fibra.porta_ftth || fibra.porta ||
+              fibra.porta_ser || fibra.numero_porta || '';
+        }
+      }
+
       const dadosOS = {
         numero_os: osIXC.protocolo || `IXC-${osIXC.id}`,
         origem: 'IXC',
@@ -366,12 +386,25 @@ class SincronizadorIXC {
       if (osExistente) {
         const statusProtegidos = ['concluida', 'em_execucao', 'em_deslocamento'];
 
-        if (!statusProtegidos.includes(osExistente.status)) {
+        // Admin mexeu direto no IXC → o app precisa RESPONDER:
+        // (a) ENCAMINHADA: o técnico do IXC agora é OUTRO → a troca de dono vence
+        //     a proteção (some pra quem tinha, aparece pro novo dono).
+        const reatribuido = String(osExistente.tecnico_id) !== String(tecnicoId);
+        // (b) REABERTA: estava 'concluida' aqui mas voltou a status ABERTO no IXC
+        //     (admin usou "Reabrir") → reativa como 'reaberta' pro técnico.
+        const reaberta = osExistente.status === 'concluida' &&
+          ['pendente', 'em_execucao'].includes(dadosOS.status);
+
+        const novoStatus = reaberta ? 'reaberta' : dadosOS.status;
+        const deveAtualizar =
+          !statusProtegidos.includes(osExistente.status) || reatribuido || reaberta;
+
+        if (deveAtualizar) {
           await trx('ordem_servico')
             .where('id', osExistente.id)
             .update({
               tecnico_id: tecnicoId,
-              status: dadosOS.status,
+              status: novoStatus,
               tipo_servico: dadosOS.tipo_servico,
               prioridade: dadosOS.prioridade,
               observacoes: dadosOS.observacoes,
@@ -384,6 +417,14 @@ class SincronizadorIXC {
               nome_estrutura: dadosOS.nome_estrutura,
               data_atualizacao: db.fn.now()
             });
+
+          if (reatribuido) {
+            console.log(`   🔀 OS ${dadosOS.numero_os} reatribuída no IXC → técnico ${tecnicoId}`);
+            try {
+              await notificationService.notificarNovaOS(db, tecnicoId, dadosOS.numero_os, clienteNome);
+            } catch (_) {}
+          }
+          if (reaberta) console.log(`   🔓 OS ${dadosOS.numero_os} REABERTA no IXC`);
         }
       } else {
         await trx('ordem_servico').insert(dadosOS);

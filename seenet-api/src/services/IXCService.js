@@ -90,6 +90,38 @@ class IXCService {
   }
 
   /**
+   * ✅ Buscar dados de FIBRA do cliente por LOGIN (Caixa FTTH / Porta FTTH / sinal)
+   * POST /radpop_radio_cliente_fibra (listar). Loga a resposta crua p/ descobrir
+   * os nomes REAIS dos campos (a UI mostra "Caixa FTTH"/"Porta FTTH", a API usa
+   * outros nomes). Retorna o 1º registro ou null.
+   */
+  async buscarClienteFibra(login) {
+    try {
+      if (!login) return null;
+      const params = new URLSearchParams({
+        qtype: 'radpop_radio_cliente_fibra.login',
+        query: login.toString(),
+        oper: '=',
+        page: '1',
+        rp: '1',
+        sortname: 'radpop_radio_cliente_fibra.id',
+        sortorder: 'desc'
+      });
+      const response = await this.clientListar.post('/radpop_radio_cliente_fibra', params.toString());
+      const reg = response.data?.registros?.[0] || null;
+      if (reg) {
+        console.log(`🔎 [FIBRA] login=${login} → CAMPOS CRUS:`, JSON.stringify(reg));
+      } else {
+        console.log(`🔎 [FIBRA] login=${login} → sem registro`);
+      }
+      return reg;
+    } catch (e) {
+      console.error(`❌ Erro ao buscar fibra do login ${login}:`, e.message);
+      return null;
+    }
+  }
+
+  /**
    * Buscar detalhes de uma OS específica (para pegar campos obrigatórios)
    */
   async buscarDetalhesOS(osId) {

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:typed_data';
 import '../../services/connectivity_service.dart';
 import '../../services/sync_manager.dart';
@@ -51,6 +52,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
   double? longitude;
   double? latitudeFinal;  // ✅ localização capturada NA FINALIZAÇÃO (prova de conclusão no local)
   double? longitudeFinal;
+  bool _capturandoFinal = false; // capturando a localização de finalização (botão único)
   List<AnexoComDescricao> fotosAnexadas = [];
   Uint8List? assinaturaBytes;
   bool osIniciada = false;
@@ -102,7 +104,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         }
       }
 
-      if (os.status == 'pendente') {
+      if (os.status == 'pendente' || os.status == 'reaberta') {
         await controller.carregarAdmins();
         if (mounted) await _selecionarAdmin();
       }
@@ -446,16 +448,119 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
               titulo: 'Localização de finalização',
               descricao: 'Confirme onde você está terminando o atendimento'),
           const SizedBox(height: 12),
-          _buildCard(child: LocalizacaoWidget(
-            onLocalizacaoCapturada: (lat, lng) {
-              setState(() { latitudeFinal = lat; longitudeFinal = lng; });
-            },
-            latitudeInicial: latitudeFinal,
-            longitudeInicial: longitudeFinal,
-          )),
+          _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (latitudeFinal != null && longitudeFinal != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00FF88).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: const Color(0xFF00FF88).withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded,
+                            color: Color(0xFF00FF88), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Localização capturada\n${latitudeFinal!.toStringAsFixed(6)}, ${longitudeFinal!.toStringAsFixed(6)}',
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      'Toque para capturar sua localização atual — obrigatório para finalizar.',
+                      style: TextStyle(color: Colors.white54, fontSize: 13),
+                    ),
+                  ),
+                ElevatedButton.icon(
+                  onPressed:
+                      _capturandoFinal ? null : _capturarLocalizacaoFinal,
+                  icon: _capturandoFinal
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.black))
+                      : Icon(
+                          latitudeFinal != null
+                              ? Icons.refresh_rounded
+                              : Icons.my_location_rounded,
+                          color: Colors.black,
+                          size: 18),
+                  label: Text(
+                    latitudeFinal != null
+                        ? 'Capturar novamente'
+                        : 'Capturar localização',
+                    style: const TextStyle(
+                        color: Colors.black, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF88),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  // Captura ÚNICA da localização de finalização (um toque, SEM auto-atualizar).
+  // Obrigatória pra finalizar (prova de que o técnico terminou no local).
+  Future<void> _capturarLocalizacaoFinal() async {
+    setState(() => _capturandoFinal = true);
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          _mostrarErro('Permissão negada. Habilite nas configurações.');
+        }
+        await Geolocator.openAppSettings();
+        return;
+      }
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
+        if (mounted) _mostrarErro('Permissão de localização necessária.');
+        return;
+      }
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) _mostrarErro('GPS desativado. Ative o GPS.');
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (mounted) {
+        setState(() {
+          latitudeFinal = pos.latitude;
+          longitudeFinal = pos.longitude;
+        });
+      }
+    } catch (_) {
+      if (mounted) _mostrarErro('Não foi possível capturar a localização');
+    } finally {
+      if (mounted) setState(() => _capturandoFinal = false);
+    }
   }
 
   // ✅ Salvar progresso do wizard no GetStorage
@@ -756,9 +861,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     final query = Uri.encodeComponent(endereco);
     final uri =
         Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) _mostrarErro('Não foi possível abrir o mapa');
+    } catch (_) {
       if (mounted) _mostrarErro('Não foi possível abrir o mapa');
     }
   }
@@ -1049,6 +1155,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
   }
 
   Future<void> _finalizarOS() async {
+    // Localização de finalização é OBRIGATÓRIA (prova de conclusão no local do cliente).
+    if (latitudeFinal == null || longitudeFinal == null) {
+      _mostrarErro('Capture a localização de finalização antes de finalizar a OS.');
+      return;
+    }
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

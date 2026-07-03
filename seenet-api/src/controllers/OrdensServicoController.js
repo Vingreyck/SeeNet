@@ -18,7 +18,7 @@ class OrdensServicoController {
         .join('usuarios as u', 'u.id', 'os.tecnico_id')
         .where('os.tecnico_id', userId)
         .where('os.tenant_id', tenantId)
-        .whereIn('os.status', ['pendente', 'em_execucao', 'em_deslocamento'])
+        .whereIn('os.status', ['pendente', 'em_execucao', 'em_deslocamento', 'reaberta'])
         .select(
           'os.*',
           'u.nome as tecnico_nome'
@@ -904,16 +904,26 @@ async finalizarExecucao(req, res) {
         }
 
         // 9b. Finalizar OS no IXC
-        const mensagemFinal =
+        let mensagemFinal =
           `Serviço finalizado via SeeNet\n\n` +
           `PROBLEMA: ${dados.relato_problema || 'N/A'}\n` +
           `SOLUÇÃO: ${dados.relato_solucao   || 'N/A'}\n` +
           `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
           `OBS: ${dados.observacoes || 'Nenhuma'}`;
 
+        // 📍 Localização de FINALIZAÇÃO (capturada no app, obrigatória) → vai na
+        // descrição da OS no IXC como prova de conclusão no local do cliente.
+        if (dados.latitude_final && dados.longitude_final) {
+          mensagemFinal +=
+            `\n\n📍 LOCALIZAÇÃO DE FINALIZAÇÃO: ${dados.latitude_final}, ${dados.longitude_final}` +
+            `\nMapa: https://www.google.com/maps/search/?api=1&query=${dados.latitude_final},${dados.longitude_final}`;
+        }
+
         await ixcService.finalizarOS(os.id_externo, {
           mensagem_resposta: mensagemFinal,
-          id_tecnico_ixc: tecnicoIdIxc
+          id_tecnico_ixc: tecnicoIdIxc,
+          latitude: dados.latitude_final || '',
+          longitude: dados.longitude_final || ''
         });
         console.log('✅ OS finalizada no IXC');
 

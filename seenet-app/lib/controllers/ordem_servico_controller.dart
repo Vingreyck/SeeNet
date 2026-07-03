@@ -224,7 +224,9 @@ class OrdemServicoController extends GetxController {
   }
 
   List<OrdemServico> get osPendentes =>
-      ordensServico.where((os) => os.status == 'pendente').toList();
+      ordensServico
+          .where((os) => os.status == 'pendente' || os.status == 'reaberta')
+          .toList();
 
   List<OrdemServico> get osEmExecucao =>
       ordensServico.where((os) =>

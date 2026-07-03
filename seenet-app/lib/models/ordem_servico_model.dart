@@ -16,6 +16,8 @@ class OrdemServico {
   final String? clienteEndereco;
   final String? clienteTelefone;
   final String? clienteLogin;
+  final String? caixaFtth; // CTO
+  final String? portaFtth;
 
   final String tipoServico;
   final String prioridade;
@@ -56,6 +58,8 @@ class OrdemServico {
     this.clienteEndereco,
     this.clienteTelefone,
     this.clienteLogin,
+    this.caixaFtth,
+    this.portaFtth,
     required this.tipoServico,
     this.prioridade = 'media',
     this.status = 'pendente',
@@ -78,20 +82,29 @@ class OrdemServico {
   });
 
   factory OrdemServico.fromJson(Map<String, dynamic> json) {
-    // Login do cliente vem dentro do dados_ixc (JSON do IXC), se disponível.
+    // Login/Caixa FTTH/Porta FTTH do cliente vêm dentro do dados_ixc (JSON do IXC).
     String? clienteLogin;
+    String? caixaFtth;
+    String? portaFtth;
     final dadosIxc = json['dados_ixc'];
     if (dadosIxc != null) {
       try {
         final d = dadosIxc is String ? jsonDecode(dadosIxc) : dadosIxc;
         if (d is Map) {
-          final l = d['login']?.toString();
-          if (l != null && l.trim().isNotEmpty) clienteLogin = l.trim();
+          String? limpo(dynamic v) {
+            final s = v?.toString().trim();
+            return (s == null || s.isEmpty || s == '0') ? null : s;
+          }
+          clienteLogin = limpo(d['login']);
+          caixaFtth = limpo(d['caixa_ftth']);
+          portaFtth = limpo(d['porta_ftth']);
         }
       } catch (_) {}
     }
     return OrdemServico(
       clienteLogin: clienteLogin,
+      caixaFtth: caixaFtth,
+      portaFtth: portaFtth,
       id: (json['id'] ?? 0).toString(),
       numeroOs: json['numero_os']?.toString() ??
           json['numero_os_ixc']?.toString() ??

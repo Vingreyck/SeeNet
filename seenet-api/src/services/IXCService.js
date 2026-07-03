@@ -314,45 +314,42 @@ async finalizarOS(osId, dados) {
 }
 
 /**
- * ✅ Reagendar OS (status RAG = Aguardando Agendamento)
- * POST /su_oss_chamado_reagendar
+ * ✅ Marcar OS para reagendamento (status RAG = Aguardando Agendamento)
+ * POST /su_oss_chamado_reagendamento
  *
- * Usado quando o técnico vai ao local e o CLIENTE NÃO ESTÁ — a OS sai de
- * execução e volta pra fila de "Aguardando Agendamento" no IXC. O técnico
- * fica livre pra outra OS. Datas de novo agendamento são opcionais (por
- * padrão o IXC deixa na fila pra um atendente reagendar).
+ * É o "Necessário reagendar" do IXC (Ações → Necessário reagendar → só Motivo,
+ * Setor pré-setado, Salvar). NÃO pede data nem GPS. Usado quando o técnico vai
+ * ao local e o CLIENTE NÃO ESTÁ — a OS sai de execução e vai pra fila de
+ * "Aguardando Agendamento". Mantém o setor atual (id_setor é obrigatório).
  */
 async reagendarOS(osId, dados) {
   try {
-    console.log(`📅 Reagendando OS ${osId} no IXC (status RAG)...`);
+    console.log(`📅 Marcando OS ${osId} para reagendamento no IXC (status RAG)...`);
 
-    if (!dados.id_tecnico_ixc) {
-      throw new Error('ID do técnico no IXC é obrigatório');
+    // Busca a OS pra manter o setor atual (id_setor é obrigatório no IXC)
+    const osDetalhes = await this.buscarDetalhesOS(osId);
+    if (!osDetalhes) {
+      throw new Error(`OS ${osId} não encontrada no IXC`);
     }
-
-    const agora = new Date();
-    const temGps = dados.latitude && dados.longitude;
 
     const payload = {
       id_chamado: osId.toString(),
-      data_agendamento: dados.data_agendamento || '',
-      data_agendamento_final: dados.data_agendamento_final || '',
       id_resposta: dados.id_resposta || '',
-      mensagem: dados.mensagem || 'Reagendamento: cliente não estava no local (via SeeNet)',
-      id_tecnico: dados.id_tecnico_ixc.toString(),
-      id_equipe: dados.id_equipe || '',
+      mensagem: dados.mensagem || 'Cliente não estava no local (via SeeNet)',
       status: 'RAG',
-      data: dados.data || '',
-      id_evento: dados.id_evento || '',
-      id_compromisso: dados.id_compromisso || '',
-      latitude: temGps ? dados.latitude.toString() : '',
-      longitude: temGps ? dados.longitude.toString() : '',
-      gps_time: temGps ? this.formatarDataIXC(agora) : ''
+      data: '',
+      id_evento: '',
+      id_compromisso: '',
+      latitude: '',
+      longitude: '',
+      gps_time: '',
+      id_setor: (osDetalhes.setor || osDetalhes.id_setor || '').toString(),
+      id_tecnico: ''
     };
 
-    console.log(`📤 POST /su_oss_chamado_reagendar - OS ${osId}`);
+    console.log(`📤 POST /su_oss_chamado_reagendamento - OS ${osId}`);
 
-    const response = await this.clientAlterar.post('/su_oss_chamado_reagendar', payload);
+    const response = await this.clientAlterar.post('/su_oss_chamado_reagendamento', payload);
 
     if (response.data?.type === 'error') {
       console.error(`❌ Erro IXC:`, response.data.message);
@@ -360,7 +357,7 @@ async reagendarOS(osId, dados) {
     }
 
     if (response.data?.type === 'success') {
-      console.log(`✅ OS ${osId} reagendada no IXC (status: RAG)`);
+      console.log(`✅ OS ${osId} marcada para reagendamento no IXC (status: RAG)`);
     }
 
     return response.data;

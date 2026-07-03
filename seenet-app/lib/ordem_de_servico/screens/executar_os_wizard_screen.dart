@@ -743,9 +743,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       return;
     }
     final uri = Uri.parse('tel:$numero');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
+    try {
+      final ok = await launchUrl(uri);
+      if (!ok && mounted) _mostrarErro('Não foi possível abrir o discador');
+    } catch (_) {
       if (mounted) _mostrarErro('Não foi possível abrir o discador');
     }
   }

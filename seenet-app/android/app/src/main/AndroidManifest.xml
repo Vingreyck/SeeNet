@@ -24,6 +24,16 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- Ligar pro cliente (abrir o discador) -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <!-- Abrir localização no Google Maps / navegador -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
     </queries>
 
     <application

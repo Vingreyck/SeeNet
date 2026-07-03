@@ -307,6 +307,63 @@ async finalizarOS(osId, dados) {
 }
 
 /**
+ * ✅ Reagendar OS (status RAG = Aguardando Agendamento)
+ * POST /su_oss_chamado_reagendar
+ *
+ * Usado quando o técnico vai ao local e o CLIENTE NÃO ESTÁ — a OS sai de
+ * execução e volta pra fila de "Aguardando Agendamento" no IXC. O técnico
+ * fica livre pra outra OS. Datas de novo agendamento são opcionais (por
+ * padrão o IXC deixa na fila pra um atendente reagendar).
+ */
+async reagendarOS(osId, dados) {
+  try {
+    console.log(`📅 Reagendando OS ${osId} no IXC (status RAG)...`);
+
+    if (!dados.id_tecnico_ixc) {
+      throw new Error('ID do técnico no IXC é obrigatório');
+    }
+
+    const agora = new Date();
+    const temGps = dados.latitude && dados.longitude;
+
+    const payload = {
+      id_chamado: osId.toString(),
+      data_agendamento: dados.data_agendamento || '',
+      data_agendamento_final: dados.data_agendamento_final || '',
+      id_resposta: dados.id_resposta || '',
+      mensagem: dados.mensagem || 'Reagendamento: cliente não estava no local (via SeeNet)',
+      id_tecnico: dados.id_tecnico_ixc.toString(),
+      id_equipe: dados.id_equipe || '',
+      status: 'RAG',
+      data: dados.data || '',
+      id_evento: dados.id_evento || '',
+      id_compromisso: dados.id_compromisso || '',
+      latitude: temGps ? dados.latitude.toString() : '',
+      longitude: temGps ? dados.longitude.toString() : '',
+      gps_time: temGps ? this.formatarDataIXC(agora) : ''
+    };
+
+    console.log(`📤 POST /su_oss_chamado_reagendar - OS ${osId}`);
+
+    const response = await this.clientAlterar.post('/su_oss_chamado_reagendar', payload);
+
+    if (response.data?.type === 'error') {
+      console.error(`❌ Erro IXC:`, response.data.message);
+      throw new Error(response.data.message || 'Erro ao reagendar OS no IXC');
+    }
+
+    if (response.data?.type === 'success') {
+      console.log(`✅ OS ${osId} reagendada no IXC (status: RAG)`);
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Erro ao reagendar OS ${osId}:`, error.message);
+    throw error;
+  }
+}
+
+/**
  * ✅ Adicionar mensagem/interação em uma OS
  * POST /su_oss_chamado_mensagem
  *

@@ -686,6 +686,98 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     return true;
   }
 
+  // Reagendar: cliente não estava no local. Confirma (+ motivo opcional),
+  // para o tracking, manda pro backend (IXC vira RAG) e volta pra lista.
+  Future<void> _reagendarOS() async {
+    final motivoCtrl =
+        TextEditingController(text: 'Cliente não estava em casa');
+    String? erroMotivo;
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Reagendar OS?',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                  'Use quando o cliente não estava no local. A OS volta para "Aguardando Agendamento" e você fica livre para a próxima.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(height: 14),
+              const Text('Motivo *',
+                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: motivoCtrl,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: 'Descreva o motivo do reagendamento',
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  errorText: erroMotivo,
+                  filled: true,
+                  fillColor: const Color(0xFF111111),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar',
+                  style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (motivoCtrl.text.trim().isEmpty) {
+                  setStateDialog(() => erroMotivo = 'Informe o motivo');
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: const Text('Reagendar',
+                  style: TextStyle(
+                      color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      // Para o rastreamento GPS — o técnico não está mais atendendo esta OS.
+      if (Get.isRegistered<TrackingService>()) {
+        Get.find<TrackingService>().parar();
+      }
+      final sucesso = await controller.reagendarOS(
+        os.id,
+        latitude ?? 0,
+        longitude ?? 0,
+        motivo: motivoCtrl.text.trim(),
+      );
+      if (sucesso) {
+        if (mounted) Get.back(); // volta pra lista de OS
+      } else {
+        if (mounted) _mostrarErro('Erro ao reagendar');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _finalizarOS() async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -916,7 +1008,35 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         border: Border(
             top: BorderSide(color: Colors.white.withOpacity(0.06))),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Botão "Reagendar" (cliente ausente): só na etapa 0 e com o técnico
+          // em campo (deslocamento/execução). Fica ao lado do "Cheguei ao Local".
+          if (_etapaAtual == 0 &&
+              (statusAtual == 'em_deslocamento' ||
+                  statusAtual == 'em_execucao'))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _reagendarOS,
+                  icon: const Icon(Icons.event_busy_rounded, size: 18),
+                  label: const Text('Reagendar (cliente ausente)',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange,
+                    side: const BorderSide(color: Colors.orange),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ),
+          Row(
         children: [
           if (_etapaAtual > 0) ...[
             Expanded(
@@ -977,6 +1097,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
               ),
             ),
           ),
+        ],
+      ),
         ],
       ),
     );

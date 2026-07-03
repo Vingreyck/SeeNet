@@ -162,6 +162,27 @@ class OrdemServicoService {
     }
   }
 
+  Future<bool> reagendarOS(String osId, double latitude, double longitude,
+      {String? motivo}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/ordens-servico/$osId/reagendar'),
+        headers: _headers,
+        body: json.encode({
+          'latitude': latitude,
+          'longitude': longitude,
+          'motivo': motivo ?? '',
+        }),
+      );
+
+      print('📥 reagendarOS - Status: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('❌ Erro em reagendarOS: $e');
+      return false;
+    }
+  }
+
   Future<bool> verificarAPR(String osId) async {
     try {
       final response = await http.get(

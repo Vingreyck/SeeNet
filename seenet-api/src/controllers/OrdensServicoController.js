@@ -411,6 +411,122 @@ async sincronizarExecucaoComIXC(trx, os, dados) {
 }
 
 /**
+ * Reagendar OS (cliente não estava no local)
+ * POST /api/ordens-servico/:id/reagendar
+ * → IXC vira RAG (Aguardando Agendamento); local vira 'reagendada' (sai de "em campo").
+ */
+async reagendarOS(req, res) {
+  const trx = await db.transaction();
+
+  try {
+    const { id } = req.params;
+    const { latitude, longitude, motivo } = req.body;
+    const userId = req.user.id;
+    const tenantId = req.tenantId;
+
+    console.log(`📅 Reagendando OS ${id} (cliente ausente)...`);
+
+    const os = await trx('ordem_servico')
+      .where('id', id)
+      .where('tenant_id', tenantId)
+      .where('tecnico_id', userId)
+      .forUpdate() // trava a linha: ações simultâneas na MESMA OS não passam juntas
+      .first();
+
+    if (!os) {
+      await trx.rollback();
+      return res.status(404).json({ success: false, error: 'OS não encontrada' });
+    }
+
+    // Só reagenda OS que o técnico está de fato atendendo (foi ao local).
+    if (!['em_deslocamento', 'em_execucao'].includes(os.status)) {
+      await trx.rollback();
+      return res.status(400).json({ success: false, error: 'OS não está em deslocamento/execução' });
+    }
+
+    // Status local 'reagendada' → sai de "em campo" (não é pendente nem concluída,
+    // então o sincronizador NÃO mexe). Quando um atendente reagendar no IXC (a OS
+    // volta pra Aberta/Agendada), o sync a traz de volta pra "pendente".
+    await trx('ordem_servico')
+      .where('id', id)
+      .update({
+        status: 'reagendada',
+        data_atualizacao: db.fn.now()
+      });
+
+    await trx.commit();
+
+    // Sincroniza com IXC FORA da transação (best-effort, igual chegar/finalizar).
+    if (os.origem === 'IXC' && os.id_externo) {
+      try {
+        await this.sincronizarReagendamentoComIXC(db, os, { latitude, longitude, motivo });
+      } catch (error) {
+        console.error('⚠️ Erro ao sincronizar reagendamento com IXC:', error.message);
+      }
+    }
+
+    // Avisa o admin que a OS foi reagendada (cliente ausente).
+    if (os.admin_responsavel_id) {
+      try {
+        const tecnico = await db('usuarios').where('id', userId).first();
+        await notificationService.enviarParaUsuario(
+          db,
+          os.admin_responsavel_id,
+          '📅 OS Reagendada',
+          `${tecnico.nome} reagendou a OS #${os.numero_os} (cliente ausente)`,
+          { route: '/ordens-servico', tipo: 'os_reagendada', referencia_id: String(id) }
+        );
+      } catch (notifErr) {
+        console.warn('⚠️ Falha ao notificar admin:', notifErr.message);
+      }
+    }
+
+    console.log(`✅ OS ${os.numero_os} reagendada (RAG)`);
+
+    return res.json({
+      success: true,
+      message: 'OS reagendada com sucesso'
+    });
+  } catch (error) {
+    try { await trx.rollback(); } catch (_) {}
+    console.error('❌ Erro ao reagendar OS:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao reagendar OS' });
+  }
+}
+
+/**
+ * Sincronizar reagendamento com IXC (status RAG)
+ */
+async sincronizarReagendamentoComIXC(trx, os, dados) {
+  console.log(`🔄 Sincronizando reagendamento da OS ${os.numero_os} com IXC...`);
+
+  const integracao = await trx('integracao_ixc')
+    .where('tenant_id', os.tenant_id)
+    .where('ativo', true)
+    .first();
+
+  if (!integracao) {
+    throw new Error('Integração IXC não configurada');
+  }
+
+  const mapeamento = await trx('mapeamento_tecnicos_ixc')
+    .where('usuario_id', os.tecnico_id)
+    .where('tenant_id', os.tenant_id)
+    .first();
+
+  const ixc = new IXCService(integracao.url_api, integracao.token_api);
+
+  await ixc.reagendarOS(parseInt(os.id_externo), {
+    id_tecnico_ixc: mapeamento?.tecnico_ixc_id,
+    mensagem: dados.motivo || 'Reagendamento: cliente não estava no local (via SeeNet)',
+    latitude: dados.latitude,
+    longitude: dados.longitude
+  });
+
+  console.log(`✅ OS ${os.numero_os} - Status "RAG" (Aguardando Agendamento) no IXC`);
+}
+
+/**
  * Finalizar execução de OS
  * POST /api/ordens-servico/:id/finalizar
  */

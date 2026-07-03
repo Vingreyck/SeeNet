@@ -141,6 +141,31 @@ class OrdemServicoController extends GetxController {
     }
   }
 
+  // Reagendar (cliente não estava no local): IXC vira "Aguardando Agendamento"
+  // e a OS sai de "em campo" — o técnico fica livre pra próxima.
+  Future<bool> reagendarOS(String osId, double lat, double lng,
+      {String? motivo}) async {
+    try {
+      final sucesso = await _service.reagendarOS(osId, lat, lng, motivo: motivo);
+
+      if (sucesso) {
+        await carregarMinhasOSs();
+        AppSnackbar.show(
+          'Reagendada',
+          'OS enviada para novo agendamento.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      }
+
+      return sucesso;
+    } catch (e) {
+      AppSnackbar.show('Erro', 'Falha ao reagendar: $e',
+          backgroundColor: Colors.red, colorText: Colors.white);
+      return false;
+    }
+  }
+
   Future<bool> finalizarExecucao(String osId, Map<String, dynamic> dados) async {
     try {
       final sucesso = await _service.finalizarOS(osId, dados);

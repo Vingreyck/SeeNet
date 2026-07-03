@@ -33,6 +33,9 @@ router.post('/:id/chegar-local', OrdensServicoController.chegarAoLocal.bind(Orde
 // 3️⃣ Finalizar OS (serviço concluído)
 router.post('/:id/finalizar', OrdensServicoController.finalizarExecucao.bind(OrdensServicoController));
 
+// 4️⃣ Reagendar OS (cliente não estava → volta pra "Aguardando Agendamento" no IXC)
+router.post('/:id/reagendar', OrdensServicoController.reagendarOS.bind(OrdensServicoController));
+
 router.get('/:id/historico-endereco', OrdensServicoController.buscarHistoricoEndereco.bind(OrdensServicoController));
 
 

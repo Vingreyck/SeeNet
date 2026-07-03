@@ -270,7 +270,7 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
 
       // ── LOGOS ─────────────────────────────────────────────────
       try { const cruzBuf = Buffer.from(LOGO_CRUZ_BASE64, 'base64'); doc.image(cruzBuf, M + 5, y + 6, { height: 42 }); } catch (_) {}
-      try { const bwBuf = Buffer.from(LOGO_BW_BASE64, 'base64'); doc.image(bwBuf, M + 50, y + 10, { height: 34 }); } catch (_) {}
+      try { const bwBuf = Buffer.from(LOGO_BW_BASE64, 'base64'); doc.image(bwBuf, M + CW - 90, y + 8, { fit: [80, 40], align: 'right', valign: 'center' }); } catch (_) {}
 
       doc.rect(M, y, CW, 55).stroke(CB);
       doc.fontSize(13).font('Helvetica-Bold').fillColor('#000000')

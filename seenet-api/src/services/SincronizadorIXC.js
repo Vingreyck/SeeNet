@@ -219,6 +219,40 @@ class SincronizadorIXC {
             if (ossCanceladas > 0) {
               console.log(`   🗑️ ${ossCanceladas} OS(s) cancelada(s)`);
             }
+
+            // 🔄 OSs em_execucao/em_deslocamento que SUMIRAM da lista de abertas
+            // provavelmente foram finalizadas/canceladas MANUALMENTE no IXC
+            // (buscarOSs exclui status F e C). Sem isso, elas travam pra sempre
+            // em "em campo" no app. Confere o status REAL de cada uma e só
+            // sincroniza se o IXC confirmar F (concluída) ou C (cancelada) —
+            // OS que o técnico está de fato executando continua na lista aberta
+            // do IXC, então nem entra aqui.
+            const ossTravadas = await trx('ordem_servico')
+              .where('tenant_id', integracao.tenant_id)
+              .where('tecnico_id', mapeamento.usuario_id)
+              .where('origem', 'IXC')
+              .whereIn('status', ['em_execucao', 'em_deslocamento'])
+              .whereNotNull('id_externo')
+              .whereNotIn('id_externo', idsExternosIXC)
+              .select('id', 'id_externo', 'numero_os');
+
+            for (const osTravada of ossTravadas) {
+              try {
+                const osReal = await ixc.buscarDetalhesOS(osTravada.id_externo);
+                if (!osReal) continue; // não confirmou → não mexe (segurança)
+                let novoStatus = null;
+                if (osReal.status === 'F') novoStatus = 'concluida';
+                else if (osReal.status === 'C') novoStatus = 'cancelada';
+                if (novoStatus) {
+                  const upd = { status: novoStatus, data_atualizacao: db.fn.now() };
+                  if (novoStatus === 'concluida') upd.data_conclusao = db.fn.now();
+                  await trx('ordem_servico').where('id', osTravada.id).update(upd);
+                  console.log(`   🔄 OS ${osTravada.numero_os} → ${novoStatus} (fechada no IXC)`);
+                }
+              } catch (e) {
+                // erro ao consultar o IXC → não mexe nessa OS
+              }
+            }
           }
 
         } catch (error) {

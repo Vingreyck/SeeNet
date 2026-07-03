@@ -124,23 +124,26 @@ class _SplashScreenState extends State<SplashScreen>
       }
       print('✅ Todos registrados!');
 
-      try {
-        await Firebase.initializeApp();
+      // ⚠️ Firebase/push NÃO podem BLOQUEAR o arranque. No iPhone o
+      // Firebase.initializeApp()/APNs pode demorar ou travar e estourar o
+      // timeout de 12s do _initializeApp → o app caía no /login SEM rodar o
+      // auto-login (por isso o iOS "não entrava sozinho"). Rodam em 2º plano.
+      Firebase.initializeApp().then((_) {
         Get.find<NotificationService>().init().then((_) {
           Get.find<NotificationService>().listenTokenRefresh();
           print('✅ NotificationService pronto');
         });
-      } catch (e) {
+      }).catchError((e) {
         print('⚠️ Firebase não iniciado: $e');
-      }
+      });
 
-      // ✅ NOVO: Inicializar background GPS service
-      try {
-        await initializeBackgroundService();
+      // ✅ Background GPS service — também em 2º plano (no iOS o setup pode
+      // demorar/pedir permissão e não pode segurar o auto-login).
+      initializeBackgroundService().then((_) {
         print('✅ Background GPS service configurado');
-      } catch (e) {
+      }).catchError((e) {
         print('⚠️ Background GPS service não iniciado: $e');
-      }
+      });
 
       print('✅ App inicializado');
 

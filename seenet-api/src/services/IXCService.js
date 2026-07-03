@@ -31,20 +31,19 @@ class IXCService {
    * Formatar data para o padrão IXC (YYYY-MM-DD HH:MM:SS)
    */
   formatarDataIXC(data = new Date()) {
-    // ⚠️ O IXC espera horário do BRASIL (America/Sao_Paulo, UTC-3). O servidor
-    // (Railway) roda em UTC → usar getHours() mandava a hora 3h adiantada e o IXC
-    // recusava ("A data/hora ultrapassou o limite de -03:00 horas"). Aqui a data
-    // é SEMPRE convertida pro fuso do Brasil, não importa o fuso do servidor.
-    const fmt = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Sao_Paulo',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-      hour12: false,
-    });
-    const p = {};
-    for (const parte of fmt.formatToParts(data)) p[parte.type] = parte.value;
-    const hora = p.hour === '24' ? '00' : p.hour; // meia-noite pode vir como '24'
-    return `${p.year}-${p.month}-${p.day} ${hora}:${p.minute}:${p.second}`;
+    // ⚠️ O IXC espera horário do BRASIL (UTC-3, sem horário de verão desde 2019).
+    // O servidor (Railway) roda em UTC → sem converter, a hora ia 3h adiantada e o
+    // IXC recusava ("A data/hora ultrapassou o limite de -03:00 horas"). Conversão
+    // MANUAL (subtrai 3h e lê em UTC): não depende do fuso do servidor nem de dados
+    // de fuso (ICU) — sempre devolve horário de Brasília.
+    const br = new Date(data.getTime() - 3 * 60 * 60 * 1000);
+    const ano = br.getUTCFullYear();
+    const mes = String(br.getUTCMonth() + 1).padStart(2, '0');
+    const dia = String(br.getUTCDate()).padStart(2, '0');
+    const hora = String(br.getUTCHours()).padStart(2, '0');
+    const minuto = String(br.getUTCMinutes()).padStart(2, '0');
+    const segundo = String(br.getUTCSeconds()).padStart(2, '0');
+    return `${ano}-${mes}-${dia} ${hora}:${minuto}:${segundo}`;
   }
 
   /**
@@ -77,7 +76,8 @@ class IXCService {
 
       const registrosFiltrados = registros.filter(os =>
         os.status === 'A' || os.status === 'AG' ||
-        os.status === 'EA' || os.status === 'EX'
+        os.status === 'EA' || os.status === 'EX' ||
+        os.status === 'EN' // encaminhada → precisa aparecer pro técnico destino
       );
 
       console.log(`✅ ${registrosFiltrados.length}/${registros.length} OSs ativas (técnico: ${filtros.tecnicoId})`);
@@ -366,6 +366,65 @@ async reagendarOS(osId, dados) {
     return response.data;
   } catch (error) {
     console.error(`❌ Erro ao reagendar OS ${osId}:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * ✅ Encaminhar OS para outro técnico (status EN = Encaminhada)
+ * POST /su_oss_chamado_alterar_setor
+ *
+ * É o "Encaminhar" do IXC (Ações → Encaminhar). NÃO altera o setor (mantém o
+ * atual); só troca o "Colaborador responsável" (id_tecnico) e registra a
+ * mensagem/motivo. Preserva setor e assunto atuais (busca a OS antes).
+ */
+async encaminharOS(osId, dados) {
+  try {
+    console.log(`📨 Encaminhando OS ${osId} no IXC (status EN)...`);
+
+    if (!dados.id_tecnico_ixc) {
+      throw new Error('ID do técnico de destino no IXC é obrigatório');
+    }
+
+    // Busca a OS pra preservar setor e assunto atuais
+    const osDetalhes = await this.buscarDetalhesOS(osId);
+    if (!osDetalhes) {
+      throw new Error(`OS ${osId} não encontrada no IXC`);
+    }
+
+    const agora = new Date();
+    const temGps = dados.latitude && dados.longitude;
+
+    const payload = {
+      id_chamado: osId.toString(),
+      id_setor: (osDetalhes.setor || osDetalhes.id_setor || '').toString(),
+      id_tecnico: dados.id_tecnico_ixc.toString(),
+      id_assunto: (osDetalhes.id_assunto || '').toString(),
+      mensagem: dados.mensagem || 'Encaminhado via SeeNet',
+      status: 'EN',
+      data: '',
+      id_evento: '',
+      latitude: temGps ? dados.latitude.toString() : '',
+      longitude: temGps ? dados.longitude.toString() : '',
+      gps_time: temGps ? this.formatarDataIXC(agora) : ''
+    };
+
+    console.log(`📤 POST /su_oss_chamado_alterar_setor - OS ${osId}`);
+
+    const response = await this.clientAlterar.post('/su_oss_chamado_alterar_setor', payload);
+
+    if (response.data?.type === 'error') {
+      console.error(`❌ Erro IXC:`, response.data.message);
+      throw new Error(response.data.message || 'Erro ao encaminhar OS no IXC');
+    }
+
+    if (response.data?.type === 'success') {
+      console.log(`✅ OS ${osId} encaminhada no IXC (status: EN)`);
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error(`❌ Erro ao encaminhar OS ${osId}:`, error.message);
     throw error;
   }
 }

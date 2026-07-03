@@ -320,7 +320,7 @@ class SincronizadorIXC {
       const prioridade = prioridadeMap[osIXC.prioridade] || 'media';
 
       const statusMap = {
-        'A': 'pendente', 'AG': 'pendente', 'EA': 'em_execucao',
+        'A': 'pendente', 'AG': 'pendente', 'EN': 'pendente', 'EA': 'em_execucao',
         'E': 'em_execucao', 'EX': 'em_execucao', 'F': 'concluida', 'C': 'cancelada'
       };
       const status = statusMap[osIXC.status] || 'pendente';

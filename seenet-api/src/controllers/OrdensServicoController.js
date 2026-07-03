@@ -537,7 +537,7 @@ async encaminharOS(req, res) {
 
   try {
     const { id } = req.params;
-    const { tecnico_id } = req.body; // usuário SeeNet de destino
+    const { tecnico_id, motivo } = req.body; // destino + mensagem do encaminhamento
     const userId = req.user.id;
     const tenantId = req.tenantId;
 
@@ -586,7 +586,7 @@ async encaminharOS(req, res) {
     // pra sincronização não reverter o encaminhamento.
     if (os.origem === 'IXC' && os.id_externo) {
       try {
-        await this.sincronizarEncaminhamentoComIXC(db, os, alvo);
+        await this.sincronizarEncaminhamentoComIXC(db, os, alvo, motivo);
       } catch (error) {
         console.error('⚠️ Erro ao sincronizar encaminhamento com IXC:', error.message);
       }
@@ -619,7 +619,7 @@ async encaminharOS(req, res) {
 /**
  * Sincronizar encaminhamento com IXC (troca o técnico responsável)
  */
-async sincronizarEncaminhamentoComIXC(trx, os, alvo) {
+async sincronizarEncaminhamentoComIXC(trx, os, alvo, motivo) {
   console.log(`🔄 Encaminhando OS ${os.numero_os} no IXC para ${alvo.nome}...`);
 
   const integracao = await trx('integracao_ixc')
@@ -641,25 +641,16 @@ async sincronizarEncaminhamentoComIXC(trx, os, alvo) {
     throw new Error('Técnico de destino não está mapeado no IXC');
   }
 
-  // Mantém o status atual do IXC, só troca o técnico responsável.
-  let statusIxc = 'A';
-  try {
-    if (os.dados_ixc) {
-      const parsed = typeof os.dados_ixc === 'string'
-        ? JSON.parse(os.dados_ixc) : os.dados_ixc;
-      if (parsed && parsed.status) statusIxc = parsed.status;
-    }
-  } catch (_) {}
-
   const ixc = new IXCService(integracao.url_api, integracao.token_api);
 
-  await ixc.atualizarStatusOS(parseInt(os.id_externo), {
-    status: statusIxc,
-    id_tecnico: mapeamentoAlvo.tecnico_ixc_id,
-    mensagem: `OS encaminhada para ${alvo.nome} via SeeNet`
+  // Encaminhamento REAL do IXC (Ações → Encaminhar): troca o colaborador
+  // responsável (id_tecnico) e registra a mensagem/motivo. Mantém o setor.
+  await ixc.encaminharOS(parseInt(os.id_externo), {
+    id_tecnico_ixc: mapeamentoAlvo.tecnico_ixc_id,
+    mensagem: motivo || `Encaminhada para ${alvo.nome} via SeeNet`
   });
 
-  console.log(`✅ OS ${os.numero_os} - técnico trocado no IXC (id_tecnico ${mapeamentoAlvo.tecnico_ixc_id})`);
+  console.log(`✅ OS ${os.numero_os} - encaminhada no IXC p/ colaborador ${mapeamentoAlvo.tecnico_ixc_id}`);
 }
 
 /**

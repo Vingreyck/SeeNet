@@ -204,12 +204,12 @@ class OrdemServicoService {
     }
   }
 
-  Future<bool> encaminharOS(String osId, int tecnicoId) async {
+  Future<bool> encaminharOS(String osId, int tecnicoId, {String? motivo}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/encaminhar'),
         headers: _headers,
-        body: json.encode({'tecnico_id': tecnicoId}),
+        body: json.encode({'tecnico_id': tecnicoId, 'motivo': motivo ?? ''}),
       );
 
       print('📥 encaminharOS - Status: ${response.statusCode}');

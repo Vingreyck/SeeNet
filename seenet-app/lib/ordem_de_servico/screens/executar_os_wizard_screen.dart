@@ -789,7 +789,74 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     );
 
     if (escolhido == null || escolhido['id'] == null) return;
+    if (!mounted) return;
     final tecnicoId = escolhido['id'];
+    final nomeTec = (escolhido['nome'] ?? 'técnico').toString();
+
+    // Motivo obrigatório → vai pro campo "Mensagem" do encaminhamento no IXC.
+    final motivoCtrl =
+        TextEditingController(text: 'Encaminhada para $nomeTec');
+    String? erroMotivo;
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Encaminhar para $nomeTec?',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Motivo *',
+                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: motivoCtrl,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: 'Descreva o motivo do encaminhamento',
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  errorText: erroMotivo,
+                  filled: true,
+                  fillColor: const Color(0xFF111111),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar',
+                  style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (motivoCtrl.text.trim().isEmpty) {
+                  setStateDialog(() => erroMotivo = 'Informe o motivo');
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3B9EFF)),
+              child: const Text('Encaminhar',
+                  style: TextStyle(
+                      color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmar != true) return;
 
     setState(() => _isLoading = true);
     try {
@@ -800,6 +867,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       final sucesso = await controller.encaminharOS(
         os.id,
         tecnicoId is int ? tecnicoId : int.parse(tecnicoId.toString()),
+        motivo: motivoCtrl.text.trim(),
       );
       if (sucesso) {
         if (mounted) Get.back(); // volta pra lista de OS

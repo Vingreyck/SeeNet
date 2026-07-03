@@ -171,9 +171,9 @@ class OrdemServicoController extends GetxController {
       _service.buscarTecnicos();
 
   // Encaminha a OS para outro técnico: some da minha lista, aparece pra ele.
-  Future<bool> encaminharOS(String osId, int tecnicoId) async {
+  Future<bool> encaminharOS(String osId, int tecnicoId, {String? motivo}) async {
     try {
-      final sucesso = await _service.encaminharOS(osId, tecnicoId);
+      final sucesso = await _service.encaminharOS(osId, tecnicoId, motivo: motivo);
       if (sucesso) {
         await carregarMinhasOSs();
         AppSnackbar.show(

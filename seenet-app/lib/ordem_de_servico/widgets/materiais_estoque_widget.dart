@@ -203,15 +203,15 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
     );
   }
 
-  // Produtos vendidos por METRAGEM (digita metros) em vez de quantidade (+/-):
-  // tudo que é cabo/fibra — cabo drop, cabo UTP, fibra óptica, etc.
-  bool _ehMetragem(String descricao) {
-    final d = descricao.toUpperCase();
-    return d.contains('DROP') ||
-        d.contains('CABO') ||
-        d.contains('FIBRA') ||
-        d.contains('UTP');
-  }
+  // Produtos vendidos por METRAGEM (digita metros) em vez de quantidade (+/-).
+  // ⚠️ MAPEAMENTO MANUAL: só os IDs de produto listados aqui usam metros;
+  // todo o resto é por quantidade. O ID aparece no seletor de produto (badge
+  // verde) e no cadastro do produto no IXC. Vinícius adiciona os IDs abaixo.
+  static const Set<String> _idsMetragem = {
+    // '1234', // ex: CABO DROP FLAT
+  };
+
+  bool _ehMetragem(String idProduto) => _idsMetragem.contains(idProduto);
 
   Widget _buildErroWidget() {
     return Container(
@@ -328,7 +328,7 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                         ),
                         child: const Text('1', style: TextStyle(color: Colors.white70, fontSize: 16)),
                       )
-                          : _ehMetragem(item.produto.descricao)
+                          : _ehMetragem(item.produto.id)
                           ? SizedBox(
                         width: 90,
                         child: TextField(

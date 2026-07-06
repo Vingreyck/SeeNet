@@ -871,6 +871,9 @@ async finalizarExecucao(req, res) {
               numero_serie:                item.numero_serie || '',
               numero_patrimonial:          item.numero_patrimonial || '',
               tipo_produto:                item.tipo_produto || (ehPatrimonio ? 'P' : 'O'),
+              // 🔑 flag que joga a linha na aba COMODATO da OS (senão cai em Produtos).
+              // 'E' = Entregue/em comodato (mesmo filtro status_comodato='E' do IXC).
+              status_comodato:             ehPatrimonio ? 'E' : '',
               ultima_situacao_patrimonio:  '',
               garantia_oss:                '',
               pcomissao:                   '',

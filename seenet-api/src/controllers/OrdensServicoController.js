@@ -847,6 +847,10 @@ async finalizarExecucao(req, res) {
               vdesconto:                   '',
             });
           } else {
+            // 🐛 FIX comodato/patrimônio: o app manda id_patrimonio/serial/
+            // numero_patrimonial, mas antes iam ZERADOS aqui → o equipamento
+            // subia como produto comum e o comodato não registrava. Agora passa
+            // a identidade do patrimônio (igual à rota de adição em tempo real).
             await ixcService.adicionarProdutoOS({
               id_oss_chamado:              os.id_externo,
               id_produto:                  item.id_produto,
@@ -862,11 +866,11 @@ async finalizarExecucao(req, res) {
               fator_conversao:             '1.000000000',
               valor_unitario:              item.valor_unitario.toFixed(2),
               valor_total:                 item.valor_total.toFixed(2),
-              id_patrimonio:               '',
-              patrimonio:                  '',
-              numero_serie:                '',
-              numero_patrimonial:          '',
-              tipo_produto:                '',
+              id_patrimonio:               ehPatrimonio ? item.id_patrimonio.toString() : '',
+              patrimonio:                  ehPatrimonio ? item.id_patrimonio.toString() : '',
+              numero_serie:                item.numero_serie || '',
+              numero_patrimonial:          item.numero_patrimonial || '',
+              tipo_produto:                item.tipo_produto || (ehPatrimonio ? 'P' : 'O'),
               ultima_situacao_patrimonio:  '',
               garantia_oss:                '',
               pcomissao:                   '',

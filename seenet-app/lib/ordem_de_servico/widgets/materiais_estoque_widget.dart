@@ -203,8 +203,14 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
     );
   }
 
-  bool _isDrop(String descricao) {
-    return descricao.toUpperCase().contains('DROP');
+  // Produtos vendidos por METRAGEM (digita metros) em vez de quantidade (+/-):
+  // tudo que é cabo/fibra — cabo drop, cabo UTP, fibra óptica, etc.
+  bool _ehMetragem(String descricao) {
+    final d = descricao.toUpperCase();
+    return d.contains('DROP') ||
+        d.contains('CABO') ||
+        d.contains('FIBRA') ||
+        d.contains('UTP');
   }
 
   Widget _buildErroWidget() {
@@ -322,11 +328,11 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                         ),
                         child: const Text('1', style: TextStyle(color: Colors.white70, fontSize: 16)),
                       )
-                          : _isDrop(item.produto.descricao)
+                          : _ehMetragem(item.produto.descricao)
                           ? SizedBox(
                         width: 90,
                         child: TextField(
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           style: const TextStyle(color: Colors.white, fontSize: 16),
                           decoration: InputDecoration(
                             hintText: 'metros',

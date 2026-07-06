@@ -68,7 +68,7 @@ void _onStart(ServiceInstance service) async {
   // Envia a posição pro servidor — no máximo ~1x a cada 10s (mesma cadência de antes).
   Future<void> enviarPosicao(Position pos) async {
     if (osId == null || token == null) return;
-    if (DateTime.now().difference(ultimoEnvio).inSeconds < 10) return;
+    if (DateTime.now().difference(ultimoEnvio).inSeconds < 5) return;
     ultimoEnvio = DateTime.now();
 
     try {
@@ -131,7 +131,7 @@ void _onStart(ServiceInstance service) async {
         : AndroidSettings(
             accuracy: LocationAccuracy.high,
             distanceFilter: 0,
-            intervalDuration: const Duration(seconds: 10),
+            intervalDuration: const Duration(seconds: 5),
           );
     posSub = Geolocator.getPositionStream(locationSettings: settings).listen(
       enviarPosicao,

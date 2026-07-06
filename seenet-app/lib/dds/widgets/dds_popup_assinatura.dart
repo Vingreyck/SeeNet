@@ -9,15 +9,18 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:ui' as ui;
 
 class DdsPopupAssinatura {
+  static bool _aberto = false; // trava anti-duplicata (splash + binding chamam)
   static void mostrar() {
+    if (_aberto) return; // já aberto → não empilha outro
     final ctrl = Get.find<DdsController>();
     if (ctrl.sessaoAtiva.value == null) return;
+    _aberto = true;
     Get.dialog(
       const _DdsPopupDialog(),
       barrierDismissible: false,
       barrierColor: Colors.black87,
       useSafeArea: false,
-    );
+    ).then((_) => _aberto = false);
   }
 }
 

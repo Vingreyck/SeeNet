@@ -12,7 +12,10 @@ class GlobalBottomNav extends StatelessWidget {
 
   // ── LÓGICA INALTERADA ──────────────────────────────────────────
 
+  static bool _menuAberto = false; // trava: toques repetidos não empilham menus
+
   void _abrirMenuGlobal() {
+    if (_menuAberto) return; // já aberto → ignora
     if (kDebugMode) debugPrint('🍔 [Menu] Botao Menu clicado');
 
     UsuarioController? usuario;
@@ -38,6 +41,7 @@ class GlobalBottomNav extends StatelessWidget {
       return;
     }
 
+    _menuAberto = true;
     navigator.push(
       PageRouteBuilder(
         opaque: false,
@@ -59,7 +63,7 @@ class GlobalBottomNav extends StatelessWidget {
           );
         },
       ),
-    );
+    ).then((_) => _menuAberto = false);
   }
 
   void _fecharMenu(BuildContext context) {

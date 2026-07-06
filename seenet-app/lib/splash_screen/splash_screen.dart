@@ -183,8 +183,23 @@ class _SplashScreenState extends State<SplashScreen>
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             await Future.delayed(const Duration(milliseconds: 600));
 
-            // Auto-abrir a OS em andamento: o técnico cai direto na OS que estava
-            // executando (o wizard restaura o passo + os dados já preenchidos).
+            // 1º DDS: se há sessão pendente de assinatura, mostra o popup e NÃO
+            // auto-abre a OS por cima (o técnico assina o DDS primeiro).
+            bool ddsPendente = false;
+            try {
+              final ddsController = Get.find<DdsController>();
+              final temSessao = await ddsController.verificarSessaoAtiva();
+              ddsPendente = temSessao &&
+                  ddsController.sessaoAtiva.value?['ja_assinou'] != true;
+              if (ddsPendente) DdsPopupAssinatura.mostrar();
+            } catch (e) {
+              print('❌ [DDS] ERRO: $e');
+            }
+
+            if (ddsPendente) return; // não auto-abre OS por cima do DDS
+
+            // Auto-abrir a OS em andamento (só se NÃO tiver DDS pendente): o técnico
+            // cai direto na OS que estava executando (o wizard restaura o passo).
             try {
               final osCtrl = Get.isRegistered<OrdemServicoController>()
                   ? Get.find<OrdemServicoController>()
@@ -199,17 +214,6 @@ class _SplashScreenState extends State<SplashScreen>
               }
             } catch (e) {
               print('⚠️ Auto-abrir OS em andamento: $e');
-            }
-
-            try {
-              final ddsController = Get.find<DdsController>();
-              final temSessao = await ddsController.verificarSessaoAtiva();
-              if (temSessao &&
-                  ddsController.sessaoAtiva.value?['ja_assinou'] != true) {
-                DdsPopupAssinatura.mostrar();
-              }
-            } catch (e) {
-              print('❌ [DDS] ERRO: $e');
             }
           });
         }

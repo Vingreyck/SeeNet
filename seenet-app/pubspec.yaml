@@ -3,7 +3,7 @@ description: Sistema de diagnóstico técnico com IA
 
 publish_to: 'none'
 
-version: 1.4.5+60
+version: 1.4.6+61
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -61,6 +61,7 @@ flutter:
     - assets/images/iptv.svg
     - assets/images/app.svg
     - assets/images/icon.png
+    - shorebird.yaml
   
 
 # ✅ CONFIGURAÇÃO DO FLUTTER_LAUNCHER_ICONS (FORA DA SEÇÃO FLUTTER)

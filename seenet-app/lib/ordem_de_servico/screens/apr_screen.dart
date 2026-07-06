@@ -423,8 +423,7 @@ class _AprScreenState extends State<AprScreen>
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.of(context)
-                .popUntil((route) => route.settings.name == '/'),
+            onTap: () => Navigator.of(context).pop(),
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(

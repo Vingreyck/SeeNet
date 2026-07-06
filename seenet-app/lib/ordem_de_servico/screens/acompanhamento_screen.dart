@@ -222,13 +222,27 @@ class _AcompanhamentoScreenState extends State<AcompanhamentoScreen>
         ? DateTime.tryParse(item['atualizado_em'])
         : null;
 
+    // Frescor da posição em 3 níveis: 🟢 ao vivo (<30s) · 🟡 atrasado (<2min) · 🔴 sem sinal.
     String tempoStr = '';
+    Color corFrescor = const Color(0xFF00FF88);
+    bool semSinal = false;
     if (atualizadoEm != null) {
       final diff = DateTime.now().difference(atualizadoEm);
-      if (diff.inSeconds < 30) tempoStr = 'agora';
-      else if (diff.inMinutes < 1) tempoStr = 'há ${diff.inSeconds}s';
-      else if (diff.inMinutes < 60) tempoStr = 'há ${diff.inMinutes}min';
-      else tempoStr = 'há ${diff.inHours}h';
+      if (diff.inSeconds < 30) {
+        tempoStr = 'ao vivo';
+        corFrescor = const Color(0xFF00FF88);
+      } else if (diff.inSeconds < 120) {
+        tempoStr = diff.inMinutes < 1
+            ? 'há ${diff.inSeconds}s'
+            : 'há ${diff.inMinutes}min';
+        corFrescor = Colors.orange;
+      } else {
+        tempoStr = diff.inMinutes < 60
+            ? 'há ${diff.inMinutes}min'
+            : 'há ${diff.inHours}h';
+        corFrescor = Colors.red;
+        semSinal = true;
+      }
     }
 
     final isDeslocamento = status == 'em_deslocamento';
@@ -310,15 +324,14 @@ class _AcompanhamentoScreenState extends State<AcompanhamentoScreen>
                           width: 8, height: 8,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: tempoStr == 'agora'
-                                ? const Color(0xFF00FF88)
-                                : Colors.orange,
+                            color: corFrescor,
                           ),
                         ),
                         const SizedBox(height: 3),
-                        Text(tempoStr,
-                            style: const TextStyle(
-                                color: Colors.white38, fontSize: 10)),
+                        Text(semSinal ? '$tempoStr • sem sinal' : tempoStr,
+                            style: TextStyle(
+                                color: semSinal ? Colors.red : Colors.white38,
+                                fontSize: 10)),
                       ],
                     ),
                 ],

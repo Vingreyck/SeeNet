@@ -249,7 +249,33 @@ class MyApp extends StatelessWidget {
           page: () => const DashboardAdminView(),
           middlewares: [AuthMiddleware()],
         ),
-        GetPage(name: '/ordens-servico', page: () => const OrdensServicoScreen()),
+        GetPage(
+          name: '/ordens-servico',
+          page: () => const OrdensServicoScreen(),
+          // ✅ Home virou /ordens-servico → o check do DDS (popup de assinatura pro
+          // técnico ao entrar) precisa rodar AQUI também, não só no /checklist.
+          binding: BindingsBuilder(() {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              await Future.delayed(const Duration(milliseconds: 800));
+              try {
+                final usuario = Get.find<UsuarioController>();
+                // Só técnicos assinam — admin e gestor_seguranca não veem o popup.
+                final tipo = usuario.tipoUsuario;
+                if (tipo == 'administrador' || tipo == 'gestor_seguranca') return;
+
+                final ddsController = Get.find<DdsController>();
+                ddsController.sessaoAtiva.value = null;
+                final temSessao = await ddsController.verificarSessaoAtiva();
+                if (temSessao &&
+                    ddsController.sessaoAtiva.value?['ja_assinou'] != true) {
+                  DdsPopupAssinatura.mostrar();
+                }
+              } catch (e) {
+                print('❌ [DDS] erro: $e');
+              }
+            });
+          }),
+        ),
         GetPage(name: '/acompanhamento', page: () => const AcompanhamentoScreen()),
         GetPage(name: '/seguranca', page: () => const SegurancaHomeScreen()),
         GetPage(name: '/seguranca/requisicao', page: () => const RequisicaoEpiScreen()),

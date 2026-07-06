@@ -52,8 +52,8 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
   void initState() {
     super.initState();
     _carregarLocalizacao();
-    // Polling a cada 10 segundos
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _carregarLocalizacao());
+    // Polling a cada 3s (near-real-time; o "de verdade" via WebSocket fica pra depois)
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _carregarLocalizacao());
   }
 
   @override

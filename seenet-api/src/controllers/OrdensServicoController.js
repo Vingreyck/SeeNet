@@ -800,15 +800,20 @@ async finalizarExecucao(req, res) {
       const hoje = new Date();
       const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
 
-      // Buscar id_contrato no IXC (necessário para comodato)
+      // Comodato precisa de id_contrato + filial_id → busca a OS no IXC uma vez
+      // (quando há patrimônio ou quando falta o contrato).
+      const temPatrimonio = dados.itens_estoque.some(i =>
+        i.id_patrimonio && i.id_patrimonio !== '' && i.id_patrimonio !== '0');
       let idContratoIxc = os.id_contrato_ixc || '';
-      if (!idContratoIxc && os.id_externo) {
+      let idFilialIxc = '';
+      if (os.id_externo && (!idContratoIxc || temPatrimonio)) {
         try {
           const osIxc = await ixcService.buscarDetalhesOS(os.id_externo);
-          idContratoIxc = osIxc?.id_contrato_kit || osIxc?.id_contrato || '';
-          console.log(`📋 id_contrato IXC: ${idContratoIxc}`);
+          if (!idContratoIxc) idContratoIxc = osIxc?.id_contrato_kit || osIxc?.id_contrato || '';
+          idFilialIxc = osIxc?.id_filial || '';
+          console.log(`📋 id_contrato IXC: ${idContratoIxc} | filial: ${idFilialIxc}`);
         } catch (e) {
-          console.warn('⚠️ Não foi possível buscar id_contrato do IXC:', e.message);
+          console.warn('⚠️ Não foi possível buscar dados da OS no IXC:', e.message);
         }
       }
 
@@ -818,7 +823,49 @@ async finalizarExecucao(req, res) {
           item.id_patrimonio !== '0');
 
         try {
-          if (os.tipo_os === 'E') {
+          if (ehPatrimonio && os.tipo_os !== 'E') {
+            // 📦 COMODATO: patrimônio (roteador/ONU) entregue ao cliente → vai pra
+            // aba COMODATO da OS via endpoint dedicado su_oss_mov_comodato_wiz.
+            // Campos obrigatórios conforme doc do IXC (id_contrato, filial_id,
+            // status_comodato='E', etc.). Antes ia como produto → caía em Produtos.
+            await ixcService.adicionarComodatoOS({
+              id_oss_mensagem:             '',
+              id_saida:                    '',
+              id_oss_chamado:              os.id_externo.toString(),
+              id_contrato:                 (idContratoIxc || '').toString(),
+              id_login:                    '',
+              id_patrimonio:               item.id_patrimonio.toString(),
+              id_produto:                  item.id_produto.toString(),
+              descricao:                   item.descricao || '',
+              data:                        dataFormatada,
+              id_unidade:                  '1',
+              id_almox:                    idAlmox.toString(),
+              filial_id:                   (idFilialIxc || '1').toString(),
+              qtde_saida:                  item.quantidade.toString(),
+              valor_unitario:              item.valor_unitario.toFixed(2),
+              pcomissao:                   '',
+              pdesconto:                   '',
+              vdesconto:                   '',
+              valor_total:                 item.valor_total.toFixed(2),
+              patrimonio:                  item.id_patrimonio.toString(),
+              mac:                         item.mac || '',
+              numero_serie:                item.numero_serie || '',
+              numero_patrimonial:          item.numero_patrimonial || '',
+              garantia_oss:                '',
+              id_terceiro_oss:             '',
+              id_su_oss_kit_equipamento:   '',
+              id_classificacao_tributaria: '1',
+              tipo:                        'C',
+              estoque:                     'S',
+              unidade_sigla:               'UND',
+              fator_conversao:             '1',
+              tipo_produto:                item.tipo_produto || 'P',
+              status_comodato:             'E',
+              status_patrimonio:           '',
+              ultima_situacao_patrimonio:  '',
+              id_pedido_os:                '',
+            });
+          } else if (os.tipo_os === 'E') {
             await ixcService.adicionarProdutoEstruturaOS({
               id_oss_chamado:              os.id_externo,
               id_produto:                  item.id_produto,
@@ -847,10 +894,7 @@ async finalizarExecucao(req, res) {
               vdesconto:                   '',
             });
           } else {
-            // 🐛 FIX comodato/patrimônio: o app manda id_patrimonio/serial/
-            // numero_patrimonial, mas antes iam ZERADOS aqui → o equipamento
-            // subia como produto comum e o comodato não registrava. Agora passa
-            // a identidade do patrimônio (igual à rota de adição em tempo real).
+            // Produto de consumo (não-patrimônio) → aba Produtos da OS.
             await ixcService.adicionarProdutoOS({
               id_oss_chamado:              os.id_externo,
               id_produto:                  item.id_produto,
@@ -866,14 +910,11 @@ async finalizarExecucao(req, res) {
               fator_conversao:             '1.000000000',
               valor_unitario:              item.valor_unitario.toFixed(2),
               valor_total:                 item.valor_total.toFixed(2),
-              id_patrimonio:               ehPatrimonio ? item.id_patrimonio.toString() : '',
-              patrimonio:                  ehPatrimonio ? item.id_patrimonio.toString() : '',
-              numero_serie:                item.numero_serie || '',
-              numero_patrimonial:          item.numero_patrimonial || '',
-              tipo_produto:                item.tipo_produto || (ehPatrimonio ? 'P' : 'O'),
-              // 🔑 flag que joga a linha na aba COMODATO da OS (senão cai em Produtos).
-              // 'E' = Entregue/em comodato (mesmo filtro status_comodato='E' do IXC).
-              status_comodato:             ehPatrimonio ? 'E' : '',
+              id_patrimonio:               '',
+              patrimonio:                  '',
+              numero_serie:                '',
+              numero_patrimonial:          '',
+              tipo_produto:                'O',
               ultima_situacao_patrimonio:  '',
               garantia_oss:                '',
               pcomissao:                   '',
@@ -883,7 +924,7 @@ async finalizarExecucao(req, res) {
               id_saida:                    '',
               id_terceiro_oss:             '',
               id_su_oss_kit_equipamento:   '',
-              id_estrutura: os.tipo_os === 'E' ? (os.id_estrutura || '') : '',
+              id_estrutura:                '',
               id_pedido_os:                '',
             });
           }

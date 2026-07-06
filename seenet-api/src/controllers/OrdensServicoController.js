@@ -846,7 +846,12 @@ async finalizarExecucao(req, res) {
               descricao:                   item.descricao || '',
               data:                        dataFormatada,
               id_unidade:                  '1',
-              id_almox:                    idAlmox.toString(),
+              // Patrimônio SÓ pode sair do almox onde ele está fisicamente. Usa o
+              // almox do próprio patrimônio (item.id_almoxarifado); só cai no almox
+              // da loja se o app não mandar. Evita "Patrimônio está indisponível".
+              id_almox:                    (item.id_almoxarifado && item.id_almoxarifado !== '0' && item.id_almoxarifado !== '')
+                                             ? item.id_almoxarifado.toString()
+                                             : idAlmox.toString(),
               filial_id:                   (idFilialIxc || '1').toString(),
               qtde_saida:                  item.quantidade.toString(),
               valor_unitario:              item.valor_unitario.toFixed(2),

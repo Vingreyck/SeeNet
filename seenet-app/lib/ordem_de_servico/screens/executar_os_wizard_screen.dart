@@ -1434,6 +1434,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           'numero_serie':        item.patrimonio?.serial ?? '',
           'numero_patrimonial':  item.patrimonio?.numeroPatrimonial ?? '',
           'mac':                 item.patrimonio?.mac ?? '',
+          // almox ONDE o patrimônio está → o comodato tem que sair de lá (senão
+          // o IXC diz "Patrimônio está indisponível").
+          'id_almoxarifado':     item.patrimonio?.idAlmoxarifado ?? '',
           'tipo_produto':        item.isPatrimonio ? 'P' : 'O',
         }).toList(),
         'observacoes': observacoesController.text.trim(),

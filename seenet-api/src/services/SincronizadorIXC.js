@@ -10,6 +10,7 @@ class SincronizadorIXC {
     this.cacheClientes = new Map();
     this.cacheAssuntos = new Map();
     this.cacheFibra = new Map(); // login → dados de fibra (Caixa FTTH / Porta FTTH)
+    this.cacheLogin = new Map(); // id_login → login string (o su_oss_chamado só traz id_login)
     this.maxOSsPorSync = 10;
 
     // ✅ Circuit breaker — para de tentar quando IXC está fora
@@ -150,6 +151,7 @@ class SincronizadorIXC {
 
       this.cacheClientes.clear();
       this.cacheFibra.clear();
+      this.cacheLogin.clear();
       console.log('🧹 Cache de clientes limpo');
       console.log('✅ Ciclo de sincronização concluído\n');
     } catch (error) {
@@ -339,6 +341,17 @@ class SincronizadorIXC {
           nomeEstrutura = resp.data?.registros?.[0]?.descricao || null;
           if (nomeEstrutura) console.log(`   🏗️ Estrutura ${osIXC.id_estrutura} → "${nomeEstrutura}"`);
         } catch (_) {}
+      }
+
+      // 🔑 LOGIN: o su_oss_chamado só traz `id_login` (numérico). Resolve a STRING
+      // do login (ex: "copadomundo2026") p/ o card mostrar e a busca de fibra rodar.
+      if (!osIXC.login && osIXC.id_login && osIXC.id_login !== '0') {
+        let loginStr = this.cacheLogin.get(osIXC.id_login);
+        if (loginStr === undefined) {
+          loginStr = await ixcService.buscarLoginPorId(osIXC.id_login);
+          this.cacheLogin.set(osIXC.id_login, loginStr);
+        }
+        if (loginStr) osIXC.login = loginStr;
       }
 
       // 🔌 FIBRA (Caixa FTTH / Porta FTTH) pro card — busca por login, com cache.

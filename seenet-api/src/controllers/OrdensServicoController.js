@@ -796,7 +796,12 @@ async finalizarExecucao(req, res) {
         .where('tenant_id', tenantId)
         .first();
 
-      const idAlmox = mapeamentoEstoque?.id_almoxarifado || 22;
+      // Material/comodato da OS descontam da LOJA da cidade (id_almoxarifado_loja)
+      // quando o admin mapeou; senão cai no almox pessoal do técnico (compat).
+      // O EPI continua no almox pessoal (não passa por aqui).
+      const idAlmox = mapeamentoEstoque?.id_almoxarifado_loja
+        || mapeamentoEstoque?.id_almoxarifado
+        || 22;
       const hoje = new Date();
       const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
 
@@ -806,12 +811,14 @@ async finalizarExecucao(req, res) {
         i.id_patrimonio && i.id_patrimonio !== '' && i.id_patrimonio !== '0');
       let idContratoIxc = os.id_contrato_ixc || '';
       let idFilialIxc = '';
+      let idLoginIxc = '';
       if (os.id_externo && (!idContratoIxc || temPatrimonio)) {
         try {
           const osIxc = await ixcService.buscarDetalhesOS(os.id_externo);
           if (!idContratoIxc) idContratoIxc = osIxc?.id_contrato_kit || osIxc?.id_contrato || '';
           idFilialIxc = osIxc?.id_filial || '';
-          console.log(`📋 id_contrato IXC: ${idContratoIxc} | filial: ${idFilialIxc}`);
+          idLoginIxc = osIxc?.id_login || ''; // login do cliente → vai no comodato
+          console.log(`📋 id_contrato IXC: ${idContratoIxc} | filial: ${idFilialIxc} | login: ${idLoginIxc}`);
         } catch (e) {
           console.warn('⚠️ Não foi possível buscar dados da OS no IXC:', e.message);
         }
@@ -833,7 +840,7 @@ async finalizarExecucao(req, res) {
               id_saida:                    '',
               id_oss_chamado:              os.id_externo.toString(),
               id_contrato:                 (idContratoIxc || '').toString(),
-              id_login:                    '',
+              id_login:                    (idLoginIxc || '').toString(),
               id_patrimonio:               item.id_patrimonio.toString(),
               id_produto:                  item.id_produto.toString(),
               descricao:                   item.descricao || '',
@@ -848,7 +855,9 @@ async finalizarExecucao(req, res) {
               vdesconto:                   '',
               valor_total:                 item.valor_total.toFixed(2),
               patrimonio:                  item.id_patrimonio.toString(),
-              mac:                         item.mac || '',
+              // MAC: o que o técnico leu da ONU no wizard (dados.onu_mac) tem
+              // prioridade; senão o MAC do patrimônio no IXC (item.mac).
+              mac:                         dados.onu_mac || item.mac || '',
               numero_serie:                item.numero_serie || '',
               numero_patrimonial:          item.numero_patrimonial || '',
               garantia_oss:                '',

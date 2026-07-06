@@ -710,6 +710,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView>
         switch (v) {
           case 'detalhes': _mostrarDetalhes(u); break;
           case 'editar':   _editarUsuario(u); break;
+          case 'loja':     _mapearLoja(u); break;
           case 'senha':    _resetarSenha(u); break;
           case 'status':   _alternarStatus(u); break;
           case 'remover':  _removerUsuario(u); break;
@@ -718,6 +719,9 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView>
       itemBuilder: (_) => [
         _menuItem('detalhes', Icons.info_outline_rounded,    'Ver Detalhes',  Colors.blue),
         _menuItem('editar',   Icons.edit_outlined,           'Editar',        Colors.orange),
+        // Mapear a LOJA da cidade (almox de desconto de OS) — só p/ técnico.
+        if (u.tipoUsuario == 'tecnico')
+          _menuItem('loja', Icons.store_rounded, 'Mapear Loja', const Color(0xFF00BCD4)),
         _menuItem('senha',    Icons.lock_reset_rounded,      'Resetar Senha', Colors.purple),
         _menuItem('status',
             u.ativo ? Icons.block_rounded : Icons.check_circle_outline_rounded,
@@ -727,6 +731,123 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView>
         _menuItem('remover',  Icons.delete_outline_rounded,  'Remover',       Colors.red),
       ],
     );
+  }
+
+  // ── Mapear LOJA da cidade do técnico ───────────────────────
+  // Define de qual almoxarifado (a LOJA da cidade) o material/comodato da OS
+  // será descontado. NÃO mexe no almox pessoal do técnico (EPI continua igual).
+  Future<void> _mapearLoja(Usuario u) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF00FF88)),
+      ),
+    );
+
+    List<Map<String, dynamic>> almoxarifados = [];
+    String? lojaAtualId;
+    try {
+      final almoxResp = await _api.get('/estoque/almoxarifados');
+      if (almoxResp is Map &&
+          almoxResp['success'] == true &&
+          almoxResp['data'] is List) {
+        almoxarifados = (almoxResp['data'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      final mapResp = await _api.get('/integracoes/ixc/mapeamento/${u.id}');
+      if (mapResp is Map && mapResp['data'] is Map) {
+        lojaAtualId = mapResp['data']['id_almoxarifado_loja']?.toString();
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+    Navigator.pop(context); // fecha o loader
+
+    if (almoxarifados.isEmpty) {
+      // A tabela 'almoxarifado' pode não estar exposta no webservice do IXC →
+      // cai no modo manual (admin digita o ID da loja, que vê no próprio IXC).
+      _mapearLojaManual(u);
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _MapearLojaSheet(
+        tecnicoNome: u.nome,
+        almoxarifados: almoxarifados,
+        lojaAtualId: lojaAtualId,
+        onSelecionar: (id, nome) async {
+          Navigator.pop(context);
+          await _salvarLoja(u, id, nome);
+        },
+      ),
+    );
+  }
+
+  // Fallback: digitar o ID da loja na mão (quando o IXC não expõe a lista).
+  void _mapearLojaManual(Usuario u) {
+    final idCtrl = TextEditingController();
+    final nomeCtrl = TextEditingController();
+    _dialogDark(
+      titulo: 'Mapear Loja',
+      icone: Icons.store_rounded,
+      cor: const Color(0xFF00BCD4),
+      conteudo: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Técnico: ${u.nome}',
+              style: const TextStyle(color: Colors.white54, fontSize: 12)),
+          const SizedBox(height: 4),
+          const Text(
+            'Digite o ID do almoxarifado da LOJA da cidade (você vê no IXC em '
+            'Almoxarifados). O material/comodato da OS será descontado dele.',
+            style: TextStyle(color: Colors.white38, fontSize: 11.5, height: 1.35),
+          ),
+          const SizedBox(height: 14),
+          _inputDark('ID do almoxarifado (loja) *', idCtrl,
+              icone: Icons.tag_rounded, keyboard: TextInputType.number),
+          const SizedBox(height: 12),
+          _inputDark('Nome da loja (opcional)', nomeCtrl,
+              icone: Icons.store_rounded),
+        ],
+      ),
+      acoes: [
+        _botaoDialog('Cancelar', Colors.white24, () => Navigator.pop(context),
+            outline: true),
+        const SizedBox(width: 10),
+        _botaoDialog('Salvar', const Color(0xFF00BCD4), () async {
+          final id = idCtrl.text.trim();
+          if (id.isEmpty) {
+            AppSnackbar.warning('Atenção', 'Informe o ID do almoxarifado');
+            return;
+          }
+          Navigator.pop(context);
+          await _salvarLoja(u, id, nomeCtrl.text.trim());
+        }, textColor: Colors.black),
+      ],
+    );
+  }
+
+  Future<void> _salvarLoja(Usuario u, String almoxId, String almoxNome) async {
+    try {
+      final r = await _api.post('/integracoes/ixc/mapear-loja', {
+        'usuario_id': u.id,
+        'id_almoxarifado_loja': almoxId,
+        'almoxarifado_loja_nome': almoxNome,
+      });
+      if (r['success'] == true) {
+        AppSnackbar.success('Sucesso', '🏬 Loja mapeada para ${u.nome}');
+      } else {
+        throw Exception(r['error'] ?? 'Falha ao mapear');
+      }
+    } catch (e) {
+      AppSnackbar.error('Erro', '$e');
+    }
   }
 
   PopupMenuItem<String> _menuItem(String val, IconData icone, String texto, Color cor) {
@@ -1350,6 +1471,220 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView>
 
   String _formatarData(DateTime d) =>
       '${d.day.toString().padLeft(2,'0')}/${d.month.toString().padLeft(2,'0')}/${d.year} ${d.hour.toString().padLeft(2,'0')}:${d.minute.toString().padLeft(2,'0')}';
+}
+
+// ── Bottom sheet: escolher a LOJA da cidade do técnico ─────────
+class _MapearLojaSheet extends StatefulWidget {
+  final String tecnicoNome;
+  final List<Map<String, dynamic>> almoxarifados;
+  final String? lojaAtualId;
+  final Future<void> Function(String id, String nome) onSelecionar;
+
+  const _MapearLojaSheet({
+    required this.tecnicoNome,
+    required this.almoxarifados,
+    required this.lojaAtualId,
+    required this.onSelecionar,
+  });
+
+  @override
+  State<_MapearLojaSheet> createState() => _MapearLojaSheetState();
+}
+
+class _MapearLojaSheetState extends State<_MapearLojaSheet> {
+  final _buscaCtrl = TextEditingController();
+  late List<Map<String, dynamic>> _filtrados;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtrados = widget.almoxarifados;
+    _buscaCtrl.addListener(_filtrar);
+  }
+
+  @override
+  void dispose() {
+    _buscaCtrl.dispose();
+    super.dispose();
+  }
+
+  void _filtrar() {
+    final q = _buscaCtrl.text.toLowerCase().trim();
+    setState(() {
+      _filtrados = q.isEmpty
+          ? widget.almoxarifados
+          : widget.almoxarifados.where((a) {
+              final desc = (a['descricao'] ?? '').toString().toLowerCase();
+              final id = (a['id'] ?? '').toString();
+              return desc.contains(q) || id.contains(q);
+            }).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00BCD4).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.store_rounded,
+                        color: Color(0xFF00BCD4), size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Loja da cidade',
+                            style: TextStyle(color: Colors.white, fontSize: 18,
+                                fontWeight: FontWeight.bold)),
+                        Text(widget.tecnicoNome,
+                            style: const TextStyle(color: Colors.white54, fontSize: 12),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white54),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00BCD4).withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF00BCD4).withOpacity(0.25)),
+                ),
+                child: const Text(
+                  'O material e o comodato da OS serão descontados desta loja. '
+                  'O EPI continua saindo do estoque pessoal do técnico.',
+                  style: TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.35),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _buscaCtrl,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Buscar loja/almoxarifado...',
+                  hintStyle: const TextStyle(color: Colors.white30),
+                  prefixIcon: const Icon(Icons.search, color: Colors.white38),
+                  filled: true,
+                  fillColor: const Color(0xFF232323),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00BCD4))),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _filtrados.isEmpty
+                  ? const Center(
+                      child: Text('Nenhum almoxarifado encontrado',
+                          style: TextStyle(color: Colors.white38)))
+                  : ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _filtrados.length,
+                      itemBuilder: (_, i) {
+                        final a = _filtrados[i];
+                        final id = (a['id'] ?? '').toString();
+                        final desc = (a['descricao'] ?? 'Almox $id').toString();
+                        final atual = id == widget.lojaAtualId;
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => widget.onSelecionar(id, desc),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: atual
+                                  ? const Color(0xFF00BCD4).withOpacity(0.12)
+                                  : const Color(0xFF232323),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: atual
+                                      ? const Color(0xFF00BCD4)
+                                      : Colors.white12),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  alignment: Alignment.center,
+                                  padding: const EdgeInsets.symmetric(vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF00BCD4).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(id,
+                                      style: const TextStyle(
+                                          color: Color(0xFF00BCD4),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12)),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(desc,
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 13.5,
+                                          fontWeight: FontWeight.w500),
+                                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                                ),
+                                if (atual)
+                                  const Icon(Icons.check_circle,
+                                      color: Color(0xFF00BCD4), size: 20)
+                                else
+                                  const Icon(Icons.chevron_right_rounded,
+                                      color: Colors.white24),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ── Grade decorativa ───────────────────────────────────────────

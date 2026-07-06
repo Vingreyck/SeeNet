@@ -183,4 +183,83 @@ router.get('/ixc/testar', async (req, res) => {
   }
 });
 
+/**
+ * Buscar o mapeamento IXC de um técnico (mostra a LOJA atual no admin)
+ * GET /api/integracoes/ixc/mapeamento/:usuarioId
+ */
+router.get('/ixc/mapeamento/:usuarioId', async (req, res) => {
+  try {
+    const { tenantId, isAdmin } = req.user;
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, error: 'Apenas administradores' });
+    }
+    const { usuarioId } = req.params;
+    // SELECT * evita erro caso a coluna id_almoxarifado_loja ainda não exista.
+    const { rows } = await pool.query(
+      `SELECT * FROM mapeamento_tecnicos_ixc WHERE usuario_id = $1 AND tenant_id = $2`,
+      [usuarioId, tenantId]
+    );
+    const m = rows[0] || null;
+    return res.json({
+      success: true,
+      data: m ? {
+        usuario_id: m.usuario_id,
+        tecnico_ixc_id: m.tecnico_ixc_id,
+        id_almoxarifado: m.id_almoxarifado,
+        almoxarifado_nome: m.almoxarifado_nome,
+        id_almoxarifado_loja: m.id_almoxarifado_loja || null,
+        almoxarifado_loja_nome: m.almoxarifado_loja_nome || null,
+      } : null
+    });
+  } catch (error) {
+    console.error('❌ Erro ao buscar mapeamento:', error.message);
+    return res.status(500).json({ success: false, error: 'Erro ao buscar mapeamento' });
+  }
+});
+
+/**
+ * Mapear a LOJA (almoxarifado de desconto de material/comodato da OS) de um técnico.
+ * NÃO altera o almox pessoal (EPI). POST /api/integracoes/ixc/mapear-loja
+ * body: { usuario_id, id_almoxarifado_loja, almoxarifado_loja_nome }
+ */
+router.post('/ixc/mapear-loja', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { tenantId, isAdmin } = req.user;
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, error: 'Apenas administradores podem mapear' });
+    }
+    const { usuario_id, id_almoxarifado_loja, almoxarifado_loja_nome } = req.body;
+    if (!usuario_id || !id_almoxarifado_loja) {
+      return res.status(400).json({ success: false, error: 'usuario_id e id_almoxarifado_loja são obrigatórios' });
+    }
+
+    // Atualiza a linha existente do técnico (o mapeamento base — almox/colaborador —
+    // já deve existir). Se não existir, orienta a mapear o técnico primeiro.
+    const upd = await client.query(
+      `UPDATE mapeamento_tecnicos_ixc
+         SET id_almoxarifado_loja = $1,
+             almoxarifado_loja_nome = $2,
+             updated_at = NOW()
+       WHERE usuario_id = $3 AND tenant_id = $4`,
+      [id_almoxarifado_loja, almoxarifado_loja_nome || null, usuario_id, tenantId]
+    );
+
+    if (upd.rowCount === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Técnico ainda não tem mapeamento IXC (almoxarifado/colaborador). Configure o mapeamento base primeiro.'
+      });
+    }
+
+    console.log(`🏬 Loja ${id_almoxarifado_loja} mapeada para o técnico ${usuario_id}`);
+    return res.json({ success: true, message: 'Loja mapeada com sucesso' });
+  } catch (error) {
+    console.error('❌ Erro ao mapear loja:', error.message);
+    return res.status(500).json({ success: false, error: 'Erro ao mapear loja' });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;

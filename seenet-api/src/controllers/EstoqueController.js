@@ -38,9 +38,35 @@ class EstoqueController {
 
     return {
       tecnicoIxcId: mapeamento.tecnico_ixc_id,
-      almoxarifadoId: mapeamento.id_almoxarifado,
-      almoxarifadoNome: mapeamento.almoxarifado_nome
+      // Estoque de material/comodato da OS sai da LOJA da cidade
+      // (id_almoxarifado_loja) quando o admin mapeia; senão cai no almox pessoal
+      // do técnico (compat — não quebra quem não tem loja mapeada). O EPI NÃO usa
+      // este helper (continua no id_almoxarifado pessoal do técnico).
+      almoxarifadoId: mapeamento.id_almoxarifado_loja || mapeamento.id_almoxarifado,
+      almoxarifadoNome: mapeamento.almoxarifado_loja_nome || mapeamento.almoxarifado_nome
     };
+  }
+
+  /**
+   * Listar almoxarifados do IXC (admin escolhe a LOJA da cidade do técnico).
+   * GET /api/estoque/almoxarifados
+   */
+  async listarAlmoxarifados(req, res) {
+    try {
+      const tenantId = req.tenantId;
+      const ixc = await this._getIXCService(tenantId);
+      const registros = await ixc.listarAlmoxarifados();
+      const almoxarifados = registros.map(a => ({
+        id: a.id?.toString(),
+        descricao: a.descricao || a.nome || `Almoxarifado ${a.id}`,
+        ativo: a.ativo,
+        id_filial: a.id_filial,
+      }));
+      return res.json({ success: true, data: almoxarifados });
+    } catch (error) {
+      console.error('❌ Erro ao listar almoxarifados:', error.message);
+      return res.status(500).json({ success: false, error: 'Erro ao listar almoxarifados' });
+    }
   }
 
   // ═══════════════════════════════════════════════════

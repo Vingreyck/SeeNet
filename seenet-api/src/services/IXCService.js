@@ -122,6 +122,29 @@ class IXCService {
   }
 
   /**
+   * ✅ Resolver o LOGIN (string) a partir do id_login da OS.
+   * O su_oss_chamado só traz `id_login` (numérico); o card e a busca de fibra
+   * precisam da string do login (ex: "copadomundo2026"). Consulta radusuarios.id.
+   */
+  async buscarLoginPorId(idLogin) {
+    try {
+      if (!idLogin || idLogin === '0') return null;
+      const params = new URLSearchParams({
+        qtype: 'radusuarios.id',
+        query: idLogin.toString(),
+        oper: '=',
+        page: '1',
+        rp: '1'
+      });
+      const response = await this.clientListar.post('/radusuarios', params.toString());
+      return response.data?.registros?.[0]?.login || null;
+    } catch (e) {
+      console.error(`❌ Erro ao buscar login id ${idLogin}:`, e.message);
+      return null;
+    }
+  }
+
+  /**
    * Buscar detalhes de uma OS específica (para pegar campos obrigatórios)
    */
   async buscarDetalhesOS(osId) {
@@ -194,6 +217,33 @@ class IXCService {
       return response.data.registros || [];
     } catch (error) {
       console.error('❌ Erro ao buscar técnicos:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Listar almoxarifados do IXC (para o admin escolher a LOJA da cidade).
+   * GET/POST /almoxarifado (listar)
+   */
+  async listarAlmoxarifados() {
+    try {
+      const params = new URLSearchParams({
+        qtype: 'almoxarifado.id',
+        query: '0',
+        oper: '>',
+        page: '1',
+        rp: '1000',
+        sortname: 'almoxarifado.descricao',
+        sortorder: 'asc'
+      });
+
+      const response = await this.clientListar.post('/almoxarifado', params.toString());
+
+      console.log(`✅ ${response.data.total || 0} almoxarifados encontrados`);
+
+      return response.data.registros || [];
+    } catch (error) {
+      console.error('❌ Erro ao listar almoxarifados:', error.message);
       throw error;
     }
   }

@@ -207,8 +207,15 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
   // ⚠️ MAPEAMENTO MANUAL: só os IDs de produto listados aqui usam metros;
   // todo o resto é por quantidade. O ID aparece no seletor de produto (badge
   // verde) e no cadastro do produto no IXC. Vinícius adiciona os IDs abaixo.
+  // IDs vindos do IXC (produtos cuja Unidade é Metro linear/M ou Metro corrido/MC).
+  // Ajuste livre: se um cabo novo entrar, é só adicionar o ID aqui.
   static const Set<String> _idsMetragem = {
-    // '1234', // ex: CABO DROP FLAT
+    '391', // CABO DE FIBRA OPTICO CFOA 06FO (MC)
+    '392', // CABO DE FIBRA OPTICO CFOA 12FO (MC)
+    '404', // CABO ÓPTICO DROP 01FO (MC)
+    '518', // CABO DE REDE CAT5 (4 PARES) (M)
+    '534', // CABO DE REDE (2 PARES) (MC)
+    '603', // CABO HDMI (MC)
   };
 
   bool _ehMetragem(String idProduto) => _idsMetragem.contains(idProduto);

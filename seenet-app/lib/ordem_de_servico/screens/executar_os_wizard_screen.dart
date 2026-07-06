@@ -39,6 +39,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
   final TextEditingController onuModeloController = TextEditingController();
   final TextEditingController onuSerialController = TextEditingController();
+  final TextEditingController onuMacController = TextEditingController();
   final TextEditingController onuStatusController = TextEditingController();
   final TextEditingController onuSinalController = TextEditingController();
   final TextEditingController relatoProblemaController = TextEditingController();
@@ -132,6 +133,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
   void dispose() {
     onuModeloController.dispose();
     onuSerialController.dispose();
+    onuMacController.dispose();
     onuStatusController.dispose();
     onuSinalController.dispose();
     relatoProblemaController.dispose();
@@ -306,6 +308,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+              CampoComVoz(controller: onuMacController, label: 'MAC da ONU', hint: 'Ex: 6E:9F:4A:...'),
               const SizedBox(height: 14),
               CampoComVoz(controller: onuStatusController, label: 'Status', hint: 'Ex: Online'),
               const SizedBox(height: 14),
@@ -575,6 +579,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       'longitudeFinal': longitudeFinal,
       'onuModelo':     onuModeloController.text,
       'onuSerial':     onuSerialController.text,
+      'onuMac':        onuMacController.text,
       'onuStatus':     onuStatusController.text,
       'onuSinal':      onuSinalController.text,
       'relatoProblema': relatoProblemaController.text,
@@ -596,6 +601,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
       onuModeloController.text     = dados['onuModelo']     ?? '';
       onuSerialController.text     = dados['onuSerial']     ?? '';
+      onuMacController.text        = dados['onuMac']        ?? '';
       onuStatusController.text     = dados['onuStatus']     ?? '';
       onuSinalController.text      = dados['onuSinal']      ?? '';
       relatoProblemaController.text = dados['relatoProblema'] ?? '';
@@ -1370,6 +1376,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         'onu_modelo':    onuModeloController.text.trim(),
         'onu_serial':    onuSerialController.text.trim(),
         'onu_status':    onuStatusController.text.trim(),
+        'onu_mac':       onuMacController.text.trim(),
         'onu_sinal_optico': onuSinalController.text.trim().isNotEmpty
             ? double.tryParse(onuSinalController.text.trim()) : null,
         'relato_problema': relatoProblemaController.text.trim(),
@@ -1384,6 +1391,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           'id_patrimonio':       item.patrimonio?.id ?? '0',
           'numero_serie':        item.patrimonio?.serial ?? '',
           'numero_patrimonial':  item.patrimonio?.numeroPatrimonial ?? '',
+          'mac':                 item.patrimonio?.mac ?? '',
           'tipo_produto':        item.isPatrimonio ? 'P' : 'O',
         }).toList(),
         'observacoes': observacoesController.text.trim(),

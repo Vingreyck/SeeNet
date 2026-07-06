@@ -25,6 +25,9 @@ router.get('/patrimonios', EstoqueController.buscarPatrimonios.bind(EstoqueContr
 // Buscar saldo de produtos no almoxarifado do técnico
 router.get('/saldo', EstoqueController.buscarSaldoEstoque.bind(EstoqueController));
 
+// Listar almoxarifados do IXC (admin escolhe a LOJA da cidade do técnico)
+router.get('/almoxarifados', EstoqueController.listarAlmoxarifados.bind(EstoqueController));
+
 // ── VINCULAR PRODUTO À OS ────────────────────────────
 // Adicionar produto/patrimônio a uma OS no IXC
 router.post('/os/:osIdExterno/produtos', EstoqueController.adicionarProdutoOS.bind(EstoqueController));

@@ -1,8 +1,10 @@
 // lib/ordem_de_servico/screens/executar_os_wizard_screen.dart — REDESIGN
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart' show XFile;
 import 'dart:typed_data';
 import '../../services/connectivity_service.dart';
 import '../../services/sync_manager.dart';
@@ -68,6 +70,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     super.initState();
     os = Get.arguments as OrdemServico;
     WidgetsBinding.instance.addObserver(this); // salva progresso ao minimizar/fechar
+    // Restaura fotos/assinatura/materiais AGORA (antes do 1º build) — o IndexedStack
+    // cria os widgets no primeiro build, então precisam já ter o valor inicial.
+    _restaurarBinarios();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final osAtualizada = controller.ordensServico
@@ -170,20 +175,6 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     }
   }
 
-  Widget _buildEtapaAtual() {
-    switch (_etapaAtual) {
-      case 0: return _buildEtapaLocalizacao();
-      case 1: return _buildEtapaAnexos();
-      case 2: return _buildEtapaDadosONU();
-      case 3: return _buildEtapaRelatos();
-      case 4: return _buildEtapaMateriais();
-      case 5: return _buildEtapaObservacoes();
-      case 6: return _buildEtapaAssinatura();
-      case 7: return _buildEtapaRevisao();
-      default: return Container();
-    }
-  }
-
   Widget _buildEtapaLocalizacao() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -265,8 +256,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           _buildTituloEtapa(icone: Icons.camera_alt_rounded, titulo: 'Fotos do Local', descricao: 'Tire fotos do roteador, ONU, local e equipamentos'),
           const SizedBox(height: 20),
           _buildCard(child: AnexosWidget(
+            anexosIniciais: fotosAnexadas,
             onAnexosAlterados: (anexos) {
               setState(() { fotosAnexadas = anexos; });
+              _salvarProgresso();
             },
           )),
         ],
@@ -367,12 +360,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           const SizedBox(height: 20),
           _buildCard(child: MateriaisEstoqueWidget(
             osIdExterno: os.idExterno ?? '',
+            itensIniciais: itensEstoque,
             onItensAlterados: (itens) {
               setState(() {
                 itensEstoque = itens;
                 materiaisController.text = itens.map((i) =>
                 '${i.produto.descricao} x${i.quantidade.toStringAsFixed(0)} (R\$${i.valorTotal.toStringAsFixed(2)})').join('\n');
               });
+              _salvarProgresso();
             },
           )),
         ],
@@ -409,8 +404,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           _buildTituloEtapa(icone: Icons.draw_rounded, titulo: 'Assinatura do Cliente', descricao: 'Solicite a assinatura do cliente no campo abaixo'),
           const SizedBox(height: 20),
           _buildCard(child: AssinaturaWidget(
+            assinaturaInicial: assinaturaBytes,
             onAssinaturaSalva: (assinatura) {
               setState(() { assinaturaBytes = assinatura; });
+              _salvarProgresso();
             },
           )),
         ],
@@ -586,7 +583,52 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       'relatoSolucao':  relatoSolucaoController.text,
       'materiais':     materiaisController.text,
       'observacoes':   observacoesController.text,
+      // ✅ Binários/estruturados — pro técnico NÃO perder se fechar/matar o app.
+      // Fotos: guarda o caminho (funciona no celular; no web o path é blob e morre
+      // no reload). Assinatura: base64. Itens: JSON serializado.
+      'fotos': fotosAnexadas
+          .map((a) => {'path': a.foto.path, 'descricao': a.descricao, 'tipo': a.tipo})
+          .toList(),
+      'assinatura': assinaturaBytes != null ? base64Encode(assinaturaBytes!) : null,
+      'itens': itensEstoque.map((i) => i.toJson()).toList(),
     });
+  }
+
+  // Restaura fotos/assinatura/itens do GetStorage (chamado no initState, síncrono).
+  void _restaurarBinarios() {
+    final dados = GetStorage().read<Map>('wizard_progress_${os.id}');
+    if (dados == null) return;
+    if (os.status != 'em_execucao' && os.status != 'em_deslocamento') return;
+
+    // Fotos — só no mobile (no web o caminho vira inválido após reload).
+    if (!kIsWeb && dados['fotos'] is List) {
+      try {
+        fotosAnexadas = (dados['fotos'] as List).map((f) {
+          final m = Map<String, dynamic>.from(f);
+          return AnexoComDescricao(
+            foto: XFile(m['path'] as String),
+            descricao: (m['descricao'] ?? '') as String,
+            tipo: (m['tipo'] ?? 'foto') as String,
+          );
+        }).toList();
+      } catch (_) {}
+    }
+
+    // Assinatura (base64 → bytes)
+    if (dados['assinatura'] is String) {
+      try { assinaturaBytes = base64Decode(dados['assinatura'] as String); } catch (_) {}
+    }
+
+    // Itens de estoque (JSON → ItemOS) + texto de materiais
+    if (dados['itens'] is List) {
+      try {
+        itensEstoque = (dados['itens'] as List)
+            .map((j) => ItemOS.fromJson(Map<String, dynamic>.from(j)))
+            .toList();
+        materiaisController.text = itensEstoque.map((i) =>
+            '${i.produto.descricao} x${i.quantidade.toStringAsFixed(0)} (R\$${i.valorTotal.toStringAsFixed(2)})').join('\n');
+      } catch (_) {}
+    }
   }
 
   // ✅ Restaurar progresso salvo
@@ -1454,7 +1496,25 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       body: Column(
         children: [
           _buildHeader(),
-          Expanded(child: _buildEtapaAtual()),
+          // IndexedStack mantém TODAS as etapas vivas (não recria ao navegar) —
+          // assim fotos, materiais/patrimônios e assinatura NÃO somem ao voltar
+          // uma etapa nem ao avançar. Antes cada etapa era recriada vazia.
+          Expanded(
+            child: IndexedStack(
+              sizing: StackFit.expand,
+              index: _etapaAtual,
+              children: [
+                _buildEtapaLocalizacao(),
+                _buildEtapaAnexos(),
+                _buildEtapaDadosONU(),
+                _buildEtapaRelatos(),
+                _buildEtapaMateriais(),
+                _buildEtapaObservacoes(),
+                _buildEtapaAssinatura(),
+                _buildEtapaRevisao(),
+              ],
+            ),
+          ),
           _buildBotoesNavegacao(),
         ],
       ),

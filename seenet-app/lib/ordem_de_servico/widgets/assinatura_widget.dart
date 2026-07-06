@@ -4,10 +4,12 @@ import 'dart:typed_data';
 
 class AssinaturaWidget extends StatefulWidget {
   final Function(Uint8List?) onAssinaturaSalva;
+  final Uint8List? assinaturaInicial; // restaura assinatura salva
 
   const AssinaturaWidget({
     Key? key,
     required this.onAssinaturaSalva,
+    this.assinaturaInicial,
   }) : super(key: key);
 
   @override
@@ -22,6 +24,16 @@ class _AssinaturaWidgetState extends State<AssinaturaWidget> {
   );
 
   bool _assinada = false;
+  Uint8List? _preview; // assinatura restaurada (mostra como imagem, não no pad)
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.assinaturaInicial != null) {
+      _preview = widget.assinaturaInicial;
+      _assinada = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -31,6 +43,61 @@ class _AssinaturaWidgetState extends State<AssinaturaWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // Assinatura restaurada → mostra a imagem confirmada + opção de refazer
+    // (não dá pra recarregar os traços no pad; mostramos o PNG salvo).
+    if (_preview != null) {
+      return Column(
+        children: [
+          Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF00FF88), width: 2),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.memory(_preview!, fit: BoxFit.contain),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.check_circle, color: Color(0xFF00FF88), size: 20),
+              SizedBox(width: 8),
+              Text('Assinatura confirmada ✓',
+                  style: TextStyle(
+                      color: Color(0xFF00FF88),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () {
+              _controller.clear();
+              setState(() {
+                _preview = null;
+                _assinada = false;
+              });
+              widget.onAssinaturaSalva(null);
+            },
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refazer assinatura'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white54),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       children: [
         // Canvas de assinatura

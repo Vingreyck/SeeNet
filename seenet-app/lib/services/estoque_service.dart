@@ -51,6 +51,18 @@ class ProdutoEstoque {
 
   /// Label legível do tipo
   String get tipoLabel => tipo == 'P' ? 'Patrimônio' : 'Consumo';
+
+  // Serialização p/ salvar o progresso do wizard (persistência offline/reabertura)
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'descricao': descricao,
+        'valor': valor,
+        'preco_base': precoBase,
+        'unidade': unidade,
+        'tipo': tipo,
+        'saldo_almoxarifado': saldoAlmoxarifado,
+        'saldo_geral': saldoGeral,
+      };
 }
 
 /// Modelo de patrimônio (equipamento com serial)
@@ -90,6 +102,17 @@ class PatrimonioEstoque {
       numeroPatrimonial: json['serial'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'descricao': descricao,
+        'serial': serial,
+        'id_mac': mac,
+        'id_produto': idProduto,
+        'id_almoxarifado': idAlmoxarifado,
+        'valor_bem': valorBem,
+        'situacao': situacao,
+      };
 }
 
 /// Modelo de item adicionado à OS (produto ou patrimônio)
@@ -109,6 +132,22 @@ class ItemOS {
   double get valorTotal => quantidade * valorUnitario;
 
   bool get isPatrimonio => patrimonio != null;
+
+  Map<String, dynamic> toJson() => {
+        'produto': produto.toJson(),
+        'patrimonio': patrimonio?.toJson(),
+        'quantidade': quantidade,
+        'valorUnitario': valorUnitario,
+      };
+
+  factory ItemOS.fromJson(Map<String, dynamic> j) => ItemOS(
+        produto: ProdutoEstoque.fromJson(Map<String, dynamic>.from(j['produto'])),
+        patrimonio: j['patrimonio'] != null
+            ? PatrimonioEstoque.fromJson(Map<String, dynamic>.from(j['patrimonio']))
+            : null,
+        quantidade: (j['quantidade'] as num?)?.toDouble() ?? 1,
+        valorUnitario: (j['valorUnitario'] as num?)?.toDouble(),
+      );
 
   String get descricaoCompleta {
     if (patrimonio != null) {

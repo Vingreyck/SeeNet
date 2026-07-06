@@ -17,10 +17,12 @@ class AnexoComDescricao {
 
 class AnexosWidget extends StatefulWidget {
   final Function(List<AnexoComDescricao>) onAnexosAlterados;
+  final List<AnexoComDescricao>? anexosIniciais; // restaura fotos salvas
 
   const AnexosWidget({
     Key? key,
     required this.onAnexosAlterados,
+    this.anexosIniciais,
   }) : super(key: key);
 
   @override
@@ -31,6 +33,15 @@ class _AnexosWidgetState extends State<AnexosWidget> {
   final List<AnexoComDescricao> _anexos = [];
   final ImagePicker _picker = ImagePicker();
   final Map<int, TextEditingController> _descricaoControllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Restaura fotos já capturadas (ex: reabertura da OS) sem re-notificar o pai.
+    if (widget.anexosIniciais != null && widget.anexosIniciais!.isNotEmpty) {
+      _anexos.addAll(widget.anexosIniciais!);
+    }
+  }
 
   @override
   void dispose() {                                   // ✅ COLOCA AQUI

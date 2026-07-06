@@ -5,11 +5,13 @@ import '../../services/estoque_service.dart';
 class MateriaisEstoqueWidget extends StatefulWidget {
   final String? osIdExterno;
   final Function(List<ItemOS>) onItensAlterados;
+  final List<ItemOS>? itensIniciais; // restaura itens já adicionados
 
   const MateriaisEstoqueWidget({
     super.key,
     this.osIdExterno,
     required this.onItensAlterados,
+    this.itensIniciais,
   });
 
   @override
@@ -29,6 +31,10 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
   @override
   void initState() {
     super.initState();
+    // Restaura itens já adicionados (ex: reabertura da OS) sem re-notificar o pai.
+    if (widget.itensIniciais != null && widget.itensIniciais!.isNotEmpty) {
+      _itensAdicionados.addAll(widget.itensIniciais!);
+    }
     _carregarDados();
   }
 

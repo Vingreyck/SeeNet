@@ -323,6 +323,14 @@ async finalizarOS(osId, dados) {
         : ''
     };
 
+    // 📋 Fechamento "modo completo" (instalação FTTH): diagnóstico/viabilidade,
+    // resposta padrão, próxima tarefa (auditoria) e comissão. Só entram quando o
+    // controller os envia (evita alterar o fechamento das demais OS).
+    if (dados.id_su_diagnostico) payload.id_su_diagnostico = dados.id_su_diagnostico.toString();
+    if (dados.id_resposta)       payload.id_resposta       = dados.id_resposta.toString();
+    if (dados.id_proxima_tarefa) payload.id_proxima_tarefa = dados.id_proxima_tarefa.toString();
+    if (dados.gera_comissao)     payload.gera_comissao     = dados.gera_comissao.toString();
+
     console.log(`📤 POST /su_oss_chamado_fechar - OS ${osId}`);
 
     // Fazer POST no endpoint correto

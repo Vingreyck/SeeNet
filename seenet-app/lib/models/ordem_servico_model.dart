@@ -18,6 +18,7 @@ class OrdemServico {
   final String? clienteLogin;
   final String? caixaFtth; // CTO
   final String? portaFtth;
+  final String? idAssunto; // assunto IXC (60 = instalação de internet FTTH)
 
   final String tipoServico;
   final String prioridade;
@@ -60,6 +61,7 @@ class OrdemServico {
     this.clienteLogin,
     this.caixaFtth,
     this.portaFtth,
+    this.idAssunto,
     required this.tipoServico,
     this.prioridade = 'media',
     this.status = 'pendente',
@@ -82,10 +84,11 @@ class OrdemServico {
   });
 
   factory OrdemServico.fromJson(Map<String, dynamic> json) {
-    // Login/Caixa FTTH/Porta FTTH do cliente vêm dentro do dados_ixc (JSON do IXC).
+    // Login/Caixa FTTH/Porta FTTH/Assunto vêm dentro do dados_ixc (JSON do IXC).
     String? clienteLogin;
     String? caixaFtth;
     String? portaFtth;
+    String? idAssunto;
     final dadosIxc = json['dados_ixc'];
     if (dadosIxc != null) {
       try {
@@ -98,6 +101,7 @@ class OrdemServico {
           clienteLogin = limpo(d['login']);
           caixaFtth = limpo(d['caixa_ftth']);
           portaFtth = limpo(d['porta_ftth']);
+          idAssunto = limpo(d['id_assunto']);
         }
       } catch (_) {}
     }
@@ -105,6 +109,7 @@ class OrdemServico {
       clienteLogin: clienteLogin,
       caixaFtth: caixaFtth,
       portaFtth: portaFtth,
+      idAssunto: idAssunto,
       id: (json['id'] ?? 0).toString(),
       numeroOs: json['numero_os']?.toString() ??
           json['numero_os_ixc']?.toString() ??

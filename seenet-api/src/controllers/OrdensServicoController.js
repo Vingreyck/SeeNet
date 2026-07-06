@@ -904,12 +904,26 @@ async finalizarExecucao(req, res) {
         }
 
         // 9b. Finalizar OS no IXC
-        let mensagemFinal =
-          `Serviço finalizado via SeeNet\n\n` +
-          `PROBLEMA: ${dados.relato_problema || 'N/A'}\n` +
-          `SOLUÇÃO: ${dados.relato_solucao   || 'N/A'}\n` +
-          `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
-          `OBS: ${dados.observacoes || 'Nenhuma'}`;
+        // 📋 Instalação FTTH (assunto 60): a mensagem é o CHECKLIST de fechamento
+        // (modo completo BBnet). Nos demais casos, o relatório padrão.
+        const chk = dados.checklist_instalacao;
+        let mensagemFinal;
+        if (chk) {
+          const marca = (v) => v ? '(X) SIM | (  ) NÃO' : '(  ) SIM | (X) NÃO';
+          mensagemFinal =
+            `1 - ATENDIDO POR: ${chk.atendido_por || ''}\n` +
+            `4 - HABILITOU ACESSO REMOTO: ${marca(chk.acesso_remoto)}\n` +
+            `5 - MUDOU SENHA PADRÃO? ${marca(chk.senha_padrao)}\n` +
+            `6 - ATIVOU IPV6: ${marca(chk.ipv6)}\n` +
+            `7 - CLIENTE ASSINA: ${marca(chk.cliente_assina)}`;
+        } else {
+          mensagemFinal =
+            `Serviço finalizado via SeeNet\n\n` +
+            `PROBLEMA: ${dados.relato_problema || 'N/A'}\n` +
+            `SOLUÇÃO: ${dados.relato_solucao   || 'N/A'}\n` +
+            `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
+            `OBS: ${dados.observacoes || 'Nenhuma'}`;
+        }
 
         // 📍 Localização de FINALIZAÇÃO (capturada no app, obrigatória) → vai na
         // descrição da OS no IXC como prova de conclusão no local do cliente.
@@ -923,12 +937,46 @@ async finalizarExecucao(req, res) {
           mensagem_resposta: mensagemFinal,
           id_tecnico_ixc: tecnicoIdIxc,
           latitude: dados.latitude_final || '',
-          longitude: dados.longitude_final || ''
+          longitude: dados.longitude_final || '',
+          // 📋 Fechamento "modo completo" só na instalação FTTH (assunto 60):
+          // viabilidade=1 (concluída c/ sucesso), resposta=48 (FECHAMENTO
+          // INSTALAÇÃO), próxima tarefa=66 (auditoria de ativação), gera comissão.
+          ...(chk ? {
+            id_su_diagnostico: '1',
+            id_resposta: '48',
+            id_proxima_tarefa: '66',
+            gera_comissao: 'S',
+          } : {})
         });
         console.log('✅ OS finalizada no IXC');
 
+        // 📋 PDF do checklist de instalação → campo de arquivos da OS no IXC.
+        let pdfChecklistBuffer = null;
+        if (chk) {
+          try {
+            const ChecklistInstalacaoPdfService = require('../services/ChecklistInstalacaoPdfService');
+            pdfChecklistBuffer = await ChecklistInstalacaoPdfService.gerar(
+              os, chk, tecnico?.nome || 'Técnico', tenantId);
+            console.log(`✅ PDF checklist instalação gerado (${pdfChecklistBuffer.length} bytes)`);
+          } catch (e) {
+            console.warn('⚠️ Erro ao gerar PDF checklist:', e.message);
+          }
+        }
+
         // 9c+9d+9e. Uploads em paralelo
         const uploads = [];
+
+        if (pdfChecklistBuffer) {
+          uploads.push(
+            ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+              buffer: pdfChecklistBuffer,
+              descricao: `Checklist de Instalação - OS ${os.numero_os}`,
+              nome: `Checklist_Instalacao_OS_${os.numero_os}.pdf`,
+              ext: 'pdf'
+            }).then(() => console.log('   ✅ PDF checklist enviado'))
+              .catch(e  => console.error('   ❌ PDF checklist:', e.message))
+          );
+        }
 
         for (const foto of fotosBase64) {
           uploads.push(

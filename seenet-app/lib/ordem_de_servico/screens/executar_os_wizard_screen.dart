@@ -21,7 +21,6 @@ import '../widgets/assinatura_widget.dart';
 import '../widgets/campo_com_voz.dart';
 import 'dart:async';
 import 'apr_screen.dart';
-import 'package:intl/intl.dart';
 
 class ExecutarOSWizardScreen extends StatefulWidget {
   const ExecutarOSWizardScreen({super.key});
@@ -1154,37 +1153,204 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     }
   }
 
+  // 📋 Checklist de fechamento da INSTALAÇÃO FTTH (só assunto 60).
+  // Retorna o mapa preenchido ou null se o técnico cancelar (aí NÃO finaliza).
+  Future<Map<String, dynamic>?> _coletarChecklistInstalacao() async {
+    final atendidoCtrl = TextEditingController();
+    bool acessoRemoto = true;
+    bool senhaPadrao = true;
+    bool ipv6 = true;
+    bool clienteAssina = true;
+    String? erroAtendido;
+
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) {
+          Widget simNao(String titulo, bool valor, ValueChanged<bool> onChange) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(titulo,
+                      style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      for (final opt in const [true, false])
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => onChange(opt),
+                            child: Container(
+                              margin: EdgeInsets.only(right: opt ? 8 : 0),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: valor == opt
+                                    ? (opt
+                                        ? const Color(0xFF00FF88)
+                                            .withOpacity(0.15)
+                                        : Colors.red.withOpacity(0.15))
+                                    : const Color(0xFF111111),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color: valor == opt
+                                        ? (opt
+                                            ? const Color(0xFF00FF88)
+                                            : Colors.red)
+                                        : Colors.white12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  opt ? 'SIM' : 'NÃO',
+                                  style: TextStyle(
+                                    color: valor == opt
+                                        ? (opt
+                                            ? const Color(0xFF00FF88)
+                                            : Colors.red)
+                                        : Colors.white38,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Fechamento da instalação',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('1 - Atendido por *',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: atendidoCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Nome de quem atendeu',
+                      hintStyle: const TextStyle(color: Colors.white38),
+                      errorText: erroAtendido,
+                      filled: true,
+                      fillColor: const Color(0xFF111111),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  simNao('4 - Habilitou acesso remoto?', acessoRemoto,
+                      (v) => setStateDialog(() => acessoRemoto = v)),
+                  simNao('5 - Mudou senha padrão?', senhaPadrao,
+                      (v) => setStateDialog(() => senhaPadrao = v)),
+                  simNao('6 - Ativou IPv6?', ipv6,
+                      (v) => setStateDialog(() => ipv6 = v)),
+                  simNao('7 - Cliente assina?', clienteAssina,
+                      (v) => setStateDialog(() => clienteAssina = v)),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: const Text('Cancelar',
+                    style: TextStyle(color: Colors.white54)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (atendidoCtrl.text.trim().isEmpty) {
+                    setStateDialog(
+                        () => erroAtendido = 'Informe quem atendeu');
+                    return;
+                  }
+                  Navigator.pop(ctx, {
+                    'atendido_por': atendidoCtrl.text.trim(),
+                    'acesso_remoto': acessoRemoto,
+                    'senha_padrao': senhaPadrao,
+                    'ipv6': ipv6,
+                    'cliente_assina': clienteAssina,
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FF88)),
+                child: const Text('Confirmar',
+                    style: TextStyle(
+                        color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _finalizarOS() async {
     // Localização de finalização é OBRIGATÓRIA (prova de conclusão no local do cliente).
     if (latitudeFinal == null || longitudeFinal == null) {
       _mostrarErro('Capture a localização de finalização antes de finalizar a OS.');
       return;
     }
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Finalizar OS?',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: const Text('Os dados serão enviados para o IXC. Confirma?',
-            style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF88),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+    // 📋 Instalação FTTH (assunto 60): checklist de fechamento OBRIGATÓRIO antes
+    // de finalizar de fato. Se cancelar, não finaliza.
+    Map<String, dynamic>? checklistInstalacao;
+    if (os.idAssunto == '60') {
+      checklistInstalacao = await _coletarChecklistInstalacao();
+      if (checklistInstalacao == null) return;
+    }
+
+    // Se o checklist de instalação foi preenchido, ele já É a confirmação
+    // ("termina de finalizar de fato a OS") → pula o diálogo genérico.
+    if (checklistInstalacao == null) {
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Finalizar OS?',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: const Text('Os dados serão enviados para o IXC. Confirma?',
+              style: TextStyle(color: Colors.white70)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF88),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Confirmar',
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
             ),
-            child: const Text('Confirmar',
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-    if (confirmar != true) return;
+          ],
+        ),
+      );
+      if (confirmar != true) return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -1226,6 +1392,12 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         }).toList(),
         'assinatura': base64Encode(assinaturaBytes!),
       };
+
+      // 📋 Checklist da instalação FTTH (assunto 60) — vai pro IXC (mensagem +
+      // arquivo) e diferencia o fechamento "modo completo".
+      if (checklistInstalacao != null) {
+        dados['checklist_instalacao'] = checklistInstalacao;
+      }
 
       final connectivity = Get.find<ConnectivityService>();
       bool sucesso;

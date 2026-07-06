@@ -108,16 +108,23 @@ class _DdsPopupDialogState extends State<_DdsPopupDialog>
     setState(() { _fotoBytes = bytes; _erro = null; });
   }
 
-  Future<void> _enviar() async {
+  // Botão ÚNICO: "Entrar no DDS". Entrar na reunião já É a confirmação de
+  // presença — então registra a presença (assina com a foto) e, em seguida,
+  // abre o Meet. Só é liberado depois que o técnico tira a selfie.
+  Future<void> _entrarNoDds() async {
     if (_fotoBytes == null) {
-      setState(() => _erro = 'Tire uma foto antes de confirmar');
+      setState(() => _erro = 'Tire uma selfie antes de entrar');
       return;
     }
     setState(() { _enviando = true; _erro = null; });
 
     final fotoBase64 = 'data:image/jpeg;base64,${base64Encode(_fotoBytes!)}';
-    final sessaoId = _ctrl.sessaoAtiva.value?['id'] as int?;
-    if (sessaoId == null) return;
+    final sessao = _ctrl.sessaoAtiva.value;
+    final sessaoId = sessao?['id'] as int?;
+    if (sessaoId == null) {
+      setState(() => _enviando = false);
+      return;
+    }
 
     final result = await _ctrl.assinar(
       sessaoId: sessaoId,
@@ -126,6 +133,15 @@ class _DdsPopupDialogState extends State<_DdsPopupDialog>
 
     if (!mounted) return;
     if (result['success'] == true) {
+      // Presença registrada → abre o Meet (entrar = confirmar presença).
+      final link = sessao?['link_meet'] as String?;
+      if (link != null && link.isNotEmpty) {
+        final uri = Uri.tryParse(link);
+        if (uri != null && await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      }
+      if (!mounted) return;
       setState(() { _assinado = true; _enviando = false; });
       await Future.delayed(const Duration(milliseconds: 1800));
       if (mounted && Get.isDialogOpen == true) Get.back();
@@ -163,7 +179,6 @@ class _DdsPopupDialogState extends State<_DdsPopupDialog>
 
     final sessao = _ctrl.sessaoAtiva.value;
     final tema = sessao?['tema'] as String? ?? '';
-    final link = sessao?['link_meet'] as String?;
     final temFoto = _fotoBytes != null;
 
     return Container(
@@ -258,7 +273,7 @@ class _DdsPopupDialogState extends State<_DdsPopupDialog>
           const SizedBox(height: 18),
 
           // Seção de foto
-          const Text('Tire uma selfie para confirmar presença:',
+          const Text('Tire uma selfie para entrar no DDS:',
               style: TextStyle(color: Colors.white54, fontSize: 12)),
           const SizedBox(height: 8),
 
@@ -317,86 +332,48 @@ class _DdsPopupDialogState extends State<_DdsPopupDialog>
                 style: const TextStyle(color: Colors.red, fontSize: 12)),
           ],
 
-          // Link Meet — só aparece após foto
-          if (link != null && link.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: temFoto
-                  ? () async {
-                final uri = Uri.tryParse(link);
-                if (uri != null && await canLaunchUrl(uri)) {
-                  await launchUrl(uri,
-                      mode: LaunchMode.externalApplication);
-                }
-              }
-                  : null,
-              child: Opacity(
-                opacity: temFoto ? 1.0 : 0.35,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 12, horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A73E8).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: const Color(0xFF1A73E8).withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.video_call,
-                          color: Color(0xFF1A73E8), size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        temFoto
-                            ? 'Entrar no Google Meet'
-                            : 'Tire a selfie para liberar o Meet',
-                        style: const TextStyle(
-                            color: Color(0xFF1A73E8),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-
           const SizedBox(height: 18),
 
-          // Botão confirmar
+          // Botão ÚNICO: "Entrar no DDS" (entrar = confirmar presença).
+          // Só é liberado depois que o técnico tira a selfie (temFoto).
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _enviando ? null : _enviar,
+            child: ElevatedButton.icon(
+              onPressed: (!temFoto || _enviando) ? null : _entrarNoDds,
+              icon: _enviando
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.black, strokeWidth: 2.5))
+                  : const Icon(Icons.video_call,
+                      color: Colors.black, size: 20),
+              label: Text(
+                _enviando
+                    ? 'Entrando...'
+                    : (temFoto
+                        ? 'Entrar no DDS'
+                        : 'Tire a selfie para entrar'),
+                style: const TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00FF88),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 disabledBackgroundColor:
-                const Color(0xFF00FF88).withOpacity(0.4),
+                    const Color(0xFF00FF88).withOpacity(0.4),
               ),
-              child: _enviando
-                  ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      color: Colors.black, strokeWidth: 2.5))
-                  : const Text('Confirmar Presença',
-                  style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15)),
             ),
           ),
 
           const SizedBox(height: 8),
           const Center(
             child: Text(
-              'Tire a selfie e confirme para registrar presença.',
+              'Ao entrar no DDS sua presença é registrada automaticamente.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white24, fontSize: 10),
             ),

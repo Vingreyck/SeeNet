@@ -211,8 +211,8 @@ class OSPdfService {
           this._linha(doc, y, COR_AZUL, 1); y += 5;
           const pats = itens.filter(i => i.isPatrimonio || i.tipo_produto === 'P');
           const prods = itens.filter(i => !i.isPatrimonio && i.tipo_produto !== 'P');
-          if (pats.length > 0)  y = this._tabelaProdutos(doc, y, 'Comodatos', pats);
-          if (prods.length > 0) y = this._tabelaProdutos(doc, y, 'Produtos Utilizados', prods);
+          if (pats.length > 0)  y = this._tabelaProdutos(doc, y, 'Comodatos', pats, true);
+          if (prods.length > 0) y = this._tabelaProdutos(doc, y, 'Produtos Utilizados', prods, false);
         }
 
         // ── MENSAGENS / INTERAÇÕES ────────────────────────────
@@ -286,8 +286,8 @@ class OSPdfService {
         if (dados.assinatura) {
           try {
             const buf = Buffer.from(dados.assinatura, 'base64');
-            doc.rect(xCli + 1, y + 1, assinLarg - 2, assinAlt - 2).fill('white');
-            doc.image(buf, xCli + 5, y + 4, { fit: [assinLarg - 10, assinAlt - 8], align: 'center', valign: 'center' });
+            doc.rect(xTec + 1, y + 1, assinLarg - 2, assinAlt - 2).fill('white');
+            doc.image(buf, xTec + 5, y + 4, { fit: [assinLarg - 10, assinAlt - 8], align: 'center', valign: 'center' });
           } catch (_) {}
         }
 
@@ -315,7 +315,7 @@ class OSPdfService {
     });
   }
 
-  static _tabelaProdutos(doc, y, titulo, itens) {
+  static _tabelaProdutos(doc, y, titulo, itens, isComodato = false) {
     doc.rect(MARGEM - 5, y, LARGURA + 10, 16).fill('#dce8f5');
     doc.fontSize(7.5).font('Helvetica-Bold').fillColor(COR_AZUL)
        .text(titulo, MARGEM, y + 4, { width: LARGURA, align: 'center' });
@@ -336,8 +336,12 @@ class OSPdfService {
 
     let total = 0;
     itens.forEach((item, idx) => {
-      if (idx % 2 === 1) doc.rect(MARGEM - 5, y, LARGURA + 10, 14).fill('#f9f9f9');
-      this._linha(doc, y + 14, COR_LINHA, 0.3);
+      const serieMac = isComodato
+        ? ['Série: ' + (item.numero_serie || '-'), 'MAC: ' + (item.mac || '-')].join('   ')
+        : '';
+      const altLinha = serieMac ? 22 : 14;
+      if (idx % 2 === 1) doc.rect(MARGEM - 5, y, LARGURA + 10, altLinha).fill('#f9f9f9');
+      this._linha(doc, y + altLinha, COR_LINHA, 0.3);
       const vUnit = parseFloat(item.valor_unitario || 0).toFixed(2);
       const qtd   = parseFloat(item.quantidade || 0).toFixed(2);
       const vTot  = parseFloat(item.valor_total || 0).toFixed(2);
@@ -348,7 +352,11 @@ class OSPdfService {
          .text(vUnit,                         MARGEM + cID + cDesc,         y + 3, { width: cUnit, align: 'right' })
          .text(qtd,                           MARGEM + cID + cDesc + cUnit, y + 3, { width: cQtd,  align: 'right' })
          .text(vTot,                          MARGEM + cID + cDesc + cUnit + cQtd, y + 3, { width: cTot, align: 'right' });
-      y += 14;
+      if (serieMac) {
+        doc.fontSize(6.5).font('Helvetica').fillColor(COR_CINZA)
+           .text(serieMac, MARGEM + cID, y + 12, { width: cDesc });
+      }
+      y += altLinha;
     });
 
     doc.rect(MARGEM - 5, y, LARGURA + 10, 16).fill(COR_CINZA_CLARO);

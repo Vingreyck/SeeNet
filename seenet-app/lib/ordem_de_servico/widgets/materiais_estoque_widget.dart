@@ -209,6 +209,29 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
     );
   }
 
+  Widget _buildTotalCard() {
+    final total = _itensAdicionados.fold<double>(0, (soma, i) => soma + i.valorTotal);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('Valor total',
+              style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold, fontSize: 14)),
+          Text('R\$ ${total.toStringAsFixed(2)}',
+              style: const TextStyle(color: Color(0xFF00FF88), fontWeight: FontWeight.bold, fontSize: 16)),
+        ],
+      ),
+    );
+  }
+
   // Produtos vendidos por METRAGEM (digita metros) em vez de quantidade (+/-).
   // ⚠️ MAPEAMENTO MANUAL: só os IDs de produto listados aqui usam metros;
   // todo o resto é por quantidade. O ID aparece no seletor de produto (badge

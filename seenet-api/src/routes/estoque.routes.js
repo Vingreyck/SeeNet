@@ -38,4 +38,11 @@ router.get('/os/:osIdExterno/produtos', EstoqueController.listarProdutosOS.bind(
 // Remover produto de uma OS
 router.delete('/os/:osIdExterno/produtos/:movimentoId', EstoqueController.removerProdutoOS.bind(EstoqueController));
 
+// ── COMODATO (devolução) ─────────────────────────────
+// Comodato ativo do cliente da OS (pelo login/contrato)
+router.get('/os/:osIdExterno/comodato-ativo', EstoqueController.buscarComodatoAtivoOS.bind(EstoqueController));
+
+// Devolver comodato pro almoxarifado (loja) do técnico
+router.post('/comodato/:idMovimento/devolver', EstoqueController.devolverComodato.bind(EstoqueController));
+
 module.exports = router;

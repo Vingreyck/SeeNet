@@ -365,4 +365,76 @@ class EstoqueService {
       return false;
     }
   }
+
+  // ═══════════════════════════════════════
+  // COMODATO ATIVO DO CLIENTE DA OS (pra oferecer devolução)
+  // ═══════════════════════════════════════
+  Future<List<ComodatoAtivo>> buscarComodatoAtivoOS(String osIdExterno) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/estoque/os/$osIdExterno/comodato-ativo'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> itens = data['data'] ?? [];
+        return itens.map((j) => ComodatoAtivo.fromJson(j)).toList();
+      }
+      return [];
+    } catch (e) {
+      print('❌ Erro em buscarComodatoAtivoOS: $e');
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // DEVOLVER COMODATO (pro almoxarifado/loja do técnico)
+  // ═══════════════════════════════════════
+  Future<Map<String, dynamic>> devolverComodato(String idMovimento) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/estoque/comodato/$idMovimento/devolver'),
+        headers: _headers,
+      );
+      final data = json.decode(response.body);
+      return {
+        'success': response.statusCode == 200 && data['success'] == true,
+        'message': data['message'] ?? data['error'] ?? 'Erro ao devolver comodato',
+      };
+    } catch (e) {
+      print('❌ Erro em devolverComodato: $e');
+      return {'success': false, 'message': 'Erro de conexão ao devolver comodato'};
+    }
+  }
+}
+
+class ComodatoAtivo {
+  final String idMovimento;
+  final String idPatrimonio;
+  final String idProduto;
+  final String descricao;
+  final String numeroSerie;
+  final String mac;
+  final double valorTotal;
+
+  ComodatoAtivo({
+    required this.idMovimento,
+    required this.idPatrimonio,
+    required this.idProduto,
+    required this.descricao,
+    required this.numeroSerie,
+    required this.mac,
+    required this.valorTotal,
+  });
+
+  factory ComodatoAtivo.fromJson(Map<String, dynamic> json) => ComodatoAtivo(
+        idMovimento: (json['id_movimento'] ?? '').toString(),
+        idPatrimonio: (json['id_patrimonio'] ?? '').toString(),
+        idProduto: (json['id_produto'] ?? '').toString(),
+        descricao: (json['descricao'] ?? '').toString(),
+        numeroSerie: (json['numero_serie'] ?? '').toString(),
+        mac: (json['mac'] ?? '').toString(),
+        valorTotal: ProdutoEstoque._parseDouble(json['valor_total']),
+      );
 }

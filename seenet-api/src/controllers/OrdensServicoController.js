@@ -725,8 +725,24 @@ async finalizarExecucao(req, res) {
     console.log('📄 Gerando PDFs em paralelo...');
     const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
 
+    // 📋 APR só para os assuntos que exigem Análise Preliminar de Risco:
+    // 60 (instalação FTTH), 4 e 32. Nos demais, finaliza sem APR.
+    let assuntoIdOS = '';
+    try {
+      const dIxc = os.dados_ixc
+        ? (typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc)
+        : {};
+      assuntoIdOS = String(dIxc.id_assunto || dados.id_assunto || '');
+    } catch (_) { assuntoIdOS = String(dados.id_assunto || ''); }
+    const ASSUNTOS_COM_APR = ['60', '4', '32'];
+    const geraApr = ASSUNTOS_COM_APR.includes(assuntoIdOS);
+
     const [aprResult, osResult] = await Promise.allSettled([
       (async () => {
+        if (!geraApr) {
+          console.log(`ℹ️ Assunto ${assuntoIdOS || 'N/D'} não exige APR — pulando geração`);
+          return null;
+        }
         const AprPdfService = require('../services/AprPdfService');
         return await AprPdfService.gerarPdfApr(id, tenantId);
       })(),
@@ -738,8 +754,8 @@ async finalizarExecucao(req, res) {
 
     let pdfBuffer    = aprResult.status === 'fulfilled' ? aprResult.value : null;
     let pdfAprBase64 = pdfBuffer ? pdfBuffer.toString('base64') : null;
-    if (pdfBuffer)   console.log(`✅ PDF APR gerado (${pdfBuffer.length} bytes)`);
-    else             console.warn('⚠️ Erro ao gerar PDF APR:', aprResult.reason?.message);
+    if (pdfBuffer)        console.log(`✅ PDF APR gerado (${pdfBuffer.length} bytes)`);
+    else if (geraApr)     console.warn('⚠️ Erro ao gerar PDF APR:', aprResult.reason?.message);
 
     let pdfOSBuffer = osResult.status === 'fulfilled' ? osResult.value : null;
     if (pdfOSBuffer) console.log(`✅ PDF OS gerado (${pdfOSBuffer.length} bytes)`);
@@ -918,7 +934,9 @@ async finalizarExecucao(req, res) {
               id_unidade:                  '1',
               id_almox:                    idAlmox.toString(),
               id_classificacao_tributaria: '1',
-              tipo:                        'C',
+              // tipo='S' (Saída) — obrigatório p/ a venda gerada faturar. Antes ia
+              // 'C', que o IXC grava vazio → venda travava em "aguardando faturamento".
+              tipo:                        'S',
               estoque:                     'S',
               unidade_sigla:               'UND',
               fator_conversao:             '1.000000000',

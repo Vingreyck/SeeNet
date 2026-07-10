@@ -1197,6 +1197,62 @@ async adicionarProdutoEstruturaOS(dados) {
         throw error;
       }
     }
+    /**
+     * Devolve um comodato ativo pro almoxarifado de destino.
+     * Endpoint informado pelo suporte IXC (Ariane, 10/jul) — não documentado
+     * nas rotas padrão. Requer que o token tenha acesso liberado ao almoxarifado
+     * de destino (config feita no painel: Webservice → Almoxarifados).
+     */
+    async devolverComodato(idMovimentoComodato, idAlmoxDestino) {
+      try {
+        console.log(`↩️ Devolvendo comodato (mov ${idMovimentoComodato}) para almox ${idAlmoxDestino}...`);
+
+        const response = await this.clientAlterar.post('/baixar_comodato_23069', {
+          id: idMovimentoComodato.toString(),
+          id_almox: idAlmoxDestino.toString(),
+          id_almox_label: '',
+          id_filial_baixa: '',
+          id_filial_baixa_label: '',
+        });
+
+        if (response.data?.type === 'error') {
+          throw new Error(response.data.message || 'Erro ao devolver comodato');
+        }
+
+        console.log(`✅ Comodato devolvido com sucesso`);
+        return response.data;
+      } catch (error) {
+        console.error('❌ Erro ao devolver comodato no IXC:', error.message);
+        throw error;
+      }
+    }
+
+    /**
+     * Lista comodatos ATIVOS (status_comodato='E') de um login — usado para
+     * detectar, ao adicionar patrimônio numa OS, se o contrato do cliente já
+     * tem um equipamento em comodato (e oferecer devolução antes de adicionar novo).
+     */
+    async buscarComodatosAtivosPorLogin(idLogin) {
+      try {
+        if (!idLogin || idLogin === '0') return [];
+        const params = new URLSearchParams({
+          qtype: 'movimento_produtos.id_login',
+          query: idLogin.toString(),
+          oper: '=',
+          page: '1',
+          rp: '20',
+          sortname: 'movimento_produtos.id',
+          sortorder: 'desc',
+          grid_param: JSON.stringify([{ TB: 'movimento_produtos.status_comodato', OP: '=', P: 'E' }]),
+        });
+        const response = await this.clientListar.post('/su_oss_mov_comodato_wiz', params.toString());
+        return response.data?.registros || [];
+      } catch (error) {
+        console.error('❌ Erro ao buscar comodatos ativos por login:', error.message);
+        return [];
+      }
+    }
+
     async buscarMensagensOS(osId) {
       try {
         const params = new URLSearchParams({

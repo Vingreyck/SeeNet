@@ -489,7 +489,19 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
   // BUSCA DE PATRIMÔNIO (BottomSheet)
   // ──────────────────────────────────────
 
-  void _abrirBuscaPatrimonio() {
+  Future<void> _abrirBuscaPatrimonio() async {
+    // Antes de abrir a busca, checa se o cliente dessa OS já tem um comodato
+    // ativo (equipamento emprestado). Se tiver, oferece devolver pro
+    // almoxarifado do técnico antes de adicionar um novo.
+    if (widget.osIdExterno != null && widget.osIdExterno!.isNotEmpty) {
+      final comodatos = await _service.buscarComodatoAtivoOS(widget.osIdExterno!);
+      if (comodatos.isNotEmpty && mounted) {
+        final continuar = await _mostrarComodatoAtivoDialog(comodatos);
+        if (continuar != true) return;
+      }
+    }
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -503,6 +515,127 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
         onSelecionado: (patrimonio, produto) {
           Navigator.pop(ctx);
           _adicionarPatrimonio(patrimonio, produto);
+        },
+      ),
+    );
+  }
+
+  // Mostra o(s) comodato(s) ativo(s) do cliente e permite devolver antes de
+  // continuar. Retorna true se o técnico quiser prosseguir pra adicionar um
+  // novo patrimônio (com ou sem devolver o anterior).
+  Future<bool?> _mostrarComodatoAtivoDialog(List<ComodatoAtivo> comodatos) {
+    // Vive fora do builder pra persistir entre rebuilds do StatefulBuilder.
+    final devolvendoIds = <String>{};
+
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 22),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Comodato já ativo',
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Este cliente já possui equipamento em comodato:',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final c in comodatos)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF232323),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(c.descricao,
+                                    style: const TextStyle(
+                                        color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  [
+                                    if (c.numeroSerie.isNotEmpty) 'S/N: ${c.numeroSerie}',
+                                    if (c.mac.isNotEmpty) 'MAC: ${c.mac}',
+                                  ].join('   '),
+                                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Builder(builder: (_) {
+                            final devolvendo = devolvendoIds.contains(c.idMovimento);
+                            return TextButton.icon(
+                              onPressed: devolvendo
+                                  ? null
+                                  : () async {
+                                      setDialogState(() => devolvendoIds.add(c.idMovimento));
+                                      final res = await _service.devolverComodato(c.idMovimento);
+                                      setDialogState(() {
+                                        devolvendoIds.remove(c.idMovimento);
+                                        if (res['success'] == true) comodatos.remove(c);
+                                      });
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(res['message'] ?? ''),
+                                            backgroundColor:
+                                                res['success'] == true ? const Color(0xFF00FF88) : Colors.red,
+                                          ),
+                                        );
+                                      }
+                                      if (comodatos.isEmpty && ctx.mounted) {
+                                        Navigator.pop(ctx, true);
+                                      }
+                                    },
+                              icon: devolvendo
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange))
+                                  : const Icon(Icons.keyboard_return_rounded, size: 16, color: Colors.orange),
+                              label: const Text('Devolver', style: TextStyle(color: Colors.orange, fontSize: 12)),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Adicionar outro mesmo assim',
+                    style: TextStyle(color: Color(0xFF00FF88))),
+              ),
+            ],
+          );
         },
       ),
     );

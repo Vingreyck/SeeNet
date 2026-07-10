@@ -357,7 +357,8 @@ class EstoqueController {
         valor_unitario: valorUnit.toString(),
         valor_total: valorTotal,
         id_classificacao_tributaria: req.body.id_classificacao_tributaria || '1',
-        tipo: 'C',
+        // tipo='S' (Saída) — obrigatório p/ a venda faturar (IXC grava vazio se 'C').
+        tipo: 'S',
         estoque: 'S',
         unidade_sigla: req.body.unidade_sigla || 'UND',
         fator_conversao: '1.000000000',
@@ -471,6 +472,91 @@ class EstoqueController {
         success: false,
         error: error.message
       });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════
+  // COMODATO ATIVO DE UMA OS (pelo login do cliente/contrato)
+  // GET /api/estoque/os/:osIdExterno/comodato-ativo
+  // ═══════════════════════════════════════════════════
+  async buscarComodatoAtivoOS(req, res) {
+    try {
+      const tenantId = req.tenantId;
+      const { osIdExterno } = req.params;
+
+      const os = await db('ordem_servico')
+        .where('id_externo', osIdExterno)
+        .where('tenant_id', tenantId)
+        .first();
+
+      if (!os) {
+        return res.status(404).json({ success: false, error: 'OS não encontrada' });
+      }
+
+      let idLogin = '';
+      try {
+        const dIxc = os.dados_ixc
+          ? (typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc)
+          : {};
+        idLogin = dIxc.id_login || '';
+      } catch (_) {}
+
+      if (!idLogin || idLogin === '0') {
+        return res.json({ success: true, data: [] });
+      }
+
+      const ixc = await this._getIXCService(tenantId);
+      const registros = await ixc.buscarComodatosAtivosPorLogin(idLogin);
+
+      const comodatos = registros.map(r => ({
+        id_movimento: r.id,
+        id_patrimonio: r.id_patrimonio,
+        id_produto: r.id_produto,
+        descricao: r.descricao,
+        numero_serie: r.numero_serie || r.numero_patrimonial || '',
+        mac: r.mac || '',
+        id_almox: r.id_almox,
+        valor_total: parseFloat(r.valor_total) || 0,
+        data: r.data,
+      }));
+
+      return res.json({ success: true, data: comodatos });
+    } catch (error) {
+      console.error('❌ Erro ao buscar comodato ativo:', error.message);
+      return res.status(500).json({ success: false, error: 'Erro ao buscar comodato ativo' });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════
+  // DEVOLVER COMODATO (pro almox/loja do técnico)
+  // POST /api/estoque/comodato/:idMovimento/devolver
+  // ═══════════════════════════════════════════════════
+  async devolverComodato(req, res) {
+    try {
+      const tenantId = req.tenantId;
+      const userId = req.user.id;
+      const { idMovimento } = req.params;
+
+      const ixc = await this._getIXCService(tenantId);
+      const { almoxarifadoId, almoxarifadoNome } = await this._getAlmoxarifadoTecnico(userId, tenantId);
+
+      if (!almoxarifadoId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Almoxarifado (loja) não configurado para este técnico'
+        });
+      }
+
+      console.log(`↩️ Devolvendo comodato (mov ${idMovimento}) → almox ${almoxarifadoId} (${almoxarifadoNome})`);
+      await ixc.devolverComodato(idMovimento, almoxarifadoId);
+
+      return res.json({
+        success: true,
+        message: `Comodato devolvido para ${almoxarifadoNome || 'o almoxarifado'} com sucesso`
+      });
+    } catch (error) {
+      console.error('❌ Erro ao devolver comodato:', error.message);
+      return res.status(500).json({ success: false, error: error.message || 'Erro ao devolver comodato' });
     }
   }
 }

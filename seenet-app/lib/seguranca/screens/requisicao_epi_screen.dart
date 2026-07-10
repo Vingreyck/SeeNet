@@ -76,7 +76,7 @@ class _RequisicaoEpiScreenState
   }
 
   static const Map<String, List<String>> _tamanhosPorEpi = {
-    'Bota de Segurança': ['39', '40', '41'],
+    'Bota de Segurança': ['39', '40', '41', '43'],
     'Calça Operacional': ['36', '38', '40', '41', '42', '46', '48'],
     'Camisa Manga Longa (Jaleco)': ['P', 'M', 'G', 'GG'],
   };
@@ -945,11 +945,13 @@ class _RequisicaoEpiScreenState
         final etapa = _tabController.index;
         final isUltima = etapa == 1;
 
-        return Container(
-          padding: EdgeInsets.only(
+        return SafeArea(
+          top: false,
+          child: Container(
+          padding: const EdgeInsets.only(
             left: 16, right: 16,
             top: 12,
-            bottom: 12 + MediaQuery.of(context).padding.bottom,
+            bottom: 12,
           ),
           decoration: BoxDecoration(
             color: const Color(0xFF181818),
@@ -1019,6 +1021,7 @@ class _RequisicaoEpiScreenState
                 )),
               ),
             ],
+          ),
           ),
         );
       },

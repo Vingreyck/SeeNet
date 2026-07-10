@@ -10,6 +10,7 @@ class Usuario {
   final bool ativo;
   final DateTime? dataCriacao;
   final DateTime? dataAtualizacao;
+  final bool temTokenNotificacao;
 
   Usuario({
     this.id,
@@ -20,6 +21,7 @@ class Usuario {
     this.ativo = true,
     this.dataCriacao,
     this.dataAtualizacao,
+    this.temTokenNotificacao = true,
   });
 
   // Verificar se é administrador

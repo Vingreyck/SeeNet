@@ -1637,7 +1637,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         children: [
           // Botão "Reagendar" (cliente ausente): só na etapa 0 e com o técnico
           // em campo (deslocamento/execução). Fica ao lado do "Cheguei ao Local".
-          if (_etapaAtual == 0 &&
+          if ((_etapaAtual == 0 || _etapaAtual == _totalEtapas - 1) &&
               (statusAtual == 'em_deslocamento' ||
                   statusAtual == 'em_execucao'))
             Padding(

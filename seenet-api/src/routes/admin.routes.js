@@ -284,7 +284,7 @@ router.get('/users', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const users = await db('usuarios')
       .where('tenant_id', req.user.tenant_id)
-      .select('id', 'nome', 'email', 'tipo_usuario', 'ativo', 'data_criacao', 'data_atualizacao') // ✅ ADICIONADO 'ativo'
+      .select('id', 'nome', 'email', 'tipo_usuario', 'ativo', 'data_criacao', 'data_atualizacao', 'fcm_token') // ✅ ADICIONADO 'ativo'
       .orderBy('nome');
     
     res.json(users);

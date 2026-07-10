@@ -235,7 +235,7 @@ class SincronizadorIXC {
               .where('tenant_id', integracao.tenant_id)
               .where('tecnico_id', mapeamento.usuario_id)
               .where('origem', 'IXC')
-              .whereIn('status', ['em_execucao', 'em_deslocamento'])
+              .whereIn('status', ['pendente', 'em_execucao', 'em_deslocamento'])
               .whereNotNull('id_externo')
               .whereNotIn('id_externo', idsExternosIXC)
               .select('id', 'id_externo', 'numero_os');
@@ -301,8 +301,10 @@ class SincronizadorIXC {
       let clienteNome = osIXC.cliente_nome || 'Cliente não identificado';
       let clienteEndereco = osIXC.endereco || null;
       let clienteTelefone = osIXC.telefone || null;
+      let clienteNumero = osIXC.numero || null;
+      let clienteBairro = osIXC.bairro || null;
 
-      if (osIXC.id_cliente && (!clienteNome || clienteNome === 'Cliente não identificado')) {
+      if (osIXC.id_cliente && (!clienteNome || clienteNome === 'Cliente não identificado' || !clienteNumero || !clienteBairro)) {
         let clienteIXC = this.cacheClientes.get(osIXC.id_cliente);
 
         if (!clienteIXC) {
@@ -318,6 +320,8 @@ class SincronizadorIXC {
           clienteNome = clienteIXC.razao || clienteNome;
           clienteEndereco = clienteIXC.endereco || clienteEndereco;
           clienteTelefone = clienteIXC.telefone_celular || clienteIXC.telefone || clienteTelefone;
+          clienteNumero = clienteIXC.numero || clienteNumero;
+          clienteBairro = clienteIXC.bairro || clienteBairro;
         }
       }
 
@@ -379,6 +383,8 @@ class SincronizadorIXC {
         tecnico_id: tecnicoId,
         cliente_nome: clienteNome,
         cliente_endereco: clienteEndereco,
+        cliente_numero: clienteNumero,
+        cliente_bairro: clienteBairro,
         cliente_telefone: clienteTelefone,
         cliente_id_externo: osIXC.id_cliente?.toString(),
         tipo_servico: await this._resolverNomeAssunto(osIXC.id_assunto, ixcService) || this.obterTipoServico(osIXC.tipo),

@@ -14,6 +14,8 @@ class OrdemServico {
 
   final String clienteNome;
   final String? clienteEndereco;
+  final String? clienteNumero;
+  final String? clienteBairro;
   final String? clienteTelefone;
   final String? clienteLogin;
   final String? caixaFtth; // CTO
@@ -57,6 +59,8 @@ class OrdemServico {
     this.nomeEstrutura,
     required this.clienteNome,
     this.clienteEndereco,
+    this.clienteNumero,
+    this.clienteBairro,
     this.clienteTelefone,
     this.clienteLogin,
     this.caixaFtth,
@@ -123,6 +127,8 @@ class OrdemServico {
       nomeEstrutura: json['nome_estrutura']?.toString(),
       clienteNome: json['cliente_nome']?.toString() ?? 'Cliente não identificado',
       clienteEndereco: json['cliente_endereco']?.toString(),
+      clienteNumero: json['cliente_numero']?.toString(),
+      clienteBairro: json['cliente_bairro']?.toString(),
       clienteTelefone: json['cliente_telefone']?.toString(),
       tipoServico: json['tipo_servico']?.toString() ?? 'Manutenção',
       prioridade: json['prioridade']?.toString() ?? 'media',
@@ -179,6 +185,8 @@ class OrdemServico {
       'nome_estrutura': nomeEstrutura,
       'cliente_nome': clienteNome,
       'cliente_endereco': clienteEndereco,
+      'cliente_numero': clienteNumero,
+      'cliente_bairro': clienteBairro,
       'cliente_telefone': clienteTelefone,
       'tipo_servico': tipoServico,
       'prioridade': prioridade,

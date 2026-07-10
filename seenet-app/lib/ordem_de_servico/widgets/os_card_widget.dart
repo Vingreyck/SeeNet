@@ -202,19 +202,38 @@ class OSCardWidget extends StatelessWidget {
               ),
             ],
 
-            // ENDEREÇO
+            // ENDEREÇO + NÚMERO / BAIRRO
             if (os.clienteEndereco != null && os.tipoOs != 'E') ...[
               const SizedBox(height: 8),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(Icons.location_on_outlined, color: Colors.white70, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      os.clienteEndereco!,
-                      style: const TextStyle(color: Colors.white60, fontSize: 14),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          [
+                            os.clienteEndereco!,
+                            if (os.clienteNumero != null && os.clienteNumero!.isNotEmpty)
+                              os.clienteNumero!,
+                          ].join(', '),
+                          style: const TextStyle(color: Colors.white60, fontSize: 14),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (os.clienteBairro != null && os.clienteBairro!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            os.clienteBairro!,
+                            style: const TextStyle(color: Colors.white38, fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],

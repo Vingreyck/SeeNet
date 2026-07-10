@@ -96,6 +96,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView>
             tipoUsuario: u['tipo_usuario'] as String? ?? 'tecnico',
             ativo: u['ativo'] == 1 || u['ativo'] == true,
             dataCriacao: DateTime.tryParse(u['data_criacao'] as String? ?? ''),
+            temTokenNotificacao: (u['fcm_token'] as String?)?.isNotEmpty == true,
           ));
         } catch (_) {}
       }
@@ -656,6 +657,21 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView>
                                   ? FontStyle.normal
                                   : FontStyle.italic),
                           maxLines: 1, overflow: TextOverflow.ellipsis),
+                      if (u.ativo && !u.temTokenNotificacao) ...[
+                        const SizedBox(height: 2),
+                        const Row(
+                          children: [
+                            Icon(Icons.notifications_off_rounded,
+                                size: 10, color: Colors.orangeAccent),
+                            SizedBox(width: 3),
+                            Text('Sem token de notificação',
+                                style: TextStyle(
+                                    color: Colors.orangeAccent,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

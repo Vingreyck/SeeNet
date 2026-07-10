@@ -419,63 +419,9 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                     ],
                   ),
                 ),
-
-                const SizedBox(width: 8),
-
-                // Valor unitário
-                Expanded(
-                  flex: 1,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Valor Unit.', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Text(
-                        'R\$ ${item.valorUnitario.toStringAsFixed(2)}',
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Total
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text('Total', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                      const SizedBox(height: 6),
-                      Text(
-                        'R\$ ${item.valorTotal.toStringAsFixed(2)}',
-                        style: const TextStyle(color: Color(0xFF00FF88), fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTotalCard() {
-    final total = _itensAdicionados.fold<double>(0, (sum, item) => sum + item.valorTotal);
-
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF00FF88).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF00FF88)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text('TOTAL MATERIAIS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-          Text('R\$ ${total.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFF00FF88), fontWeight: FontWeight.bold, fontSize: 20)),
         ],
       ),
     );

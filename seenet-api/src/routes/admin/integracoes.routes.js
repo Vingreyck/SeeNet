@@ -22,7 +22,8 @@ router.post('/ixc/configurar', async (req, res) => {
   
   try {
     const { url_api, token_api } = req.body;
-    const { tenantId, isAdmin } = req.user;
+    const tenantId = req.user.tenant_id;
+    const isAdmin = req.user.tipo_usuario === 'administrador';
 
     // Verificar se é admin
     if (!isAdmin) {
@@ -91,7 +92,8 @@ router.post('/ixc/mapear-tecnico', async (req, res) => {
   
   try {
     const { tecnico_seenet_id, tecnico_ixc_id, tecnico_ixc_nome } = req.body;
-    const { tenantId, isAdmin } = req.user;
+    const tenantId = req.user.tenant_id;
+    const isAdmin = req.user.tipo_usuario === 'administrador';
 
     if (!isAdmin) {
       return res.status(403).json({
@@ -141,7 +143,7 @@ router.post('/ixc/mapear-tecnico', async (req, res) => {
  */
 router.get('/ixc/testar', async (req, res) => {
   try {
-    const { tenantId } = req.user;
+    const tenantId = req.user.tenant_id;
 
     console.log('🧪 Testando integração IXC...');
 
@@ -189,7 +191,8 @@ router.get('/ixc/testar', async (req, res) => {
  */
 router.get('/ixc/mapeamento/:usuarioId', async (req, res) => {
   try {
-    const { tenantId, isAdmin } = req.user;
+    const tenantId = req.user.tenant_id;
+    const isAdmin = req.user.tipo_usuario === 'administrador';
     if (!isAdmin) {
       return res.status(403).json({ success: false, error: 'Apenas administradores' });
     }
@@ -225,7 +228,8 @@ router.get('/ixc/mapeamento/:usuarioId', async (req, res) => {
 router.post('/ixc/mapear-loja', async (req, res) => {
   const client = await pool.connect();
   try {
-    const { tenantId, isAdmin } = req.user;
+    const tenantId = req.user.tenant_id;
+    const isAdmin = req.user.tipo_usuario === 'administrador';
     if (!isAdmin) {
       return res.status(403).json({ success: false, error: 'Apenas administradores podem mapear' });
     }

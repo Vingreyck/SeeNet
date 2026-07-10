@@ -243,8 +243,7 @@ router.post('/ixc/mapear-loja', async (req, res) => {
     const upd = await client.query(
       `UPDATE mapeamento_tecnicos_ixc
          SET id_almoxarifado_loja = $1,
-             almoxarifado_loja_nome = $2,
-             updated_at = NOW()
+             almoxarifado_loja_nome = $2
        WHERE usuario_id = $3 AND tenant_id = $4`,
       [id_almoxarifado_loja, almoxarifado_loja_nome || null, usuario_id, tenantId]
     );

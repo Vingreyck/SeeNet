@@ -940,7 +940,7 @@ async uploadFotoOS(osId, clienteId, fotoData) {
 
   async listarPatrimonios(filtros = {}) {
     try {
-      const { busca = '', tipo = 'todos', almoxarifadoId, page = 1, rp = 500 } = filtros;
+      const { busca = '', tipo = 'todos', almoxarifadoId, page = 1, rp = 500, idFilial } = filtros;
 
       let qtype = 'patrimonio.id';
       let oper = '>=';
@@ -964,6 +964,10 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       const gridParams = [];
       if (almoxarifadoId) {
         gridParams.push({ TB: 'patrimonio.id_almoxarifado', OP: '=', P: almoxarifadoId.toString() });
+      }
+      // Só patrimônios da filial da OS (o comodato só sai da mesma filial da OS).
+      if (idFilial) {
+        gridParams.push({ TB: 'patrimonio.id_filial', OP: '=', P: idFilial.toString() });
       }
       body.grid_param = JSON.stringify(gridParams);
 
@@ -1001,7 +1005,17 @@ async uploadFotoOS(osId, clienteId, fotoData) {
 
   async buscarEstoquePorAlmoxarifado(filtros = {}) {
     try {
-      const { almoxarifadoId, busca = '', page = 1, rp = 50 } = filtros;
+      const { almoxarifadoId, busca = '', page = 1, rp = 50, idFilial } = filtros;
+
+      // Filtro base: almox da loja + saldo>0 + produto ativo. Quando a OS informa
+      // a filial, filtra TAMBÉM por ela — o IXC só baixa estoque da mesma filial
+      // da OS, então mostrar de outra filial só induziria o técnico ao erro.
+      const grid = [
+        { TB: 'estoque_produtos_almox_filial.id_almox', OP: '=', P: almoxarifadoId.toString() },
+        { TB: 'estoque_produtos_almox_filial.saldo', OP: '>', P: '0' },
+        { TB: 'estoque_produtos_almox_filial.produto_ativo', OP: '=', P: 'S' }
+      ];
+      if (idFilial) grid.push({ TB: 'estoque_produtos_almox_filial.id_filial', OP: '=', P: idFilial.toString() });
 
       const body = {
         qtype: busca ? 'estoque_produtos_almox_filial.produto_descricao' : 'estoque_produtos_almox_filial.id',
@@ -1011,11 +1025,7 @@ async uploadFotoOS(osId, clienteId, fotoData) {
         rp: rp.toString(),
         sortname: 'estoque_produtos_almox_filial.produto_descricao',
         sortorder: 'asc',
-        grid_param: JSON.stringify([
-          { TB: 'estoque_produtos_almox_filial.id_almox', OP: '=', P: almoxarifadoId.toString() },
-          { TB: 'estoque_produtos_almox_filial.saldo', OP: '>', P: '0' },
-          { TB: 'estoque_produtos_almox_filial.produto_ativo', OP: '=', P: 'S' }
-        ])
+        grid_param: JSON.stringify(grid)
       };
 
       const response = await this.clientAlterar.post('/estoque_produtos_almox_filial', body, {

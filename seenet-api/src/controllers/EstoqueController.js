@@ -24,6 +24,27 @@ class EstoqueController {
   }
 
   /**
+   * Helper: Resolve a filial de uma OS (pelo id_externo). O IXC só permite dar
+   * baixa de estoque/comodato na MESMA filial da OS, então usamos a filial da OS
+   * para filtrar o estoque e os patrimônios mostrados ao técnico.
+   */
+  async _getFilialOS(osIdExterno, tenantId) {
+    if (!osIdExterno) return null;
+    try {
+      const os = await db('ordem_servico')
+        .where('id_externo', osIdExterno.toString())
+        .where('tenant_id', tenantId)
+        .first();
+      if (!os || !os.dados_ixc) return null;
+      const d = typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc;
+      const f = d.id_filial;
+      return (f && f !== '0') ? f.toString() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /**
    * Helper: Buscar almoxarifado do técnico logado
    */
   async _getAlmoxarifadoTecnico(userId, tenantId) {
@@ -188,17 +209,19 @@ class EstoqueController {
     try {
       const tenantId = req.tenantId;
       const userId = req.user.id;
-      const { busca = '', tipo = 'todos', page = 1, rp = 20 } = req.query;
+      const { busca = '', tipo = 'todos', page = 1, rp = 20, os_id_externo } = req.query;
 
       console.log(`🔍 Buscando patrimônios IXC: "${busca}" (tipo: ${tipo})`);
 
       const ixc = await this._getIXCService(tenantId);
       const { almoxarifadoId } = await this._getAlmoxarifadoTecnico(userId, tenantId);
+      const idFilial = await this._getFilialOS(os_id_externo, tenantId);
 
       const resultado = await ixc.listarPatrimonios({
         busca,
         tipo, // serial, mac, patrimonial, todos
         almoxarifadoId,
+        idFilial, // só patrimônios da filial da OS (evita erro de baixa cross-filial)
         page: parseInt(page),
         rp: parseInt(rp)
       });
@@ -241,10 +264,11 @@ class EstoqueController {
     try {
       const tenantId = req.tenantId;
       const userId = req.user.id;
-      const { busca = '', page = 1, rp = 50 } = req.query;
+      const { busca = '', page = 1, rp = 50, os_id_externo } = req.query;
 
       const ixc = await this._getIXCService(tenantId);
       const { almoxarifadoId, almoxarifadoNome } = await this._getAlmoxarifadoTecnico(userId, tenantId);
+      const idFilial = await this._getFilialOS(os_id_externo, tenantId);
 
       if (!almoxarifadoId) {
         return res.status(400).json({
@@ -253,11 +277,12 @@ class EstoqueController {
         });
       }
 
-      console.log(`📦 Buscando saldo do almoxarifado ${almoxarifadoId} (${almoxarifadoNome})`);
+      console.log(`📦 Buscando saldo do almoxarifado ${almoxarifadoId} (${almoxarifadoNome})${idFilial ? ' | filial ' + idFilial : ''}`);
 
       const resultado = await ixc.buscarEstoquePorAlmoxarifado({
         almoxarifadoId,
         busca,
+        idFilial, // só o estoque da filial da OS
         page: parseInt(page),
         rp: parseInt(rp)
       });

@@ -42,9 +42,11 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
     setState(() { _isLoading = true; _erro = null; });
 
     try {
+      // Passa a OS → o backend filtra o estoque/patrimônio pela FILIAL da OS
+      // (o IXC só baixa da mesma filial; assim o técnico só vê o que dá pra usar).
       final resultados = await Future.wait([
-        _service.buscarSaldoEstoque(),
-        _service.buscarPatrimonios(),
+        _service.buscarSaldoEstoque(osIdExterno: widget.osIdExterno),
+        _service.buscarPatrimonios(osIdExterno: widget.osIdExterno),
       ]);
 
       setState(() {
@@ -235,19 +237,19 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
   // Produtos vendidos por METRAGEM (digita metros) em vez de quantidade (+/-).
   // ⚠️ MAPEAMENTO MANUAL: só os IDs de produto listados aqui usam metros;
   // todo o resto é por quantidade. O ID aparece no seletor de produto (badge
-  // verde) e no cadastro do produto no IXC. Vinícius adiciona os IDs abaixo.
-  // IDs vindos do IXC (produtos cuja Unidade é Metro linear/M ou Metro corrido/MC).
-  // Ajuste livre: se um cabo novo entrar, é só adicionar o ID aqui.
-  static const Set<String> _idsMetragem = {
-    '391', // CABO DE FIBRA OPTICO CFOA 06FO (MC)
-    '392', // CABO DE FIBRA OPTICO CFOA 12FO (MC)
-    '404', // CABO ÓPTICO DROP 01FO (MC)
-    '518', // CABO DE REDE CAT5 (4 PARES) (M)
-    '534', // CABO DE REDE (2 PARES) (MC)
-    '603', // CABO HDMI (MC)
-  };
+  // Unidades de MEDIDA (metro) no IXC — produto com essa unidade digita a
+  // quantidade (metros) em vez de usar +/-. '2'=Metro corrido (MC),
+  // '15'=Metro linear (M). Fonte da verdade = o campo "Unidade" do produto no
+  // IXC, então basta cadastrar o cabo como Metro lá que o app já entende.
+  static const Set<String> _unidadesMetro = {'2', '15'};
 
-  bool _ehMetragem(String idProduto) => _idsMetragem.contains(idProduto);
+  // Override manual: IDs de produto que devem ser metragem MESMO que a unidade
+  // no IXC esteja errada (ex.: cadastrado como UND mas é cabo). Normalmente vazio.
+  static const Set<String> _idsMetragemForcado = {};
+
+  bool _ehMetragem(ProdutoEstoque produto) =>
+      _unidadesMetro.contains(produto.unidade) ||
+      _idsMetragemForcado.contains(produto.id);
 
   Widget _buildErroWidget() {
     return Container(
@@ -364,7 +366,7 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                         ),
                         child: const Text('1', style: TextStyle(color: Colors.white70, fontSize: 16)),
                       )
-                          : _ehMetragem(item.produto.id)
+                          : _ehMetragem(item.produto)
                           ? SizedBox(
                         width: 90,
                         child: TextField(

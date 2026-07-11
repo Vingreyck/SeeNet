@@ -219,10 +219,13 @@ class EstoqueService {
   // ═══════════════════════════════════════
   // BUSCAR SALDO DO ALMOXARIFADO (produtos com saldo)
   // ═══════════════════════════════════════
-  Future<List<ProdutoEstoque>> buscarSaldoEstoque() async {
+  Future<List<ProdutoEstoque>> buscarSaldoEstoque({String? osIdExterno}) async {
     try {
+      final q = (osIdExterno != null && osIdExterno.isNotEmpty)
+          ? '?os_id_externo=$osIdExterno'
+          : '';
       final response = await http.get(
-        Uri.parse('$baseUrl/estoque/saldo'),
+        Uri.parse('$baseUrl/estoque/saldo$q'),
         headers: _headers,
       );
 
@@ -263,10 +266,13 @@ class EstoqueService {
   // ═══════════════════════════════════════
   // BUSCAR PATRIMÔNIOS DO ALMOXARIFADO
   // ═══════════════════════════════════════
-  Future<List<PatrimonioEstoque>> buscarPatrimonios() async {
+  Future<List<PatrimonioEstoque>> buscarPatrimonios({String? osIdExterno}) async {
     try {
+      final q = (osIdExterno != null && osIdExterno.isNotEmpty)
+          ? '&os_id_externo=$osIdExterno'
+          : '';
       final response = await http.get(
-        Uri.parse('$baseUrl/estoque/patrimonios?rp=500'),
+        Uri.parse('$baseUrl/estoque/patrimonios?rp=500$q'),
         headers: _headers,
       );
 

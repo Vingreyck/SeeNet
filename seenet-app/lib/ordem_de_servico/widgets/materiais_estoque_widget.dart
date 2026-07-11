@@ -125,9 +125,7 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
           itemCount: _itensAdicionados.length,
           itemBuilder: (context, index) => _buildItemCard(index),
         ),
-
-        // Total
-        if (_itensAdicionados.isNotEmpty) _buildTotalCard(),
+        // Valor total removido de propósito: o técnico não deve ver valores.
       ],
     );
   }
@@ -206,29 +204,6 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                 Text('$totalPatrimonios equip.', style: const TextStyle(color: Colors.white54, fontSize: 12)),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTotalCard() {
-    final total = _itensAdicionados.fold<double>(0, (soma, i) => soma + i.valorTotal);
-
-    return Container(
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text('Valor total',
-              style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold, fontSize: 14)),
-          Text('R\$ ${total.toStringAsFixed(2)}',
-              style: const TextStyle(color: Color(0xFF00FF88), fontWeight: FontWeight.bold, fontSize: 16)),
         ],
       ),
     );
@@ -820,13 +795,7 @@ class _BuscaProdutoSheetState extends State<_BuscaProdutoSheet> {
                               children: [
                                 Text(p.descricao, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
                                 const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Text('Saldo: ${p.saldoAlmoxarifado.toStringAsFixed(0)}', style: TextStyle(color: p.saldoAlmoxarifado > 0 ? const Color(0xFF00FF88) : Colors.red, fontSize: 12)),
-                                    const SizedBox(width: 12),
-                                    Text('R\$ ${p.valorUnitario.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                                  ],
-                                ),
+                                Text('Saldo: ${p.saldoAlmoxarifado.toStringAsFixed(0)}', style: TextStyle(color: p.saldoAlmoxarifado > 0 ? const Color(0xFF00FF88) : Colors.red, fontSize: 12)),
                               ],
                             ),
                           ),
@@ -1021,7 +990,6 @@ class _BuscaPatrimonioSheetState extends State<_BuscaPatrimonioSheet> {
                                     ],
                                   ],
                                 ),
-                                Text('R\$ ${pat.valorBem.toStringAsFixed(2)}', style: const TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w500)),
                               ],
                             ),
                           ),

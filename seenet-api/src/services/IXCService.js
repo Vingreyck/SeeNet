@@ -969,6 +969,10 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       if (idFilial) {
         gridParams.push({ TB: 'patrimonio.id_filial', OP: '=', P: idFilial.toString() });
       }
+      // Só patrimônios EM ESTOQUE (situacao=1). Sem isso, o picker mostrava
+      // equipamentos já em comodato (situacao=4) e o fechamento falhava com
+      // "Saldo do produto 0 no almoxarifado" — o técnico via ONT que não dá pra usar.
+      gridParams.push({ TB: 'patrimonio.situacao', OP: '=', P: '1' });
       body.grid_param = JSON.stringify(gridParams);
 
       const response = await this.clientAlterar.post('/patrimonio', body, {

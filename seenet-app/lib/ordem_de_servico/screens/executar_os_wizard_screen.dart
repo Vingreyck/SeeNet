@@ -18,6 +18,7 @@ import '../widgets/qr_scanner_widget.dart';
 import 'package:get_storage/get_storage.dart';
 import '../widgets/anexos_widget.dart';
 import '../widgets/historico_endereco_widget.dart';
+import '../widgets/fachada_foto_widget.dart';
 import '../widgets/materiais_estoque_widget.dart';
 import '../widgets/assinatura_widget.dart';
 import '../widgets/campo_com_voz.dart';
@@ -234,6 +235,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           ],
           const SizedBox(height: 12),
           HistoricoEnderecoWidget(osId: os.id),
+          const SizedBox(height: 12),
+          FachadaFotoWidget(osId: os.id),
           const SizedBox(height: 12),
           _buildCard(child: LocalizacaoWidget(
             onLocalizacaoCapturada: (lat, lng) {

@@ -44,5 +44,9 @@ router.post('/:id/encaminhar', OrdensServicoController.encaminharOS.bind(OrdensS
 
 router.get('/:id/historico-endereco', OrdensServicoController.buscarHistoricoEndereco.bind(OrdensServicoController));
 
+// 📷 Foto da fachada (frente da casa) do cliente — 1 por cliente, só no SeeNet
+router.get('/:id/fachada', OrdensServicoController.buscarFachada.bind(OrdensServicoController));
+router.post('/:id/fachada', OrdensServicoController.salvarFachada.bind(OrdensServicoController));
+
 
 module.exports = router;

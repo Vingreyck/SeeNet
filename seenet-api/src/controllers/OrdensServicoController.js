@@ -1559,6 +1559,104 @@ if (dados.fotos && dados.fotos.length > 0) {
         return res.status(500).json({ success: false, error: error.message });
       }
     }
+
+    /**
+     * Salvar/atualizar a foto da FACHADA (frente da casa) do cliente da OS.
+     * Chave = cliente_id_externo (1 foto por cliente, igual ao histórico de endereço).
+     * Fica só no SeeNet — não sobe pro IXC.
+     * POST /api/ordens-servico/:id/fachada  body: { foto_base64, mime? }
+     */
+    async salvarFachada(req, res) {
+      try {
+        const { id } = req.params;
+        const tenantId = req.tenantId;
+        const userId = req.user.id;
+        const { foto_base64, mime } = req.body;
+
+        if (!foto_base64) {
+          return res.status(400).json({ success: false, error: 'foto_base64 é obrigatório' });
+        }
+
+        const os = await db('ordem_servico')
+          .where('id', id).where('tenant_id', tenantId)
+          .select('cliente_id_externo').first();
+        if (!os) {
+          return res.status(404).json({ success: false, error: 'OS não encontrada' });
+        }
+        if (!os.cliente_id_externo) {
+          return res.status(400).json({ success: false, error: 'OS sem cliente_id_externo — não é possível vincular a foto da fachada' });
+        }
+
+        const existente = await db('foto_fachada')
+          .where('tenant_id', tenantId)
+          .where('cliente_id_externo', os.cliente_id_externo)
+          .first();
+
+        if (existente) {
+          await db('foto_fachada').where('id', existente.id).update({
+            foto_base64,
+            mime: mime || 'image/jpeg',
+            tecnico_id: userId,
+            os_id_origem: String(id),
+            updated_at: db.fn.now(),
+          });
+        } else {
+          await db('foto_fachada').insert({
+            tenant_id: tenantId,
+            cliente_id_externo: os.cliente_id_externo,
+            foto_base64,
+            mime: mime || 'image/jpeg',
+            tecnico_id: userId,
+            os_id_origem: String(id),
+          });
+        }
+
+        console.log(`📷 Foto da fachada salva (cliente ${os.cliente_id_externo}, OS ${id})`);
+        return res.json({ success: true, message: 'Foto da fachada salva' });
+      } catch (error) {
+        console.error('❌ Erro ao salvar foto da fachada:', error);
+        return res.status(500).json({ success: false, error: error.message });
+      }
+    }
+
+    /**
+     * Buscar a foto da fachada do cliente desta OS (se existir).
+     * GET /api/ordens-servico/:id/fachada  →  { success, data: {foto_base64, mime, data} | null }
+     */
+    async buscarFachada(req, res) {
+      try {
+        const { id } = req.params;
+        const tenantId = req.tenantId;
+
+        const os = await db('ordem_servico')
+          .where('id', id).where('tenant_id', tenantId)
+          .select('cliente_id_externo').first();
+        if (!os || !os.cliente_id_externo) {
+          return res.json({ success: true, data: null });
+        }
+
+        const foto = await db('foto_fachada')
+          .where('tenant_id', tenantId)
+          .where('cliente_id_externo', os.cliente_id_externo)
+          .first();
+        if (!foto) {
+          return res.json({ success: true, data: null });
+        }
+
+        return res.json({
+          success: true,
+          data: {
+            foto_base64: foto.foto_base64,
+            mime: foto.mime || 'image/jpeg',
+            data: foto.updated_at,
+            tecnico_id: foto.tecnico_id,
+          },
+        });
+      } catch (error) {
+        console.error('❌ Erro ao buscar foto da fachada:', error);
+        return res.status(500).json({ success: false, error: error.message });
+      }
+    }
 /**
      * Dashboard de indicadores
      * GET /api/ordens-servico/dashboard

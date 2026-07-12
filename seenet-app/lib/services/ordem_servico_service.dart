@@ -22,6 +22,40 @@ class OrdemServicoService {
     };
   }
 
+  // 📷 Foto da fachada (frente da casa) do cliente — 1 por cliente, só no SeeNet.
+  Future<bool> salvarFachada(String osId, String base64Foto,
+      {String mime = 'image/jpeg'}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/ordens-servico/$osId/fachada'),
+        headers: _headers,
+        body: json.encode({'foto_base64': base64Foto, 'mime': mime}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('❌ Erro ao salvar foto da fachada: $e');
+      return false;
+    }
+  }
+
+  /// Retorna {foto_base64, mime, data} da fachada do cliente da OS, ou null.
+  Future<Map<String, dynamic>?> buscarFachada(String osId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ordens-servico/$osId/fachada'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'] as Map<String, dynamic>?;
+      }
+      return null;
+    } catch (e) {
+      print('❌ Erro ao buscar foto da fachada: $e');
+      return null;
+    }
+  }
+
   // ✅ NOVO: Buscar lista de admins do tenant
   Future<List<Map<String, dynamic>>> buscarAdmins() async {
     try {

@@ -172,8 +172,12 @@ async deslocarParaOS(req, res) {
       return res.status(404).json({ success: false, error: 'OS não encontrada' });
     }
 
-    if (os.status !== 'pendente') {
+    // Aceita 'pendente' (OS nova) e 'reaberta' (admin reabriu no IXC uma OS que
+    // já estava concluída — Sincronizador marca como 'reaberta', ver SincronizadorIXC).
+    // Sem 'reaberta' aqui, o deslocamento de OS reaberta caía em 400 silencioso.
+    if (os.status !== 'pendente' && os.status !== 'reaberta') {
       await trx.rollback();
+      console.warn(`⚠️ Deslocamento recusado: OS ${id} está em status '${os.status}' (esperado 'pendente' ou 'reaberta')`);
       return res.status(400).json({ success: false, error: 'OS já foi iniciada' });
     }
 

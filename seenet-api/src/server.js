@@ -106,6 +106,24 @@ try {
   console.error('   O sistema funcionará normalmente, mas a sincronização automática não estará ativa.');
 }
 
+// 📦 Alerta de estoque baixo (Telegram) — desativado sozinho se as env vars
+// TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID não estiverem setadas.
+try {
+  const EstoqueAlertaService = require('./services/EstoqueAlertaService');
+  new EstoqueAlertaService().iniciar();
+} catch (error) {
+  console.error('⚠️ Erro ao iniciar alerta de estoque:', error.message);
+}
+
+// 🤖 Bot de comandos do Telegram (/lojas, /onts, /produtos) — idem, só sobe se
+// as env vars do Telegram estiverem setadas.
+try {
+  const TelegramBotService = require('./services/TelegramBotService');
+  new TelegramBotService().iniciar();
+} catch (error) {
+  console.error('⚠️ Erro ao iniciar bot do Telegram:', error.message);
+}
+
     // ========== ROTAS PÚBLICAS (SEM AUTENTICAÇÃO) ==========
     
     try {
@@ -872,7 +890,19 @@ app.get('/api/debug/meu-ip-agora', async (req, res) => {
     return res.json({ erro: error.message });
   }
 });
-/* Rota para forçar sincronização de todas as empresas via debug sem token necessario agora 
+
+// 📦 Dispara o alerta de estoque na HORA (teste manual) — confira o Telegram.
+// Ex: GET https://seenet-production.up.railway.app/api/debug/alerta-estoque
+app.get('/api/debug/alerta-estoque', async (req, res) => {
+  try {
+    const EstoqueAlertaService = require('./services/EstoqueAlertaService');
+    await new EstoqueAlertaService().verificar();
+    res.json({ success: true, message: 'Verificação disparada — confira o canal do Telegram.' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+/* Rota para forçar sincronização de todas as empresas via debug sem token necessario agora
 app.get('/api/debug/force-sync', async (req, res) => {
   try {
     console.log('🚀 === SYNC FORÇADO VIA DEBUG ===');

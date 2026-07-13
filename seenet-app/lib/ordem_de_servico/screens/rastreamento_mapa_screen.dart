@@ -32,8 +32,9 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
 
   final MapController _mapController = MapController();
   Timer? _timer;
+  Timer? _timerTrilha;
   LatLng? _posicaoAtual;
-  String _statusOS = '';
+  List<LatLng> _trilha = []; // rota percorrida (histórico do backend)
   String _tempoAtualizado = '';
   double? _velocidade;
   bool _primeiraVez = true;
@@ -52,15 +53,44 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
   void initState() {
     super.initState();
     _carregarLocalizacao();
+    _carregarTrilha();
     // Polling a cada 3s (near-real-time; o "de verdade" via WebSocket fica pra depois)
     _timer = Timer.periodic(const Duration(seconds: 3), (_) => _carregarLocalizacao());
+    // Trilha muda devagar (backend grava 1 ponto/15s) → atualiza a cada 30s
+    _timerTrilha = Timer.periodic(const Duration(seconds: 30), (_) => _carregarTrilha());
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _mapController?.dispose();
+    _timerTrilha?.cancel();
+    _mapController.dispose();
     super.dispose();
+  }
+
+  /// Busca a rota percorrida (histórico de posições) pra desenhar a polyline.
+  Future<void> _carregarTrilha() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ordens-servico/${widget.osId}/trilha'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> pontos = json.decode(response.body)['data'] ?? [];
+        if (mounted) {
+          setState(() {
+            _trilha = pontos
+                .map((p) => LatLng(
+                      (p['latitude'] as num).toDouble(),
+                      (p['longitude'] as num).toDouble(),
+                    ))
+                .toList();
+          });
+        }
+      }
+    } catch (e) {
+      print('⚠️ Erro ao carregar trilha: $e');
+    }
   }
 
   Future<void> _carregarLocalizacao() async {
@@ -79,7 +109,6 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
         if (mounted) {
           setState(() {
             _posicaoAtual = LatLng(lat, lng);
-            _statusOS = status;
             _velocidade = data['velocidade'] != null
                 ? (data['velocidade'] as num).toDouble()
                 : null;
@@ -252,6 +281,35 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
                       'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.seenet.diagnostico',
                 ),
+                // 🛣️ Rota percorrida (trilha) — desenhada por baixo do marcador
+                if (_trilha.length >= 2)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: _trilha,
+                        strokeWidth: 4,
+                        color: const Color(0xFF3B9EFF).withOpacity(0.85),
+                      ),
+                    ],
+                  ),
+                // Ponto de partida da trilha
+                if (_trilha.isNotEmpty)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: _trilha.first,
+                        width: 18,
+                        height: 18,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF3B9EFF),
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 // Marcador do técnico
                 MarkerLayer(
                   markers: [

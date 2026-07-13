@@ -1292,11 +1292,10 @@ console.log('🚀 CHEGOU NO APP.LISTEN - INICIANDO SERVIDOR...');
         timestamp: new Date().toISOString()
       });
 
-      // Keep-alive DENTRO do listen
+      // Keep-alive DENTRO do listen (silencioso — o log a cada 4min era só ruído)
       setInterval(() => {
         const http = require('http');
         http.get(`http://localhost:${PORT}/health`, () => {}).on('error', () => {});
-        console.log('💓 Keep-alive ping');
       }, 4 * 60 * 1000);
     });
 

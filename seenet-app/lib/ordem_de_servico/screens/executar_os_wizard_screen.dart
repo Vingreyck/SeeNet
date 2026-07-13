@@ -93,7 +93,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       }
       _restaurarProgresso();
 
-      if (os.status == 'em_execucao') {
+      if (os.status == 'em_execucao' && _exigeApr) {
         // ✅ Se o APR já foi CONCLUÍDO nesta OS (marca local), NÃO re-força ao reabrir —
         // volta pro passo do wizard onde parou. Antes, o verificarAPR só olhava o
         // SERVIDOR; um APR concluído OFFLINE (ainda não sincronizado) reabria o APR
@@ -161,6 +161,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     }
     super.didChangeAppLifecycleState(state);
   }
+
+  // APR obrigatória só para estes assuntos (MESMA regra do backend em finalizarExecucao).
+  // Nos demais assuntos a OS segue normal, sem passar pela tela da APR.
+  static const Set<String> _assuntosComApr = {'60', '4', '32'};
+  bool get _exigeApr => _assuntosComApr.contains(os.idAssunto);
 
   String _getNomeEtapa(int etapa) {
     switch (etapa) {
@@ -747,7 +752,6 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         return;
       }
       if (statusAtual == 'em_deslocamento') {
-        if (Get.isRegistered<TrackingService>()) Get.find<TrackingService>().parar();
         final connectivity = Get.find<ConnectivityService>();
         bool sucesso;
         if (connectivity.offline) {
@@ -758,7 +762,23 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           sucesso = await controller.chegarAoLocal(os.id, latitude!, longitude!);
         }
         if (!sucesso) { if (mounted) _mostrarErro('Erro ao informar chegada'); return; }
+        // ✅ Chegou ao local: NÃO para mais o tracking — muda pro modo ECONÔMICO.
+        // O admin continua vendo o técnico no mapa durante toda a execução,
+        // mas o GPS gasta uma fração da bateria (precisão média, envio ~60s).
+        if (Get.isRegistered<TrackingService>()) {
+          Get.find<TrackingService>().modoEconomico();
+        }
         if (!mounted) return;
+        // APR só é obrigatória para alguns assuntos (mesma regra do backend). Nos
+        // demais, a chegada ao local vai DIRETO pra execução, sem abrir a APR.
+        if (!_exigeApr) {
+          setState(() { statusAtual = 'em_execucao'; osIniciada = true; _etapaAtual = 1; });
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ Chegada confirmada! Preencha os dados do atendimento.'),
+            backgroundColor: Color(0xFF00FF88), duration: Duration(seconds: 2),
+          ));
+          return;
+        }
         final aprConcluido = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => AprScreen(os: os)));
         if (aprConcluido == true) {
           GetStorage().write('apr_concluido_${os.id}', true); // ✅ não re-força ao reabrir
@@ -1468,6 +1488,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
       // ✅ Fechar dialog de progresso
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
+
+      // OS encerrada → para o rastreamento (o pino do técnico sai do mapa do admin).
+      if (sucesso && Get.isRegistered<TrackingService>()) {
+        Get.find<TrackingService>().parar();
+      }
 
       if (sucesso && mounted) {
         _limparProgresso(); // ✅ Limpar progresso salvo

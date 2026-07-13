@@ -152,7 +152,15 @@ class SincronizadorIXC {
       this.cacheClientes.clear();
       this.cacheFibra.clear();
       this.cacheLogin.clear();
-      console.log('🧹 Cache de clientes limpo');
+
+      // 🛣️ Retenção da trilha GPS: apaga pontos com +7 dias (barato — indexado
+      // por criado_em; na maioria dos ciclos deleta 0 linhas).
+      try {
+        await db('localizacao_trilha')
+          .where('criado_em', '<', db.raw("NOW() - INTERVAL '7 days'"))
+          .del();
+      } catch (_) { /* tabela pode ainda não existir no 1º boot */ }
+
       console.log('✅ Ciclo de sincronização concluído\n');
     } catch (error) {
       console.error('❌ Erro no ciclo de sincronização:', error.message);
@@ -193,12 +201,13 @@ class SincronizadorIXC {
 
       for (const mapeamento of mapeamentos) {
         try {
-          console.log(`   🔍 Buscando OSs do técnico: ${mapeamento.tecnico_seenet_nome}`);
-
           const ossIXC = await ixc.buscarOSs({ tecnicoId: mapeamento.tecnico_ixc_id });
 
-          console.log(`✅ ${ossIXC.length}/${ossIXC.length} OSs ativas (técnico: ${mapeamento.tecnico_ixc_id})`);
-          console.log(`   📋 ${ossIXC.length} OS(s) abertas no IXC`);
+          // Só loga técnicos COM OS — antes eram 3 linhas × 33 técnicos × ciclo
+          // de 2min (a maioria "0 OS"), o que afogava o log do Railway.
+          if (ossIXC.length > 0) {
+            console.log(`   📋 ${mapeamento.tecnico_seenet_nome}: ${ossIXC.length} OS(s) abertas no IXC`);
+          }
 
           const ossParaProcessar = ossIXC.slice(0, this.maxOSsPorSync);
           const idsExternosIXC = ossIXC.map(os => os.id.toString());

@@ -12,8 +12,7 @@ class OrdensServicoController {
       const userId = req.user.id;
       const tenantId = req.tenantId;
 
-      console.log(`📋 Buscando OSs do técnico ${userId} (tenant: ${tenantId})`);
-
+      // (sem log aqui — o app consulta isso o tempo todo; logar cada poll afoga o Railway)
       const rows = await db('ordem_servico as os')
         .join('usuarios as u', 'u.id', 'os.tecnico_id')
         .where('os.tecnico_id', userId)
@@ -32,8 +31,6 @@ class OrdensServicoController {
           END
         `)
         .orderBy('os.data_criacao', 'desc');
-
-      console.log(`✅ ${rows.length} OS(s) encontrada(s)`);
 
       return res.json(rows);
     } catch (error) {
@@ -56,7 +53,7 @@ class OrdensServicoController {
       const tenantId = req.tenantId;
       const { limite = 50, pagina = 1, busca = '' } = req.query;
 
-      console.log(`📋 Buscando OSs concluídas do técnico ${userId}`);
+      // (sem log de poll — mesma razão do buscarMinhasOSs)
 
       let query = db('ordem_servico as os')
         .join('usuarios as u', 'u.id', 'os.tecnico_id')
@@ -1386,6 +1383,33 @@ if (dados.fotos && dados.fotos.length > 0) {
            `, [tenantId, userId, osId, latitude, longitude, velocidade || null, precisao || null,
                latitude, longitude, velocidade || null, precisao || null]);
 
+           // 🛣️ TRILHA (histórico p/ desenhar a rota no mapa do admin): guarda 1
+           // ponto a cada ≥15s por OS. Best-effort — falha aqui NUNCA derruba o
+           // tracking ao vivo acima.
+           try {
+             const ultimo = await db('localizacao_trilha')
+               .where('ordem_servico_id', osId)
+               .orderBy('id', 'desc')
+               .select('criado_em')
+               .first();
+             const idadeMs = ultimo
+               ? Date.now() - new Date(ultimo.criado_em).getTime()
+               : Infinity;
+             if (idadeMs >= 15000) {
+               await db('localizacao_trilha').insert({
+                 tenant_id: tenantId,
+                 tecnico_id: userId,
+                 ordem_servico_id: osId,
+                 latitude,
+                 longitude,
+                 velocidade: velocidade || null,
+                 precisao: precisao || null,
+               });
+             }
+           } catch (trilhaErr) {
+             console.warn('⚠️ Trilha não gravada:', trilhaErr.message);
+           }
+
            return res.json({ success: true });
          } catch (error) {
            console.error('❌ Erro ao atualizar localização:', error.message);
@@ -1430,6 +1454,33 @@ if (dados.fotos && dados.fotos.length > 0) {
       } catch (error) {
         console.error('❌ Erro ao consultar localização:', error.message);
         return res.status(500).json({ success: false, error: 'Erro ao consultar localização' });
+      }
+    }
+
+    /**
+     * Admin consulta a TRILHA (rota percorrida) do técnico numa OS.
+     * GET /api/ordens-servico/:id/trilha → pontos em ordem cronológica.
+     */
+    async consultarTrilha(req, res) {
+      try {
+        const { id } = req.params;
+        const tenantId = req.tenantId;
+
+        if (req.user.tipo_usuario !== 'administrador') {
+          return res.status(403).json({ success: false, error: 'Apenas administradores' });
+        }
+
+        const pontos = await db('localizacao_trilha')
+          .where('ordem_servico_id', id)
+          .where('tenant_id', tenantId)
+          .orderBy('id', 'asc')
+          .limit(2000)
+          .select('latitude', 'longitude', 'velocidade', 'criado_em');
+
+        return res.json({ success: true, data: pontos });
+      } catch (error) {
+        console.error('❌ Erro ao consultar trilha:', error.message);
+        return res.status(500).json({ success: false, error: 'Erro ao consultar trilha' });
       }
     }
 
@@ -1716,11 +1767,55 @@ if (dados.fotos && dados.fotos.length > 0) {
           .whereRaw('data_conclusao <= data_agendamento')
           .count('id as total').first();
 
+        // 📊 PRODUTIVIDADE por técnico (OSs CONCLUÍDAS no mês, pelos timestamps
+        // que o fluxo já grava): deslocamento = data_inicio_deslocamento→data_inicio;
+        // execução = data_inicio→data_conclusao. CASEs descartam negativos e
+        // outliers (deslocamento >4h / execução >12h — OS esquecida aberta não
+        // pode destruir a média).
+        const produtividade = await db('ordem_servico as os')
+          .join('usuarios as u', 'u.id', 'os.tecnico_id')
+          .where('os.tenant_id', tenantId)
+          .where('os.status', 'concluida')
+          .whereNotNull('os.data_conclusao')
+          .where('os.data_conclusao', '>=', inicioMes)
+          .where('os.data_conclusao', '<=', fimMes)
+          .groupBy('u.id', 'u.nome')
+          .select(
+            'u.nome as tecnico',
+            db.raw('COUNT(os.id) as concluidas'),
+            db.raw(`AVG(CASE
+              WHEN os.data_inicio_deslocamento IS NOT NULL AND os.data_inicio IS NOT NULL
+                AND os.data_inicio > os.data_inicio_deslocamento
+                AND EXTRACT(EPOCH FROM (os.data_inicio - os.data_inicio_deslocamento)) < 14400
+              THEN EXTRACT(EPOCH FROM (os.data_inicio - os.data_inicio_deslocamento))
+            END) / 60 as media_deslocamento_min`),
+            db.raw(`AVG(CASE
+              WHEN os.data_inicio IS NOT NULL AND os.data_conclusao > os.data_inicio
+                AND EXTRACT(EPOCH FROM (os.data_conclusao - os.data_inicio)) < 43200
+              THEN EXTRACT(EPOCH FROM (os.data_conclusao - os.data_inicio))
+            END) / 60 as media_execucao_min`)
+          )
+          .orderByRaw('COUNT(os.id) DESC');
+
+        // Dias decorridos do mês consultado (p/ média de OSs/dia no app)
+        const fimJanela = agora < fimMes ? agora : fimMes;
+        const diasDecorridos = Math.max(
+          1, Math.ceil((fimJanela - inicioMes) / 86400000));
+
         return res.json({
           success: true,
           data: {
             por_status: porStatus,
             por_tecnico: porTecnico,
+            produtividade: produtividade.map(p => ({
+              tecnico: p.tecnico,
+              concluidas: parseInt(p.concluidas) || 0,
+              media_deslocamento_min: p.media_deslocamento_min != null
+                ? Math.round(parseFloat(p.media_deslocamento_min)) : null,
+              media_execucao_min: p.media_execucao_min != null
+                ? Math.round(parseFloat(p.media_execucao_min)) : null,
+            })),
+            dias_decorridos: diasDecorridos,
             tempo_medio_horas: parseFloat(tempoMedio?.media_horas || 0).toFixed(1),
             taxa_conclusao_prazo: totalMes?.total > 0
               ? Math.round((concluidasNoPrazo?.total / totalMes?.total) * 100)

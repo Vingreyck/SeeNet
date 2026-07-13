@@ -222,16 +222,21 @@ class _AcompanhamentoScreenState extends State<AcompanhamentoScreen>
         ? DateTime.tryParse(item['atualizado_em'])
         : null;
 
-    // Frescor da posição em 3 níveis: 🟢 ao vivo (<30s) · 🟡 atrasado (<2min) · 🔴 sem sinal.
+    // Frescor da posição em 3 níveis: 🟢 ao vivo · 🟡 atrasado · 🔴 sem sinal.
+    // Em EXECUÇÃO o GPS roda em modo econômico (envio ~60s), então os limiares
+    // são mais folgados — senão o card marcaria "sem sinal" com o técnico no local.
+    final bool emExecucao = (item['status'] ?? '') == 'em_execucao';
+    final int limiteVivo = emExecucao ? 90 : 30;
+    final int limiteAtraso = emExecucao ? 300 : 120;
     String tempoStr = '';
     Color corFrescor = const Color(0xFF00FF88);
     bool semSinal = false;
     if (atualizadoEm != null) {
       final diff = DateTime.now().difference(atualizadoEm);
-      if (diff.inSeconds < 30) {
+      if (diff.inSeconds < limiteVivo) {
         tempoStr = 'ao vivo';
         corFrescor = const Color(0xFF00FF88);
-      } else if (diff.inSeconds < 120) {
+      } else if (diff.inSeconds < limiteAtraso) {
         tempoStr = diff.inMinutes < 1
             ? 'há ${diff.inSeconds}s'
             : 'há ${diff.inMinutes}min';

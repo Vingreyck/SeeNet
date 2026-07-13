@@ -23,15 +23,20 @@ class OrdemServicoController extends GetxController {
   void onInit() {
     super.onInit();
     carregarMinhasOSs().then((_) {
-      // Retomar tracking se tiver OS em deslocamento
+      // Retomar tracking se tiver OS em andamento:
+      // - em_deslocamento → GPS pleno (dirigindo)
+      // - em_execucao → modo ECONÔMICO (parado no local do cliente; o admin
+      //   continua vendo o técnico até finalizar/reagendar/encaminhar)
       final osAtiva = ordensServico.firstWhereOrNull(
-            (os) => os.status == 'em_deslocamento',
+            (os) => os.status == 'em_deslocamento' || os.status == 'em_execucao',
       );
       if (osAtiva != null) {
         try {
           final tracking = Get.find<TrackingService>();
-          tracking.iniciar(osAtiva.id);
-          print('🔄 Tracking retomado para OS ${osAtiva.numeroOs}');
+          tracking.iniciar(osAtiva.id,
+              economico: osAtiva.status == 'em_execucao');
+          print('🔄 Tracking retomado para OS ${osAtiva.numeroOs} '
+              '(${osAtiva.status == 'em_execucao' ? 'eco' : 'deslocamento'})');
         } catch (_) {}
       }
     });

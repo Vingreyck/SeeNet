@@ -17,6 +17,7 @@ router.get('/acompanhamento', OrdensServicoController.listarAcompanhamento.bind(
 router.put('/:id/location', OrdensServicoController.atualizarLocalizacao.bind(OrdensServicoController));
 router.get('/:id/location', OrdensServicoController.consultarLocalizacao.bind(OrdensServicoController));
 router.delete('/:id/location', OrdensServicoController.pararLocalizacao.bind(OrdensServicoController));
+router.get('/:id/trilha', OrdensServicoController.consultarTrilha.bind(OrdensServicoController));
 
 // Buscar detalhes de uma OS
 router.get('/:id/detalhes', OrdensServicoController.buscarDetalhesOS.bind(OrdensServicoController));

@@ -162,6 +162,12 @@ class _DashboardAdminViewState extends State<DashboardAdminView>
                       const SizedBox(height: 10),
                       _buildTecnicosTable(),
                       const SizedBox(height: 20),
+                      _buildSectionHeader(
+                          'Produtividade do mês',
+                          Icons.speed_rounded),
+                      const SizedBox(height: 10),
+                      _buildProdutividadeTable(),
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
@@ -470,4 +476,138 @@ class _DashboardAdminViewState extends State<DashboardAdminView>
     child: Text(label,
         style: TextStyle(color: cor, fontSize: 10)),
   );
+
+  // ── PRODUTIVIDADE (OSs concluídas no mês, tempos médios reais) ──
+  // Dados do backend: concluidas, media_deslocamento_min (deslocar→chegar),
+  // media_execucao_min (chegar→finalizar), dias_decorridos (p/ OSs/dia).
+
+  String _fmtMin(dynamic min) {
+    if (min == null) return '—';
+    final m = (min as num).round();
+    if (m < 60) return '${m}min';
+    final h = m ~/ 60;
+    final r = m % 60;
+    return r == 0 ? '${h}h' : '${h}h${r.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildProdutividadeTable() {
+    final produtividade =
+        dados!['produtividade'] as List<dynamic>? ?? [];
+    final diasDecorridos =
+        int.tryParse('${dados!['dias_decorridos'] ?? 1}') ?? 1;
+
+    if (produtividade.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF181818),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Center(
+          child: Text('Nenhuma OS concluída no mês ainda',
+              style: TextStyle(color: Colors.white38)),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF181818),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        children: [
+          // Cabeçalho da tabela
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
+              ),
+            ),
+            child: const Row(
+              children: [
+                Expanded(
+                    flex: 3,
+                    child: Text('Técnico',
+                        style: TextStyle(color: Colors.white38, fontSize: 10))),
+                Expanded(
+                    child: Text('Concl.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white38, fontSize: 10))),
+                Expanded(
+                    child: Text('OS/dia',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white38, fontSize: 10))),
+                Expanded(
+                    child: Text('🚗 Desl.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white38, fontSize: 10))),
+                Expanded(
+                    child: Text('🔧 Exec.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white38, fontSize: 10))),
+              ],
+            ),
+          ),
+          ...produtividade.map((p) {
+            final concluidas =
+                int.tryParse('${p['concluidas'] ?? 0}') ?? 0;
+            final porDia = concluidas / diasDecorridos;
+            return Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom:
+                      BorderSide(color: Colors.white.withOpacity(0.05)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(p['tecnico'] ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500)),
+                  ),
+                  Expanded(
+                    child: Text('$concluidas',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Color(0xFF00FF88),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold)),
+                  ),
+                  Expanded(
+                    child: Text(porDia.toStringAsFixed(1),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12)),
+                  ),
+                  Expanded(
+                    child: Text(_fmtMin(p['media_deslocamento_min']),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.blue, fontSize: 12)),
+                  ),
+                  Expanded(
+                    child: Text(_fmtMin(p['media_execucao_min']),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.orange, fontSize: 12)),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
 }

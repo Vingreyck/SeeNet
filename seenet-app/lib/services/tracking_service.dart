@@ -14,6 +14,15 @@ class TrackingService extends GetxService {
   final isTracking = false.obs;
   Timer? _webTimer; // no web não há background service → timer em foreground
 
+  // Modos de rastreamento:
+  // - 'deslocamento': GPS agressivo (alta precisão, envio ~5s) — técnico dirigindo.
+  // - 'eco': técnico NO LOCAL (após "cheguei ao local") — continua visível pro
+  //   admin até finalizar/reagendar/encaminhar, mas gastando MUITO menos bateria
+  //   (precisão média, envio ~60s, só se mover >30m).
+  static const String modoDeslocamento = 'deslocamento';
+  static const String modoEco = 'eco';
+  String _modo = modoDeslocamento;
+
   final String baseUrl = 'https://seenet-production.up.railway.app/api';
 
   Map<String, String> get _headers {
@@ -29,10 +38,12 @@ class TrackingService extends GetxService {
   /// - Mobile: background service (continua com o app minimizado/fechado).
   /// - Web: timer em foreground (enquanto a aba estiver aberta).
   /// Em AMBOS envia UMA posição na hora, pra o admin não ficar em "aguardando GPS".
-  Future<void> iniciar(String osId) async {
+  /// [economico]=true inicia direto no modo eco (ex: retomada de OS em execução).
+  Future<void> iniciar(String osId, {bool economico = false}) async {
     if (_osId != null) parar(); // não deixa dois trackings simultâneos
 
     _osId = osId;
+    _modo = economico ? modoEco : modoDeslocamento;
     isTracking.value = true;
 
     // ✅ Posição IMEDIATA (não espera o 1º fix do stream, que pode demorar ~10s).
@@ -40,10 +51,8 @@ class TrackingService extends GetxService {
 
     if (kIsWeb) {
       // Web não suporta flutter_background_service (startService estoura). Usa timer.
-      _webTimer?.cancel();
-      _webTimer = Timer.periodic(
-          const Duration(seconds: 5), (_) => _enviarPosicaoAtual(osId));
-      print('📡 [WEB] tracking por timer iniciado — OS $osId');
+      _iniciarTimerWeb(osId);
+      print('📡 [WEB] tracking por timer iniciado — OS $osId (modo: $_modo)');
       return;
     }
 
@@ -53,9 +62,32 @@ class TrackingService extends GetxService {
       'osId': osId,
       'token': auth.token ?? '',
       'tenantCode': auth.tenantCode ?? '',
+      'modo': _modo,
     });
 
-    print('📡 Background tracking iniciado — OS $osId');
+    print('📡 Background tracking iniciado — OS $osId (modo: $_modo)');
+  }
+
+  void _iniciarTimerWeb(String osId) {
+    _webTimer?.cancel();
+    final intervalo = _modo == modoEco
+        ? const Duration(seconds: 60)
+        : const Duration(seconds: 5);
+    _webTimer = Timer.periodic(intervalo, (_) => _enviarPosicaoAtual(osId));
+  }
+
+  /// Chegou ao local: NÃO para o rastreamento — muda pro modo econômico.
+  /// O admin continua vendo o técnico no mapa até finalizar/reagendar/encaminhar,
+  /// mas o GPS passa a gastar uma fração da bateria.
+  void modoEconomico() {
+    if (_osId == null) return;
+    _modo = modoEco;
+    if (kIsWeb) {
+      _iniciarTimerWeb(_osId!);
+    } else {
+      _bgService.invoke('setMode', {'modo': modoEco});
+    }
+    print('🔋 Tracking em modo econômico — OS $_osId');
   }
 
   /// Captura o GPS agora e manda pro backend (usado no start e no timer do web).
@@ -101,6 +133,7 @@ class TrackingService extends GetxService {
     }
 
     _osId = null;
+    _modo = modoDeslocamento;
     isTracking.value = false;
 
     if (!kIsWeb) _bgService.invoke('stopService', {});

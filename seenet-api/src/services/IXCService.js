@@ -80,7 +80,11 @@ class IXCService {
         os.status === 'EN' // encaminhada → precisa aparecer pro técnico destino
       );
 
-      console.log(`✅ ${registrosFiltrados.length}/${registros.length} OSs ativas (técnico: ${filtros.tecnicoId})`);
+      // Só loga quando HÁ OSs — com 33 técnicos a cada 2min, logar os zeros
+      // afogava o Railway (e ainda saía duplicado com o log do Sincronizador).
+      if (registrosFiltrados.length > 0) {
+        console.log(`✅ ${registrosFiltrados.length}/${registros.length} OSs ativas (técnico: ${filtros.tecnicoId})`);
+      }
       return registrosFiltrados;
 
     } catch (error) {
@@ -108,12 +112,9 @@ class IXCService {
         sortorder: 'desc'
       });
       const response = await this.clientListar.post('/radpop_radio_cliente_fibra', params.toString());
+      // (logs de descoberta removidos — o "[FIBRA] sem registro" repetia dezenas
+      // de vezes por ciclo de sync e só servia pra mapear os nomes dos campos)
       const reg = response.data?.registros?.[0] || null;
-      if (reg) {
-        console.log(`🔎 [FIBRA] login=${login} → CAMPOS CRUS:`, JSON.stringify(reg));
-      } else {
-        console.log(`🔎 [FIBRA] login=${login} → sem registro`);
-      }
       return reg;
     } catch (e) {
       console.error(`❌ Erro ao buscar fibra do login ${login}:`, e.message);

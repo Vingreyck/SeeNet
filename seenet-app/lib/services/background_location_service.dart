@@ -64,11 +64,15 @@ void _onStart(ServiceInstance service) async {
   String? tenantCode;
   StreamSubscription<Position>? posSub;
   DateTime ultimoEnvio = DateTime.fromMillisecondsSinceEpoch(0);
+  // 'deslocamento' = GPS agressivo (dirigindo); 'eco' = técnico no local do
+  // cliente (após "cheguei ao local") — precisão média, envio raro, gasta pouco.
+  String modo = 'deslocamento';
 
-  // Envia a posição pro servidor — no máximo ~1x a cada 10s (mesma cadência de antes).
+  // Envia a posição pro servidor — cadência conforme o modo.
   Future<void> enviarPosicao(Position pos) async {
     if (osId == null || token == null) return;
-    if (DateTime.now().difference(ultimoEnvio).inSeconds < 5) return;
+    final minIntervalo = modo == 'eco' ? 45 : 5;
+    if (DateTime.now().difference(ultimoEnvio).inSeconds < minIntervalo) return;
     ultimoEnvio = DateTime.now();
 
     try {
@@ -95,7 +99,9 @@ void _onStart(ServiceInstance service) async {
         final hStr =
             '${h.hour.toString().padLeft(2,'0')}:${h.minute.toString().padLeft(2,'0')}';
         service.setForegroundNotificationInfo(
-          title:   'SeeNet — GPS Ativo',
+          title: modo == 'eco'
+              ? 'SeeNet — GPS (modo econômico)'
+              : 'SeeNet — GPS Ativo',
           content: 'OS #$osId • ${pos.latitude.toStringAsFixed(5)}, '
               '${pos.longitude.toStringAsFixed(5)} • $hStr',
         );
@@ -117,21 +123,29 @@ void _onStart(ServiceInstance service) async {
   // Abre o stream de localização. No iOS, allowBackgroundLocationUpdates:true
   // mantém o app recebendo posição com ele minimizado (o Timer NÃO roda em 2º
   // plano no iOS — por isso a troca). No Android segue pelo foreground service.
+  //
+  // MODO ECO (técnico parado no local do cliente): precisão MÉDIA (~100m — o
+  // SO resolve por WiFi/célula em vez de segurar o chip GPS ligado) e cadência
+  // de ~60s. distanceFilter fica 0 de propósito: com filtro de distância um
+  // técnico PARADO nunca dispararia update e o admin veria "sem sinal". No iOS
+  // o stream contínuo também é o que mantém o app vivo em background.
   void iniciarStream() {
     posSub?.cancel();
+    final bool eco = modo == 'eco';
     final LocationSettings settings = Platform.isIOS
         ? AppleSettings(
-            accuracy: LocationAccuracy.high,
-            activityType: ActivityType.automotiveNavigation,
+            accuracy: eco ? LocationAccuracy.medium : LocationAccuracy.high,
+            activityType:
+                eco ? ActivityType.other : ActivityType.automotiveNavigation,
             distanceFilter: 0,
             pauseLocationUpdatesAutomatically: false,
             showBackgroundLocationIndicator: true,
             allowBackgroundLocationUpdates: true,
           )
         : AndroidSettings(
-            accuracy: LocationAccuracy.high,
+            accuracy: eco ? LocationAccuracy.medium : LocationAccuracy.high,
             distanceFilter: 0,
-            intervalDuration: const Duration(seconds: 5),
+            intervalDuration: Duration(seconds: eco ? 60 : 5),
           );
     posSub = Geolocator.getPositionStream(locationSettings: settings).listen(
       enviarPosicao,
@@ -143,8 +157,21 @@ void _onStart(ServiceInstance service) async {
     osId        = event?['osId']        as String?;
     token       = event?['token']       as String?;
     tenantCode  = event?['tenantCode']  as String?;
-    print('📡 [BG] Tracking iniciado — OS $osId');
+    modo        = (event?['modo'] as String?) ?? 'deslocamento';
+    print('📡 [BG] Tracking iniciado — OS $osId (modo: $modo)');
     iniciarStream();
+  });
+
+  // Troca de modo em tempo real (ex: "cheguei ao local" → eco). Reabre o
+  // stream com as novas configurações e zera o throttle pra mandar uma
+  // posição logo — o admin vê o pino "no local" na hora.
+  service.on('setMode').listen((event) {
+    final novo = (event?['modo'] as String?) ?? 'deslocamento';
+    if (novo == modo) return;
+    modo = novo;
+    ultimoEnvio = DateTime.fromMillisecondsSinceEpoch(0);
+    print('🔋 [BG] Modo de tracking → $modo');
+    if (osId != null) iniciarStream();
   });
 
   service.on('stopTracking').listen((_) {

@@ -68,8 +68,10 @@ const { db } = require('../config/database');
       return res.status(401).json({ error: 'Usuário não encontrado ou inativo' });
     }
 
-    // Log de autenticação bem-sucedida
-    logger.info('Acesso autorizado', {
+    // Log de autenticação bem-sucedida — DEBUG de propósito: em nível info isso
+    // roda a CADA request e afoga o log do Railway (escondia erros reais).
+    // Falhas continuam em warn/error acima/abaixo.
+    logger.debug('Acesso autorizado', {
       ...requestContext,
       userId: user.id,
       userName: user.nome,
@@ -84,7 +86,6 @@ const { db } = require('../config/database');
     req.tenantId = user.tenant_id;
     req.tenantCode = user.tenant_code;
 
-    console.log('✅ AUTH MIDDLEWARE CONCLUÍDO - Passando para próximo middleware');
     next();
   } catch (error) {
     // Log detalhado do erro

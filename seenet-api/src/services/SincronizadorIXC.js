@@ -240,11 +240,15 @@ class SincronizadorIXC {
             // sincroniza se o IXC confirmar F (concluída) ou C (cancelada) —
             // OS que o técnico está de fato executando continua na lista aberta
             // do IXC, então nem entra aqui.
+            // ⚠️ INCLUI 'reaberta': OS reaberta no IXC que depois é finalizada ou
+            // reatribuída SUMIA da lista de abertas mas ficava presa no app pra
+            // sempre — o status 'reaberta' (criado na feature de reabertura) não
+            // estava aqui. Foi o bug do "David com OSs que não são dele".
             const ossTravadas = await trx('ordem_servico')
               .where('tenant_id', integracao.tenant_id)
               .where('tecnico_id', mapeamento.usuario_id)
               .where('origem', 'IXC')
-              .whereIn('status', ['pendente', 'em_execucao', 'em_deslocamento'])
+              .whereIn('status', ['pendente', 'reaberta', 'em_execucao', 'em_deslocamento'])
               .whereNotNull('id_externo')
               .whereNotIn('id_externo', idsExternosIXC)
               .select('id', 'id_externo', 'numero_os');
@@ -257,6 +261,13 @@ class SincronizadorIXC {
                 if (osReal.status === 'F') novoStatus = 'concluida';
                 else if (osReal.status === 'C') novoStatus = 'cancelada';
                 else if (osReal.status === 'RAG') novoStatus = 'reagendada'; // "Necessário reagendar" no IXC
+                // Ainda ABERTA no IXC, mas o dono agora é OUTRO técnico
+                // (reatribuída) → tira da lista deste; o novo dono recebe pela
+                // própria sync. Sem isso, ficava presa em "em campo".
+                else if (osReal.id_tecnico &&
+                         String(osReal.id_tecnico) !== String(mapeamento.tecnico_ixc_id)) {
+                  novoStatus = 'cancelada';
+                }
                 if (novoStatus) {
                   const upd = { status: novoStatus, data_atualizacao: db.fn.now() };
                   if (novoStatus === 'concluida') upd.data_conclusao = db.fn.now();

@@ -6,6 +6,7 @@ const { enviarTelegram, telegramConfigurado } = require('./telegramService');
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Alerta de estoque baixo por loja → canal privado no Telegram.
@@ -22,7 +23,7 @@ class EstoqueAlertaService {
     this.intervaloHoras = parseInt(process.env.ESTOQUE_CHECK_HORAS || '12', 10);
     // Equipamentos monitorados (o CPE que o técnico leva pro cliente).
     // Quer só ONT? troca por /ONT/i. Quer incluir mais? adiciona no regex.
-    this.regexEquip = /ONT|ROTEADOR/i;
+    this.regexEquip = /ONT|ONU|ROTEADOR/i;
     this.intervalId = null;
   }
 
@@ -99,19 +100,51 @@ class EstoqueAlertaService {
 
     if (!alertas.length) return; // nada baixo → não manda nada (sem ruído)
 
+    // Agrupa por loja e manda UM bloco (mensagem) por cidade — muito mais legível
+    // no grupo do que um textão só. Cabeçalho + 1 card por loja.
     const porLoja = {};
     for (const a of alertas) (porLoja[a.loja] = porLoja[a.loja] || []).push(a);
+    const cidades = Object.keys(porLoja).sort();
 
-    let msg = `⚠️ <b>Estoque baixo — equipamentos</b>\n<i>mínimo por modelo: ${this.minimo}</i>\n`;
-    for (const loja of Object.keys(porLoja).sort()) {
-      msg += `\n🏬 <b>${esc(loja)}</b>\n`;
-      for (const a of porLoja[loja].sort((x, y) => x.saldo - y.saldo)) {
-        msg += `   • ${esc(a.desc)}: <b>${a.saldo}</b>\n`;
-      }
+    const agora = new Date().toLocaleString('pt-BR', {
+      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    });
+
+    await enviarTelegram(
+      `⚠️ <b>ESTOQUE BAIXO</b>  ·  ${agora}\n` +
+      `<i>${cidades.length} loja(s) com equipamento abaixo de ${this.minimo} un.</i> 👇`
+    );
+    await sleep(400);
+
+    for (const loja of cidades) {
+      const itens = porLoja[loja];
+      const onts = itens.filter((i) => /ONT|ONU/i.test(i.desc)).sort((a, b) => a.saldo - b.saldo);
+      const rotas = itens.filter((i) => /ROTEADOR/i.test(i.desc)).sort((a, b) => a.saldo - b.saldo);
+      const outros = itens.filter((i) => !/ONT|ONU|ROTEADOR/i.test(i.desc)).sort((a, b) => a.saldo - b.saldo);
+
+      let m = `🏬 <b>${esc(loja)}</b>\n`;
+      m += this._secao('📡 <b>ONT</b>', onts, /^\s*(ONT|ONU)[-\s]*/i);
+      m += this._secao('📶 <b>Roteador</b>', rotas, /^\s*ROTEADOR[-\s]*/i);
+      m += this._secao('📦 <b>Outros</b>', outros, null);
+
+      await enviarTelegram(m.trimEnd());
+      await sleep(400); // respeita o limite de mensagens/min do Telegram
     }
 
-    const ok = await enviarTelegram(msg.trim());
-    console.log(`📦 Alerta de estoque ${ok ? 'enviado' : 'NÃO enviado'} — ${alertas.length} item(ns) baixo(s)`);
+    console.log(`📦 Alerta de estoque enviado — ${alertas.length} item(ns) em ${cidades.length} loja(s)`);
+  }
+
+  // Monta uma seção (ONT / Roteador) do card da loja. 🔴 = 1 un (crítico), 🟠 = 2.
+  // `prefixo` tira o "ONT "/"ROTEADOR " do nome (já está no título da seção).
+  _secao(titulo, itens, prefixo) {
+    if (!itens.length) return '';
+    let s = `\n${titulo}\n`;
+    for (const i of itens) {
+      const nome = prefixo ? i.desc.replace(prefixo, '').trim() : i.desc;
+      const marca = i.saldo <= 1 ? '🔴' : '🟠';
+      s += `${marca} ${esc(nome)} — <b>${i.saldo}</b>\n`;
+    }
+    return s;
   }
 }
 

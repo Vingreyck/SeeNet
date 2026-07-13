@@ -24,8 +24,40 @@ class TelegramBotService {
     this.offset = 0;
     this.rodando = false;
     this.regexOnt = /ONT|ONU/i;
+    this.minimo = parseInt(process.env.ESTOQUE_MINIMO_ONT || '3', 10);
     this.cache = { ts: 0, lojas: [] }; // [{almox, nome, rows}]
     this.cacheTTL = 120000; // 2 min
+  }
+
+  // Semáforo pelo saldo: 🔴 ≤1 · 🟠 abaixo do mínimo · 🟢 ok
+  _marca(saldo) {
+    if (saldo <= 1) return '🔴';
+    if (saldo < this.minimo) return '🟠';
+    return '🟢';
+  }
+
+  // Envia mensagem longa quebrando por linha (limite do Telegram é ~4096).
+  async _enviarLongo(chatId, texto) {
+    const LIM = 3900;
+    if (texto.length <= LIM) return enviarPara(chatId, texto);
+    const linhas = texto.split('\n');
+    let buf = '';
+    for (const ln of linhas) {
+      if (buf.length + ln.length + 1 > LIM) { await enviarPara(chatId, buf); buf = ''; }
+      buf += (buf ? '\n' : '') + ln;
+    }
+    if (buf) await enviarPara(chatId, buf);
+  }
+
+  // Seção "• nome — saldo" (usada no /produtos), tirando o prefixo repetido.
+  _secaoLista(titulo, itens, prefixo) {
+    if (!itens.length) return '';
+    let s = `\n${titulo}\n`;
+    for (const i of itens) {
+      const nome = prefixo ? i.desc.replace(prefixo, '').trim() : i.desc;
+      s += `• ${esc(nome)} — <b>${i.saldo}</b>\n`;
+    }
+    return s;
   }
 
   async iniciar() {
@@ -131,24 +163,27 @@ class TelegramBotService {
   async _lojas(chatId) {
     const lojas = await this._carregarLojas();
     if (!lojas.length) return enviarPara(chatId, 'Nenhuma loja mapeada.');
-    let txt = '<b>🏬 Lojas monitoradas</b>\n\n';
+    let txt = `🏬 <b>Lojas monitoradas</b> (${lojas.length})\n\n`;
     for (const l of [...lojas].sort((a, b) => a.nome.localeCompare(b.nome))) txt += `• ${esc(l.nome)}\n`;
-    txt += '\n<i>Use: /onts &lt;loja&gt; ou /produtos &lt;loja&gt;</i>';
-    return enviarPara(chatId, txt);
+    txt += '\n<i>Use:</i> <code>/onts malhador</code> <i>ou</i> <code>/produtos malhador</code>';
+    return this._enviarLongo(chatId, txt);
   }
 
   async _onts(chatId, arg) {
     const lojas = this._match(await this._carregarLojas(), arg);
     if (!lojas.length) return enviarPara(chatId, `Não achei a loja "${esc(arg)}". Use /lojas.`);
-    let txt = '<b>📡 ONT/ONU em estoque</b>\n';
+    let txt = '📡 <b>ONT/ONU em estoque</b>\n';
     for (const l of lojas) {
       const onts = this._resumo(l.rows, this.regexOnt).filter((p) => p.saldo > 0).sort((a, b) => b.saldo - a.saldo);
       const total = onts.reduce((s, p) => s + p.saldo, 0);
       txt += `\n🏬 <b>${esc(l.nome)}</b> — total: <b>${total}</b>\n`;
-      if (!onts.length) txt += '   (nenhuma em estoque)\n';
-      for (const p of onts) txt += `   • ${esc(p.desc)}: <b>${p.saldo}</b>\n`;
+      if (!onts.length) { txt += '<i>   nenhuma em estoque</i>\n'; continue; }
+      for (const p of onts) {
+        const nome = p.desc.replace(/^\s*(ONT|ONU)[-\s]*/i, '').trim();
+        txt += `${this._marca(p.saldo)} ${esc(nome)} — <b>${p.saldo}</b>\n`;
+      }
     }
-    return enviarPara(chatId, txt.trim());
+    return this._enviarLongo(chatId, txt.trim());
   }
 
   async _produtos(chatId, arg) {
@@ -156,16 +191,16 @@ class TelegramBotService {
     const lojas = this._match(await this._carregarLojas(), arg);
     if (!lojas.length) return enviarPara(chatId, `Não achei a loja "${esc(arg)}". Use /lojas.`);
     for (const l of lojas) {
-      const prods = this._resumo(l.rows, null).filter((p) => p.saldo > 0)
-        .sort((a, b) => a.desc.localeCompare(b.desc));
-      let txt = `<b>📦 Estoque — ${esc(l.nome)}</b>\n<i>${prods.length} item(ns) com saldo</i>\n\n`;
-      let count = 0;
-      for (const p of prods) {
-        const linha = `• ${esc(p.desc)}: <b>${p.saldo}</b>\n`;
-        if (txt.length + linha.length > 3900) { txt += `… e mais ${prods.length - count} item(ns)`; break; }
-        txt += linha; count++;
-      }
-      await enviarPara(chatId, txt.trim());
+      const all = this._resumo(l.rows, null).filter((p) => p.saldo > 0);
+      const onts = all.filter((p) => /ONT|ONU/i.test(p.desc)).sort((a, b) => a.desc.localeCompare(b.desc));
+      const rotas = all.filter((p) => /ROTEADOR/i.test(p.desc)).sort((a, b) => a.desc.localeCompare(b.desc));
+      const outros = all.filter((p) => !/ONT|ONU|ROTEADOR/i.test(p.desc)).sort((a, b) => a.desc.localeCompare(b.desc));
+
+      let m = `📦 <b>Estoque — ${esc(l.nome)}</b>\n<i>${all.length} item(ns) com saldo</i>\n`;
+      m += this._secaoLista('📡 <b>ONT</b>', onts, /^\s*(ONT|ONU)[-\s]*/i);
+      m += this._secaoLista('📶 <b>Roteador</b>', rotas, /^\s*ROTEADOR[-\s]*/i);
+      m += this._secaoLista('📦 <b>Outros</b>', outros, null);
+      await this._enviarLongo(chatId, m.trim());
     }
   }
 }

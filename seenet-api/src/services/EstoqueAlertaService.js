@@ -2,118 +2,149 @@ const { db } = require('../config/database');
 const IXCService = require('./IXCService');
 const { enviarTelegram, telegramConfigurado } = require('./telegramService');
 
-// escapa pro parse_mode HTML do Telegram
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Alerta de estoque baixo por loja → canal privado no Telegram.
- * Verifica os equipamentos (ONT/roteador) das lojas que os técnicos usam e avisa
- * quando um modelo está ACABANDO (tem estoque, mas abaixo do mínimo).
+ * Alerta de estoque baixo por loja → Telegram, EVENT-DRIVEN.
+ * Só avisa quando um equipamento (ONT/roteador) CAI abaixo do mínimo numa loja
+ * (ou piora enquanto já está baixo). Guarda o último saldo na tabela
+ * `estoque_estado` (persistente) — por isso:
+ *   • não repete o mesmo item a cada checagem;
+ *   • NÃO dispara ao subir deploy (o estado salvo não mudou);
+ *   • no 1º run cria um baseline SILENCIOSO (sem alertar o que já está baixo).
  *
- * Config (env, todas opcionais):
- *   ESTOQUE_MINIMO_ONT  = mínimo por modelo (padrão 3)
- *   ESTOQUE_CHECK_HORAS = de quanto em quanto tempo checa (padrão 12h)
+ * Env: ESTOQUE_MINIMO_ONT (padrão 3), ESTOQUE_CHECK_MIN (padrão 60 min).
  */
 class EstoqueAlertaService {
   constructor() {
     this.minimo = parseInt(process.env.ESTOQUE_MINIMO_ONT || '3', 10);
-    this.intervaloHoras = parseInt(process.env.ESTOQUE_CHECK_HORAS || '12', 10);
-    // Equipamentos monitorados (o CPE que o técnico leva pro cliente).
-    // Quer só ONT? troca por /ONT/i. Quer incluir mais? adiciona no regex.
+    this.intervaloMin = parseInt(process.env.ESTOQUE_CHECK_MIN || '60', 10);
     this.regexEquip = /ONT|ONU|ROTEADOR/i;
     this.intervalId = null;
   }
 
   iniciar() {
     if (!telegramConfigurado()) {
-      console.log('📴 Alerta de estoque: Telegram não configurado (defina TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID) — desativado.');
+      console.log('📴 Alerta de estoque: Telegram não configurado (TELEGRAM_BOT_TOKEN/CHAT_ID) — desativado.');
       return;
     }
-    console.log(`📦 Alerta de estoque baixo ATIVO — mínimo ${this.minimo}/modelo, checando a cada ${this.intervaloHoras}h`);
-    // 1ª checagem ~20s após subir (deixa o banco/IXC prontos), depois no intervalo.
+    console.log(`📦 Alerta de estoque (event-driven) ATIVO — mínimo ${this.minimo}, checa a cada ${this.intervaloMin}min`);
     setTimeout(() => this.verificar().catch(() => {}), 20000);
-    this.intervalId = setInterval(
-      () => this.verificar().catch(() => {}),
-      this.intervaloHoras * 3600 * 1000
-    );
+    this.intervalId = setInterval(() => this.verificar().catch(() => {}), this.intervaloMin * 60 * 1000);
   }
 
   async verificar() {
-    const integracoes = await db('integracao_ixc')
-      .where('ativo', true)
+    const integracoes = await db('integracao_ixc').where('ativo', true)
       .select('tenant_id', 'url_api', 'token_api');
     for (const integ of integracoes) {
-      try {
-        await this._verificarEmpresa(integ);
-      } catch (e) {
-        console.error(`⚠️ Alerta de estoque (tenant ${integ.tenant_id}):`, e.message);
-      }
+      try { await this._verificarEmpresa(integ); }
+      catch (e) { console.error(`⚠️ Alerta de estoque (tenant ${integ.tenant_id}):`, e.message); }
     }
   }
 
-  async _verificarEmpresa(integ) {
-    // Lojas monitoradas = almoxarifados que os técnicos usam (do mapeamento).
+  // Estoque atual de equipamento por loja: [{almox, nome, produtos: Map(id→{desc,saldo})}]
+  async _coletar(integ) {
     const rows = await db('mapeamento_tecnicos_ixc')
-      .where('tenant_id', integ.tenant_id)
-      .where('ativo', true)
-      .whereNotNull('id_almoxarifado')
-      .select('id_almoxarifado');
-    const lojas = [...new Set(rows.map((r) => r.id_almoxarifado).filter(Boolean))];
-    if (!lojas.length) return;
-
+      .where('tenant_id', integ.tenant_id).where('ativo', true)
+      .whereNotNull('id_almoxarifado').select('id_almoxarifado');
+    const almoxIds = [...new Set(rows.map((r) => r.id_almoxarifado).filter(Boolean))];
+    if (!almoxIds.length) return [];
     const ixc = new IXCService(integ.url_api, integ.token_api);
-    const alertas = [];
-
-    for (const almox of lojas) {
-      let estoque;
-      try {
-        estoque = await ixc.buscarSaldoAlmoxarifado(almox);
-      } catch (_) { continue; }
-
-      // Colapsa filiais: o mesmo almox traz 1 linha por filial e a loja só tem
-      // estoque real numa delas → soma o saldo por produto pra ter o total real.
-      const porProduto = new Map();
+    const lojas = [];
+    for (const almox of almoxIds) {
+      let estoque = [];
+      try { estoque = await ixc.buscarSaldoAlmoxarifado(almox); } catch (_) { continue; }
+      const produtos = new Map();
+      let nome = `Almox ${almox}`;
       for (const r of estoque || []) {
+        if (r.almox_descricao) nome = r.almox_descricao;
         if (r.produto_ativo === 'N') continue;
         if (!this.regexEquip.test(r.produto_descricao || '')) continue;
-        const cur = porProduto.get(r.id_produto) || {
-          desc: r.produto_descricao,
-          loja: r.almox_descricao || `almox ${almox}`,
-          saldo: 0,
-        };
+        // Colapsa filiais: soma o saldo do mesmo produto no almox.
+        const cur = produtos.get(r.id_produto) || { desc: r.produto_descricao, saldo: 0 };
         cur.saldo += parseFloat(r.saldo || '0');
-        porProduto.set(r.id_produto, cur);
+        produtos.set(r.id_produto, cur);
       }
+      lojas.push({ almox, nome, produtos });
+    }
+    return lojas;
+  }
 
-      for (const p of porProduto.values()) {
-        // "Acabando": tem estoque (>0) mas abaixo do mínimo. Os que estão em 0
-        // são EXCLUÍDOS de propósito — a maioria é modelo que a loja nem usa
-        // (fica sempre zerado) e viraria spam. O objetivo é REPOR antes de zerar.
-        if (p.saldo > 0 && p.saldo < this.minimo) {
-          alertas.push(p);
+  async _verificarEmpresa(integ) {
+    const lojas = await this._coletar(integ);
+    if (!lojas.length) return;
+
+    // Estado anterior (persistente).
+    const prevRows = await db('estoque_estado')
+      .where('tenant_id', integ.tenant_id)
+      .select('id_almoxarifado', 'id_produto', 'saldo');
+    const prev = new Map();
+    for (const r of prevRows) prev.set(`${r.id_almoxarifado}|${r.id_produto}`, parseFloat(r.saldo));
+    const primeiraVez = prevRows.length === 0; // 1º run → baseline silencioso
+
+    const alertas = [];
+    const upserts = [];
+    for (const loja of lojas) {
+      for (const [idProduto, p] of loja.produtos) {
+        const antes = prev.has(`${loja.almox}|${idProduto}`) ? prev.get(`${loja.almox}|${idProduto}`) : null;
+        const agora = p.saldo;
+        if (!primeiraVez && antes !== null) {
+          const cruzou = antes >= this.minimo && agora < this.minimo; // ex: 3 → 2
+          const piorou = agora < antes && agora < this.minimo;        // ex: 2 → 1
+          if (cruzou || piorou) alertas.push({ loja: loja.nome, desc: p.desc, saldo: agora, de: antes });
         }
+        // produto novo / 1º run → só registra baseline, não alerta
+        upserts.push({ tenant_id: integ.tenant_id, id_almoxarifado: loja.almox, id_produto: idProduto, saldo: agora });
       }
     }
 
-    if (!alertas.length) return; // nada baixo → não manda nada (sem ruído)
+    if (upserts.length) {
+      await db('estoque_estado')
+        .insert(upserts.map((u) => ({ ...u, atualizado_em: db.fn.now() })))
+        .onConflict(['tenant_id', 'id_almoxarifado', 'id_produto'])
+        .merge(['saldo', 'atualizado_em']);
+    }
 
-    // Agrupa por loja e manda UM bloco (mensagem) por cidade — muito mais legível
-    // no grupo do que um textão só. Cabeçalho + 1 card por loja.
+    if (primeiraVez) {
+      console.log(`📦 Estoque: baseline inicial gravado (${upserts.length} itens) — sem alerta no 1º run.`);
+      return;
+    }
+    if (alertas.length) {
+      await this._enviarBlocos(alertas, '⚠️ <b>ESTOQUE BAIXOU</b>', 'com queda abaixo de');
+      console.log(`📦 Alerta de estoque enviado — ${alertas.length} queda(s).`);
+    }
+  }
+
+  // Snapshot atual (on-demand) — usado pelo comando /baixo e pela rota de debug.
+  async digestParaGrupo() {
+    const integracoes = await db('integracao_ixc').where('ativo', true)
+      .select('tenant_id', 'url_api', 'token_api');
+    for (const integ of integracoes) {
+      const lojas = await this._coletar(integ);
+      const alertas = [];
+      for (const loja of lojas) {
+        for (const [, p] of loja.produtos) {
+          if (p.saldo > 0 && p.saldo < this.minimo) alertas.push({ loja: loja.nome, desc: p.desc, saldo: p.saldo });
+        }
+      }
+      if (alertas.length) await this._enviarBlocos(alertas, '📦 <b>ESTOQUE BAIXO</b> (agora)', 'abaixo de');
+      else await enviarTelegram('✅ Nenhum equipamento abaixo do mínimo agora.');
+    }
+  }
+
+  // Cabeçalho + 1 bloco (mensagem) por loja.
+  async _enviarBlocos(alertas, titulo, frase) {
     const porLoja = {};
     for (const a of alertas) (porLoja[a.loja] = porLoja[a.loja] || []).push(a);
     const cidades = Object.keys(porLoja).sort();
-
     const agora = new Date().toLocaleString('pt-BR', {
       day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
     });
 
-    await enviarTelegram(
-      `⚠️ <b>ESTOQUE BAIXO</b>  ·  ${agora}\n` +
-      `<i>${cidades.length} loja(s) com equipamento abaixo de ${this.minimo} un.</i> 👇`
-    );
+    await enviarTelegram(`${titulo}  ·  ${agora}\n<i>${cidades.length} loja(s) ${frase} ${this.minimo} un.</i> 👇`);
     await sleep(400);
 
     for (const loja of cidades) {
@@ -128,21 +159,19 @@ class EstoqueAlertaService {
       m += this._secao('📦 <b>Outros</b>', outros, null);
 
       await enviarTelegram(m.trimEnd());
-      await sleep(400); // respeita o limite de mensagens/min do Telegram
+      await sleep(400);
     }
-
-    console.log(`📦 Alerta de estoque enviado — ${alertas.length} item(ns) em ${cidades.length} loja(s)`);
   }
 
-  // Monta uma seção (ONT / Roteador) do card da loja. 🔴 = 1 un (crítico), 🟠 = 2.
-  // `prefixo` tira o "ONT "/"ROTEADOR " do nome (já está no título da seção).
+  // 🔴 = 1 un (crítico), 🟠 = 2. Mostra "(era X)" quando é queda (event-driven).
   _secao(titulo, itens, prefixo) {
     if (!itens.length) return '';
     let s = `\n${titulo}\n`;
     for (const i of itens) {
       const nome = prefixo ? i.desc.replace(prefixo, '').trim() : i.desc;
       const marca = i.saldo <= 1 ? '🔴' : '🟠';
-      s += `${marca} ${esc(nome)} — <b>${i.saldo}</b>\n`;
+      const era = (i.de != null) ? ` <i>(era ${i.de})</i>` : '';
+      s += `${marca} ${esc(nome)} — <b>${i.saldo}</b>${era}\n`;
     }
     return s;
   }

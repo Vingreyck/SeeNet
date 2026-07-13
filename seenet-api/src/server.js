@@ -891,13 +891,14 @@ app.get('/api/debug/meu-ip-agora', async (req, res) => {
   }
 });
 
-// 📦 Dispara o alerta de estoque na HORA (teste manual) — confira o Telegram.
+// 📦 Manda o SNAPSHOT atual do estoque baixo (teste manual) — confira o Telegram.
+// (o alerta automático é event-driven; isso aqui é o retrato completo na hora)
 // Ex: GET https://seenet-production.up.railway.app/api/debug/alerta-estoque
 app.get('/api/debug/alerta-estoque', async (req, res) => {
   try {
     const EstoqueAlertaService = require('./services/EstoqueAlertaService');
-    await new EstoqueAlertaService().verificar();
-    res.json({ success: true, message: 'Verificação disparada — confira o canal do Telegram.' });
+    await new EstoqueAlertaService().digestParaGrupo();
+    res.json({ success: true, message: 'Snapshot enviado — confira o grupo do Telegram.' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

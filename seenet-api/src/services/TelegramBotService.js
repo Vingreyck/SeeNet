@@ -102,6 +102,7 @@ class TelegramBotService {
     if (cmd === '/lojas') return this._lojas(chatId);
     if (['/onts', '/ont', '/onus', '/onu'].includes(cmd)) return this._onts(chatId, arg);
     if (['/produtos', '/produto', '/estoque'].includes(cmd)) return this._produtos(chatId, arg);
+    if (['/baixo', '/baixos', '/baixoestoque'].includes(cmd)) return this._baixo(chatId);
     return enviarPara(chatId, 'Comando não reconhecido. Use /comandos pra ver a lista.');
   }
 
@@ -111,9 +112,16 @@ class TelegramBotService {
       '/lojas — lista as lojas monitoradas\n' +
       '/onts [loja] — quantas ONT/ONU tem (todas, ou só a loja informada)\n' +
       '/produtos &lt;loja&gt; — estoque da loja (produtos com saldo)\n' +
+      '/baixo — retrato de tudo que está abaixo do mínimo agora\n' +
       '/comandos — mostra esta ajuda\n\n' +
       '<i>Exemplos:</i> <code>/onts malhador</code> · <code>/produtos malhador</code>';
     return enviarPara(chatId, txt);
+  }
+
+  async _baixo(chatId) {
+    await enviarPara(chatId, '🔎 Gerando o retrato do estoque baixo...');
+    const EstoqueAlertaService = require('./EstoqueAlertaService');
+    await new EstoqueAlertaService().digestParaGrupo();
   }
 
   async _integracao() {

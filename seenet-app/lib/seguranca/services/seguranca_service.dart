@@ -236,11 +236,13 @@ class SegurancaService extends GetxService {
         String? dataEntrega,
         List<Map<String, dynamic>>? itensIxc,
         // itensIxc: [{'id_produto': '525', 'descricao': 'Luva', 'quantidade': 2}]
+        String? idAlmoxarifado,
       }) async {
     final r = await _http('POST', '$_base/requisicoes/$id/aprovar', {
       'observacao': observacao ?? '',
       if (dataEntrega != null) 'data_entrega': dataEntrega,
       if (itensIxc != null && itensIxc.isNotEmpty) 'itens_ixc': itensIxc,
+      if (idAlmoxarifado != null) 'id_almoxarifado': idAlmoxarifado,
     });
     if (r['status'] == 200) {
       return {

@@ -466,6 +466,7 @@ class _DialogAprovacaoEpiState extends State<DialogAprovacaoEpi> {
         widget.requisicao['id'] as int,
         observacao: obs,
         itensIxc: itensIxc.cast<Map<String, dynamic>>(),
+        idAlmoxarifado: _almoxSelecionadoId,
       );
 
       if (mounted) {

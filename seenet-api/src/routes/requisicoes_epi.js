@@ -661,7 +661,7 @@ router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
       return res.status(409).json({ error: 'Esta requisição já está sendo aprovada.' });
     }
 
-    const { observacao, data_entrega, itens_ixc = [], devolucoes = [] } = req.body;
+    const { observacao, data_entrega, itens_ixc = [], devolucoes = [], id_almoxarifado } = req.body;
 
     // ── Integração IXC ─────────────────────────────────────────
     let id_requisicao_ixc = null;
@@ -686,6 +686,10 @@ router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
         return res.status(400).json({ error: 'Técnico sem almoxarifado/colaborador mapeado no IXC. Configure o mapeamento antes de aprovar — a baixa de estoque não pode ser feita. Requisição mantida como pendente.' });
       }
 
+      // O gestor pode sobrescrever, no momento da aprovação, o almoxarifado de onde
+      // sai o material (ex: técnico mudou de loja temporariamente).
+      const idAlmoxarifadoUsado = id_almoxarifado ? id_almoxarifado.toString() : mapeamento.id_almoxarifado.toString();
+
       const IXCService = require('../services/IXCService');
       const ixc = new IXCService(integracao.url_api, integracao.token_api);
 
@@ -693,7 +697,7 @@ router.post('/requisicoes/:id/aprovar', authMiddleware, async (req, res) => {
       //    (mantém 'pendente') para o gestor tentar de novo — nunca aprova sem baixar.
       try {
         const { id: reqIxcId } = await ixc.criarRequisicaoMaterial({
-          id_filial: integracao.id_filial || '1', id_almoxarifado: mapeamento.id_almoxarifado.toString(),
+          id_filial: integracao.id_filial || '1', id_almoxarifado: idAlmoxarifadoUsado,
           id_colaborador: mapeamento.tecnico_ixc_id.toString(), observacao: `Req. EPI #${requisicao.id} - SeeNet`,
         });
         id_requisicao_ixc = reqIxcId;
@@ -914,11 +918,14 @@ router.get('/almoxarifados-colaboradores', authMiddleware, async (req, res) => {
     if (!integracao) return res.json({ almoxarifados: [] });
     const IXCService = require('../services/IXCService');
     const ixc = new IXCService(integracao.url_api, integracao.token_api);
-    const IDS_COLABORADORES = [25,26,27,28,29,30,31,32,33,35,36,37,38,39,40,41,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,76,97,102,107,116];
+    // O "almoxarifado do colaborador" é a mesma loja/cidade escolhida no cadastro
+    // (ver registro.view.dart) e salva em mapeamento_tecnicos_ixc.id_almoxarifado.
+    // Não existe um conjunto separado de IDs "de colaborador" — são os almoxarifados
+    // ativos normais do IXC.
     const body = { qtype: 'almox.id', query: '1', oper: '>=', page: '1', rp: '200', sortname: 'almox.descricao', sortorder: 'asc' };
     const response = await ixc.clientAlterar.post('/almox', body, { headers: { 'ixcsoft': 'listar' } });
     const todos = response.data.registros || [];
-    const filtrados = todos.filter(a => IDS_COLABORADORES.includes(parseInt(a.id)) && a.ativo === 'S').map(a => ({ id: a.id, descricao: a.descricao }));
+    const filtrados = todos.filter(a => a.ativo === 'S').map(a => ({ id: a.id, descricao: a.descricao }));
     res.json({ almoxarifados: filtrados });
   } catch (err) { console.error('❌ Erro almoxarifados:', err.message); res.status(500).json({ error: 'Erro ao buscar almoxarifados' }); }
 });

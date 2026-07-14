@@ -222,6 +222,7 @@ class SegurancaController extends GetxController {
         String? observacao,
         String? dataEntrega,
         List<Map<String, dynamic>>? itensIxc,
+        String? idAlmoxarifado,
       }) async {
     isSending.value = true;
     try {
@@ -230,6 +231,7 @@ class SegurancaController extends GetxController {
         observacao: observacao,
         dataEntrega: dataEntrega,
         itensIxc: itensIxc,
+        idAlmoxarifado: idAlmoxarifado,
       );
       if (result['success'] == true) {
         carregarPendentes();

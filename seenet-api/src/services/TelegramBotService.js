@@ -110,7 +110,7 @@ class TelegramBotService {
     const txt =
       '<b>🤖 Comandos</b>\n\n' +
       '/lojas — lista as lojas monitoradas\n' +
-      '/onts [loja] — quantas ONT/ONU tem (todas, ou só a loja informada)\n' +
+      '/onts [loja] — ONT/ONU + roteadores em estoque (todas, ou só a loja)\n' +
       '/produtos &lt;loja&gt; — estoque da loja (produtos com saldo)\n' +
       '/baixo — retrato de tudo que está abaixo do mínimo agora\n' +
       '/comandos — mostra esta ajuda\n\n' +
@@ -180,18 +180,28 @@ class TelegramBotService {
   async _onts(chatId, arg) {
     const lojas = this._match(await this._carregarLojas(), arg);
     if (!lojas.length) return enviarPara(chatId, `Não achei a loja "${esc(arg)}". Use /lojas.`);
-    let txt = '📡 <b>ONT/ONU em estoque</b>\n';
+    let txt = '📡 <b>Equipamentos em estoque</b>\n';
     for (const l of lojas) {
-      const onts = this._resumo(l.rows, this.regexOnt).filter((p) => p.saldo > 0).sort((a, b) => b.saldo - a.saldo);
-      const total = onts.reduce((s, p) => s + p.saldo, 0);
-      txt += `\n🏬 <b>${esc(l.nome)}</b> — total: <b>${total}</b>\n`;
-      if (!onts.length) { txt += '<i>   nenhuma em estoque</i>\n'; continue; }
-      for (const p of onts) {
-        const nome = p.desc.replace(/^\s*(ONT|ONU)[-\s]*/i, '').trim();
-        txt += `${this._marca(p.saldo)} ${esc(nome)} — <b>${p.saldo}</b>\n`;
-      }
+      const onts = this._resumo(l.rows, /ONT|ONU/i).filter((p) => p.saldo > 0).sort((a, b) => b.saldo - a.saldo);
+      const rotas = this._resumo(l.rows, /ROTEADOR/i).filter((p) => p.saldo > 0).sort((a, b) => b.saldo - a.saldo);
+      txt += `\n🏬 <b>${esc(l.nome)}</b>\n`;
+      txt += this._blocoEquip('📡 ONT/ONU', onts, /^\s*(ONT|ONU)[-\s]*/i);
+      txt += this._blocoEquip('📶 Roteador', rotas, /^\s*ROTEADOR[-\s]*/i);
+      if (!onts.length && !rotas.length) txt += '<i>   nenhum em estoque</i>\n';
     }
     return this._enviarLongo(chatId, txt.trim());
+  }
+
+  // Bloco de uma categoria (ONT ou Roteador) com total + semáforo por item.
+  _blocoEquip(titulo, itens, prefixo) {
+    if (!itens.length) return '';
+    const total = itens.reduce((s, p) => s + p.saldo, 0);
+    let s = `<b>${titulo}</b> <i>(total ${total})</i>\n`;
+    for (const p of itens) {
+      const nome = p.desc.replace(prefixo, '').trim();
+      s += `${this._marca(p.saldo)} ${esc(nome)} — <b>${p.saldo}</b>\n`;
+    }
+    return s;
   }
 
   async _produtos(chatId, arg) {

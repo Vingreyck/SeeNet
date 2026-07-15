@@ -56,6 +56,7 @@ class _RequisicaoEpiScreenState
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     controller.limparSelecao();
+    controller.carregarEpis();
     _carregarDuplicados();
   }
 

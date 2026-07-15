@@ -43,21 +43,37 @@ class SegurancaService extends GetxService {
       final response = await GetConnect().get('$_base/epis', headers: _headers);
       if (response.statusCode == 200) {
         final List epis = (response.body['data'] ?? response.body)['epis'] ?? [];
-        return epis.cast<String>();
+        return _ordenarPt(epis.cast<String>());
       }
       return _episPadrao();
     } catch (_) { return _episPadrao(); }
   }
 
-  List<String> _episPadrao() => [
-    'Capacete de Segurança (Classe B)', 'Carneira', 'Jugular', 'Balaclava',
-    'Óculos de Segurança', 'Luva de Segurança (Isolante)', 'Luva de Vaqueta',
-    'Bota de Segurança', 'Cinto de Segurança', 'Talabarte de Posicionamento',
-    'Protetor Solar', 'Escada de Alumínio', 'Escada Extensível',
-    'Fita de Sinalização Zebrada', 'Cone de Sinalização', 'Bandeirola',
-    'Detector de Tensão', 'Calça Operacional', 'Camisa Manga Longa (Jaleco)',
-    'Catraca Trava Escada', 'Avental', 'Luva Latex',
-  ];
+  // Ordena ignorando acentos (Ó, Ã, Ç...), pra qualquer EPI novo entrar
+  // sempre na posição certa, mesmo se vier fora de ordem do backend.
+  List<String> _ordenarPt(List<String> lista) {
+    String semAcento(String s) => s
+        .toLowerCase()
+        .replaceAll(RegExp('[áàâã]'), 'a')
+        .replaceAll(RegExp('[éê]'), 'e')
+        .replaceAll('í', 'i')
+        .replaceAll(RegExp('[óôõ]'), 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ç', 'c');
+    final copia = [...lista];
+    copia.sort((a, b) => semAcento(a).compareTo(semAcento(b)));
+    return copia;
+  }
+
+  List<String> _episPadrao() => _ordenarPt(const [
+    'Avental', 'Balaclava', 'Bandeirola', 'Bota de Segurança',
+    'Calça Operacional', 'Camisa Manga Longa (Jaleco)',
+    'Capacete de Segurança (Classe B)', 'Carneira', 'Catraca Trava Escada',
+    'Cinto de Segurança', 'Cone de Sinalização', 'Detector de Tensão',
+    'Escada de Alumínio', 'Escada Extensível', 'Fita de Sinalização Zebrada',
+    'Jugular', 'Luva de Segurança (Isolante)', 'Luva de Vaqueta', 'Luva Latex',
+    'Óculos de Segurança', 'Protetor Solar', 'Talabarte de Posicionamento',
+  ]);
 
   // ── Criar requisição ──────────────────────────────────────────
   Future<Map<String, dynamic>> criarRequisicao({required List<String> episSolicitados}) async {

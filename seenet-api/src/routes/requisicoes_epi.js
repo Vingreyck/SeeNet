@@ -16,6 +16,14 @@ function isGestorOuAdmin(tipo) {
   return tipo === 'administrador' || tipo === 'gestor_seguranca';
 }
 
+// Ordena por nome respeitando acentos do PT-BR (Ó, Ã, Ç...), sem depender do
+// collation do banco. `campo` é a chave do nome quando o array é de objetos.
+function ordenarPt(lista, campo) {
+  return [...lista].sort((a, b) =>
+    (campo ? a[campo] : a).localeCompare(campo ? b[campo] : b, 'pt', { sensitivity: 'base' })
+  );
+}
+
 function downloadImage(url) {
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https') ? https : http;
@@ -224,14 +232,16 @@ async function gerarPDF(requisicao, tecnico, gestor) {
 // ================================================================
 // LISTA DE EPIs PADRÃO
 // ================================================================
+// Mantida em ordem alfabética — ao adicionar um EPI novo, insira já na posição
+// certa (a rota /epis ainda reordena com ordenarPt() como garantia extra).
 const EPIS_PADRAO = [
-  'Capacete de Segurança (Classe B)', 'Carneira', 'Jugular', 'Balaclava',
-  'Óculos de Segurança', 'Luva de Segurança (Isolante)', 'Luva de Vaqueta',
-  'Bota de Segurança', 'Cinto de Segurança', 'Talabarte de Posicionamento',
-  'Protetor Solar', 'Escada de Alumínio', 'Escada Extensível',
-  'Fita de Sinalização Zebrada', 'Cone de Sinalização', 'Bandeirola',
-  'Detector de Tensão', 'Calça Operacional', 'Camisa Manga Longa(Jaleco)',
-  'Catraca Trava Escada', 'Avental', 'Luva Latex',
+  'Avental', 'Balaclava', 'Bandeirola', 'Bota de Segurança',
+  'Calça Operacional', 'Camisa Manga Longa(Jaleco)',
+  'Capacete de Segurança (Classe B)', 'Carneira', 'Catraca Trava Escada',
+  'Cinto de Segurança', 'Cone de Sinalização', 'Detector de Tensão',
+  'Escada de Alumínio', 'Escada Extensível', 'Fita de Sinalização Zebrada',
+  'Jugular', 'Luva de Segurança (Isolante)', 'Luva de Vaqueta', 'Luva Latex',
+  'Óculos de Segurança', 'Protetor Solar', 'Talabarte de Posicionamento',
 ];
 
 // ================================================================
@@ -511,9 +521,9 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
 router.get('/epis', authMiddleware, async (req, res) => {
   try {
     const produtos = await db('produtos_epi').where('tenant_id', req.user.tenant_id).where('ativo', true).orderBy('nome', 'asc');
-    if (produtos.length > 0) return res.json({ epis: produtos.map(p => p.nome) });
-    res.json({ epis: EPIS_PADRAO });
-  } catch (err) { res.json({ epis: EPIS_PADRAO }); }
+    if (produtos.length > 0) return res.json({ epis: ordenarPt(produtos, 'nome').map(p => p.nome) });
+    res.json({ epis: ordenarPt(EPIS_PADRAO) });
+  } catch (err) { res.json({ epis: ordenarPt(EPIS_PADRAO) }); }
 });
 
 router.post('/requisicoes', authMiddleware, async (req, res) => {
@@ -918,14 +928,15 @@ router.get('/almoxarifados-colaboradores', authMiddleware, async (req, res) => {
     if (!integracao) return res.json({ almoxarifados: [] });
     const IXCService = require('../services/IXCService');
     const ixc = new IXCService(integracao.url_api, integracao.token_api);
-    // O "almoxarifado do colaborador" é a mesma loja/cidade escolhida no cadastro
-    // (ver registro.view.dart) e salva em mapeamento_tecnicos_ixc.id_almoxarifado.
-    // Não existe um conjunto separado de IDs "de colaborador" — são os almoxarifados
-    // ativos normais do IXC.
+    // Almoxarifado PESSOAL do colaborador (usado só pra EPI) — diferente do
+    // almoxarifado da LOJA (produtos/patrimônio, ver id_almoxarifado_loja).
+    // Se essa lista vier vazia, o perfil da API do SeeNet no IXC provavelmente
+    // só tem os almoxarifados de loja anexados — precisa liberar os pessoais lá.
+    const IDS_COLABORADORES = [25,26,27,28,29,30,31,32,33,35,36,37,38,39,40,41,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,76,97,102,107,116];
     const body = { qtype: 'almox.id', query: '1', oper: '>=', page: '1', rp: '200', sortname: 'almox.descricao', sortorder: 'asc' };
     const response = await ixc.clientAlterar.post('/almox', body, { headers: { 'ixcsoft': 'listar' } });
     const todos = response.data.registros || [];
-    const filtrados = todos.filter(a => a.ativo === 'S').map(a => ({ id: a.id, descricao: a.descricao }));
+    const filtrados = todos.filter(a => IDS_COLABORADORES.includes(parseInt(a.id)) && a.ativo === 'S').map(a => ({ id: a.id, descricao: a.descricao }));
     res.json({ almoxarifados: filtrados });
   } catch (err) { console.error('❌ Erro almoxarifados:', err.message); res.status(500).json({ error: 'Erro ao buscar almoxarifados' }); }
 });
@@ -934,7 +945,7 @@ router.get('/produtos-epi', authMiddleware, async (req, res) => {
   try {
     if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
     const produtos = await db('produtos_epi').where('tenant_id', req.user.tenant_id).where('ativo', true).orderBy('nome', 'asc');
-    const mapeamento = produtos.map(p => ({ epi: p.nome, id_produto: p.id_produto_ixc, descricao_ixc: p.descricao_ixc, tamanhos: p.tamanhos, ca: p.ca, fornecedor: p.fornecedor }));
+    const mapeamento = ordenarPt(produtos, 'nome').map(p => ({ epi: p.nome, id_produto: p.id_produto_ixc, descricao_ixc: p.descricao_ixc, tamanhos: p.tamanhos, ca: p.ca, fornecedor: p.fornecedor }));
     res.json({ mapeamento });
   } catch (err) { res.status(500).json({ error: 'Erro ao buscar produtos EPI' }); }
 });
@@ -943,7 +954,7 @@ router.get('/produtos-epi-cadastro', authMiddleware, async (req, res) => {
   try {
     if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
     const produtos = await db('produtos_epi').where('tenant_id', req.user.tenant_id).where('ativo', true).orderBy('nome', 'asc');
-    res.json({ produtos });
+    res.json({ produtos: ordenarPt(produtos, 'nome') });
   } catch (err) { console.error('❌ Erro produtos EPI:', err); res.status(500).json({ error: 'Erro ao buscar produtos' }); }
 });
 

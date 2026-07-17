@@ -6,6 +6,7 @@ import '../controllers/usuario_controller.dart';
 import '../controllers/ordem_servico_controller.dart';
 import '../ordem_de_servico/screens/executar_os_wizard_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
+import '../firebase_options.dart';
 import '../config/environment.dart';
 import 'dart:async';
 import '../services/api_service.dart';
@@ -128,7 +129,9 @@ class _SplashScreenState extends State<SplashScreen>
       // Firebase.initializeApp()/APNs pode demorar ou travar e estourar o
       // timeout de 12s do _initializeApp → o app caía no /login SEM rodar o
       // auto-login (por isso o iOS "não entrava sozinho"). Rodam em 2º plano.
-      Firebase.initializeApp().then((_) {
+      Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ).then((_) {
         Get.find<NotificationService>().init().then((_) {
           Get.find<NotificationService>().listenTokenRefresh();
           print('✅ NotificationService pronto');

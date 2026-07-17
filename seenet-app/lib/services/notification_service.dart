@@ -2,8 +2,16 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:get/get.dart';
 import 'api_service.dart';
+import '../widgets/web_notification_helper.dart'
+    if (dart.library.io) '../widgets/web_notification_helper_stub.dart';
+
+// Chave VAPID gerada no Firebase Console (Cloud Messaging → Web Push
+// certificates). Só é usada no navegador — Android/iOS não precisam dela.
+const String _webVapidKey =
+    'COLOQUE_AQUI_A_CHAVE_VAPID_DO_FIREBASE_CONSOLE';
 
 /// Handler de mensagens em background (precisa ser top-level function)
 @pragma('vm:entry-point')
@@ -31,8 +39,11 @@ class NotificationService extends GetxService {
 
   /// Inicializar tudo (chamar no main.dart após Firebase.initializeApp)
   Future<void> init() async {
-    // 1. Registrar handler de background
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    // 1. Registrar handler de background — só nativo (Android/iOS). No WEB o
+    // 2º plano é tratado pelo service worker (web/firebase-messaging-sw.js).
+    if (!kIsWeb) {
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    }
 
     // 2. Pedir permissão
     final settings = await _messaging.requestPermission(
@@ -43,20 +54,23 @@ class NotificationService extends GetxService {
     );
     print('🔔 Permissão de notificação: ${settings.authorizationStatus}');
 
-    // 3. Configurar notificações locais (para foreground)
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
+    // 3./4. Notificações locais (foreground) — o pacote flutter_local_notifications
+    // NÃO tem suporte a web, só inicializa em Android/iOS (no web o foreground
+    // usa a Notification API nativa do navegador, ver _onForegroundMessage).
+    if (!kIsWeb) {
+      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initSettings = InitializationSettings(android: androidSettings);
 
-    await _localNotifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
-    );
+      await _localNotifications.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: _onNotificationTapped,
+      );
 
-    // 4. Criar canal Android
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(_androidChannel);
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(_androidChannel);
+    }
 
     // 5. Listener: notificações em foreground
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
@@ -76,7 +90,9 @@ class NotificationService extends GetxService {
   /// Obter FCM token do dispositivo
   Future<String?> getToken() async {
     try {
-      final token = await _messaging.getToken();
+      final token = await _messaging.getToken(
+        vapidKey: kIsWeb ? _webVapidKey : null,
+      );
       print('📱 FCM Token: ${token?.substring(0, 20)}...');
       return token;
     } catch (e) {
@@ -117,6 +133,12 @@ class NotificationService extends GetxService {
     if (notification == null) return;
 
     unreadCount.value++;
+
+    if (kIsWeb) {
+      mostrarNotificacaoWeb(notification.title ?? 'SeeNet',
+          notification.body ?? '', message.data['route'] ?? '');
+      return;
+    }
 
     _localNotifications.show(
       notification.hashCode,

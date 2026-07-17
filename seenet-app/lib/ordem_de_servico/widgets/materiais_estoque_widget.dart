@@ -851,7 +851,9 @@ class _BuscaPatrimonioSheetState extends State<_BuscaPatrimonioSheet> {
       } else {
         final busca = texto.toLowerCase();
         _filtrados = widget.patrimonios.where((p) =>
-            p.descricao.toLowerCase().contains(busca)
+            p.descricao.toLowerCase().contains(busca) ||
+            p.mac.toLowerCase().contains(busca) ||
+            p.serial.toLowerCase().contains(busca)
         ).toList();
       }
     });
@@ -922,7 +924,7 @@ class _BuscaPatrimonioSheetState extends State<_BuscaPatrimonioSheet> {
                 onChanged: _filtrar,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Buscar por nome do equipamento...',
+                  hintText: 'Buscar por nome, MAC ou S/N...',
                   hintStyle: const TextStyle(color: Colors.white30),
                   prefixIcon: const Icon(Icons.search, color: Colors.white38),
                   filled: true,

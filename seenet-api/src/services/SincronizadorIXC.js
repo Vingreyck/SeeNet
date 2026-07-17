@@ -13,6 +13,11 @@ class SincronizadorIXC {
     this.cacheLogin = new Map(); // id_login → login string (o su_oss_chamado só traz id_login)
     this.maxOSsPorSync = 10;
 
+    // ⚡ Sync SOB DEMANDA (técnico abriu/atualizou a lista) — throttle por técnico
+    // pra não martelar o IXC se ficar batendo "atualizar".
+    this._ultimoSyncTecnico = new Map(); // "tenant:usuario" → timestamp
+    this.throttleTecnicoMs = 20000; // no máx 1 sync on-demand a cada 20s por técnico
+
     // ✅ Circuit breaker — para de tentar quando IXC está fora
     this.falhasConsecutivas = new Map(); // tenant_id → { count, pausadoAte }
     this.maxFalhas = 3;
@@ -101,6 +106,9 @@ class SincronizadorIXC {
     console.log(`📊 Máximo: ${this.maxOSsPorSync} OSs por ciclo`);
 
     this.sincronizacaoAtiva = true;
+    // Expõe a instância ativa pro sync sob demanda (buscarMinhasOSs) reusar a
+    // MESMA instância (mesmos caches, circuit breaker e mutex _cicloRodando).
+    SincronizadorIXC._instanciaAtiva = this;
     this.sincronizarTodasEmpresas();
 
     this.intervalId = setInterval(() => {
@@ -303,6 +311,85 @@ class SincronizadorIXC {
 
       // ✅ Registrar falha — pode abrir o circuit breaker
       this._registrarFalha(integracao.tenant_id, integracao.empresa_nome);
+    }
+  }
+
+  /**
+   * ⚡ Sincroniza SÓ um técnico, na hora (chamado quando o técnico abre/atualiza
+   * a lista de OS). Faz a OS nova do IXC aparecer sem esperar o ciclo de 2min.
+   *
+   * Seguro por design:
+   *  - throttle por técnico (não martela o IXC);
+   *  - respeita o circuit breaker (IXC fora → nem tenta);
+   *  - usa o MESMO mutex `_cicloRodando` do ciclo de fundo → NUNCA rodam juntos,
+   *    logo sem corrida/duplicata/deadlock (mesma garantia de hoje);
+   *  - só INSERE/ATUALIZA OS (via sincronizarOS). NÃO cancela nem mexe em OS
+   *    "travada"/sumida — isso continua exclusivo do ciclo de fundo (conservador).
+   *  - qualquer falha é engolida: a busca no banco segue normal.
+   *
+   * Retorna { ok, motivo? } — o chamador não precisa usar o retorno.
+   */
+  async sincronizarTecnicoAgora(tenantId, usuarioId) {
+    const chave = `${tenantId}:${usuarioId}`;
+
+    // Throttle: no máx 1 sync on-demand a cada throttleTecnicoMs por técnico
+    const agora = Date.now();
+    const ultima = this._ultimoSyncTecnico.get(chave) || 0;
+    if (agora - ultima < this.throttleTecnicoMs) return { ok: false, motivo: 'throttle' };
+
+    // Circuit breaker: IXC fora → não tenta (o ciclo de fundo cuida quando voltar)
+    if (this._circuitAberto(tenantId)) return { ok: false, motivo: 'circuit' };
+
+    // Mutex único: se QUALQUER sync está rodando (ciclo de fundo ou outro
+    // on-demand), desiste — os dados vêm do banco e o ciclo cobre logo.
+    // check + set SEM await entre eles = atômico no event loop (sem corrida).
+    if (this._cicloRodando) return { ok: false, motivo: 'ocupado' };
+    this._cicloRodando = true;
+    this._ultimoSyncTecnico.set(chave, agora);
+
+    let empresaNome = `tenant ${tenantId}`;
+    try {
+      const integracao = await db('integracao_ixc as i')
+        .join('tenants as t', 't.id', 'i.tenant_id')
+        .where('i.tenant_id', tenantId).where('i.ativo', true)
+        .select('i.url_api', 'i.token_api', 't.nome as empresa_nome')
+        .first();
+      if (!integracao) return { ok: false, motivo: 'sem_integracao' };
+      empresaNome = integracao.empresa_nome || empresaNome;
+
+      const mapeamento = await db('mapeamento_tecnicos_ixc')
+        .where('tenant_id', tenantId).where('usuario_id', usuarioId).where('ativo', true)
+        .first();
+      if (!mapeamento) return { ok: false, motivo: 'sem_mapeamento' };
+
+      const ixc = new IXCService(integracao.url_api, integracao.token_api);
+      const ossIXC = await ixc.buscarOSs({ tecnicoId: mapeamento.tecnico_ixc_id });
+      const ossParaProcessar = ossIXC.slice(0, this.maxOSsPorSync);
+
+      const trx = await db.transaction();
+      try {
+        for (const osIXC of ossParaProcessar) {
+          await this.sincronizarOS(trx, tenantId, usuarioId, osIXC, ixc);
+        }
+        await trx.commit();
+      } catch (e) {
+        await trx.rollback();
+        throw e;
+      }
+
+      // Mesmos caches temporários que o ciclo de fundo limpa a cada volta.
+      this.cacheClientes.clear();
+      this.cacheFibra.clear();
+      this.cacheLogin.clear();
+
+      this._registrarSucesso(tenantId);
+      return { ok: true, total: ossParaProcessar.length };
+    } catch (error) {
+      console.error(`⚡ [on-demand] Erro ao sincronizar técnico ${usuarioId}:`, error.message);
+      this._registrarFalha(tenantId, empresaNome);
+      return { ok: false, motivo: 'erro' };
+    } finally {
+      this._cicloRodando = false;
     }
   }
 

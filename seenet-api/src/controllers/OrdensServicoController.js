@@ -12,6 +12,22 @@ class OrdensServicoController {
       const userId = req.user.id;
       const tenantId = req.tenantId;
 
+      // ⚡ Sync SOB DEMANDA (best-effort): faz a OS nova do IXC aparecer na hora
+      // em vez de esperar o ciclo de fundo (2min). É throttlado por técnico (20s)
+      // no próprio sincronizador. Protegido por timeout curto: se o IXC demorar,
+      // NÃO segura a resposta — devolve o que já está no banco e o sync termina
+      // em background (a OS entra no próximo poll). Nunca deixa a busca falhar.
+      try {
+        const SincronizadorIXC = require('../services/SincronizadorIXC');
+        const sync = SincronizadorIXC._instanciaAtiva;
+        if (sync) {
+          await Promise.race([
+            sync.sincronizarTecnicoAgora(tenantId, userId),
+            new Promise((resolve) => setTimeout(resolve, 6000)),
+          ]);
+        }
+      } catch (_) { /* sync on-demand nunca quebra a listagem */ }
+
       // (sem log aqui — o app consulta isso o tempo todo; logar cada poll afoga o Railway)
       const rows = await db('ordem_servico as os')
         .join('usuarios as u', 'u.id', 'os.tecnico_id')
@@ -1627,7 +1643,7 @@ if (dados.fotos && dados.fotos.length > 0) {
         const { id } = req.params;
         const tenantId = req.tenantId;
         const userId = req.user.id;
-        const { foto_base64, mime } = req.body;
+        const { foto_base64, mime, latitude, longitude } = req.body;
 
         if (!foto_base64) {
           return res.status(400).json({ success: false, error: 'foto_base64 é obrigatório' });
@@ -1648,23 +1664,32 @@ if (dados.fotos && dados.fotos.length > 0) {
           .where('cliente_id_externo', os.cliente_id_externo)
           .first();
 
-        if (existente) {
-          await db('foto_fachada').where('id', existente.id).update({
-            foto_base64,
-            mime: mime || 'image/jpeg',
-            tecnico_id: userId,
-            os_id_origem: String(id),
-            updated_at: db.fn.now(),
-          });
-        } else {
-          await db('foto_fachada').insert({
-            tenant_id: tenantId,
-            cliente_id_externo: os.cliente_id_externo,
-            foto_base64,
-            mime: mime || 'image/jpeg',
-            tecnico_id: userId,
-            os_id_origem: String(id),
-          });
+        const dadosBase = {
+          foto_base64,
+          mime: mime || 'image/jpeg',
+          tecnico_id: userId,
+          os_id_origem: String(id),
+        };
+        // Coluna nova (lat/lng de onde a foto foi tirada) — se a migração ainda
+        // não rodou nesse deploy, cai no fallback e salva sem coordenada.
+        const dadosComLoc = (latitude != null && longitude != null)
+          ? { ...dadosBase, latitude, longitude }
+          : dadosBase;
+
+        try {
+          if (existente) {
+            await db('foto_fachada').where('id', existente.id).update({ ...dadosComLoc, updated_at: db.fn.now() });
+          } else {
+            await db('foto_fachada').insert({ tenant_id: tenantId, cliente_id_externo: os.cliente_id_externo, ...dadosComLoc });
+          }
+        } catch (errLoc) {
+          if (dadosComLoc === dadosBase) throw errLoc;
+          console.warn('⚠️ Falha ao salvar lat/lng da fachada (migração pendente?), salvando sem coordenada:', errLoc.message);
+          if (existente) {
+            await db('foto_fachada').where('id', existente.id).update({ ...dadosBase, updated_at: db.fn.now() });
+          } else {
+            await db('foto_fachada').insert({ tenant_id: tenantId, cliente_id_externo: os.cliente_id_externo, ...dadosBase });
+          }
         }
 
         console.log(`📷 Foto da fachada salva (cliente ${os.cliente_id_externo}, OS ${id})`);
@@ -1706,6 +1731,8 @@ if (dados.fotos && dados.fotos.length > 0) {
             mime: foto.mime || 'image/jpeg',
             data: foto.updated_at,
             tecnico_id: foto.tecnico_id,
+            latitude: foto.latitude != null ? Number(foto.latitude) : null,
+            longitude: foto.longitude != null ? Number(foto.longitude) : null,
           },
         });
       } catch (error) {

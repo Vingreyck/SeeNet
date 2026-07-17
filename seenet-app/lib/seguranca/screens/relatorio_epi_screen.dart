@@ -3,12 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
-import '../widgets/web_pdf_helper.dart' if (dart.library.io) '../widgets/web_pdf_helper_stub.dart';
 import '../../services/auth_service.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../widgets/pdf_viewer_screen.dart';
 
 class RelatorioEpiScreen extends StatefulWidget {
   const RelatorioEpiScreen({super.key});
@@ -91,20 +87,9 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        if (kIsWeb) {
-          abrirPdfNoNavegador(response.bodyBytes);
-          return;
-        }
-        final dir = await getTemporaryDirectory();
-        final nomeArquivo =
-            'EPI_${_tecnicoNome?.replaceAll(' ', '_') ?? 'tecnico'}.pdf';
-        final arquivo = File('${dir.path}/$nomeArquivo');
-        await arquivo.writeAsBytes(response.bodyBytes);
         if (mounted) {
-          await Share.shareXFiles(
-            [XFile(arquivo.path, mimeType: 'application/pdf')],
-            subject: 'Relatório de EPI — $_tecnicoNome',
-          );
+          await abrirVisualizadorPdf(context, response.bodyBytes,
+              titulo: 'Relatório de EPI — ${_tecnicoNome ?? 'Técnico'}');
         }
       } else {
         if (mounted) {
@@ -381,50 +366,59 @@ class _RelatorioEpiScreenState extends State<RelatorioEpiScreen> {
                         ),
                       );
                     }),
-
-                  const SizedBox(height: 24),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _gerando ||
-                          _tecnicoSelecionado == null
-                          ? null
-                          : _gerarPDF,
-                      icon: _gerando
-                          ? const SizedBox(
-                          width: 18, height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.black))
-                          : const Icon(Icons.download_rounded,
-                          color: Colors.black),
-                      label: Text(
-                        _gerando
-                            ? 'Gerando PDF...'
-                            : 'Gerar Relatório PDF',
-                        style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                        _tecnicoSelecionado == null
-                            ? Colors.white12
-                            : const Color(0xFF00FF88),
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius:
-                            BorderRadius.circular(14)),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
           ),
+
+          // Botão fixo embaixo — sempre visível, sem precisar rolar a lista
+          if (!_carregando)
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                  16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                border: Border(
+                    top: BorderSide(color: Colors.white.withOpacity(0.06))),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _gerando ||
+                      _tecnicoSelecionado == null
+                      ? null
+                      : _gerarPDF,
+                  icon: _gerando
+                      ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.black))
+                      : const Icon(Icons.download_rounded,
+                      color: Colors.black),
+                  label: Text(
+                    _gerando
+                        ? 'Gerando PDF...'
+                        : 'Gerar Relatório PDF',
+                    style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                    _tecnicoSelecionado == null
+                        ? Colors.white12
+                        : const Color(0xFF00FF88),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius:
+                        BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

@@ -7,6 +7,7 @@ import '../controllers/seguranca_controller.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import '../services/seguranca_service.dart';
+import '../../widgets/assinatura_expandida.dart';
 
 class ConfirmarRecebimentoScreen extends StatefulWidget {
   final int requisicaoId;
@@ -294,33 +295,45 @@ class _ConfirmarRecebimentoScreenState
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Container(
-                    height: 180,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                          color: _signatureController.isNotEmpty
-                              ? const Color(0xFF00FF88)
-                              : Colors.white24,
-                          width: 1.5),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(13),
-                      child: Stack(
-                        children: [
-                          Signature(
-                            controller: _signatureController,
-                            backgroundColor: Colors.white,
+                  GestureDetector(
+                    onTap: () async {
+                      await abrirAssinaturaExpandida(
+                        context,
+                        _signatureController,
+                        titulo: 'Assinatura',
+                      );
+                      if (mounted) setState(() {});
+                    },
+                    child: AbsorbPointer(
+                      child: Container(
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: _signatureController.isNotEmpty
+                                  ? const Color(0xFF00FF88)
+                                  : Colors.white24,
+                              width: 1.5),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(13),
+                          child: Stack(
+                            children: [
+                              Signature(
+                                controller: _signatureController,
+                                backgroundColor: Colors.white,
+                              ),
+                              if (_signatureController.isEmpty)
+                                const Center(
+                                  child: Text('Toque para assinar',
+                                      style: TextStyle(
+                                          color: Colors.black26,
+                                          fontSize: 14)),
+                                ),
+                            ],
                           ),
-                          if (_signatureController.isEmpty)
-                            const Center(
-                              child: Text('Assine aqui',
-                                  style: TextStyle(
-                                      color: Colors.black26,
-                                      fontSize: 14)),
-                            ),
-                        ],
+                        ),
                       ),
                     ),
                   ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
 import 'dart:typed_data';
+import '../../widgets/assinatura_expandida.dart';
 
 class AssinaturaWidget extends StatefulWidget {
   final Function(Uint8List?) onAssinaturaSalva;
@@ -100,22 +101,35 @@ class _AssinaturaWidgetState extends State<AssinaturaWidget> {
 
     return Column(
       children: [
-        // Canvas de assinatura
-        Container(
-          height: 200,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _assinada ? const Color(0xFF00FF88) : Colors.white24,
-              width: 2,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Signature(
-              controller: _controller,
-              backgroundColor: const Color(0xFF1A1A1A),
+        // Canvas de assinatura — toca pra abrir num quadro maior
+        GestureDetector(
+          onTap: () async {
+            await abrirAssinaturaExpandida(
+              context,
+              _controller,
+              titulo: 'Assinatura',
+              corFundo: const Color(0xFF1A1A1A),
+            );
+            if (mounted) setState(() {});
+          },
+          child: AbsorbPointer(
+            child: Container(
+              height: 200,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _assinada ? const Color(0xFF00FF88) : Colors.white24,
+                  width: 2,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Signature(
+                  controller: _controller,
+                  backgroundColor: const Color(0xFF1A1A1A),
+                ),
+              ),
             ),
           ),
         ),
@@ -141,7 +155,7 @@ class _AssinaturaWidgetState extends State<AssinaturaWidget> {
           )
         else
           const Text(
-            'Assine no espaço acima',
+            'Toque no quadro acima para assinar',
             style: TextStyle(
               color: Colors.white54,
               fontSize: 12,

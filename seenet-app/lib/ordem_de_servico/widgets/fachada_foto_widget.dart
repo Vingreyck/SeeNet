@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/ordem_servico_service.dart';
 
 /// Foto da FACHADA (frente da casa) do cliente.
@@ -23,6 +25,8 @@ class _FachadaFotoWidgetState extends State<FachadaFotoWidget> {
   bool _carregando = true;
   bool _enviando = false;
   Uint8List? _fotoBytes; // foto atual (do servidor ou recém-capturada)
+  double? _latitude; // onde a foto foi tirada (se disponível)
+  double? _longitude;
 
   static const _verde = Color(0xFF00FF88);
 
@@ -42,8 +46,55 @@ class _FachadaFotoWidgetState extends State<FachadaFotoWidget> {
           _fotoBytes = base64Decode(b64);
         } catch (_) {}
       }
+      final lat = data?['latitude'];
+      final lng = data?['longitude'];
+      _latitude = lat is num ? lat.toDouble() : null;
+      _longitude = lng is num ? lng.toDouble() : null;
       _carregando = false;
     });
+  }
+
+  // Best-effort: se não tiver permissão/GPS, só não salva a coordenada
+  // (não trava a foto por causa disso).
+  Future<Position?> _capturarLocalizacao() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever ||
+          (permission != LocationPermission.whileInUse &&
+              permission != LocationPermission.always)) {
+        return null;
+      }
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+      return await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _abrirLocalizacao() async {
+    if (_latitude == null || _longitude == null) return;
+    final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$_latitude,$_longitude');
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Não foi possível abrir o mapa'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Não foi possível abrir o mapa'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
   }
 
   Future<void> _escolherOrigem() async {
@@ -88,11 +139,24 @@ class _FachadaFotoWidgetState extends State<FachadaFotoWidget> {
       final bytes = await foto.readAsBytes();
       setState(() => _enviando = true);
 
-      final ok = await _service.salvarFachada(widget.osId, base64Encode(bytes));
+      final pos = await _capturarLocalizacao();
+
+      final ok = await _service.salvarFachada(
+        widget.osId,
+        base64Encode(bytes),
+        latitude: pos?.latitude,
+        longitude: pos?.longitude,
+      );
       if (!mounted) return;
       setState(() {
         _enviando = false;
-        if (ok) _fotoBytes = bytes;
+        if (ok) {
+          _fotoBytes = bytes;
+          if (pos != null) {
+            _latitude = pos.latitude;
+            _longitude = pos.longitude;
+          }
+        }
       });
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -186,14 +250,26 @@ class _FachadaFotoWidgetState extends State<FachadaFotoWidget> {
               ),
             ),
             const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: _enviando ? null : _escolherOrigem,
-                icon: const Icon(Icons.refresh, size: 16, color: Colors.white54),
-                label: const Text('Refazer', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (_latitude != null && _longitude != null)
+                  TextButton.icon(
+                    onPressed: _abrirLocalizacao,
+                    icon: const Icon(Icons.location_on, size: 16, color: _verde),
+                    label: const Text('Ver localização',
+                        style: TextStyle(color: _verde, fontSize: 12)),
+                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  )
+                else
+                  const SizedBox.shrink(),
+                TextButton.icon(
+                  onPressed: _enviando ? null : _escolherOrigem,
+                  icon: const Icon(Icons.refresh, size: 16, color: Colors.white54),
+                  label: const Text('Refazer', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                ),
+              ],
             ),
           ] else ...[
             const Text('Ainda não há foto da frente desta casa (opcional).',

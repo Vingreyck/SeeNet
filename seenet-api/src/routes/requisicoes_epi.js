@@ -78,7 +78,7 @@ async function gerarPDF(requisicao, tecnico, gestor) {
       const W = 595.28;
       const H = 841.89;
       const MARGIN = 40;
-      const VERDE = '#00C878';
+      const VERDE = '#00FF88'; // verde padrão do app (botões/confirmações)
       const VERDE_ESCURO = '#007A4A';
       const CINZA = '#F5F5F5';
       const CINZA_BORDA = '#E0E0E0';
@@ -210,7 +210,9 @@ async function gerarPDF(requisicao, tecnico, gestor) {
         y += boxH + 12;
       }
 
-      if (y > 680) { doc.addPage(); y = MARGIN; }
+      // Declaração ocupa +64pt e o rodapé começa em H-50 (~791.89) — 712 ainda
+      // deixa margem folgada antes do rodapé, evitando quebrar pra pág. 2 à toa.
+      if (y > 712) { doc.addPage(); y = MARGIN; }
       doc.rect(MARGIN, y, W - MARGIN * 2, 56).fill('#FFFDE7').stroke('#F9A825');
       doc.fontSize(8.5).fillColor('#4A3700').font('Helvetica')
         .text('DECLARAÇÃO: Declaro que recebi os Equipamentos de Proteção Individual (EPIs) listados neste documento em perfeito estado de conservação, comprometendo-me a utilizá-los sempre que necessário, conforme NR-6 (Norma Regulamentadora nº 6 do Ministério do Trabalho). Estou ciente das responsabilidades quanto ao uso, conservação e devolução dos equipamentos.', MARGIN + 10, y + 8, { width: W - MARGIN * 2 - 20 });

@@ -1,17 +1,13 @@
 // lib/dds/screens/dds_historico_screen.dart
 import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import '../controllers/dds_controller.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/dds_service.dart';
 import '../../services/api_service.dart';
 import '../../config/api_config.dart';
+import '../../widgets/pdf_viewer_screen.dart';
 
 class DdsHistoricoScreen extends StatefulWidget {
   const DdsHistoricoScreen({super.key});
@@ -39,12 +35,6 @@ class _DdsHistoricoScreenState extends State<DdsHistoricoScreen> {
   Future<void> _gerarPdfHistorico() async {
     try {
       final api = Get.find<ApiService>();
-      if (kIsWeb) {
-        final url = ApiConfig.getUrl(
-            '/api/dds/historico/pdf?ano=$_anoSelecionado&token=${api.token}&tenant=${api.tenantCode}');
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-        return;
-      }
       Get.snackbar('Gerando...', 'Aguarde o PDF do histórico.',
           backgroundColor: const Color(0xFF2A2A2A),
           colorText: Colors.white,
@@ -54,15 +44,9 @@ class _DdsHistoricoScreenState extends State<DdsHistoricoScreen> {
         Uri.parse(url),
         headers: ApiConfig.getAuthHeaders(api.token!, api.tenantCode!),
       );
-      if (response.statusCode == 200) {
-        final bytes = response.bodyBytes;
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/DDS_$_anoSelecionado.pdf');
-        await file.writeAsBytes(bytes);
-        await Share.shareXFiles(
-          [XFile(file.path, mimeType: 'application/pdf')],
-          subject: 'DDS Histórico $_anoSelecionado',
-        );
+      if (response.statusCode == 200 && mounted) {
+        await abrirVisualizadorPdf(context, response.bodyBytes,
+            titulo: 'DDS Histórico $_anoSelecionado');
       }
     } catch (e) {
       Get.snackbar('Erro', 'Falha ao gerar PDF: $e',
@@ -309,26 +293,14 @@ class _DdsHistoricoScreenState extends State<DdsHistoricoScreen> {
   Future<void> _gerarPdfSessao(int sessaoId) async {
     try {
       final api = Get.find<ApiService>();
-      if (kIsWeb) {
-        final url = ApiConfig.getUrl(
-            '/api/dds/sessao/$sessaoId/pdf?token=${api.token}&tenant=${api.tenantCode}');
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-        return;
-      }
       final url = ApiConfig.getUrl('/api/dds/sessao/$sessaoId/pdf');
       final response = await http.get(
         Uri.parse(url),
         headers: ApiConfig.getAuthHeaders(api.token!, api.tenantCode!),
       );
-      if (response.statusCode == 200) {
-        final bytes = response.bodyBytes;
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/DDS_Sessao_$sessaoId.pdf');
-        await file.writeAsBytes(bytes);
-        await Share.shareXFiles(
-          [XFile(file.path, mimeType: 'application/pdf')],
-          subject: 'Lista de Presença DDS',
-        );
+      if (response.statusCode == 200 && mounted) {
+        await abrirVisualizadorPdf(context, response.bodyBytes,
+            titulo: 'Lista de Presença DDS');
       }
     } catch (e) {
       Get.snackbar('Erro', 'Falha ao gerar PDF: $e',

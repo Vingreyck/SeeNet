@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import '../controllers/seguranca_controller.dart';
 import '../services/seguranca_service.dart';
 import 'package:seenet/services/auth_service.dart';
+import '../../widgets/assinatura_expandida.dart';
 
 class RegistroManualEpiScreen extends StatefulWidget {
   final int? tecnicoIdFixo;
@@ -371,29 +372,41 @@ class _RegistroManualEpiScreenState
                   // ── Assinatura ───────────────────────────────
                   _sectionLabel('Assinatura Digital (opcional)'),
                   const SizedBox(height: 8),
-                  Container(
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Stack(
-                        children: [
-                          Signature(
-                            controller: _signatureController,
-                            backgroundColor: Colors.white,
+                  GestureDetector(
+                    onTap: () async {
+                      await abrirAssinaturaExpandida(
+                        context,
+                        _signatureController,
+                        titulo: 'Assinatura Digital',
+                      );
+                      if (mounted) setState(() {});
+                    },
+                    child: AbsorbPointer(
+                      child: Container(
+                        height: 150,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Stack(
+                            children: [
+                              Signature(
+                                controller: _signatureController,
+                                backgroundColor: Colors.white,
+                              ),
+                              if (_signatureController.isEmpty)
+                                const Center(
+                                  child: Text('Toque para assinar',
+                                      style: TextStyle(
+                                          color: Colors.black26,
+                                          fontSize: 14)),
+                                ),
+                            ],
                           ),
-                          if (_signatureController.isEmpty)
-                            const Center(
-                              child: Text('Assine aqui',
-                                  style: TextStyle(
-                                      color: Colors.black26,
-                                      fontSize: 14)),
-                            ),
-                        ],
+                        ),
                       ),
                     ),
                   ),

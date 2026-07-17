@@ -286,8 +286,8 @@ class OSPdfService {
         if (dados.assinatura) {
           try {
             const buf = Buffer.from(dados.assinatura, 'base64');
-            doc.rect(xTec + 1, y + 1, assinLarg - 2, assinAlt - 2).fill('white');
-            doc.image(buf, xTec + 5, y + 4, { fit: [assinLarg - 10, assinAlt - 8], align: 'center', valign: 'center' });
+            doc.rect(xCli + 1, y + 1, assinLarg - 2, assinAlt - 2).fill('white');
+            doc.image(buf, xCli + 5, y + 4, { fit: [assinLarg - 10, assinAlt - 8], align: 'center', valign: 'center' });
           } catch (_) {}
         }
 

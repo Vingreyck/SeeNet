@@ -2,17 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import '../widgets/web_pdf_helper.dart' if (dart.library.io) '../widgets/web_pdf_helper_stub.dart';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
 import '../services/seguranca_service.dart';
 import '../controllers/seguranca_controller.dart';
 import '../widgets/botao_pdf.dart';
 import 'registro_manual_epi_screen.dart';
 import '../../dds/screens/dds_calendario_tecnico_screen.dart';
+import '../../widgets/pdf_viewer_screen.dart';
 
 class PerfilTecnicoGestorScreen extends StatefulWidget {
   final int tecnicoId;
@@ -1155,20 +1151,12 @@ class _PerfilTecnicoGestorScreenState
           backgroundColor: Colors.red, colorText: Colors.white);
       return;
     }
-    if (kIsWeb) {
-      final clean = pdfBase64.replaceFirst(RegExp(r'^data:application/pdf;base64,'), '');
-      abrirPdfNoNavegador(base64Decode(clean));
-      return;
-    }
     final clean = pdfBase64.replaceFirst(RegExp(r'^data:application/pdf;base64,'), '');
     final bytes = base64Decode(clean);
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/Ficha_EPI_${widget.tecnicoNome.replaceAll(' ', '_')}.pdf');
-    await file.writeAsBytes(bytes);
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/pdf')],
-      subject: 'Ficha de EPI - ${widget.tecnicoNome}',
-    );
+    if (mounted) {
+      await abrirVisualizadorPdf(context, bytes,
+          titulo: 'Ficha de EPI - ${widget.tecnicoNome}');
+    }
   }
 
   Future<void> _uploadAssinaturaAdmissao() async {

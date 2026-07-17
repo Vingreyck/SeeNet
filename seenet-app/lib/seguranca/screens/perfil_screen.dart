@@ -7,6 +7,7 @@ import '../controllers/seguranca_controller.dart';
 import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
 import '../../controllers/usuario_controller.dart';
+import '../../widgets/pdf_viewer_screen.dart';
 
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
@@ -106,10 +107,8 @@ class _PerfilScreenState extends State<PerfilScreen>
         'X-Tenant-Code': auth.tenantCode ?? '',
       });
       if (response.statusCode == 200 && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('PDF gerado! Compartilhando...'),
-          backgroundColor: Color(0xFF00FF88),
-        ));
+        await abrirVisualizadorPdf(context, response.bodyBytes,
+            titulo: 'Relatório de EPI');
       }
     } catch (e) {
       if (mounted) {

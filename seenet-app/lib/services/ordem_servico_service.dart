@@ -24,12 +24,17 @@ class OrdemServicoService {
 
   // 📷 Foto da fachada (frente da casa) do cliente — 1 por cliente, só no SeeNet.
   Future<bool> salvarFachada(String osId, String base64Foto,
-      {String mime = 'image/jpeg'}) async {
+      {String mime = 'image/jpeg', double? latitude, double? longitude}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/fachada'),
         headers: _headers,
-        body: json.encode({'foto_base64': base64Foto, 'mime': mime}),
+        body: json.encode({
+          'foto_base64': base64Foto,
+          'mime': mime,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+        }),
       );
       return response.statusCode == 200;
     } catch (e) {

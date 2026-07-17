@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import '../controllers/seguranca_controller.dart';
 import '../services/seguranca_service.dart';
 import '../../controllers/usuario_controller.dart';
+import '../../widgets/assinatura_expandida.dart';
 
 class RequisicaoEpiScreen extends StatefulWidget {
   const RequisicaoEpiScreen({super.key});
@@ -131,18 +132,27 @@ class _RequisicaoEpiScreenState
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              Container(
-                height: 150,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white24),
+              GestureDetector(
+                onTap: () => abrirAssinaturaExpandida(
+                  context,
+                  sigController,
+                  titulo: 'Assinatura de Devolução',
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Signature(
-                    controller: sigController,
-                    backgroundColor: Colors.white,
+                child: AbsorbPointer(
+                  child: Container(
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Signature(
+                        controller: sigController,
+                        backgroundColor: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ),

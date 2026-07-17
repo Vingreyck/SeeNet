@@ -1027,6 +1027,11 @@ async finalizarExecucao(req, res) {
             id_resposta: '48',
             id_proxima_tarefa: '66',
             gera_comissao: 'S',
+          // 📋 OS de cobrança (assunto 90): próxima tarefa escolhida pelo
+          // técnico no popup (40=negociar débitos, 41=recepcionar
+          // equipamentos, 43=cancelar contrato por inadimplência).
+          } : dados.id_proxima_tarefa ? {
+            id_proxima_tarefa: dados.id_proxima_tarefa.toString(),
           } : {})
         });
         console.log('✅ OS finalizada no IXC');

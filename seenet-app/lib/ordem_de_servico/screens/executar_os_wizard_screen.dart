@@ -1378,6 +1378,112 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     );
   }
 
+  // 📋 Decisão de fechamento das OS de COBRANÇA (só assunto 90).
+  // Retorna o id_proxima_tarefa escolhido, ou null se o técnico cancelar
+  // (aí NÃO finaliza — igual ao checklist da instalação).
+  static const List<Map<String, String>> _opcoesProximaTarefa = [
+    {'id': '40', 'label': 'Negociar débitos com cliente'},
+    {'id': '41', 'label': 'Recepcionar equipamentos'},
+    {'id': '43', 'label': 'Cancelar contrato por inadimplência'},
+  ];
+
+  Future<String?> _coletarProximaTarefaCobranca() async {
+    String? selecionado;
+    bool tentouConfirmar = false;
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Decisão da OS de cobrança',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Próxima tarefa *',
+                  style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              for (final opt in _opcoesProximaTarefa)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: GestureDetector(
+                    onTap: () => setStateDialog(() => selecionado = opt['id']),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: selecionado == opt['id']
+                            ? const Color(0xFF00FF88).withOpacity(0.12)
+                            : const Color(0xFF111111),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: selecionado == opt['id']
+                                ? const Color(0xFF00FF88)
+                                : Colors.white12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            selecionado == opt['id']
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                            color: selecionado == opt['id']
+                                ? const Color(0xFF00FF88)
+                                : Colors.white38,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(opt['label']!,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 13)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              if (tentouConfirmar && selecionado == null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text('Selecione uma opção',
+                      style: TextStyle(color: Colors.red, fontSize: 11)),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Cancelar',
+                  style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (selecionado == null) {
+                  setStateDialog(() => tentouConfirmar = true);
+                  return;
+                }
+                Navigator.pop(ctx, selecionado);
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00FF88)),
+              child: const Text('Confirmar',
+                  style: TextStyle(
+                      color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _finalizarOS() async {
     // Localização de finalização é OBRIGATÓRIA (prova de conclusão no local do cliente).
     if (latitudeFinal == null || longitudeFinal == null) {
@@ -1393,9 +1499,17 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       if (checklistInstalacao == null) return;
     }
 
-    // Se o checklist de instalação foi preenchido, ele já É a confirmação
-    // ("termina de finalizar de fato a OS") → pula o diálogo genérico.
-    if (checklistInstalacao == null) {
+    // 📋 OS de cobrança (assunto 90): escolha OBRIGATÓRIA da próxima tarefa
+    // antes de finalizar. Se cancelar, não finaliza.
+    String? idProximaTarefa;
+    if (os.idAssunto == '90') {
+      idProximaTarefa = await _coletarProximaTarefaCobranca();
+      if (idProximaTarefa == null) return;
+    }
+
+    // Se o checklist de instalação ou a decisão de cobrança já foram
+    // preenchidos, isso já É a confirmação → pula o diálogo genérico.
+    if (checklistInstalacao == null && idProximaTarefa == null) {
       final confirmar = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -1473,6 +1587,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       // arquivo) e diferencia o fechamento "modo completo".
       if (checklistInstalacao != null) {
         dados['checklist_instalacao'] = checklistInstalacao;
+      }
+
+      // 📋 Decisão da OS de cobrança (assunto 90) → id_proxima_tarefa no IXC.
+      if (idProximaTarefa != null) {
+        dados['id_proxima_tarefa'] = idProximaTarefa;
       }
 
       final connectivity = Get.find<ConnectivityService>();

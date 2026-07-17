@@ -11,7 +11,7 @@ import '../widgets/web_notification_helper.dart'
 // Chave VAPID gerada no Firebase Console (Cloud Messaging → Web Push
 // certificates). Só é usada no navegador — Android/iOS não precisam dela.
 const String _webVapidKey =
-    'COLOQUE_AQUI_A_CHAVE_VAPID_DO_FIREBASE_CONSOLE';
+    'BOOQAVBFGtzhaL50yQjhkgc7zxwyF-9787pwLDJ_LI09BNknKVmLPRczpmqC0xhfFR8H2Gqc5fPe9p6Dqk2oS7E';
 
 /// Handler de mensagens em background (precisa ser top-level function)
 @pragma('vm:entry-point')

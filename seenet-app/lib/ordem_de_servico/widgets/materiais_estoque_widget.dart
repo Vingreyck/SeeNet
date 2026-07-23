@@ -22,6 +22,12 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
   final EstoqueService _service = EstoqueService();
   final List<ItemOS> _itensAdicionados = [];
 
+  // Controller do campo de metragem por item (chave = id do produto), pra o
+  // campo mostrar o valor restaurado ao reabrir a OS (sem controller, o
+  // TextField nasce em branco mesmo com a quantidade já salva nos dados).
+  final Map<String, TextEditingController> _metragemControllers = {};
+  Set<String> _idsRestaurados = {};
+
   // Dados carregados do IXC
   List<ProdutoEstoque> _produtosEstoque = [];
   List<PatrimonioEstoque> _patrimoniosEstoque = [];
@@ -34,8 +40,17 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
     // Restaura itens já adicionados (ex: reabertura da OS) sem re-notificar o pai.
     if (widget.itensIniciais != null && widget.itensIniciais!.isNotEmpty) {
       _itensAdicionados.addAll(widget.itensIniciais!);
+      _idsRestaurados = widget.itensIniciais!.map((i) => i.produto.id).toSet();
     }
     _carregarDados();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _metragemControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _carregarDados() async {
@@ -345,6 +360,14 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
                           ? SizedBox(
                         width: 90,
                         child: TextField(
+                          controller: _metragemControllers.putIfAbsent(
+                            item.produto.id,
+                            () => TextEditingController(
+                              text: _idsRestaurados.contains(item.produto.id)
+                                  ? item.quantidade.toStringAsFixed(0)
+                                  : '',
+                            ),
+                          ),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           style: const TextStyle(color: Colors.white, fontSize: 16),
                           decoration: InputDecoration(
@@ -640,7 +663,9 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
   }
 
   void _removerItem(int index) {
+    final produtoId = _itensAdicionados[index].produto.id;
     setState(() => _itensAdicionados.removeAt(index));
+    _metragemControllers.remove(produtoId)?.dispose();
     widget.onItensAlterados(_itensAdicionados);
   }
 }

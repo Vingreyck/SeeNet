@@ -10,7 +10,9 @@ class SincronizadorIXC {
     this.cacheClientes = new Map();
     this.cacheAssuntos = new Map();
     this.cacheFibra = new Map(); // login → dados de fibra (Caixa FTTH / Porta FTTH)
-    this.cacheLogin = new Map(); // id_login → login string (o su_oss_chamado só traz id_login)
+    this.cacheLogin = new Map(); // id_login → { login, senha, id_contrato }
+    this.cacheCidade = new Map(); // id_cidade → { nome, uf } (cidade não muda)
+    this.cacheContrato = new Map(); // id_contrato → nome do plano
     this.maxOSsPorSync = 10;
 
     // ⚡ Sync SOB DEMANDA (técnico abriu/atualizou a lista) — throttle por técnico
@@ -410,8 +412,17 @@ class SincronizadorIXC {
       let clienteTelefone = osIXC.telefone || null;
       let clienteNumero = osIXC.numero || null;
       let clienteBairro = osIXC.bairro || null;
+      // Campos extras do cliente pro card (injetados no dados_ixc mais abaixo).
+      let clienteCidade = null;      // "Nome - UF" (cidade é ID no IXC)
+      let clienteCep = null;
+      let clienteReferencia = null;
+      let clienteComplemento = null;
+      let clienteApartamento = null;
 
-      if (osIXC.id_cliente && (!clienteNome || clienteNome === 'Cliente não identificado' || !clienteNumero || !clienteBairro)) {
+      // Busca o cliente sempre que houver id_cliente (com cache por cliente →
+      // 1 chamada por cliente único no ciclo). Precisa do registro completo pro
+      // endereço detalhado (cidade/cep/referência/complemento/apartamento).
+      if (osIXC.id_cliente && osIXC.id_cliente !== '0') {
         let clienteIXC = this.cacheClientes.get(osIXC.id_cliente);
 
         if (!clienteIXC) {
@@ -429,6 +440,22 @@ class SincronizadorIXC {
           clienteTelefone = clienteIXC.telefone_celular || clienteIXC.telefone || clienteTelefone;
           clienteNumero = clienteIXC.numero || clienteNumero;
           clienteBairro = clienteIXC.bairro || clienteBairro;
+          clienteCep = clienteIXC.cep || null;
+          clienteReferencia = clienteIXC.referencia || null;
+          clienteComplemento = clienteIXC.complemento || null;
+          clienteApartamento = clienteIXC.apartamento || null;
+
+          // Cidade vem como ID → resolve nome + UF (cache permanente, cidade não muda).
+          if (clienteIXC.cidade && clienteIXC.cidade !== '0') {
+            let cid = this.cacheCidade.get(clienteIXC.cidade);
+            if (cid === undefined) {
+              cid = await ixcService.buscarCidade(clienteIXC.cidade);
+              this.cacheCidade.set(clienteIXC.cidade, cid);
+            }
+            if (cid && cid.nome) {
+              clienteCidade = cid.uf ? `${cid.nome} - ${cid.uf}` : cid.nome;
+            }
+          }
         }
       }
 
@@ -455,14 +482,31 @@ class SincronizadorIXC {
       }
 
       // 🔑 LOGIN: o su_oss_chamado só traz `id_login` (numérico). Resolve a STRING
-      // do login (ex: "copadomundo2026") p/ o card mostrar e a busca de fibra rodar.
-      if (!osIXC.login && osIXC.id_login && osIXC.id_login !== '0') {
-        let loginStr = this.cacheLogin.get(osIXC.id_login);
-        if (loginStr === undefined) {
-          loginStr = await ixcService.buscarLoginPorId(osIXC.id_login);
-          this.cacheLogin.set(osIXC.id_login, loginStr);
+      // do login (ex: "copadomundo2026") p/ o card e a busca de fibra, e de quebra
+      // a SENHA PPPoE + id_contrato (usado p/ achar o nome do plano).
+      let senhaPppoe = null;
+      let idContratoLogin = null;
+      if (osIXC.id_login && osIXC.id_login !== '0') {
+        let rec = this.cacheLogin.get(osIXC.id_login);
+        if (rec === undefined) {
+          rec = await ixcService.buscarDadosLogin(osIXC.id_login);
+          this.cacheLogin.set(osIXC.id_login, rec);
         }
-        if (loginStr) osIXC.login = loginStr;
+        if (rec) {
+          if (!osIXC.login && rec.login) osIXC.login = rec.login;
+          senhaPppoe = rec.senha || null;
+          idContratoLogin = rec.id_contrato || null;
+        }
+      }
+
+      // 📋 PLANO: nome legível do plano vem do contrato do login (cache permanente).
+      let planoNome = null;
+      if (idContratoLogin) {
+        planoNome = this.cacheContrato.get(idContratoLogin);
+        if (planoNome === undefined) {
+          planoNome = await ixcService.buscarPlanoContrato(idContratoLogin);
+          this.cacheContrato.set(idContratoLogin, planoNome);
+        }
       }
 
       // 🔌 FIBRA (Caixa FTTH / Porta FTTH) pro card — busca por login, com cache.
@@ -481,6 +525,17 @@ class SincronizadorIXC {
               fibra.porta_ser || fibra.numero_porta || '';
         }
       }
+
+      // 📇 Campos extras do cliente/plano pro card — injetados no dados_ixc (o app
+      // lê no ordem_servico_model). Prefixo sn_ pra não colidir com campos nativos
+      // do su_oss_chamado. Vazio fica vazio (o card mostra o campo mesmo assim).
+      osIXC.sn_cidade = clienteCidade || '';
+      osIXC.sn_cep = clienteCep || '';
+      osIXC.sn_referencia = clienteReferencia || '';
+      osIXC.sn_complemento = clienteComplemento || '';
+      osIXC.sn_apartamento = clienteApartamento || '';
+      osIXC.sn_plano = planoNome || '';
+      osIXC.sn_senha = senhaPppoe || '';
 
       const dadosOS = {
         numero_os: osIXC.protocolo || `IXC-${osIXC.id}`,

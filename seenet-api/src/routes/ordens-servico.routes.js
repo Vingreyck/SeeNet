@@ -43,6 +43,14 @@ router.post('/:id/reagendar', OrdensServicoController.reagendarOS.bind(OrdensSer
 // 5️⃣ Encaminhar OS para outro técnico
 router.post('/:id/encaminhar', OrdensServicoController.encaminharOS.bind(OrdensServicoController));
 
+// 🧹 Limpar MAC do login do cliente (botão Limpar MAC do IXC)
+router.post('/:id/limpar-mac', OrdensServicoController.limparMac.bind(OrdensServicoController));
+
+// 💾 Rascunho do wizard no servidor (preserva tudo ao reagendar/encaminhar)
+router.get('/:id/rascunho', OrdensServicoController.buscarRascunho.bind(OrdensServicoController));
+router.post('/:id/rascunho', OrdensServicoController.salvarRascunho.bind(OrdensServicoController));
+router.delete('/:id/rascunho', OrdensServicoController.deletarRascunho.bind(OrdensServicoController));
+
 router.get('/:id/historico-endereco', OrdensServicoController.buscarHistoricoEndereco.bind(OrdensServicoController));
 
 // 📷 Foto da fachada (frente da casa) do cliente — 1 por cliente, só no SeeNet

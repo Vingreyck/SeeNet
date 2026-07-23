@@ -16,8 +16,17 @@ class OrdemServico {
   final String? clienteEndereco;
   final String? clienteNumero;
   final String? clienteBairro;
+  final String? clienteCidade;      // "Nome - UF" (vem do dados_ixc)
+  final String? clienteCep;
+  final String? clienteReferencia;
+  final String? clienteComplemento;
+  final String? clienteApartamento;
+  final String? clienteCondominio;
   final String? clienteTelefone;
   final String? clienteLogin;
+  final String? idLogin;            // id numérico do login no IXC (p/ limpar MAC)
+  final String? senhaPppoe;         // senha PPPoE do login (dados_ixc)
+  final String? plano;              // nome do plano/contrato (dados_ixc)
   final String? caixaFtth; // CTO
   final String? portaFtth;
   final String? idAssunto; // assunto IXC (60 = instalação de internet FTTH)
@@ -61,8 +70,17 @@ class OrdemServico {
     this.clienteEndereco,
     this.clienteNumero,
     this.clienteBairro,
+    this.clienteCidade,
+    this.clienteCep,
+    this.clienteReferencia,
+    this.clienteComplemento,
+    this.clienteApartamento,
+    this.clienteCondominio,
     this.clienteTelefone,
     this.clienteLogin,
+    this.idLogin,
+    this.senhaPppoe,
+    this.plano,
     this.caixaFtth,
     this.portaFtth,
     this.idAssunto,
@@ -93,6 +111,15 @@ class OrdemServico {
     String? caixaFtth;
     String? portaFtth;
     String? idAssunto;
+    String? clienteCidade;
+    String? clienteCep;
+    String? clienteReferencia;
+    String? clienteComplemento;
+    String? clienteApartamento;
+    String? clienteCondominio;
+    String? senhaPppoe;
+    String? plano;
+    String? idLogin;
     final dadosIxc = json['dados_ixc'];
     if (dadosIxc != null) {
       try {
@@ -106,14 +133,32 @@ class OrdemServico {
           caixaFtth = limpo(d['caixa_ftth']);
           portaFtth = limpo(d['porta_ftth']);
           idAssunto = limpo(d['id_assunto']);
+          clienteCidade = limpo(d['sn_cidade']);
+          clienteCep = limpo(d['sn_cep']);
+          clienteReferencia = limpo(d['sn_referencia']);
+          clienteComplemento = limpo(d['sn_complemento']);
+          clienteApartamento = limpo(d['sn_apartamento']);
+          clienteCondominio = limpo(d['sn_condominio']);
+          senhaPppoe = limpo(d['sn_senha']);
+          plano = limpo(d['sn_plano']);
+          idLogin = limpo(d['id_login']);
         }
       } catch (_) {}
     }
     return OrdemServico(
       clienteLogin: clienteLogin,
+      idLogin: idLogin,
       caixaFtth: caixaFtth,
       portaFtth: portaFtth,
       idAssunto: idAssunto,
+      clienteCidade: clienteCidade,
+      clienteCep: clienteCep,
+      clienteReferencia: clienteReferencia,
+      clienteComplemento: clienteComplemento,
+      clienteApartamento: clienteApartamento,
+      clienteCondominio: clienteCondominio,
+      senhaPppoe: senhaPppoe,
+      plano: plano,
       id: (json['id'] ?? 0).toString(),
       numeroOs: json['numero_os']?.toString() ??
           json['numero_os_ixc']?.toString() ??

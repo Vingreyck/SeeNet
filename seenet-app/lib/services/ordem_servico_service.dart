@@ -22,6 +22,71 @@ class OrdemServicoService {
     };
   }
 
+  // 💾 Rascunho do wizard no servidor (preserva tudo ao reagendar/encaminhar).
+  Future<bool> salvarRascunho(String osId, Map<String, dynamic> dados) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/ordens-servico/$osId/rascunho'),
+        headers: _headers,
+        body: json.encode({'dados': dados}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('❌ Erro ao salvar rascunho da OS: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> buscarRascunho(String osId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/ordens-servico/$osId/rascunho'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final body = json.decode(response.body);
+        final d = body['data'];
+        return d is Map ? Map<String, dynamic>.from(d) : null;
+      }
+      return null;
+    } catch (e) {
+      print('❌ Erro ao buscar rascunho da OS: $e');
+      return null;
+    }
+  }
+
+  Future<void> limparRascunho(String osId) async {
+    try {
+      await http.delete(
+        Uri.parse('$baseUrl/ordens-servico/$osId/rascunho'),
+        headers: _headers,
+      );
+    } catch (e) {
+      print('⚠️ Erro ao apagar rascunho da OS: $e');
+    }
+  }
+
+  // 🧹 Limpar MAC do login do cliente da OS (botão Limpar MAC do IXC).
+  // Retorna {ok, message}. O backend lê o id_login do dados_ixc da OS.
+  Future<Map<String, dynamic>> limparMac(String osId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/ordens-servico/$osId/limpar-mac'),
+        headers: _headers,
+      );
+      final body = response.body.isNotEmpty
+          ? json.decode(response.body) as Map<String, dynamic>
+          : <String, dynamic>{};
+      if (response.statusCode == 200 && body['success'] == true) {
+        return {'ok': true, 'message': body['message'] ?? 'MAC limpo'};
+      }
+      return {'ok': false, 'message': body['error'] ?? 'Falha ao limpar MAC'};
+    } catch (e) {
+      print('❌ Erro ao limpar MAC: $e');
+      return {'ok': false, 'message': 'Erro de conexão ao limpar MAC'};
+    }
+  }
+
   // 📷 Foto da fachada (frente da casa) do cliente — 1 por cliente, só no SeeNet.
   Future<bool> salvarFachada(String osId, String base64Foto,
       {String mime = 'image/jpeg', double? latitude, double? longitude}) async {

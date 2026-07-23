@@ -715,6 +715,11 @@ async finalizarExecucao(req, res) {
         data_atualizacao: new Date()
       });
 
+    // 🗑️ OS finalizada → apaga o rascunho do wizard (não é mais necessário).
+    try {
+      await db('os_rascunho').where('tenant_id', tenantId).where('os_id', id).del();
+    } catch (_) { /* best-effort */ }
+
     // 3. Buscar mapeamento do técnico IXC
     const mapeamentoTecnico = await db('mapeamento_tecnicos_ixc')
       .where('usuario_id', os.tecnico_id)
@@ -1920,6 +1925,129 @@ if (dados.fotos && dados.fotos.length > 0) {
         console.error('❌ Erro no job de SLA:', error.message);
       }
     }
+
+  /**
+   * 💾 Salvar o RASCUNHO do wizard no servidor (atrelado à OS). Chamado ao
+   * reagendar/encaminhar → o próximo técnico continua de onde parou (todos os
+   * dados: fotos, assinatura, produtos/patrimônios, ONU, relatos, APR...).
+   * POST /api/ordens-servico/:id/rascunho  body: { dados: {...} }
+   */
+  async salvarRascunho(req, res) {
+    try {
+      const { id } = req.params;
+      const tenantId = req.tenantId;
+      const userId = req.user.id;
+      const { dados } = req.body;
+
+      if (dados == null) {
+        return res.status(400).json({ success: false, error: 'dados é obrigatório' });
+      }
+
+      const os = await db('ordem_servico')
+        .where('id', id).where('tenant_id', tenantId).select('id').first();
+      if (!os) {
+        return res.status(404).json({ success: false, error: 'OS não encontrada' });
+      }
+
+      const dadosStr = typeof dados === 'string' ? dados : JSON.stringify(dados);
+
+      const existente = await db('os_rascunho')
+        .where('tenant_id', tenantId).where('os_id', id).first();
+      if (existente) {
+        await db('os_rascunho').where('id', existente.id).update({
+          dados: dadosStr, atualizado_por: userId, atualizado_em: db.fn.now(),
+        });
+      } else {
+        await db('os_rascunho').insert({
+          tenant_id: tenantId, os_id: id, dados: dadosStr, atualizado_por: userId,
+        });
+      }
+
+      return res.json({ success: true });
+    } catch (error) {
+      console.error('❌ Erro ao salvar rascunho da OS:', error.message);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * 📥 Buscar o rascunho do wizard salvo no servidor pra esta OS.
+   * GET /api/ordens-servico/:id/rascunho → { success, data: {...} | null }
+   */
+  async buscarRascunho(req, res) {
+    try {
+      const { id } = req.params;
+      const tenantId = req.tenantId;
+
+      const row = await db('os_rascunho')
+        .where('tenant_id', tenantId).where('os_id', id).first();
+      if (!row) return res.json({ success: true, data: null });
+
+      let dados = row.dados;
+      try { dados = typeof dados === 'string' ? JSON.parse(dados) : dados; } catch (_) {}
+      return res.json({ success: true, data: dados });
+    } catch (error) {
+      console.error('❌ Erro ao buscar rascunho da OS:', error.message);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * 🗑️ Apagar o rascunho do wizard (chamado ao FINALIZAR a OS).
+   * DELETE /api/ordens-servico/:id/rascunho
+   */
+  async deletarRascunho(req, res) {
+    try {
+      const { id } = req.params;
+      const tenantId = req.tenantId;
+      await db('os_rascunho').where('tenant_id', tenantId).where('os_id', id).del();
+      return res.json({ success: true });
+    } catch (error) {
+      console.error('❌ Erro ao apagar rascunho da OS:', error.message);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * 🧹 Limpar MAC do login do cliente da OS (botão "Limpar MAC" do IXC).
+   * POST /api/ordens-servico/:id/limpar-mac
+   * O id_login é lido do dados_ixc da OS (o app não precisa mandar nada).
+   */
+  async limparMac(req, res) {
+    try {
+      const { id } = req.params;
+      const tenantId = req.tenantId;
+
+      const os = await db('ordem_servico')
+        .where('id', id).where('tenant_id', tenantId)
+        .select('dados_ixc').first();
+      if (!os) {
+        return res.status(404).json({ success: false, error: 'OS não encontrada' });
+      }
+
+      let idLogin = null;
+      try {
+        const d = typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc;
+        idLogin = (d && d.id_login && d.id_login !== '0') ? d.id_login : null;
+      } catch (_) {}
+      if (!idLogin) {
+        return res.status(400).json({ success: false, error: 'Esta OS não tem login vinculado — não dá pra limpar o MAC.' });
+      }
+
+      const integracao = await db('integracao_ixc')
+        .where('tenant_id', tenantId).where('ativo', true).first();
+      if (!integracao) {
+        return res.status(400).json({ success: false, error: 'Integração IXC não configurada' });
+      }
+      const ixc = new IXCService(integracao.url_api, integracao.token_api);
+      await ixc.limparMac(idLogin);
+
+      return res.json({ success: true, message: 'MAC limpo com sucesso' });
+    } catch (error) {
+      console.error('❌ Erro ao limpar MAC:', error.message);
+      return res.status(500).json({ success: false, error: error.message || 'Erro ao limpar MAC' });
+    }
+  }
 
 }
 

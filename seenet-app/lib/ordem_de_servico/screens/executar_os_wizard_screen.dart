@@ -5,6 +5,8 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart' show XFile;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io' if (dart.library.html) '../../utils/io_stub.dart';
 import 'dart:typed_data';
 import '../../services/connectivity_service.dart';
 import '../../services/sync_manager.dart';
@@ -12,6 +14,7 @@ import '../../services/tracking_service.dart';
 import '../../services/estoque_service.dart';
 import 'dart:convert';
 import '../../controllers/ordem_servico_controller.dart';
+import '../../services/ordem_servico_service.dart';
 import '../../models/ordem_servico_model.dart';
 import '../widgets/localizacao_widget.dart';
 import '../widgets/qr_scanner_widget.dart';
@@ -19,6 +22,7 @@ import 'package:get_storage/get_storage.dart';
 import '../widgets/anexos_widget.dart';
 import '../widgets/historico_endereco_widget.dart';
 import '../widgets/fachada_foto_widget.dart';
+import '../widgets/os_cliente_info.dart';
 import '../widgets/materiais_estoque_widget.dart';
 import '../widgets/assinatura_widget.dart';
 import '../widgets/campo_com_voz.dart';
@@ -35,7 +39,14 @@ class ExecutarOSWizardScreen extends StatefulWidget {
 class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     with WidgetsBindingObserver {
   final OrdemServicoController controller = Get.find<OrdemServicoController>();
+  final OrdemServicoService _osService = OrdemServicoService();
   late OrdemServico os;
+
+  // Carregando o rascunho do SERVIDOR (outro técnico reagendou/encaminhou com
+  // dados). Enquanto true, mostra spinner — as etapas só nascem depois que os
+  // dados iniciais (fotos/itens/assinatura) estão prontos (o IndexedStack cria
+  // os widgets filhos no 1º build, então precisam já ter o valor certo).
+  bool _carregandoRascunho = false;
 
   int _etapaAtual = 0;
   final int _totalEtapas = 8;
@@ -75,6 +86,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     // cria os widgets no primeiro build, então precisam já ter o valor inicial.
     _restaurarBinarios();
 
+    // Sem progresso LOCAL desta OS? Pode existir um rascunho no SERVIDOR (outro
+    // técnico reagendou/encaminhou). Gate o build até carregar (async).
+    final temProgressoLocal =
+        GetStorage().read('wizard_progress_${os.id}') != null;
+    if (!temProgressoLocal && os.tipoOs != 'E') {
+      _carregandoRascunho = true;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final osAtualizada = controller.ordensServico
           .firstWhereOrNull((o) => o.id == os.id);
@@ -91,7 +110,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           }
         });
       }
-      _restaurarProgresso();
+
+      // Carrega o rascunho do servidor ANTES de tudo (se aplicável), pra os
+      // widgets filhos nascerem já com fotos/itens/assinatura corretos.
+      if (_carregandoRascunho) {
+        await _carregarRascunhoServidor();
+      } else {
+        _restaurarProgresso();
+      }
 
       if (os.status == 'em_execucao' && _exigeApr) {
         // ✅ Se o APR já foi CONCLUÍDO nesta OS (marca local), NÃO re-força ao reabrir —
@@ -189,20 +215,31 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         children: [
           _buildTituloEtapa(icone: Icons.location_on_rounded, titulo: 'Localização', descricao: 'Confirme ou capture a localização do atendimento'),
           const SizedBox(height: 20),
-          _buildCard(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildInfoRow('Cliente', os.clienteNome),
-              if (os.clienteEndereco != null) _buildInfoRow('Endereço', os.clienteEndereco!),
-              if (os.clienteTelefone != null) _buildInfoRow('Telefone', os.clienteTelefone!),
-            ],
-          )),
-          // Atalhos: ligar pro cliente + abrir a localização no Google Maps.
+          // Mesmos dados do OS card (login/senha copiáveis, plano, CTO, endereço
+          // completo, Limpar MAC).
+          _buildCard(child: OSClienteInfo(os: os, mostrarNome: true)),
+          // Atalhos: WhatsApp + Ligar + abrir a localização no Google Maps.
           if (_temTelefone || _temEndereco) ...[
             const SizedBox(height: 12),
             Row(
               children: [
-                if (_temTelefone)
+                if (_temTelefone) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _abrirWhatsapp(os.clienteTelefone!),
+                      icon: const Icon(Icons.chat_rounded, size: 18),
+                      label: const Text('WhatsApp',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF25D366),
+                        side: const BorderSide(color: Color(0xFF25D366)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () => _ligarCliente(os.clienteTelefone!),
@@ -218,13 +255,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
                       ),
                     ),
                   ),
-                if (_temTelefone && _temEndereco) const SizedBox(width: 10),
+                ],
+                if (_temTelefone && _temEndereco) const SizedBox(width: 8),
                 if (_temEndereco)
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () => _abrirMapa(os.clienteEndereco!),
                       icon: const Icon(Icons.map_rounded, size: 18),
-                      label: const Text('Localização',
+                      label: const Text('Mapa',
                           style: TextStyle(fontWeight: FontWeight.bold)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF3B9EFF),
@@ -676,6 +714,136 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
   // ✅ Limpar progresso ao finalizar com sucesso
   void _limparProgresso() {
     GetStorage().remove('wizard_progress_${os.id}');
+    // Backend já apaga o rascunho do servidor no finalizar; garante mesmo assim.
+    _osService.limparRascunho(os.id);
+  }
+
+  // Limpa TODO o progresso LOCAL desta OS (usado ao reagendar/encaminhar: a OS
+  // deixa este técnico; se voltar, o servidor é a fonte da verdade).
+  void _limparProgressoLocalCompleto() {
+    final s = GetStorage();
+    s.remove('wizard_progress_${os.id}');
+    s.remove('apr_rascunho_${os.id}');
+    s.remove('apr_concluido_${os.id}');
+  }
+
+  // 💾 Salva TODO o estado do wizard no SERVIDOR (fotos em base64 pra funcionar
+  // entre aparelhos diferentes). Usado ao reagendar/encaminhar → o próximo
+  // técnico continua com tudo. Retorna true se salvou.
+  Future<bool> _salvarRascunhoServidor() async {
+    final fotosB64 = <Map<String, dynamic>>[];
+    for (final a in fotosAnexadas) {
+      try {
+        final bytes = await a.foto.readAsBytes();
+        fotosB64.add({
+          'base64': base64Encode(bytes),
+          'descricao': a.descricao,
+          'tipo': a.tipo,
+        });
+      } catch (_) {}
+    }
+    final dados = <String, dynamic>{
+      'etapa': _etapaAtual,
+      'statusAtual': statusAtual,
+      'adminId': adminSelecionadoId,
+      'adminNome': adminSelecionadoNome,
+      'latitude': latitude,
+      'longitude': longitude,
+      'latitudeFinal': latitudeFinal,
+      'longitudeFinal': longitudeFinal,
+      'onuModelo': onuModeloController.text,
+      'onuSerial': onuSerialController.text,
+      'onuMac': onuMacController.text,
+      'onuStatus': onuStatusController.text,
+      'onuSinal': onuSinalController.text,
+      'relatoProblema': relatoProblemaController.text,
+      'relatoSolucao': relatoSolucaoController.text,
+      'materiais': materiaisController.text,
+      'observacoes': observacoesController.text,
+      'fotos': fotosB64,
+      'assinatura': assinaturaBytes != null ? base64Encode(assinaturaBytes!) : null,
+      'itens': itensEstoque.map((i) => i.toJson()).toList(),
+      'aprRascunho': GetStorage().read('apr_rascunho_${os.id}'),
+    };
+    return await _osService.salvarRascunho(os.id, dados);
+  }
+
+  // 📥 Carrega o rascunho do servidor (outro técnico deixou dados) e aplica.
+  Future<void> _carregarRascunhoServidor() async {
+    try {
+      final dados = await _osService.buscarRascunho(os.id);
+      if (dados != null && mounted) await _aplicarDadosRascunho(dados);
+    } catch (_) {}
+    if (mounted) setState(() => _carregandoRascunho = false);
+  }
+
+  // Aplica os dados do rascunho do servidor no estado. Fotos: no MOBILE são
+  // gravadas em arquivo temporário (path válido → exibe E finaliza igual às fotos
+  // do picker); no WEB viram XFile em memória (blob). NÃO aplica a 'etapa' — quem
+  // assume começa pelo passo natural do status; o que importa é preservar os DADOS.
+  Future<void> _aplicarDadosRascunho(Map dados) async {
+    onuModeloController.text     = dados['onuModelo']     ?? '';
+    onuSerialController.text     = dados['onuSerial']     ?? '';
+    onuMacController.text        = dados['onuMac']        ?? '';
+    onuStatusController.text     = dados['onuStatus']     ?? '';
+    onuSinalController.text      = dados['onuSinal']      ?? '';
+    relatoProblemaController.text = dados['relatoProblema'] ?? '';
+    relatoSolucaoController.text  = dados['relatoSolucao']  ?? '';
+    materiaisController.text     = dados['materiais']     ?? '';
+    observacoesController.text   = dados['observacoes']   ?? '';
+
+    if (dados['adminId'] != null) {
+      adminSelecionadoId   = dados['adminId']   as int?;
+      adminSelecionadoNome = dados['adminNome'] as String?;
+    }
+    if (dados['latitude'] != null) latitude = (dados['latitude'] as num).toDouble();
+    if (dados['longitude'] != null) longitude = (dados['longitude'] as num).toDouble();
+    if (dados['latitudeFinal'] != null) latitudeFinal = (dados['latitudeFinal'] as num).toDouble();
+    if (dados['longitudeFinal'] != null) longitudeFinal = (dados['longitudeFinal'] as num).toDouble();
+
+    if (dados['fotos'] is List) {
+      final novas = <AnexoComDescricao>[];
+      Directory? tmpDir;
+      if (!kIsWeb) {
+        try { tmpDir = await getTemporaryDirectory(); } catch (_) {}
+      }
+      int i = 0;
+      for (final f in (dados['fotos'] as List)) {
+        try {
+          final m = Map<String, dynamic>.from(f);
+          final bytes = base64Decode(m['base64'] as String);
+          XFile xf;
+          if (kIsWeb || tmpDir == null) {
+            xf = XFile.fromData(bytes, name: 'foto.jpg', mimeType: 'image/jpeg');
+          } else {
+            final p =
+                '${tmpDir.path}/rascunho_${os.id}_${DateTime.now().microsecondsSinceEpoch}_$i.jpg';
+            await File(p).writeAsBytes(bytes);
+            xf = XFile(p);
+          }
+          novas.add(AnexoComDescricao(
+            foto: xf,
+            descricao: (m['descricao'] ?? '') as String,
+            tipo: (m['tipo'] ?? 'foto') as String,
+          ));
+          i++;
+        } catch (_) {}
+      }
+      fotosAnexadas = novas;
+    }
+    if (dados['assinatura'] is String) {
+      try { assinaturaBytes = base64Decode(dados['assinatura'] as String); } catch (_) {}
+    }
+    if (dados['itens'] is List) {
+      try {
+        itensEstoque = (dados['itens'] as List)
+            .map((j) => ItemOS.fromJson(Map<String, dynamic>.from(j)))
+            .toList();
+      } catch (_) {}
+    }
+    if (dados['aprRascunho'] != null) {
+      try { GetStorage().write('apr_rascunho_${os.id}', dados['aprRascunho']); } catch (_) {}
+    }
   }
 
   void _proximaEtapa() {
@@ -928,6 +1096,26 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     }
   }
 
+  // Abre a conversa do WhatsApp com o número do cliente (wa.me). Adiciona o
+  // código do Brasil (55) quando o número vem só com DDD + número.
+  Future<void> _abrirWhatsapp(String telefone) async {
+    var numero = telefone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (numero.isEmpty) {
+      _mostrarErro('Telefone inválido');
+      return;
+    }
+    if (!numero.startsWith('55') && numero.length <= 11) {
+      numero = '55$numero';
+    }
+    final uri = Uri.parse('https://wa.me/$numero');
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) _mostrarErro('Não foi possível abrir o WhatsApp');
+    } catch (_) {
+      if (mounted) _mostrarErro('Não foi possível abrir o WhatsApp');
+    }
+  }
+
   // Abre o Google Maps buscando pelo endereço do cliente (iOS e Android).
   Future<void> _abrirMapa(String endereco) async {
     final query = Uri.encodeComponent(endereco);
@@ -1115,6 +1303,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
     setState(() => _isLoading = true);
     try {
+      // 💾 Preserva TODO o progresso no servidor pro técnico que vai receber.
+      final okRascunho = await _salvarRascunhoServidor();
+      if (!okRascunho && mounted) {
+        _mostrarErro('Aviso: não consegui salvar todo o progresso p/ o próximo técnico.');
+      }
       // Para o rastreamento — não é mais a minha OS.
       if (Get.isRegistered<TrackingService>()) {
         Get.find<TrackingService>().parar();
@@ -1125,6 +1318,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         motivo: motivoCtrl.text.trim(),
       );
       if (sucesso) {
+        _limparProgressoLocalCompleto(); // a OS deixa este técnico
         if (mounted) Get.back(); // volta pra lista de OS
       } else {
         if (mounted) _mostrarErro('Erro ao encaminhar');
@@ -1206,6 +1400,12 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
     setState(() => _isLoading = true);
     try {
+      // 💾 Preserva TODO o progresso no servidor — quando esta OS for reagendada
+      // e alguém pegar de novo, continua exatamente de onde parou.
+      final okRascunho = await _salvarRascunhoServidor();
+      if (!okRascunho && mounted) {
+        _mostrarErro('Aviso: não consegui salvar todo o progresso da OS.');
+      }
       // Para o rastreamento GPS — o técnico não está mais atendendo esta OS.
       if (Get.isRegistered<TrackingService>()) {
         Get.find<TrackingService>().parar();
@@ -1217,6 +1417,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         motivo: motivoCtrl.text.trim(),
       );
       if (sucesso) {
+        _limparProgressoLocalCompleto(); // a OS deixa este técnico
         if (mounted) Get.back(); // volta pra lista de OS
       } else {
         if (mounted) _mostrarErro('Erro ao reagendar');
@@ -1643,6 +1844,24 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Enquanto carrega o rascunho do servidor (outro técnico deixou dados),
+    // mostra spinner — as etapas só nascem depois pra já virem com fotos/itens.
+    if (_carregandoRascunho) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF111111),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF00FF88)),
+              SizedBox(height: 16),
+              Text('Carregando dados salvos da OS...',
+                  style: TextStyle(color: Colors.white54)),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFF111111),
       body: Column(
@@ -2048,29 +2267,6 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     );
   }
 
-  Widget _buildInfoRow(String label, String valor) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text('$label:',
-                style: const TextStyle(
-                    color: Colors.white38, fontSize: 13)),
-          ),
-          Expanded(
-            child: Text(valor,
-                style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500)),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _FinalizacaoProgressDialog extends StatefulWidget {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../models/ordem_servico_model.dart';
+import 'os_cliente_info.dart';
 import 'package:intl/intl.dart';
 
 class OSCardWidget extends StatelessWidget {
@@ -139,6 +141,22 @@ class OSCardWidget extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    // Copiar nome do cliente
+                    if (os.tipoOs != 'E')
+                      GestureDetector(
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: os.clienteNome));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            content: Text('Cliente copiado'),
+                            backgroundColor: Color(0xFF00FF88),
+                            duration: Duration(seconds: 1),
+                          ));
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.only(left: 6),
+                          child: Icon(Icons.copy_rounded, color: Colors.white38, size: 15),
+                        ),
+                      ),
                     if (os.tipoOs == 'E')
                       Container(
                         margin: const EdgeInsets.only(left: 8),
@@ -162,82 +180,11 @@ class OSCardWidget extends StatelessWidget {
               ],
             ),
 
-            // LOGIN do cliente
-            if (os.tipoOs != 'E' && os.clienteLogin != null) ...[
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(Icons.wifi_rounded, color: Colors.white38, size: 15),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Login: ${os.clienteLogin}',
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                ],
-              ),
-            ],
-
-            // CTO (Caixa FTTH) + Porta FTTH
-            if (os.tipoOs != 'E' &&
-                (os.caixaFtth != null || os.portaFtth != null)) ...[
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(Icons.hub_outlined,
-                      color: Colors.white38, size: 15),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      [
-                        if (os.caixaFtth != null) 'CTO: ${os.caixaFtth}',
-                        if (os.portaFtth != null) 'Porta: ${os.portaFtth}',
-                      ].join('   •   '),
-                      style:
-                          const TextStyle(color: Colors.white54, fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            // ENDEREÇO + NÚMERO / BAIRRO
-            if (os.clienteEndereco != null && os.tipoOs != 'E') ...[
+            // DADOS DO CLIENTE (login/senha copiáveis, plano, CTO, endereço
+            // completo, Limpar MAC) — mesmo bloco usado na etapa de Localização.
+            if (os.tipoOs != 'E') ...[
               const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.location_on_outlined, color: Colors.white70, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          [
-                            os.clienteEndereco!,
-                            if (os.clienteNumero != null && os.clienteNumero!.isNotEmpty)
-                              os.clienteNumero!,
-                          ].join(', '),
-                          style: const TextStyle(color: Colors.white60, fontSize: 14),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (os.clienteBairro != null && os.clienteBairro!.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            os.clienteBairro!,
-                            style: const TextStyle(color: Colors.white38, fontSize: 12),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              OSClienteInfo(os: os),
             ],
 
             const SizedBox(height: 12),

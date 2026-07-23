@@ -146,6 +146,91 @@ class IXCService {
   }
 
   /**
+   * ✅ Dados do LOGIN (radusuarios) a partir do id_login da OS: além da string
+   * do login, traz a SENHA PPPoE e o id_contrato (usado p/ achar o plano).
+   * Retorna { login, senha, id_contrato } ou null.
+   */
+  async buscarDadosLogin(idLogin) {
+    try {
+      if (!idLogin || idLogin === '0') return null;
+      const params = new URLSearchParams({
+        qtype: 'radusuarios.id',
+        query: idLogin.toString(),
+        oper: '=',
+        page: '1',
+        rp: '1'
+      });
+      const response = await this.clientListar.post('/radusuarios', params.toString());
+      const reg = response.data?.registros?.[0];
+      if (!reg) return null;
+      return {
+        login: reg.login || null,
+        senha: reg.senha || null,
+        id_contrato: reg.id_contrato || null,
+      };
+    } catch (e) {
+      console.error(`❌ Erro ao buscar dados do login id ${idLogin}:`, e.message);
+      return null;
+    }
+  }
+
+  /**
+   * ✅ Nome da cidade (+ UF) a partir do id da cidade (o cliente traz cidade como
+   * ID numérico). Retorna { nome, uf } — uf convertido do código IBGE p/ sigla.
+   */
+  async buscarCidade(cidadeId) {
+    try {
+      if (!cidadeId || cidadeId === '0') return null;
+      const params = new URLSearchParams({
+        qtype: 'id',
+        query: cidadeId.toString(),
+        oper: '=',
+        page: '1',
+        rp: '1'
+      });
+      const response = await this.clientListar.post('/cidade', params.toString());
+      const reg = response.data?.registros?.[0];
+      if (!reg) return null;
+      // Código IBGE do estado → sigla (o campo `uf` vem como número, ex: 28=SE).
+      const ufMap = {
+        '11': 'RO', '12': 'AC', '13': 'AM', '14': 'RR', '15': 'PA', '16': 'AP',
+        '17': 'TO', '21': 'MA', '22': 'PI', '23': 'CE', '24': 'RN', '25': 'PB',
+        '26': 'PE', '27': 'AL', '28': 'SE', '29': 'BA', '31': 'MG', '32': 'ES',
+        '33': 'RJ', '35': 'SP', '41': 'PR', '42': 'SC', '43': 'RS', '50': 'MS',
+        '51': 'MT', '52': 'GO', '53': 'DF'
+      };
+      const ufSigla = ufMap[reg.uf?.toString()] || (reg.uf?.toString() || '');
+      return { nome: reg.nome || '', uf: ufSigla };
+    } catch (e) {
+      console.error(`❌ Erro ao buscar cidade ${cidadeId}:`, e.message);
+      return null;
+    }
+  }
+
+  /**
+   * ✅ Nome do PLANO a partir do id_contrato do login. No IXC o nome legível do
+   * plano fica no campo `contrato` do cliente_contrato (ex: "FIBRA COMBO 300MB
+   * - 69,90 - BBNET"). Retorna a string ou null.
+   */
+  async buscarPlanoContrato(idContrato) {
+    try {
+      if (!idContrato || idContrato === '0') return null;
+      const params = new URLSearchParams({
+        qtype: 'id',
+        query: idContrato.toString(),
+        oper: '=',
+        page: '1',
+        rp: '1'
+      });
+      const response = await this.clientListar.post('/cliente_contrato', params.toString());
+      return response.data?.registros?.[0]?.contrato || null;
+    } catch (e) {
+      console.error(`❌ Erro ao buscar plano do contrato ${idContrato}:`, e.message);
+      return null;
+    }
+  }
+
+  /**
    * Buscar detalhes de uma OS específica (para pegar campos obrigatórios)
    */
   async buscarDetalhesOS(osId) {
@@ -1238,6 +1323,31 @@ async adicionarProdutoEstruturaOS(dados) {
         return response.data;
       } catch (error) {
         console.error('❌ Erro ao devolver comodato no IXC:', error.message);
+        throw error;
+      }
+    }
+
+    /**
+     * 🧹 Limpar MAC do login (botão "Limpar MAC" do IXC). Libera o MAC gravado
+     * no login pra o cliente reconectar com outro equipamento. Endpoint de botão
+     * do IXC: POST /radusuarios_25452 com { get_id: <id do login> }.
+     */
+    async limparMac(idLogin) {
+      try {
+        if (!idLogin || idLogin === '0') {
+          throw new Error('id_login ausente — não dá pra limpar o MAC');
+        }
+        console.log(`🧹 Limpando MAC do login ${idLogin}...`);
+        const response = await this.clientAlterar.post('/radusuarios_25452', {
+          get_id: idLogin.toString(),
+        });
+        if (response.data?.type === 'error') {
+          throw new Error(response.data.message || 'Erro ao limpar MAC');
+        }
+        console.log(`✅ MAC do login ${idLogin} limpo`);
+        return response.data;
+      } catch (error) {
+        console.error('❌ Erro ao limpar MAC no IXC:', error.message);
         throw error;
       }
     }

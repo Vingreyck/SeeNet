@@ -86,11 +86,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     // cria os widgets no primeiro build, então precisam já ter o valor inicial.
     _restaurarBinarios();
 
-    // Sem progresso LOCAL desta OS? Pode existir um rascunho no SERVIDOR (outro
-    // técnico reagendou/encaminhou). Gate o build até carregar (async).
-    final temProgressoLocal =
-        GetStorage().read('wizard_progress_${os.id}') != null;
-    if (!temProgressoLocal && os.tipoOs != 'E') {
+    // SEMPRE checa se existe rascunho no SERVIDOR (criado ao reagendar/encaminhar).
+    // Se existir, ele VENCE o progresso local (é a fonte da verdade do handoff);
+    // senão, cai no progresso local. Gate o build até carregar (async).
+    if (os.tipoOs != 'E') {
       _carregandoRascunho = true;
     }
 
@@ -765,15 +764,31 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       'itens': itensEstoque.map((i) => i.toJson()).toList(),
       'aprRascunho': GetStorage().read('apr_rascunho_${os.id}'),
     };
-    return await _osService.salvarRascunho(os.id, dados);
+    final ok = await _osService.salvarRascunho(os.id, dados);
+    print('💾 [RASCUNHO] OS ${os.id} salvar → ${ok ? "OK" : "FALHOU"} '
+        '(${fotosB64.length} fotos, ${itensEstoque.length} itens, '
+        'assinatura=${assinaturaBytes != null})');
+    return ok;
   }
 
   // 📥 Carrega o rascunho do servidor (outro técnico deixou dados) e aplica.
+  // Se o servidor não tiver, cai no progresso LOCAL (mesmo aparelho/técnico).
   Future<void> _carregarRascunhoServidor() async {
     try {
       final dados = await _osService.buscarRascunho(os.id);
-      if (dados != null && mounted) await _aplicarDadosRascunho(dados);
-    } catch (_) {}
+      print('📥 [RASCUNHO] OS ${os.id} → servidor '
+          '${dados == null ? "VAZIO" : "OK (${dados.keys.length} chaves, "
+              "${(dados['fotos'] as List?)?.length ?? 0} fotos, "
+              "${(dados['itens'] as List?)?.length ?? 0} itens)"}');
+      if (dados != null && mounted) {
+        await _aplicarDadosRascunho(dados);
+      } else {
+        _restaurarProgresso(); // sem rascunho no servidor → usa o local
+      }
+    } catch (e) {
+      print('❌ [RASCUNHO] erro ao carregar: $e');
+      _restaurarProgresso();
+    }
     if (mounted) setState(() => _carregandoRascunho = false);
   }
 

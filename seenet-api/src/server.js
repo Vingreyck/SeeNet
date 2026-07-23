@@ -57,9 +57,11 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '10mb' }));
+// 25mb: o rascunho da OS (reagendar/encaminhar) e a finalização mandam TODAS as
+// fotos em base64 num único corpo — 10mb estourava em OS com muitas fotos.
+app.use(express.json({ limit: '25mb' }));
 app.use(formatResponse);
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // ========== ROTAS BÁSICAS ==========
 app.get('/health', (req, res) => {

@@ -1963,6 +1963,7 @@ if (dados.fotos && dados.fotos.length > 0) {
         });
       }
 
+      console.log(`💾 Rascunho OS ${id} salvo (${existente ? 'update' : 'insert'}) — ${dadosStr.length} bytes`);
       return res.json({ success: true });
     } catch (error) {
       console.error('❌ Erro ao salvar rascunho da OS:', error.message);
@@ -1981,10 +1982,14 @@ if (dados.fotos && dados.fotos.length > 0) {
 
       const row = await db('os_rascunho')
         .where('tenant_id', tenantId).where('os_id', id).first();
-      if (!row) return res.json({ success: true, data: null });
+      if (!row) {
+        console.log(`📥 Rascunho OS ${id} (tenant ${tenantId}) → NÃO existe`);
+        return res.json({ success: true, data: null });
+      }
 
       let dados = row.dados;
       try { dados = typeof dados === 'string' ? JSON.parse(dados) : dados; } catch (_) {}
+      console.log(`📥 Rascunho OS ${id} → encontrado (${(row.dados || '').length} bytes)`);
       return res.json({ success: true, data: dados });
     } catch (error) {
       console.error('❌ Erro ao buscar rascunho da OS:', error.message);

@@ -407,6 +407,20 @@ class SincronizadorIXC {
         .where('id_externo', osIXC.id.toString())
         .first();
 
+      // ⚡ Reaproveita o enriquecimento já feito (cliente/endereço/cidade/plano/
+      // senha/login/fibra quase não mudam). Sem isso, CADA ciclo re-consultava o
+      // IXC pra TODA OS de TODO técnico → sync lento e pesado (rate-limit), e o
+      // "iniciar deslocamento"/abrir OS travavam (o sync sob demanda esperava tudo).
+      // Só a 1ª sincronização de uma OS busca no IXC; depois copia do snapshot.
+      let ixcAntigo = null;
+      if (osExistente && osExistente.dados_ixc) {
+        try {
+          ixcAntigo = typeof osExistente.dados_ixc === 'string'
+            ? JSON.parse(osExistente.dados_ixc) : osExistente.dados_ixc;
+        } catch (_) {}
+      }
+      const jaEnriquecido = !!(ixcAntigo && ixcAntigo.sn_enriquecido);
+
       let clienteNome = osIXC.cliente_nome || 'Cliente não identificado';
       let clienteEndereco = osIXC.endereco || null;
       let clienteTelefone = osIXC.telefone || null;
@@ -419,10 +433,20 @@ class SincronizadorIXC {
       let clienteComplemento = null;
       let clienteApartamento = null;
 
-      // Busca o cliente sempre que houver id_cliente (com cache por cliente →
-      // 1 chamada por cliente único no ciclo). Precisa do registro completo pro
-      // endereço detalhado (cidade/cep/referência/complemento/apartamento).
-      if (osIXC.id_cliente && osIXC.id_cliente !== '0') {
+      // Já enriquecido antes → copia os campos-base do cliente do snapshot (a
+      // linha existente já tem nome/endereço/número/bairro/telefone corretos) e
+      // NÃO consulta o IXC. Os campos sn_* / login / fibra vêm do ixcAntigo na injeção.
+      if (jaEnriquecido) {
+        clienteNome = osExistente.cliente_nome || clienteNome;
+        clienteEndereco = osExistente.cliente_endereco || clienteEndereco;
+        clienteNumero = osExistente.cliente_numero || clienteNumero;
+        clienteBairro = osExistente.cliente_bairro || clienteBairro;
+        clienteTelefone = osExistente.cliente_telefone || clienteTelefone;
+      }
+
+      // Busca o cliente (só na 1ª sincronização da OS). Precisa do registro
+      // completo pro endereço detalhado (cidade/cep/referência/complemento/apartamento).
+      if (!jaEnriquecido && osIXC.id_cliente && osIXC.id_cliente !== '0') {
         let clienteIXC = this.cacheClientes.get(osIXC.id_cliente);
 
         if (!clienteIXC) {
@@ -481,61 +505,77 @@ class SincronizadorIXC {
         } catch (_) {}
       }
 
-      // 🔑 LOGIN: o su_oss_chamado só traz `id_login` (numérico). Resolve a STRING
-      // do login (ex: "copadomundo2026") p/ o card e a busca de fibra, e de quebra
-      // a SENHA PPPoE + id_contrato (usado p/ achar o nome do plano).
+      // 🔑 LOGIN + 📋 PLANO + 🔌 FIBRA — só na 1ª sincronização da OS (depois vem
+      // do snapshot, ver injeção). Evita 3 chamadas ao IXC por OS a cada ciclo.
       let senhaPppoe = null;
-      let idContratoLogin = null;
-      if (osIXC.id_login && osIXC.id_login !== '0') {
-        let rec = this.cacheLogin.get(osIXC.id_login);
-        if (rec === undefined) {
-          rec = await ixcService.buscarDadosLogin(osIXC.id_login);
-          this.cacheLogin.set(osIXC.id_login, rec);
-        }
-        if (rec) {
-          if (!osIXC.login && rec.login) osIXC.login = rec.login;
-          senhaPppoe = rec.senha || null;
-          idContratoLogin = rec.id_contrato || null;
-        }
-      }
-
-      // 📋 PLANO: nome legível do plano vem do contrato do login (cache permanente).
       let planoNome = null;
-      if (idContratoLogin) {
-        planoNome = this.cacheContrato.get(idContratoLogin);
-        if (planoNome === undefined) {
-          planoNome = await ixcService.buscarPlanoContrato(idContratoLogin);
-          this.cacheContrato.set(idContratoLogin, planoNome);
+      if (!jaEnriquecido) {
+        // LOGIN: o su_oss_chamado só traz `id_login` (numérico). Resolve a STRING
+        // do login p/ o card e a busca de fibra, + SENHA PPPoE + id_contrato.
+        let idContratoLogin = null;
+        if (osIXC.id_login && osIXC.id_login !== '0') {
+          let rec = this.cacheLogin.get(osIXC.id_login);
+          if (rec === undefined) {
+            rec = await ixcService.buscarDadosLogin(osIXC.id_login);
+            this.cacheLogin.set(osIXC.id_login, rec);
+          }
+          if (rec) {
+            if (!osIXC.login && rec.login) osIXC.login = rec.login;
+            senhaPppoe = rec.senha || null;
+            idContratoLogin = rec.id_contrato || null;
+          }
         }
-      }
 
-      // 🔌 FIBRA (Caixa FTTH / Porta FTTH) pro card — busca por login, com cache.
-      // Merge no osIXC ANTES do JSON.stringify (o dados_ixc leva junto → o app lê).
-      if (osIXC.login) {
-        let fibra = this.cacheFibra.get(osIXC.login);
-        if (fibra === undefined) {
-          fibra = await ixcService.buscarClienteFibra(osIXC.login);
-          this.cacheFibra.set(osIXC.login, fibra);
+        // PLANO: nome legível vem do contrato do login (cache permanente).
+        if (idContratoLogin) {
+          planoNome = this.cacheContrato.get(idContratoLogin);
+          if (planoNome === undefined) {
+            planoNome = await ixcService.buscarPlanoContrato(idContratoLogin);
+            this.cacheContrato.set(idContratoLogin, planoNome);
+          }
         }
-        if (fibra) {
-          // fallbacks — o log 🔎 [FIBRA] mostra os nomes reais; ajusto depois.
-          osIXC.caixa_ftth = fibra.caixa_ftth || fibra.id_caixa_ftth ||
-              fibra.caixa || fibra.caixa_hermetica || fibra.nome_caixa || '';
-          osIXC.porta_ftth = fibra.porta_ftth || fibra.porta ||
-              fibra.porta_ser || fibra.numero_porta || '';
+
+        // FIBRA (Caixa FTTH / Porta FTTH) pro card — busca por login, com cache.
+        if (osIXC.login) {
+          let fibra = this.cacheFibra.get(osIXC.login);
+          if (fibra === undefined) {
+            fibra = await ixcService.buscarClienteFibra(osIXC.login);
+            this.cacheFibra.set(osIXC.login, fibra);
+          }
+          if (fibra) {
+            osIXC.caixa_ftth = fibra.caixa_ftth || fibra.id_caixa_ftth ||
+                fibra.caixa || fibra.caixa_hermetica || fibra.nome_caixa || '';
+            osIXC.porta_ftth = fibra.porta_ftth || fibra.porta ||
+                fibra.porta_ser || fibra.numero_porta || '';
+          }
         }
       }
 
       // 📇 Campos extras do cliente/plano pro card — injetados no dados_ixc (o app
-      // lê no ordem_servico_model). Prefixo sn_ pra não colidir com campos nativos
-      // do su_oss_chamado. Vazio fica vazio (o card mostra o campo mesmo assim).
-      osIXC.sn_cidade = clienteCidade || '';
-      osIXC.sn_cep = clienteCep || '';
-      osIXC.sn_referencia = clienteReferencia || '';
-      osIXC.sn_complemento = clienteComplemento || '';
-      osIXC.sn_apartamento = clienteApartamento || '';
-      osIXC.sn_plano = planoNome || '';
-      osIXC.sn_senha = senhaPppoe || '';
+      // lê no ordem_servico_model). Prefixo sn_ pra não colidir com campos nativos.
+      if (jaEnriquecido && ixcAntigo) {
+        // Copia do snapshot anterior (sem tocar o IXC).
+        if (!osIXC.login && ixcAntigo.login) osIXC.login = ixcAntigo.login;
+        osIXC.caixa_ftth = ixcAntigo.caixa_ftth || '';
+        osIXC.porta_ftth = ixcAntigo.porta_ftth || '';
+        osIXC.sn_cidade = ixcAntigo.sn_cidade || '';
+        osIXC.sn_cep = ixcAntigo.sn_cep || '';
+        osIXC.sn_referencia = ixcAntigo.sn_referencia || '';
+        osIXC.sn_complemento = ixcAntigo.sn_complemento || '';
+        osIXC.sn_apartamento = ixcAntigo.sn_apartamento || '';
+        osIXC.sn_plano = ixcAntigo.sn_plano || '';
+        osIXC.sn_senha = ixcAntigo.sn_senha || '';
+      } else {
+        osIXC.sn_cidade = clienteCidade || '';
+        osIXC.sn_cep = clienteCep || '';
+        osIXC.sn_referencia = clienteReferencia || '';
+        osIXC.sn_complemento = clienteComplemento || '';
+        osIXC.sn_apartamento = clienteApartamento || '';
+        osIXC.sn_plano = planoNome || '';
+        osIXC.sn_senha = senhaPppoe || '';
+      }
+      // Marca como enriquecida → os próximos ciclos copiam daqui (não tocam o IXC).
+      osIXC.sn_enriquecido = true;
 
       const dadosOS = {
         numero_os: osIXC.protocolo || `IXC-${osIXC.id}`,

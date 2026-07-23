@@ -520,10 +520,13 @@ async reagendarOS(osId, dados) {
       longitude: '',
       gps_time: '',
       id_setor: (osDetalhes.setor || osDetalhes.id_setor || '').toString(),
-      id_tecnico: ''
+      // Colaborador responsável = o próprio técnico da OS (mantém quem era o
+      // dono), igual ao "Necessário reagendar" manual do IXC. dados.id_tecnico
+      // (passado pelo controller) vence; senão, o técnico atual da OS no IXC.
+      id_tecnico: (dados.id_tecnico || dados.id_tecnico_ixc || osDetalhes.id_tecnico || '').toString()
     };
 
-    console.log(`📤 POST /su_oss_chamado_reagendamento - OS ${osId}`);
+    console.log(`📤 POST /su_oss_chamado_reagendamento - OS ${osId} (colaborador ${payload.id_tecnico || '—'})`);
 
     const response = await this.clientAlterar.post('/su_oss_chamado_reagendamento', payload);
 

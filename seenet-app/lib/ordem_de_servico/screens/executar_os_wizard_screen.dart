@@ -86,10 +86,12 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     // cria os widgets no primeiro build, então precisam já ter o valor inicial.
     _restaurarBinarios();
 
-    // SEMPRE checa se existe rascunho no SERVIDOR (criado ao reagendar/encaminhar).
-    // Se existir, ele VENCE o progresso local (é a fonte da verdade do handoff);
-    // senão, cai no progresso local. Gate o build até carregar (async).
-    if (os.tipoOs != 'E') {
+    // Sem progresso LOCAL desta OS? Pode existir um rascunho no SERVIDOR (outro
+    // técnico reagendou/encaminhou → o local foi limpo). Só nesse caso gastamos um
+    // GET (com spinner) — pra OS nova/continuando no mesmo aparelho, usa o local.
+    final temProgressoLocal =
+        GetStorage().read('wizard_progress_${os.id}') != null;
+    if (!temProgressoLocal && os.tipoOs != 'E') {
       _carregandoRascunho = true;
     }
 

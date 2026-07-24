@@ -826,7 +826,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
     if (dados['fotos'] is List) {
       final novas = <AnexoComDescricao>[];
-      Directory? tmpDir;
+      // dynamic (não Directory?): no build WEB o `Directory` do import condicional
+      // vira um stub diferente do Directory real que o path_provider devolve —
+      // dynamic evita esse choque de tipo em tempo de compilação (o bloco só roda
+      // de fato no !kIsWeb, então isso nunca é executado no web).
+      dynamic tmpDir;
       if (!kIsWeb) {
         try { tmpDir = await getTemporaryDirectory(); } catch (_) {}
       }

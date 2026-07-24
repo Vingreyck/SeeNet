@@ -212,7 +212,10 @@ class _ConfirmarRecebimentoScreenState
 
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              // Folga extra embaixo = altura da barra do celular, pro botão de
+              // confirmar não encostar/ficar atrás da navegação ao rolar até o fim.
+              padding: EdgeInsets.fromLTRB(
+                  16, 16, 16, 16 + MediaQuery.of(context).viewPadding.bottom),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

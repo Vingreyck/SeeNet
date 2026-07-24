@@ -12,7 +12,11 @@ import '../../services/ordem_servico_service.dart';
 /// Chave = cliente (backend resolve por cliente_id_externo). Só no SeeNet.
 class FachadaFotoWidget extends StatefulWidget {
   final String osId;
-  const FachadaFotoWidget({super.key, required this.osId});
+  // Quando false: modo SÓ VISUALIZAR (ajuda a achar a casa no deslocamento) —
+  // sem botão de tirar/refazer. A captura só faz sentido AO CHEGAR no local, então
+  // fica no passo de Fotos (podeCapturar:true), não no de Localização/deslocamento.
+  final bool podeCapturar;
+  const FachadaFotoWidget({super.key, required this.osId, this.podeCapturar = true});
 
   @override
   State<FachadaFotoWidget> createState() => _FachadaFotoWidgetState();
@@ -263,15 +267,19 @@ class _FachadaFotoWidgetState extends State<FachadaFotoWidget> {
                   )
                 else
                   const SizedBox.shrink(),
-                TextButton.icon(
-                  onPressed: _enviando ? null : _escolherOrigem,
-                  icon: const Icon(Icons.refresh, size: 16, color: Colors.white54),
-                  label: const Text('Refazer', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
-                ),
+                // "Refazer" só quando pode capturar (ao chegar no local).
+                if (widget.podeCapturar)
+                  TextButton.icon(
+                    onPressed: _enviando ? null : _escolherOrigem,
+                    icon: const Icon(Icons.refresh, size: 16, color: Colors.white54),
+                    label: const Text('Refazer', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  )
+                else
+                  const SizedBox.shrink(),
               ],
             ),
-          ] else ...[
+          ] else if (widget.podeCapturar) ...[
             const Text('Ainda não há foto da frente desta casa (opcional).',
                 style: TextStyle(color: Colors.white38, fontSize: 12)),
             const SizedBox(height: 8),
@@ -289,6 +297,10 @@ class _FachadaFotoWidgetState extends State<FachadaFotoWidget> {
                 ),
               ),
             ),
+          ] else ...[
+            // Modo visualizar, sem foto ainda: só um aviso (a captura é ao chegar).
+            const Text('A foto da fachada é tirada ao chegar no local.',
+                style: TextStyle(color: Colors.white38, fontSize: 12)),
           ],
         ],
       ),

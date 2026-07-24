@@ -280,7 +280,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           const SizedBox(height: 12),
           HistoricoEnderecoWidget(osId: os.id),
           const SizedBox(height: 12),
-          FachadaFotoWidget(osId: os.id),
+          // Aqui é SÓ VISUALIZAR a foto da fachada (ajuda a achar a casa). Tirar a
+          // foto fica no passo "Fotos", que só aparece depois de "Cheguei ao Local".
+          FachadaFotoWidget(osId: os.id, podeCapturar: false),
           const SizedBox(height: 12),
           _buildCard(child: LocalizacaoWidget(
             onLocalizacaoCapturada: (lat, lng) {
@@ -302,6 +304,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         children: [
           _buildTituloEtapa(icone: Icons.camera_alt_rounded, titulo: 'Fotos do Local', descricao: 'Tire fotos do roteador, ONU, local e equipamentos'),
           const SizedBox(height: 20),
+          // Foto da FACHADA (frente da casa) — agora aqui, pois o técnico já chegou
+          // ao local. Fica registrada pro próximo que pegar este cliente achar a casa.
+          FachadaFotoWidget(osId: os.id, podeCapturar: true),
+          const SizedBox(height: 12),
           _buildCard(child: AnexosWidget(
             anexosIniciais: fotosAnexadas,
             onAnexosAlterados: (anexos) {

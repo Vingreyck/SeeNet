@@ -956,13 +956,14 @@ class _RequisicaoEpiScreenState
         final etapa = _tabController.index;
         final isUltima = etapa == 1;
 
-        return SafeArea(
-          top: false,
-          child: Container(
-          padding: const EdgeInsets.only(
+        return Container(
+          // Padding inferior = altura da barra de navegação do celular + folga,
+          // pra o botão NUNCA ficar coberto pelos botões do sistema (MIUI/Redmi
+          // reportava mal com SafeArea → o botão sumia atrás da navegação).
+          padding: EdgeInsets.only(
             left: 16, right: 16,
             top: 12,
-            bottom: 12,
+            bottom: MediaQuery.of(context).viewPadding.bottom + 12,
           ),
           decoration: BoxDecoration(
             color: const Color(0xFF181818),
@@ -1032,7 +1033,6 @@ class _RequisicaoEpiScreenState
                 )),
               ),
             ],
-          ),
           ),
         );
       },

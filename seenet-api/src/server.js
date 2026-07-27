@@ -1317,7 +1317,13 @@ app.get('/api/debug/test-ixc-estoque-v3/:osIdIxc', async (req, res) => {
       console.error('⚠️ Erro ao listar rotas:', routeListError.message);
     }*/
 console.log('🚀 CHEGOU NO APP.LISTEN - INICIANDO SERVIDOR...');
-    app.listen(PORT, '0.0.0.0', () => {
+    // http.Server "cru" em vez de app.listen direto: o WebSocket hub precisa
+    // se anexar no MESMO servidor/porta (Railway só expõe uma porta).
+    const http = require('http');
+    const httpServer = http.createServer(app);
+    require('./services/WebSocketHub').init(httpServer);
+
+    httpServer.listen(PORT, '0.0.0.0', () => {
       logger.info('✨ SERVIDOR INICIADO COM SUCESSO', {
         port: PORT,
         environment: process.env.NODE_ENV,
@@ -1327,7 +1333,6 @@ console.log('🚀 CHEGOU NO APP.LISTEN - INICIANDO SERVIDOR...');
 
       // Keep-alive DENTRO do listen (silencioso — o log a cada 4min era só ruído)
       setInterval(() => {
-        const http = require('http');
         http.get(`http://localhost:${PORT}/health`, () => {}).on('error', () => {});
       }, 4 * 60 * 1000);
     });

@@ -7,6 +7,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import '../database/local_database.dart';
 
 const _kChannelId   = 'seenet_gps_channel';
 const _kChannelName = 'SeeNet GPS';
@@ -117,6 +118,22 @@ void _onStart(ServiceInstance service) async {
       print('📍 [BG] ${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}');
     } catch (e) {
       print('⚠️ [BG] Erro ao enviar GPS: $e');
+      // 📥 Sem internet → guarda na fila offline (mesma tabela/fila do
+      // SyncManager). Esse isolate não tem GetX, então grava direto no
+      // sqflite; quem drena a fila é o SyncManager (app em foreground),
+      // chamado pelo ConnectivityService assim que a conexão voltar.
+      try {
+        await LocalDatabase.enfileirar(
+          'POSICAO',
+          json.encode({
+            'os_id': osId,
+            'latitude': pos.latitude,
+            'longitude': pos.longitude,
+            'velocidade': pos.speed,
+            'precisao': pos.accuracy,
+          }),
+        );
+      } catch (_) {}
     }
   }
 

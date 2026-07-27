@@ -1436,6 +1436,21 @@ if (dados.fotos && dados.fotos.length > 0) {
              console.warn('⚠️ Trilha não gravada:', trilhaErr.message);
            }
 
+           // 🔌 Empurra pro admin na hora (WebSocket) — best-effort, nunca quebra
+           // o salvamento acima nem o retorno pro técnico se o hub falhar.
+           try {
+             require('../services/WebSocketHub').broadcastPosicao(tenantId, osId, {
+               tecnico_id: userId,
+               latitude,
+               longitude,
+               velocidade: velocidade || null,
+               precisao: precisao || null,
+               atualizado_em: new Date().toISOString(),
+             });
+           } catch (wsErr) {
+             console.warn('⚠️ Broadcast WS não enviado:', wsErr.message);
+           }
+
            return res.json({ success: true });
          } catch (error) {
            console.error('❌ Erro ao atualizar localização:', error.message);

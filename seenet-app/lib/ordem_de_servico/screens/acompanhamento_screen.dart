@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
+import '../../services/realtime_socket_service.dart';
 import 'rastreamento_mapa_screen.dart';
 
 class AcompanhamentoScreen extends StatefulWidget {
@@ -20,6 +21,9 @@ class _AcompanhamentoScreenState extends State<AcompanhamentoScreen>
   List<Map<String, dynamic>> _tecnicos = [];
   bool _carregando = true;
   Timer? _timer;
+
+  final RealtimeSocketService _socket = RealtimeSocketService();
+  StreamSubscription? _socketSub;
 
   late AnimationController _pulseCtrl;
 
@@ -38,6 +42,12 @@ class _AcompanhamentoScreenState extends State<AcompanhamentoScreen>
   void initState() {
     super.initState();
     _carregar();
+    // 🔌 WebSocket: atualiza a posição na lista NA HORA. O polling de 15s
+    // continua como fallback (WS caiu, rede bloqueando, etc.) — ele também
+    // é quem detecta técnico NOVO entrando/saindo da lista de "em campo".
+    _socket.conectar();
+    _socket.inscreverGeral();
+    _socketSub = _socket.posicoes.listen(_aplicarPosicaoNaLista);
     _timer = Timer.periodic(const Duration(seconds: 15), (_) => _carregar());
     _pulseCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1200))
@@ -47,8 +57,28 @@ class _AcompanhamentoScreenState extends State<AcompanhamentoScreen>
   @override
   void dispose() {
     _timer?.cancel();
+    _socketSub?.cancel();
+    _socket.fechar();
     _pulseCtrl.dispose();
     super.dispose();
+  }
+
+  /// Atualiza in-place o técnico da lista cuja OS bateu com a mensagem do WS
+  /// (a lista em si — quem entra/sai — continua vindo do polling normal).
+  void _aplicarPosicaoNaLista(Map<String, dynamic> msg) {
+    final osId = msg['os_id']?.toString();
+    if (osId == null || !mounted) return;
+    final index = _tecnicos.indexWhere((t) => t['id'].toString() == osId);
+    if (index == -1) return;
+    setState(() {
+      _tecnicos[index] = {
+        ..._tecnicos[index],
+        'latitude': msg['latitude'],
+        'longitude': msg['longitude'],
+        'velocidade': msg['velocidade'],
+        'atualizado_em': msg['atualizado_em'],
+      };
+    });
   }
 
   Future<void> _carregar() async {

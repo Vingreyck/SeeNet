@@ -66,6 +66,18 @@ class SyncManager extends GetxService {
                 'epis_selecionados': payload['epis_selecionados'],
               });
               break;
+            case 'POSICAO':
+              // Posição do GPS que falhou por falta de conexão (ver
+              // tracking_service.dart / background_location_service.dart).
+              // Reenvia pro mesmo endpoint que o tracking ao vivo usa — o
+              // backend trata como uma posição normal (upsert + trilha).
+              await _api.put('/ordens-servico/${payload['os_id']}/location', {
+                'latitude': payload['latitude'],
+                'longitude': payload['longitude'],
+                'velocidade': payload['velocidade'],
+                'precisao': payload['precisao'],
+              });
+              break;
           }
 
           await LocalDatabase.marcarSincronizado(id);
@@ -109,6 +121,21 @@ class SyncManager extends GetxService {
     await LocalDatabase.enfileirar(
       'CHEGAR_LOCAL',
       json.encode({'os_id': osId, 'latitude': lat, 'longitude': lng}),
+    );
+    await _atualizarContador();
+  }
+
+  Future<void> enfileirarPosicao(String osId, double lat, double lng,
+      {double? velocidade, double? precisao}) async {
+    await LocalDatabase.enfileirar(
+      'POSICAO',
+      json.encode({
+        'os_id': osId,
+        'latitude': lat,
+        'longitude': lng,
+        'velocidade': velocidade,
+        'precisao': precisao,
+      }),
     );
     await _atualizarContador();
   }

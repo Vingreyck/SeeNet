@@ -18,7 +18,7 @@ class RegistrarView extends GetView<RegistroController> {
   static const List<Map<String, dynamic>> _almoxarifados = [
     {'id': 1, 'nome': 'ITABAIANA'},
     {'id': 91,  'nome': 'CAPELA'},
-    {'id': 71,  'nome': 'CAMPO DO BRITO'},
+    {'id': 86,  'nome': 'CAMPO DO BRITO'}, // ⚠️ NÃO usar 71 ("LOJA") — sem patrimônio, o correto é o 86 ("SUPORTE")
     {'id': 69,  'nome': 'MACAMBIRA'},
     {'id': 68,  'nome': 'AREIA BRANCA'},
     {'id': 22,  'nome': 'MOITA BONITA'},

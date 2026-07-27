@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import 'sync_manager.dart';
 
 class TrackingService extends GetxService {
   final _bgService = FlutterBackgroundService();
@@ -105,19 +106,32 @@ class TrackingService extends GetxService {
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-      await http.put(
-        Uri.parse('$baseUrl/ordens-servico/$osId/location'),
-        headers: _headers,
-        body: json.encode({
-          'latitude': pos.latitude,
-          'longitude': pos.longitude,
-          'velocidade': pos.speed,
-          'precisao': pos.accuracy,
-        }),
-      );
-      print('📍 Posição enviada — OS $osId (${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)})');
+      try {
+        await http.put(
+          Uri.parse('$baseUrl/ordens-servico/$osId/location'),
+          headers: _headers,
+          body: json.encode({
+            'latitude': pos.latitude,
+            'longitude': pos.longitude,
+            'velocidade': pos.speed,
+            'precisao': pos.accuracy,
+          }),
+        ).timeout(const Duration(seconds: 10));
+        print('📍 Posição enviada — OS $osId (${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)})');
+      } catch (e) {
+        // 📥 Sem internet (ou request travou) → guarda na fila offline em vez
+        // de simplesmente descartar o ponto. O SyncManager reenvia sozinho
+        // quando a conexão voltar (ConnectivityService já dispara isso).
+        try {
+          await Get.find<SyncManager>().enfileirarPosicao(
+            osId, pos.latitude, pos.longitude,
+            velocidade: pos.speed, precisao: pos.accuracy,
+          );
+          print('📥 Posição enfileirada (offline) — OS $osId');
+        } catch (_) {}
+      }
     } catch (e) {
-      print('⚠️ Erro ao enviar posição atual: $e');
+      print('⚠️ Erro ao capturar GPS: $e');
     }
   }
 

@@ -7,6 +7,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
+import '../../services/realtime_socket_service.dart';
 
 /// Mapa ao vivo mostrando a posição do técnico em tempo real
 class RastreamentoMapaScreen extends StatefulWidget {
@@ -39,6 +40,10 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
   double? _velocidade;
   bool _primeiraVez = true;
   bool _tecnicoChegou = false;
+  DateTime? _atualizadoEm;
+
+  final RealtimeSocketService _socket = RealtimeSocketService();
+  StreamSubscription? _socketSub;
 
   Map<String, String> get _headers {
     final auth = Get.find<AuthService>();
@@ -54,8 +59,25 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
     super.initState();
     _carregarLocalizacao();
     _carregarTrilha();
-    // Polling a cada 3s (near-real-time; o "de verdade" via WebSocket fica pra depois)
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _carregarLocalizacao());
+    // 🔌 WebSocket: posição chega NA HORA (empurrada pelo backend a cada
+    // update do técnico). O polling abaixo agora é só um FALLBACK (rede que
+    // bloqueia WS, app antigo sem esse recurso etc.) — por isso ficou mais
+    // espaçado (era 3s).
+    _socket.conectar();
+    _socket.inscreverOS(widget.osId);
+    _socketSub = _socket.posicoes.listen((msg) {
+      if (msg['os_id'].toString() != widget.osId) return;
+      final lat = (msg['latitude'] as num?)?.toDouble();
+      final lng = (msg['longitude'] as num?)?.toDouble();
+      if (lat == null || lng == null) return;
+      _aplicarPosicao(
+        lat: lat,
+        lng: lng,
+        velocidade: (msg['velocidade'] as num?)?.toDouble(),
+        atualizadoEm: DateTime.tryParse(msg['atualizado_em']?.toString() ?? ''),
+      );
+    });
+    _timer = Timer.periodic(const Duration(seconds: 15), (_) => _carregarLocalizacao());
     // Trilha muda devagar (backend grava 1 ponto/15s) → atualiza a cada 30s
     _timerTrilha = Timer.periodic(const Duration(seconds: 30), (_) => _carregarTrilha());
   }
@@ -64,8 +86,44 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
   void dispose() {
     _timer?.cancel();
     _timerTrilha?.cancel();
+    _socketSub?.cancel();
+    _socket.fechar();
     _mapController.dispose();
     super.dispose();
+  }
+
+  /// Aplica uma posição nova (venha do WebSocket ou do polling HTTP) — mesma
+  /// lógica de estado pros dois casos, pra não duplicar.
+  void _aplicarPosicao({
+    required double lat,
+    required double lng,
+    double? velocidade,
+    DateTime? atualizadoEm,
+    String? statusOs,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      _posicaoAtual = LatLng(lat, lng);
+      _velocidade = velocidade;
+      if (statusOs != null) _tecnicoChegou = statusOs == 'em_execucao';
+      _atualizadoEm = atualizadoEm ?? DateTime.now();
+
+      final diff = DateTime.now().difference(_atualizadoEm!);
+      if (diff.inSeconds < 30) {
+        _tempoAtualizado = 'agora';
+      } else if (diff.inMinutes < 1) {
+        _tempoAtualizado = 'há ${diff.inSeconds}s';
+      } else {
+        _tempoAtualizado = 'há ${diff.inMinutes}min';
+      }
+    });
+
+    if (_primeiraVez) {
+      try {
+        _mapController.move(LatLng(lat, lng), 16);
+      } catch (_) {}
+      _primeiraVez = false;
+    }
   }
 
   /// Busca a rota percorrida (histórico de posições) pra desenhar a polyline.
@@ -106,38 +164,13 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
         final lng = data['longitude'] as double;
         final status = data['os_status'] ?? '';
 
-        if (mounted) {
-          setState(() {
-            _posicaoAtual = LatLng(lat, lng);
-            _velocidade = data['velocidade'] != null
-                ? (data['velocidade'] as num).toDouble()
-                : null;
-            _tecnicoChegou = status == 'em_execucao';
-
-            // Calcular tempo
-            if (data['atualizado_em'] != null) {
-              final dt = DateTime.tryParse(data['atualizado_em']);
-              if (dt != null) {
-                final diff = DateTime.now().difference(dt);
-                if (diff.inSeconds < 30) {
-                  _tempoAtualizado = 'agora';
-                } else if (diff.inMinutes < 1) {
-                  _tempoAtualizado = 'há ${diff.inSeconds}s';
-                } else {
-                  _tempoAtualizado = 'há ${diff.inMinutes}min';
-                }
-              }
-            }
-          });
-
-          // Centraliza na primeira posição recebida (depois use "Centralizar")
-          if (_primeiraVez) {
-            try {
-              _mapController.move(LatLng(lat, lng), 16);
-            } catch (_) {}
-            _primeiraVez = false;
-          }
-        }
+        _aplicarPosicao(
+          lat: lat,
+          lng: lng,
+          velocidade: data['velocidade'] != null ? (data['velocidade'] as num).toDouble() : null,
+          atualizadoEm: data['atualizado_em'] != null ? DateTime.tryParse(data['atualizado_em']) : null,
+          statusOs: status,
+        );
       } else if (response.statusCode == 404) {
         // Técnico parou de enviar (chegou ao local)
         if (mounted) {
@@ -247,6 +280,35 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
                           style: const TextStyle(color: Colors.white54, fontSize: 12),
                         ),
                       ],
+                      // Mostra se o mapa está recebendo em TEMPO REAL (WebSocket)
+                      // ou caiu no modo de reserva (atualiza a cada 15s). Sem
+                      // isso não dá pra saber, em campo, se o tempo real está
+                      // mesmo funcionando.
+                      const SizedBox(width: 10),
+                      Obx(() => Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _socket.conectado.value
+                                    ? Icons.bolt_rounded
+                                    : Icons.sync_rounded,
+                                size: 13,
+                                color: _socket.conectado.value
+                                    ? const Color(0xFF00FF88)
+                                    : Colors.white38,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                _socket.conectado.value ? 'ao vivo' : 'a cada 15s',
+                                style: TextStyle(
+                                  color: _socket.conectado.value
+                                      ? const Color(0xFF00FF88)
+                                      : Colors.white38,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          )),
                     ],
                   ),
                 ),

@@ -147,8 +147,13 @@ class IXCService {
 
   /**
    * ✅ Dados do LOGIN (radusuarios) a partir do id_login da OS: além da string
-   * do login, traz a SENHA PPPoE e o id_contrato (usado p/ achar o plano).
-   * Retorna { login, senha, id_contrato } ou null.
+   * do login, traz a SENHA PPPoE, o id_contrato (usado p/ achar o plano) e o
+   * ENDEREÇO PRÓPRIO do login (o mesmo contrato pode ter mais de um login,
+   * cada um numa casa/endereço diferente — no IXC isso fica na aba "Endereço"
+   * do Login). Campos de endereço vazios = login não tem endereço próprio →
+   * quem chama deve cair pro endereço do cliente/contrato (fallback).
+   * Retorna { login, senha, id_contrato, endereco, numero, bairro, cep,
+   * referencia, complemento, apartamento, cidade } ou null.
    */
   async buscarDadosLogin(idLogin) {
     try {
@@ -167,6 +172,14 @@ class IXCService {
         login: reg.login || null,
         senha: reg.senha || null,
         id_contrato: reg.id_contrato || null,
+        endereco: reg.endereco || null,
+        numero: reg.numero || null,
+        bairro: reg.bairro || null,
+        cep: reg.cep || null,
+        referencia: reg.referencia || null,
+        complemento: reg.complemento || null,
+        apartamento: reg.apartamento || null,
+        cidade: reg.cidade || null,
       };
     } catch (e) {
       console.error(`❌ Erro ao buscar dados do login id ${idLogin}:`, e.message);

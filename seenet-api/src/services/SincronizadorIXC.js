@@ -10,7 +10,7 @@ class SincronizadorIXC {
     this.cacheClientes = new Map();
     this.cacheAssuntos = new Map();
     this.cacheFibra = new Map(); // login → dados de fibra (Caixa FTTH / Porta FTTH)
-    this.cacheLogin = new Map(); // id_login → { login, senha, id_contrato }
+    this.cacheLogin = new Map(); // id_login → { login, senha, id_contrato, endereco... }
     this.cacheCidade = new Map(); // id_cidade → { nome, uf } (cidade não muda)
     this.cacheContrato = new Map(); // id_contrato → nome do plano
     this.maxOSsPorSync = 10;
@@ -523,6 +523,32 @@ class SincronizadorIXC {
             if (!osIXC.login && rec.login) osIXC.login = rec.login;
             senhaPppoe = rec.senha || null;
             idContratoLogin = rec.id_contrato || null;
+
+            // 🏠 Endereço PRÓPRIO do login tem prioridade sobre o do cliente/contrato:
+            // um contrato pode ter mais de um login, cada um numa casa diferente
+            // (ex: contrato da mãe com 2 logins — "casa" e "casa da filha"). Se o
+            // login não tiver endereço próprio (campos vazios), mantém o do cliente
+            // já buscado acima (fallback).
+            if (rec.endereco) {
+              clienteEndereco = rec.endereco;
+              clienteNumero = rec.numero || clienteNumero;
+              clienteBairro = rec.bairro || clienteBairro;
+              clienteCep = rec.cep || clienteCep;
+              clienteReferencia = rec.referencia || clienteReferencia;
+              clienteComplemento = rec.complemento || clienteComplemento;
+              clienteApartamento = rec.apartamento || clienteApartamento;
+
+              if (rec.cidade && rec.cidade !== '0') {
+                let cidLogin = this.cacheCidade.get(rec.cidade);
+                if (cidLogin === undefined) {
+                  cidLogin = await ixcService.buscarCidade(rec.cidade);
+                  this.cacheCidade.set(rec.cidade, cidLogin);
+                }
+                if (cidLogin && cidLogin.nome) {
+                  clienteCidade = cidLogin.uf ? `${cidLogin.nome} - ${cidLogin.uf}` : cidLogin.nome;
+                }
+              }
+            }
           }
         }
 

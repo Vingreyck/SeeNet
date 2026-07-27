@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io' if (dart.library.html) '../utils/io_stub.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/ordem_servico_model.dart';
 import 'package:get/get.dart';
@@ -287,9 +286,14 @@ class OrdemServicoService {
     }
   }
 
+  /// [itensEstoque] e [onuMac]: material já usado até aqui. Vai junto pro IXC
+  /// (o backend reconcilia, não duplica) pra não se perder quando outro técnico
+  /// pegar a OS — e pra auditoria já enxergar o que foi gasto.
   Future<bool> reagendarOS(String osId, double latitude, double longitude,
-      {String? motivo}) async {
+      {String? motivo, List<Map<String, dynamic>>? itensEstoque, String? onuMac,
+      List<dynamic>? fotos}) async {
     try {
+      final fotosB64 = await _fotosParaBase64(fotos);
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/reagendar'),
         headers: _headers,
@@ -297,6 +301,10 @@ class OrdemServicoService {
           'latitude': latitude,
           'longitude': longitude,
           'motivo': motivo ?? '',
+          if (itensEstoque != null && itensEstoque.isNotEmpty)
+            'itens_estoque': itensEstoque,
+          if (onuMac != null && onuMac.isNotEmpty) 'onu_mac': onuMac,
+          if (fotosB64.isNotEmpty) 'fotos': fotosB64,
         }),
       );
 
@@ -308,12 +316,22 @@ class OrdemServicoService {
     }
   }
 
-  Future<bool> encaminharOS(String osId, int tecnicoId, {String? motivo}) async {
+  Future<bool> encaminharOS(String osId, int tecnicoId,
+      {String? motivo, List<Map<String, dynamic>>? itensEstoque, String? onuMac,
+      List<dynamic>? fotos}) async {
     try {
+      final fotosB64 = await _fotosParaBase64(fotos);
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/encaminhar'),
         headers: _headers,
-        body: json.encode({'tecnico_id': tecnicoId, 'motivo': motivo ?? ''}),
+        body: json.encode({
+          'tecnico_id': tecnicoId,
+          'motivo': motivo ?? '',
+          if (itensEstoque != null && itensEstoque.isNotEmpty)
+            'itens_estoque': itensEstoque,
+          if (onuMac != null && onuMac.isNotEmpty) 'onu_mac': onuMac,
+          if (fotosB64.isNotEmpty) 'fotos': fotosB64,
+        }),
       );
 
       print('📥 encaminharOS - Status: ${response.statusCode}');
@@ -341,33 +359,40 @@ class OrdemServicoService {
     }
   }
 
+  /// Converte a lista de fotos do wizard (com `path` de arquivo) pra `base64`,
+  /// formato que o backend espera. Usado na finalização e também no
+  /// reagendar/encaminhar (material já usado não pode se perder na troca de
+  /// técnico). No web não tem acesso a arquivo local → pula (mesma limitação
+  /// de sempre; a foto some, mas o resto do fluxo segue normal).
+  Future<List<Map<String, String>>> _fotosParaBase64(List<dynamic>? fotos) async {
+    final fotosComMetadados = <Map<String, String>>[];
+    if (fotos == null || fotos.isEmpty) return fotosComMetadados;
+
+    for (var anexo in List<Map<String, dynamic>>.from(fotos)) {
+      try {
+        if (kIsWeb) continue; // web não tem acesso ao sistema de arquivos
+        final File file = File(anexo['path']);
+        if (!await file.exists()) continue;
+        final bytes = await file.readAsBytes();
+        final String base64Image = base64Encode(bytes);
+        fotosComMetadados.add({
+          'base64': base64Image,
+          'tipo': anexo['tipo'] ?? 'outro',
+          'descricao': anexo['descricao'] ?? '',
+        });
+      } catch (e) {
+        print('❌ Erro ao converter foto: $e');
+      }
+    }
+    return fotosComMetadados;
+  }
+
   Future<bool> finalizarOS(String osId, Map<String, dynamic> dados) async {
     try {
       print('🏁 Finalizando OS $osId');
 
       if (dados['fotos'] != null && (dados['fotos'] as List).isNotEmpty) {
-        List<Map<String, String>> fotosComMetadados = [];
-        List<Map<String, dynamic>> anexos = List<Map<String, dynamic>>.from(dados['fotos']);
-
-        for (var anexo in anexos) {
-          try {
-            if (kIsWeb) continue; // web não tem acesso ao sistema de arquivos
-            final File file = File(anexo['path']);
-            if (!await file.exists()) continue;
-            final bytes = await file.readAsBytes();
-            final Uint8List uint8Bytes = Uint8List.fromList(bytes);
-            final String base64Image = base64Encode(bytes);
-            fotosComMetadados.add({
-              'base64': base64Image,
-              'tipo': anexo['tipo'] ?? 'outro',
-              'descricao': anexo['descricao'] ?? '',
-            });
-          } catch (e) {
-            print('❌ Erro ao converter foto: $e');
-          }
-        }
-
-        dados['fotos'] = fotosComMetadados;
+        dados['fotos'] = await _fotosParaBase64(dados['fotos'] as List);
       }
 
       print('📦 Payload itens_estoque: ${json.encode(dados['itens_estoque'])}');

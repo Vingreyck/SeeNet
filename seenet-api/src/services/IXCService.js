@@ -1202,6 +1202,105 @@ async uploadFotoOS(osId, clienteId, fotoData) {
     }
   }
 
+  /**
+   * ✏️ Editar um movimento de produto já lançado na OS (ex.: auditoria viu que
+   * o técnico usou 150m de drop e não 50m). PUT em /su_oss_mov_produto/:id.
+   *
+   * ⚠️ Só funciona enquanto o PEDIDO DE VENDA da OS não foi FATURADO pelo
+   * financeiro — depois disso o IXC recusa ("Produtos e serviços não podem ser
+   * alterados. O pedido de venda está finalizado."). Use [pedidoOsEditavel]
+   * antes de tentar. (Validado ao vivo em 27/jul/2026.)
+   */
+  async editarProdutoOS(movimentoId, dados) {
+    try {
+      console.log(`✏️ Editando movimento ${movimentoId} na OS...`);
+
+      const response = await this.clientAlterar.put(
+        `/su_oss_mov_produto/${movimentoId}`, dados
+      );
+
+      if (response.data?.type === 'error') {
+        throw new Error(response.data.message || 'Erro ao editar produto');
+      }
+
+      console.log(`✅ Movimento ${movimentoId} atualizado`);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Erro ao editar produto ${movimentoId}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 🚦 O pedido de venda gerado pela OS ainda aceita alteração de produtos?
+   * O financeiro fatura MANUALMENTE (confirmado pelo suporte IXC); depois de
+   * faturado (`status_fat_os='F'` / `id_saida` preenchido) nada mais pode ser
+   * editado ou removido por webservice — só cancelando a venda no painel.
+   *
+   * Retorna { editavel, motivo, pedidoId }. Em caso de falha na consulta,
+   * devolve editavel=true (não trava o fluxo por indisponibilidade do IXC —
+   * a operação em si vai falhar com mensagem clara se for o caso).
+   */
+  async pedidoOsEditavel(osIdExterno) {
+    try {
+      const params = new URLSearchParams({
+        qtype: 'pedido_os.id_oss_chamado',
+        query: osIdExterno.toString(),
+        oper: '=',
+        page: '1',
+        rp: '5',
+        sortname: 'pedido_os.id',
+        sortorder: 'desc'
+      });
+      const response = await this.clientListar.post('/pedido_os', params.toString());
+      const pedidos = response.data?.registros || [];
+      if (pedidos.length === 0) {
+        // Sem pedido ainda = primeira vez que a OS recebe produto → livre.
+        return { editavel: true, motivo: null, pedidoId: null };
+      }
+
+      const faturado = pedidos.find(p =>
+        p.status_fat_os === 'F' || (p.id_saida && p.id_saida !== '0' && p.id_saida !== '')
+      );
+      if (faturado) {
+        return {
+          editavel: false,
+          motivo: `O pedido de venda ${faturado.id} desta OS já foi faturado pelo financeiro. ` +
+                  `Para alterar os produtos é preciso cancelar a venda no painel do IXC.`,
+          pedidoId: faturado.id,
+        };
+      }
+      return { editavel: true, motivo: null, pedidoId: pedidos[0].id };
+    } catch (error) {
+      console.warn(`⚠️ Não foi possível checar o pedido da OS ${osIdExterno}:`, error.message);
+      return { editavel: true, motivo: null, pedidoId: null };
+    }
+  }
+
+  /**
+   * Lista os comodatos ATIVOS lançados nesta OS (pra reconciliar: o que já está
+   * no IXC vs o que o técnico deixou na lista depois de editar).
+   */
+  async listarComodatosOS(osIdExterno) {
+    try {
+      const params = new URLSearchParams({
+        qtype: 'movimento_produtos.id_oss_chamado',
+        query: osIdExterno.toString(),
+        oper: '=',
+        page: '1',
+        rp: '50',
+        sortname: 'movimento_produtos.id',
+        sortorder: 'desc',
+        grid_param: JSON.stringify([{ TB: 'movimento_produtos.status_comodato', OP: '=', P: 'E' }]),
+      });
+      const response = await this.clientListar.post('/su_oss_mov_comodato_wiz', params.toString());
+      return response.data?.registros || [];
+    } catch (error) {
+      console.error(`❌ Erro ao listar comodatos da OS ${osIdExterno}:`, error.message);
+      return [];
+    }
+  }
+
   async criarRequisicaoMaterial(dados) {
       try {
         console.log(`📋 Criando requisição de material no IXC...`);

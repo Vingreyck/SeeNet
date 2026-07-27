@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { db } = require('../config/database');
 const IXCService = require('../services/IXCService');
 const notificationService = require('../services/NotificationService');
@@ -475,6 +476,33 @@ async reagendarOS(req, res) {
 
     // Sincroniza com IXC FORA da transação (best-effort, igual chegar/finalizar).
     if (os.origem === 'IXC' && os.id_externo) {
+      // 📦 Material e 📸 fotos já usadas NÃO se perdem na troca de técnico:
+      // registra no IXC agora. Ambos são reconciliados/deduplicados (não
+      // duplicam), então quem pegar a OS depois pode ajustar. App antigo não
+      // manda esses campos → simplesmente pula, sem quebrar nada.
+      const temItens = Array.isArray(req.body.itens_estoque) && req.body.itens_estoque.length > 0;
+      const temFotos = Array.isArray(req.body.fotos) && req.body.fotos.length > 0;
+      if (temItens || temFotos) {
+        try {
+          const integ = await db('integracao_ixc')
+            .where('tenant_id', tenantId).where('ativo', true).first();
+          if (integ) {
+            const ixcReag = new IXCService(integ.url_api, integ.token_api);
+            if (temItens) {
+              await this.sincronizarItensEstoqueIXC(
+                os, { itens_estoque: req.body.itens_estoque, onu_mac: req.body.onu_mac },
+                ixcReag, tenantId
+              );
+            }
+            if (temFotos) {
+              await this.sincronizarFotosIXC(os, req.body.fotos, ixcReag, tenantId);
+            }
+          }
+        } catch (e) {
+          console.error('⚠️ Erro ao registrar material/fotos no reagendamento:', e.message);
+        }
+      }
+
       try {
         await this.sincronizarReagendamentoComIXC(db, os, { latitude, longitude, motivo });
       } catch (error) {
@@ -514,6 +542,377 @@ async reagendarOS(req, res) {
 /**
  * Sincronizar reagendamento com IXC (status RAG)
  */
+/**
+ * 📦 Envia os itens de estoque da OS pro IXC RECONCILIANDO com o que já está lá.
+ *
+ * Antes isso era um loop de INSERÇÃO CEGA dentro do finalizarExecucao: rodar
+ * duas vezes duplicava tudo. Como agora o material também vai pro IXC no
+ * reagendar/encaminhar (pra não se perder na troca de técnico) e a OS pode ser
+ * REABERTA pela auditoria pra corrigir quantidade, precisa comparar:
+ *
+ *   • produto que já está lá com a MESMA quantidade  → não faz nada
+ *   • produto que está lá com quantidade DIFERENTE   → edita (PUT)
+ *   • produto que sumiu da lista do técnico          → remove (DELETE)
+ *   • produto novo                                    → adiciona (POST)
+ *
+ * Comodato (patrimônio) não aceita editar nem deletar no IXC (405) — então o
+ * que saiu da lista é DEVOLVIDO (baixar_comodato_23069) e o novo é adicionado.
+ *
+ * ⚠️ Depois que o financeiro FATURA o pedido de venda, o IXC trava qualquer
+ * alteração. Nesse caso não tenta nada e devolve o motivo (o fluxo segue —
+ * a OS finaliza normalmente, só não mexe no que já foi faturado).
+ *
+ * OS de ESTRUTURA (tipo_os='E') não passa por aqui — usa outro endpoint e não
+ * tem o fluxo de auditoria/comodato; segue como antes (inserção direta).
+ *
+ * @returns {{aplicado:boolean, motivo:string|null, resumo:object}}
+ */
+async sincronizarItensEstoqueIXC(os, dados, ixcService, tenantId) {
+  const itens = Array.isArray(dados.itens_estoque) ? dados.itens_estoque : [];
+  const resumo = { adicionados: 0, editados: 0, removidos: 0, inalterados: 0, devolvidos: 0, erros: 0 };
+
+  if (!ixcService || !os.id_externo) return { aplicado: false, motivo: 'Sem integração IXC', resumo };
+
+  // OS de estrutura mantém o comportamento antigo (inserção direta).
+  if (os.tipo_os === 'E') {
+    await this._inserirItensEstruturaIXC(os, itens, ixcService, tenantId);
+    return { aplicado: true, motivo: null, resumo };
+  }
+
+  // 🚦 Pedido já faturado → IXC bloqueia tudo. Não insiste.
+  const gate = await ixcService.pedidoOsEditavel(os.id_externo);
+  if (!gate.editavel) {
+    console.warn(`⛔ Estoque da OS ${os.numero_os} NÃO sincronizado: ${gate.motivo}`);
+    return { aplicado: false, motivo: gate.motivo, resumo };
+  }
+
+  // ── Contexto (almoxarifado, contrato, filial, login) ──────────────────
+  const mapeamentoEstoque = await db('mapeamento_tecnicos_ixc')
+    .where('usuario_id', os.tecnico_id)
+    .where('tenant_id', tenantId)
+    .first();
+
+  // Material/comodato da OS descontam da LOJA da cidade (id_almoxarifado_loja)
+  // quando o admin mapeou; senão cai no almox pessoal do técnico (compat).
+  const idAlmox = mapeamentoEstoque?.id_almoxarifado_loja
+    || mapeamentoEstoque?.id_almoxarifado
+    || 22;
+
+  const hoje = new Date();
+  const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
+
+  const ehPatrimonioItem = (i) => !!(i.id_patrimonio && i.id_patrimonio !== '' && i.id_patrimonio !== '0');
+  const desejadosProduto  = itens.filter(i => !ehPatrimonioItem(i));
+  const desejadosComodato = itens.filter(i => ehPatrimonioItem(i));
+
+  let idContratoIxc = os.id_contrato_ixc || '';
+  let idFilialIxc = '';
+  let idLoginIxc = '';
+  if (!idContratoIxc || desejadosComodato.length > 0) {
+    try {
+      const osIxc = await ixcService.buscarDetalhesOS(os.id_externo);
+      if (!idContratoIxc) idContratoIxc = osIxc?.id_contrato_kit || osIxc?.id_contrato || '';
+      idFilialIxc = osIxc?.id_filial || '';
+      idLoginIxc = osIxc?.id_login || '';
+    } catch (e) {
+      console.warn('⚠️ Não foi possível buscar dados da OS no IXC:', e.message);
+    }
+  }
+
+  // ── O que JÁ está no IXC ───────────────────────────────────────────────
+  // Comodato e produto moram na mesma tabela; o que separa é o id_patrimonio.
+  let existentes = [];
+  try {
+    const resp = await ixcService.listarProdutosOS(os.id_externo);
+    existentes = resp?.registros || [];
+  } catch (e) {
+    console.warn('⚠️ Não foi possível listar os produtos já lançados:', e.message);
+  }
+  const temPatrim = (m) => !!(m.id_patrimonio && m.id_patrimonio !== '' && m.id_patrimonio !== '0');
+  const existentesProduto = existentes.filter(m => !temPatrim(m));
+
+  console.log(`📦 Reconciliando estoque da OS ${os.numero_os}: ` +
+    `${desejadosProduto.length} produto(s) desejado(s) vs ${existentesProduto.length} já no IXC`);
+
+  // ── PRODUTOS: edita / adiciona / remove ────────────────────────────────
+  const usados = new Set();
+  for (const item of desejadosProduto) {
+    const qtde = Number(item.quantidade);
+    const jaLa = existentesProduto.find(m =>
+      !usados.has(m.id) && String(m.id_produto) === String(item.id_produto));
+
+    try {
+      if (jaLa) {
+        usados.add(jaLa.id);
+        if (Math.abs(parseFloat(jaLa.qtde_saida) - qtde) < 0.000001) {
+          resumo.inalterados++;
+          continue;
+        }
+        // Quantidade mudou (caso clássico da auditoria: 50m → 150m de drop).
+        // Mantém `estoque` como está no registro pra não repetir baixa.
+        await ixcService.editarProdutoOS(jaLa.id, {
+          id:                          jaLa.id,
+          id_oss_chamado:              os.id_externo.toString(),
+          id_produto:                  item.id_produto.toString(),
+          descricao:                   item.descricao || jaLa.descricao || '',
+          qtde_saida:                  qtde.toString(),
+          valor_unitario:              item.valor_unitario.toFixed(2),
+          valor_total:                 (qtde * item.valor_unitario).toFixed(2),
+          id_almox:                    jaLa.id_almox || idAlmox.toString(),
+          id_unidade:                  jaLa.id_unidade || '1',
+          unidade_sigla:               jaLa.unidade_sigla || 'UND',
+          fator_conversao:             jaLa.fator_conversao || '1.000000000',
+          tipo:                        jaLa.tipo || 'S',
+          tipo_produto:                jaLa.tipo_produto || 'O',
+          estoque:                     jaLa.estoque || 'S',
+          data:                        jaLa.data || dataFormatada,
+          filial_id:                   jaLa.filial_id || (idFilialIxc || '1').toString(),
+          id_classificacao_tributaria: jaLa.id_classificacao_tributaria || '1',
+        });
+        console.log(`   ✏️ ${item.descricao}: ${parseFloat(jaLa.qtde_saida)} → ${qtde}`);
+        resumo.editados++;
+      } else {
+        await ixcService.adicionarProdutoOS({
+          id_oss_chamado:              os.id_externo,
+          id_produto:                  item.id_produto,
+          descricao:                   item.descricao || '',
+          qtde_saida:                  qtde.toString(),
+          data:                        dataFormatada,
+          id_unidade:                  '1',
+          id_almox:                    idAlmox.toString(),
+          id_classificacao_tributaria: '1',
+          // tipo='S' (Saída) — obrigatório p/ a venda gerada faturar.
+          tipo:                        'S',
+          estoque:                     'S',
+          unidade_sigla:               'UND',
+          fator_conversao:             '1.000000000',
+          valor_unitario:              item.valor_unitario.toFixed(2),
+          valor_total:                 (qtde * item.valor_unitario).toFixed(2),
+          id_patrimonio:               '',
+          patrimonio:                  '',
+          numero_serie:                '',
+          numero_patrimonial:          '',
+          tipo_produto:                'O',
+          ultima_situacao_patrimonio:  '',
+          garantia_oss:                '',
+          pcomissao:                   '',
+          pdesconto:                   '',
+          vdesconto:                   '',
+          id_oss_mensagem:             '',
+          id_saida:                    '',
+          id_terceiro_oss:             '',
+          id_su_oss_kit_equipamento:   '',
+          id_estrutura:                '',
+          id_pedido_os:                '',
+        });
+        console.log(`   ➕ [PRODUTO] ${item.descricao} x${qtde}`);
+        resumo.adicionados++;
+      }
+    } catch (e) {
+      console.error(`   ❌ Erro no item ${item.descricao}:`, e.message);
+      resumo.erros++;
+    }
+  }
+
+  // Sobrou no IXC e não está mais na lista do técnico → remove.
+  for (const m of existentesProduto) {
+    if (usados.has(m.id)) continue;
+    try {
+      await ixcService.removerProdutoOS(m.id);
+      console.log(`   🗑️ removido: ${m.descricao || m.id_produto} x${parseFloat(m.qtde_saida)}`);
+      resumo.removidos++;
+    } catch (e) {
+      console.error(`   ❌ Erro ao remover movimento ${m.id}:`, e.message);
+      resumo.erros++;
+    }
+  }
+
+  // ── COMODATO (patrimônio): não edita/deleta → devolve o que saiu ───────
+  let comodatosAtivos = [];
+  try {
+    comodatosAtivos = await ixcService.listarComodatosOS(os.id_externo);
+  } catch (_) {}
+
+  const patrimoniosDesejados = new Set(desejadosComodato.map(i => String(i.id_patrimonio)));
+  for (const c of comodatosAtivos) {
+    if (patrimoniosDesejados.has(String(c.id_patrimonio))) continue;
+    // Equipamento que o técnico tirou da lista → volta pro almoxarifado.
+    try {
+      const almoxDestino = c.id_almox || idAlmox;
+      await ixcService.devolverComodato(c.id, almoxDestino);
+      console.log(`   ↩️ comodato devolvido: patrimônio ${c.id_patrimonio}`);
+      resumo.devolvidos++;
+    } catch (e) {
+      console.error(`   ❌ Erro ao devolver comodato ${c.id}:`, e.message);
+      resumo.erros++;
+    }
+  }
+
+  const patrimoniosNoIxc = new Set(comodatosAtivos.map(c => String(c.id_patrimonio)));
+  for (const item of desejadosComodato) {
+    if (patrimoniosNoIxc.has(String(item.id_patrimonio))) {
+      resumo.inalterados++;
+      continue; // já está em comodato nesta OS
+    }
+    try {
+      await ixcService.adicionarComodatoOS({
+        id_oss_mensagem:             '',
+        id_saida:                    '',
+        id_oss_chamado:              os.id_externo.toString(),
+        id_contrato:                 (idContratoIxc || '').toString(),
+        id_login:                    (idLoginIxc || '').toString(),
+        id_patrimonio:               item.id_patrimonio.toString(),
+        id_produto:                  item.id_produto.toString(),
+        descricao:                   item.descricao || '',
+        data:                        dataFormatada,
+        id_unidade:                  '1',
+        // Patrimônio SÓ pode sair do almox onde ele está fisicamente.
+        id_almox:                    (item.id_almoxarifado && item.id_almoxarifado !== '0' && item.id_almoxarifado !== '')
+                                       ? item.id_almoxarifado.toString()
+                                       : idAlmox.toString(),
+        filial_id:                   (idFilialIxc || '1').toString(),
+        qtde_saida:                  item.quantidade.toString(),
+        valor_unitario:              item.valor_unitario.toFixed(2),
+        pcomissao:                   '',
+        pdesconto:                   '',
+        vdesconto:                   '',
+        valor_total:                 item.valor_total.toFixed(2),
+        patrimonio:                  item.id_patrimonio.toString(),
+        mac:                         dados.onu_mac || item.mac || '',
+        numero_serie:                item.numero_serie || '',
+        numero_patrimonial:          item.numero_patrimonial || '',
+        garantia_oss:                '',
+        id_terceiro_oss:             '',
+        id_su_oss_kit_equipamento:   '',
+        id_classificacao_tributaria: '1',
+        tipo:                        'C',
+        estoque:                     'S',
+        unidade_sigla:               'UND',
+        fator_conversao:             '1',
+        tipo_produto:                item.tipo_produto || 'P',
+        status_comodato:             'E',
+        status_patrimonio:           '',
+        ultima_situacao_patrimonio:  '',
+        id_pedido_os:                '',
+      });
+      console.log(`   ➕ [COMODATO] ${item.descricao} (patrimônio ${item.id_patrimonio})`);
+      resumo.adicionados++;
+    } catch (e) {
+      console.error(`   ❌ Erro no comodato ${item.descricao}:`, e.message);
+      resumo.erros++;
+    }
+  }
+
+  console.log(`📦 Estoque da OS ${os.numero_os}: +${resumo.adicionados} ✏️${resumo.editados} ` +
+    `🗑️${resumo.removidos} ↩️${resumo.devolvidos} =${resumo.inalterados} ❌${resumo.erros}`);
+
+  return { aplicado: true, motivo: null, resumo };
+}
+
+/** OS de ESTRUTURA: endpoint próprio, sem auditoria/comodato → inserção direta
+ *  (comportamento de sempre, extraído só pra manter o método principal limpo). */
+async _inserirItensEstruturaIXC(os, itens, ixcService, tenantId) {
+  const mapeamentoEstoque = await db('mapeamento_tecnicos_ixc')
+    .where('usuario_id', os.tecnico_id)
+    .where('tenant_id', tenantId)
+    .first();
+  const idAlmox = mapeamentoEstoque?.id_almoxarifado_loja
+    || mapeamentoEstoque?.id_almoxarifado || 22;
+  const hoje = new Date();
+  const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
+
+  for (const item of itens) {
+    try {
+      await ixcService.adicionarProdutoEstruturaOS({
+        id_oss_chamado:              os.id_externo,
+        id_produto:                  item.id_produto,
+        descricao:                   item.descricao || '',
+        qtde_saida:                  item.quantidade.toString(),
+        data:                        dataFormatada,
+        id_unidade:                  '1',
+        id_almox:                    idAlmox.toString(),
+        id_classificacao_tributaria: '1',
+        tipo:                        'C',
+        estoque:                     'S',
+        unidade_sigla:               'UND',
+        fator_conversao:             '1.000000000',
+        valor_unitario:              item.valor_unitario.toFixed(2),
+        valor_total:                 item.valor_total.toFixed(2),
+        id_estrutura:                '',
+        id_oss_mensagem:             '',
+        id_saida:                    '',
+        id_su_oss_kit_equipamento:   '',
+        tipo_produto:                '',
+        saldo_produto:               '',
+        ultima_situacao_patrimonio:  '',
+        id_pedido_os:                '',
+        pcomissao:                   '',
+        pdesconto:                   '',
+        vdesconto:                   '',
+      });
+      console.log(`   ✅ [ESTRUTURA] ${item.descricao} x${item.quantidade}`);
+    } catch (e) {
+      console.error(`   ❌ Erro ao enviar item ${item.descricao}:`, e.message);
+    }
+  }
+}
+
+/**
+ * 📸 Envia fotos pro IXC (arquivos anexados na OS) COM DEDUPLICAÇÃO.
+ *
+ * Como as fotos agora também vão no reagendar/encaminhar (não só na
+ * finalização), a MESMA foto pode aparecer de novo na lista em vários pontos
+ * do fluxo — reagendar 2x, ou reagendar e depois finalizar. Sem controle isso
+ * duplicaria o arquivo no IXC toda vez.
+ *
+ * Identifica cada foto pelo HASH do conteúdo (não pelo nome/descrição, que
+ * podem mudar) e guarda em `os_fotos_ixc_enviadas` — só sobe a que ainda não
+ * foi enviada. Best-effort: erro numa foto não impede as outras.
+ */
+async sincronizarFotosIXC(os, fotos, ixcService, tenantId) {
+  const lista = Array.isArray(fotos) ? fotos : [];
+  if (lista.length === 0 || !ixcService || !os.id_externo) return { enviadas: 0, jaEnviadas: 0 };
+
+  let enviadas = 0, jaEnviadas = 0;
+
+  for (const foto of lista) {
+    const base64 = foto.base64 || foto.data;
+    if (!base64) continue;
+
+    const hash = crypto.createHash('sha256').update(base64).digest('hex');
+
+    let jaExiste = null;
+    try {
+      jaExiste = await db('os_fotos_ixc_enviadas')
+        .where({ tenant_id: tenantId, os_id: os.id, hash }).first();
+    } catch (e) {
+      console.warn('⚠️ Não foi possível checar dedup de fotos:', e.message);
+    }
+    if (jaExiste) { jaEnviadas++; continue; }
+
+    try {
+      await ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
+        base64,
+        descricao: foto.descricao || foto.tipo || 'Foto do atendimento',
+        nome: `foto_${Date.now()}.jpg`,
+        ext: 'jpg',
+      });
+      try {
+        await db('os_fotos_ixc_enviadas').insert({ tenant_id: tenantId, os_id: os.id, hash });
+      } catch (_) { /* corrida rara com outra chamada — não é grave, só reenviaria 1x */ }
+      enviadas++;
+      console.log(`   📸 foto enviada ao IXC: ${foto.descricao || foto.tipo || '(sem descrição)'}`);
+    } catch (e) {
+      console.error(`   ❌ Erro ao enviar foto ao IXC:`, e.message);
+    }
+  }
+
+  if (enviadas || jaEnviadas) {
+    console.log(`📸 Fotos da OS ${os.numero_os}: +${enviadas} enviada(s), ${jaEnviadas} já estava(m) no IXC`);
+  }
+  return { enviadas, jaEnviadas };
+}
+
 async sincronizarReagendamentoComIXC(trx, os, dados) {
   console.log(`🔄 Sincronizando reagendamento da OS ${os.numero_os} com IXC...`);
 
@@ -602,6 +1001,32 @@ async encaminharOS(req, res) {
     // IXC FORA da transação (best-effort): troca o técnico responsável no IXC
     // pra sincronização não reverter o encaminhamento.
     if (os.origem === 'IXC' && os.id_externo) {
+      // 📦 Material e 📸 fotos já usadas pelo técnico que está passando a OS
+      // adiante ficam registradas no IXC (reconciliado/deduplicado — quem
+      // receber pode ajustar depois, e nada se duplica ao finalizar).
+      const temItens = Array.isArray(req.body.itens_estoque) && req.body.itens_estoque.length > 0;
+      const temFotos = Array.isArray(req.body.fotos) && req.body.fotos.length > 0;
+      if (temItens || temFotos) {
+        try {
+          const integ = await db('integracao_ixc')
+            .where('tenant_id', tenantId).where('ativo', true).first();
+          if (integ) {
+            const ixcEnc = new IXCService(integ.url_api, integ.token_api);
+            if (temItens) {
+              await this.sincronizarItensEstoqueIXC(
+                os, { itens_estoque: req.body.itens_estoque, onu_mac: req.body.onu_mac },
+                ixcEnc, tenantId
+              );
+            }
+            if (temFotos) {
+              await this.sincronizarFotosIXC(os, req.body.fotos, ixcEnc, tenantId);
+            }
+          }
+        } catch (e) {
+          console.error('⚠️ Erro ao registrar material/fotos no encaminhamento:', e.message);
+        }
+      }
+
       try {
         await this.sincronizarEncaminhamentoComIXC(db, os, alvo, motivo);
       } catch (error) {
@@ -825,167 +1250,16 @@ async finalizarExecucao(req, res) {
       }
     }
 
-    // 8. Enviar itens de estoque para o IXC
+    // 8. Enviar itens de estoque para o IXC (RECONCILIANDO com o que ja esta la:
+    //    edita quantidade, remove o que saiu, adiciona o novo, devolve comodato).
     if (dados.itens_estoque && dados.itens_estoque.length > 0 && ixcService) {
-      console.log(`📦 Enviando ${dados.itens_estoque.length} item(ns) de estoque para o IXC...`);
-
-      const mapeamentoEstoque = await db('mapeamento_tecnicos_ixc')
-        .where('usuario_id', os.tecnico_id)
-        .where('tenant_id', tenantId)
-        .first();
-
-      // Material/comodato da OS descontam da LOJA da cidade (id_almoxarifado_loja)
-      // quando o admin mapeou; senão cai no almox pessoal do técnico (compat).
-      // O EPI continua no almox pessoal (não passa por aqui).
-      const idAlmox = mapeamentoEstoque?.id_almoxarifado_loja
-        || mapeamentoEstoque?.id_almoxarifado
-        || 22;
-      const hoje = new Date();
-      const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
-
-      // Comodato precisa de id_contrato + filial_id → busca a OS no IXC uma vez
-      // (quando há patrimônio ou quando falta o contrato).
-      const temPatrimonio = dados.itens_estoque.some(i =>
-        i.id_patrimonio && i.id_patrimonio !== '' && i.id_patrimonio !== '0');
-      let idContratoIxc = os.id_contrato_ixc || '';
-      let idFilialIxc = '';
-      let idLoginIxc = '';
-      if (os.id_externo && (!idContratoIxc || temPatrimonio)) {
-        try {
-          const osIxc = await ixcService.buscarDetalhesOS(os.id_externo);
-          if (!idContratoIxc) idContratoIxc = osIxc?.id_contrato_kit || osIxc?.id_contrato || '';
-          idFilialIxc = osIxc?.id_filial || '';
-          idLoginIxc = osIxc?.id_login || ''; // login do cliente → vai no comodato
-          console.log(`📋 id_contrato IXC: ${idContratoIxc} | filial: ${idFilialIxc} | login: ${idLoginIxc}`);
-        } catch (e) {
-          console.warn('⚠️ Não foi possível buscar dados da OS no IXC:', e.message);
+      try {
+        const rEstoque = await this.sincronizarItensEstoqueIXC(os, dados, ixcService, tenantId);
+        if (!rEstoque.aplicado && rEstoque.motivo) {
+          console.warn(`⚠️ Estoque nao sincronizado: ${rEstoque.motivo}`);
         }
-      }
-
-      for (const item of dados.itens_estoque) {
-        const ehPatrimonio = !!(item.id_patrimonio &&
-          item.id_patrimonio !== '' &&
-          item.id_patrimonio !== '0');
-
-        try {
-          if (ehPatrimonio && os.tipo_os !== 'E') {
-            // 📦 COMODATO: patrimônio (roteador/ONU) entregue ao cliente → vai pra
-            // aba COMODATO da OS via endpoint dedicado su_oss_mov_comodato_wiz.
-            // Campos obrigatórios conforme doc do IXC (id_contrato, filial_id,
-            // status_comodato='E', etc.). Antes ia como produto → caía em Produtos.
-            await ixcService.adicionarComodatoOS({
-              id_oss_mensagem:             '',
-              id_saida:                    '',
-              id_oss_chamado:              os.id_externo.toString(),
-              id_contrato:                 (idContratoIxc || '').toString(),
-              id_login:                    (idLoginIxc || '').toString(),
-              id_patrimonio:               item.id_patrimonio.toString(),
-              id_produto:                  item.id_produto.toString(),
-              descricao:                   item.descricao || '',
-              data:                        dataFormatada,
-              id_unidade:                  '1',
-              // Patrimônio SÓ pode sair do almox onde ele está fisicamente. Usa o
-              // almox do próprio patrimônio (item.id_almoxarifado); só cai no almox
-              // da loja se o app não mandar. Evita "Patrimônio está indisponível".
-              id_almox:                    (item.id_almoxarifado && item.id_almoxarifado !== '0' && item.id_almoxarifado !== '')
-                                             ? item.id_almoxarifado.toString()
-                                             : idAlmox.toString(),
-              filial_id:                   (idFilialIxc || '1').toString(),
-              qtde_saida:                  item.quantidade.toString(),
-              valor_unitario:              item.valor_unitario.toFixed(2),
-              pcomissao:                   '',
-              pdesconto:                   '',
-              vdesconto:                   '',
-              valor_total:                 item.valor_total.toFixed(2),
-              patrimonio:                  item.id_patrimonio.toString(),
-              // MAC: o que o técnico leu da ONU no wizard (dados.onu_mac) tem
-              // prioridade; senão o MAC do patrimônio no IXC (item.mac).
-              mac:                         dados.onu_mac || item.mac || '',
-              numero_serie:                item.numero_serie || '',
-              numero_patrimonial:          item.numero_patrimonial || '',
-              garantia_oss:                '',
-              id_terceiro_oss:             '',
-              id_su_oss_kit_equipamento:   '',
-              id_classificacao_tributaria: '1',
-              tipo:                        'C',
-              estoque:                     'S',
-              unidade_sigla:               'UND',
-              fator_conversao:             '1',
-              tipo_produto:                item.tipo_produto || 'P',
-              status_comodato:             'E',
-              status_patrimonio:           '',
-              ultima_situacao_patrimonio:  '',
-              id_pedido_os:                '',
-            });
-          } else if (os.tipo_os === 'E') {
-            await ixcService.adicionarProdutoEstruturaOS({
-              id_oss_chamado:              os.id_externo,
-              id_produto:                  item.id_produto,
-              descricao:                   item.descricao || '',
-              qtde_saida:                  item.quantidade.toString(),
-              data:                        dataFormatada,
-              id_unidade:                  '1',
-              id_almox:                    idAlmox.toString(),
-              id_classificacao_tributaria: '1',
-              tipo:                        'C',
-              estoque:                     'S',
-              unidade_sigla:               'UND',
-              fator_conversao:             '1.000000000',
-              valor_unitario:              item.valor_unitario.toFixed(2),
-              valor_total:                 item.valor_total.toFixed(2),
-              id_estrutura:                '',
-              id_oss_mensagem:             '',
-              id_saida:                    '',
-              id_su_oss_kit_equipamento:   '',
-              tipo_produto:                '',
-              saldo_produto:               '',
-              ultima_situacao_patrimonio:  '',
-              id_pedido_os:                '',
-              pcomissao:                   '',
-              pdesconto:                   '',
-              vdesconto:                   '',
-            });
-          } else {
-            // Produto de consumo (não-patrimônio) → aba Produtos da OS.
-            await ixcService.adicionarProdutoOS({
-              id_oss_chamado:              os.id_externo,
-              id_produto:                  item.id_produto,
-              descricao:                   item.descricao || '',
-              qtde_saida:                  item.quantidade.toString(),
-              data:                        dataFormatada,
-              id_unidade:                  '1',
-              id_almox:                    idAlmox.toString(),
-              id_classificacao_tributaria: '1',
-              // tipo='S' (Saída) — obrigatório p/ a venda gerada faturar. Antes ia
-              // 'C', que o IXC grava vazio → venda travava em "aguardando faturamento".
-              tipo:                        'S',
-              estoque:                     'S',
-              unidade_sigla:               'UND',
-              fator_conversao:             '1.000000000',
-              valor_unitario:              item.valor_unitario.toFixed(2),
-              valor_total:                 item.valor_total.toFixed(2),
-              id_patrimonio:               '',
-              patrimonio:                  '',
-              numero_serie:                '',
-              numero_patrimonial:          '',
-              tipo_produto:                'O',
-              ultima_situacao_patrimonio:  '',
-              garantia_oss:                '',
-              pcomissao:                   '',
-              pdesconto:                   '',
-              vdesconto:                   '',
-              id_oss_mensagem:             '',
-              id_saida:                    '',
-              id_terceiro_oss:             '',
-              id_su_oss_kit_equipamento:   '',
-              id_estrutura:                '',
-              id_pedido_os:                '',
-            });
-          }
-          console.log(`   ✅ ${ehPatrimonio ? '[COMODATO]' : '[PRODUTO]'} ${item.descricao} x${item.quantidade}`);
-        } catch (estoqueError) {
-          console.error(`   ❌ Erro ao enviar item ${item.descricao}:`, estoqueError.message);
-        }
+      } catch (estoqueError) {
+        console.error('❌ Erro ao sincronizar estoque com IXC:', estoqueError.message);
       }
     }
 
@@ -1085,15 +1359,12 @@ async finalizarExecucao(req, res) {
           );
         }
 
-        for (const foto of fotosBase64) {
+        // Fotos já podem ter ido pro IXC no reagendar/encaminhar — dedup por
+        // hash evita reenviar a mesma foto de novo aqui.
+        if (fotosBase64.length > 0) {
           uploads.push(
-            ixcService.uploadFotoOS(os.id_externo, os.cliente_id_externo, {
-              base64: foto.base64,
-              descricao: foto.descricao,
-              nome: `foto_${Date.now()}.jpg`,
-              ext: 'jpg'
-            }).then(() => console.log(`   ✅ ${foto.descricao} enviada`))
-              .catch(e  => console.error(`   ❌ ${foto.descricao}:`, e.message))
+            this.sincronizarFotosIXC(os, fotosBase64, ixcService, tenantId)
+              .catch(e => console.error('   ❌ Erro ao sincronizar fotos:', e.message))
           );
         }
 

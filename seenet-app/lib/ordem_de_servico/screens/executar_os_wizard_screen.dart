@@ -118,6 +118,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         await _carregarRascunhoServidor();
       } else {
         _restaurarProgresso();
+        // OS reaberta/reagendada que continua no MESMO aparelho: o progresso
+        // local pode não ter os itens que já foram pro IXC na finalização
+        // anterior — busca lá também (só preenche se a lista estiver vazia).
+        await _carregarMateriaisDoIXC();
       }
 
       if (os.status == 'em_execucao' && _exigeApr) {
@@ -797,8 +801,36 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       print('❌ [RASCUNHO] erro ao carregar: $e');
       _restaurarProgresso();
     }
+    await _carregarMateriaisDoIXC();
     if (mounted) setState(() => _carregandoRascunho = false);
   }
+
+  /// OS que VOLTOU pro técnico (reaberta pela auditoria ou reagendada) já pode
+  /// ter material lançado no IXC — inclusive de uma finalização anterior, quando
+  /// o rascunho local já foi apagado. Traz essa lista pra ele CORRIGIR
+  /// (ex.: auditoria viu 150m de drop, o técnico tinha lançado 50m).
+  /// Só roda quando a lista está vazia: nunca sobrescreve o que ele já digitou.
+  Future<void> _carregarMateriaisDoIXC() async {
+    if (itensEstoque.isNotEmpty) return;
+    if (!_osVoltouParaOTecnico) return;
+    final idExterno = os.idExterno;
+    if (idExterno == null || idExterno.isEmpty) return;
+
+    final itens = await EstoqueService().carregarItensLancadosNoIXC(idExterno);
+    if (itens.isEmpty || !mounted) return;
+
+    setState(() {
+      itensEstoque = itens;
+      materiaisController.text = itensEstoque
+          .map((i) => '${i.produto.descricao} x${i.quantidade}')
+          .join(', ');
+    });
+    print('📦 ${itens.length} item(ns) carregado(s) do IXC p/ conferência/edição');
+  }
+
+  /// Reaberta (auditoria) ou reagendada = a OS está voltando, não é a 1ª visita.
+  bool get _osVoltouParaOTecnico =>
+      os.status == 'reaberta' || os.status == 'reagendada';
 
   // Aplica os dados do rascunho do servidor no estado. Fotos: no MOBILE são
   // gravadas em arquivo temporário (path válido → exibe E finaliza igual às fotos
@@ -1158,6 +1190,33 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
   // Encaminhar: escolhe um técnico da empresa e passa a OS pra ele.
   // A OS some da minha lista e aparece pra ele.
+  /// Material da OS no formato que o backend espera. Usado na finalização e
+  /// também no reagendar/encaminhar — assim o que já foi gasto fica registrado
+  /// no IXC mesmo que outro técnico termine a OS (o backend reconcilia, então
+  /// mandar mais de uma vez não duplica).
+  List<Map<String, dynamic>> _payloadItensEstoque() => itensEstoque.map((item) => {
+        'id_produto':          item.produto.id,
+        'descricao':           item.produto.descricao,
+        'quantidade':          item.quantidade,
+        'valor_unitario':      item.valorUnitario,
+        'valor_total':         item.valorTotal,
+        'id_patrimonio':       item.patrimonio?.id ?? '0',
+        'numero_serie':        item.patrimonio?.serial ?? '',
+        'numero_patrimonial':  item.patrimonio?.numeroPatrimonial ?? '',
+        'mac':                 item.patrimonio?.mac ?? '',
+        // almox ONDE o patrimônio está → o comodato tem que sair de lá (senão
+        // o IXC diz "Patrimônio está indisponível").
+        'id_almoxarifado':     item.patrimonio?.idAlmoxarifado ?? '',
+        'tipo_produto':        item.isPatrimonio ? 'P' : 'O',
+      }).toList();
+
+  /// Fotos já tiradas, no mesmo formato usado na finalização — usado também
+  /// no reagendar/encaminhar (o service converte pra base64 e o backend
+  /// deduplica, então não duplica quando finalizar depois).
+  List<Map<String, dynamic>> _payloadFotos() => fotosAnexadas.map((anexo) => {
+        'tipo': anexo.tipo, 'descricao': anexo.descricao, 'path': anexo.foto.path,
+      }).toList();
+
   Future<void> _encaminharOS() async {
     setState(() => _isLoading = true);
     List<Map<String, dynamic>> tecnicos;
@@ -1343,6 +1402,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         os.id,
         tecnicoId is int ? tecnicoId : int.parse(tecnicoId.toString()),
         motivo: motivoCtrl.text.trim(),
+        itensEstoque: _payloadItensEstoque(),
+        onuMac: onuMacController.text.trim(),
+        fotos: _payloadFotos(),
       );
       if (sucesso) {
         _limparProgressoLocalCompleto(); // a OS deixa este técnico
@@ -1442,6 +1504,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         latitude ?? 0,
         longitude ?? 0,
         motivo: motivoCtrl.text.trim(),
+        itensEstoque: _payloadItensEstoque(),
+        onuMac: onuMacController.text.trim(),
+        fotos: _payloadFotos(),
       );
       if (sucesso) {
         _limparProgressoLocalCompleto(); // a OS deixa este técnico
@@ -1791,21 +1856,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         'relato_problema': relatoProblemaController.text.trim(),
         'relato_solucao':  relatoSolucaoController.text.trim(),
         'materiais_utilizados': materiaisController.text.trim(),
-        'itens_estoque': itensEstoque.map((item) => {
-          'id_produto':          item.produto.id,
-          'descricao':           item.produto.descricao,
-          'quantidade':          item.quantidade,
-          'valor_unitario':      item.valorUnitario,
-          'valor_total':         item.valorTotal,
-          'id_patrimonio':       item.patrimonio?.id ?? '0',
-          'numero_serie':        item.patrimonio?.serial ?? '',
-          'numero_patrimonial':  item.patrimonio?.numeroPatrimonial ?? '',
-          'mac':                 item.patrimonio?.mac ?? '',
-          // almox ONDE o patrimônio está → o comodato tem que sair de lá (senão
-          // o IXC diz "Patrimônio está indisponível").
-          'id_almoxarifado':     item.patrimonio?.idAlmoxarifado ?? '',
-          'tipo_produto':        item.isPatrimonio ? 'P' : 'O',
-        }).toList(),
+        'itens_estoque': _payloadItensEstoque(),
         'observacoes': observacoesController.text.trim(),
         'fotos': fotosAnexadas.map((anexo) => {
           'tipo': anexo.tipo, 'descricao': anexo.descricao, 'path': anexo.foto.path,

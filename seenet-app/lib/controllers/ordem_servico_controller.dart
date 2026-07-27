@@ -149,9 +149,11 @@ class OrdemServicoController extends GetxController {
   // Reagendar (cliente não estava no local): IXC vira "Aguardando Agendamento"
   // e a OS sai de "em campo" — o técnico fica livre pra próxima.
   Future<bool> reagendarOS(String osId, double lat, double lng,
-      {String? motivo}) async {
+      {String? motivo, List<Map<String, dynamic>>? itensEstoque, String? onuMac,
+      List<dynamic>? fotos}) async {
     try {
-      final sucesso = await _service.reagendarOS(osId, lat, lng, motivo: motivo);
+      final sucesso = await _service.reagendarOS(osId, lat, lng,
+          motivo: motivo, itensEstoque: itensEstoque, onuMac: onuMac, fotos: fotos);
 
       if (sucesso) {
         await carregarMinhasOSs();
@@ -176,9 +178,12 @@ class OrdemServicoController extends GetxController {
       _service.buscarTecnicos();
 
   // Encaminha a OS para outro técnico: some da minha lista, aparece pra ele.
-  Future<bool> encaminharOS(String osId, int tecnicoId, {String? motivo}) async {
+  Future<bool> encaminharOS(String osId, int tecnicoId,
+      {String? motivo, List<Map<String, dynamic>>? itensEstoque, String? onuMac,
+      List<dynamic>? fotos}) async {
     try {
-      final sucesso = await _service.encaminharOS(osId, tecnicoId, motivo: motivo);
+      final sucesso = await _service.encaminharOS(osId, tecnicoId,
+          motivo: motivo, itensEstoque: itensEstoque, onuMac: onuMac, fotos: fotos);
       if (sucesso) {
         await carregarMinhasOSs();
         AppSnackbar.show(

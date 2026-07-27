@@ -169,6 +169,7 @@ class ProdutoOS {
   final String numeroSerie;
   final String tipoProtudo;
   final String data;
+  final String idAlmox;
 
   ProdutoOS({
     required this.id,
@@ -181,6 +182,7 @@ class ProdutoOS {
     this.numeroSerie = '',
     this.tipoProtudo = 'O',
     this.data = '',
+    this.idAlmox = '',
   });
 
   factory ProdutoOS.fromJson(Map<String, dynamic> json) {
@@ -195,6 +197,7 @@ class ProdutoOS {
       numeroSerie: json['numero_serie'] ?? '',
       tipoProtudo: json['tipo_produto'] ?? 'O',
       data: json['data'] ?? '',
+      idAlmox: json['id_almox']?.toString() ?? '',
     );
   }
 
@@ -307,6 +310,44 @@ class EstoqueService {
     } catch (e) {
       print('❌ Erro em listarProdutosOS: $e');
       rethrow;
+    }
+  }
+
+  /// Traz o material JÁ LANÇADO no IXC desta OS no formato do wizard, pra
+  /// pré-carregar a lista quando a OS volta pro técnico (reaberta pela
+  /// auditoria ou reagendada). Assim ele vê o que foi registrado e pode
+  /// CORRIGIR (ex.: auditoria viu 150m de drop e não os 50m lançados).
+  /// Nunca estoura: se der erro, devolve lista vazia (o técnico preenche do zero).
+  Future<List<ItemOS>> carregarItensLancadosNoIXC(String osIdExterno) async {
+    try {
+      final produtos = await listarProdutosOS(osIdExterno);
+      return produtos.map((p) {
+        final ehPatrimonio = p.idPatrimonio.isNotEmpty && p.idPatrimonio != '0';
+        return ItemOS(
+          produto: ProdutoEstoque(
+            id: p.idProduto,
+            descricao: p.descricao,
+            valor: p.valorUnitario,
+            precoBase: p.valorUnitario,
+            tipo: ehPatrimonio ? 'P' : 'O',
+          ),
+          patrimonio: ehPatrimonio
+              ? PatrimonioEstoque(
+                  id: p.idPatrimonio,
+                  descricao: p.descricao,
+                  serial: p.numeroSerie,
+                  idProduto: p.idProduto,
+                  idAlmoxarifado: p.idAlmox,
+                  numeroPatrimonial: p.numeroSerie,
+                )
+              : null,
+          quantidade: p.quantidade,
+          valorUnitario: p.valorUnitario,
+        );
+      }).toList();
+    } catch (e) {
+      print('⚠️ Não consegui carregar o material já lançado no IXC: $e');
+      return [];
     }
   }
 

@@ -1,6 +1,7 @@
 // lib/modules/login/widgets/logarbutton.widget.dart - ATUALIZADO
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../services/auth_service.dart' show ResultadoEmpresa;
 import '../loginview.controller.dart';
 
 class LogarButton extends GetView<LoginController> {
@@ -67,19 +68,21 @@ class LogarButton extends GetView<LoginController> {
     if (controller.email.isEmpty) {
       return 'Preencha os campos';
     }
-    
+
     if (controller.codigoEmpresa.isEmpty) {
       return 'Digite código da empresa';
     }
-    
+
     if (controller.verificandoEmpresa.value) {
       return 'Verificando empresa...';
     }
-    
-    if (!controller.empresaValida.value) {
+
+    // "Empresa inválida" SÓ quando o servidor confirmou que não existe. Falha
+    // de rede não trava mais o login (o servidor confere no /auth/login).
+    if (controller.statusEmpresa.value == ResultadoEmpresa.naoEncontrada) {
       return 'Empresa inválida';
     }
-    
+
     return 'ENTRAR';
   }
 }

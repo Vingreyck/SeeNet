@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../services/auth_service.dart' show ResultadoEmpresa;
 import '../loginview.controller.dart';
 
 class CodigoEmpresaTextField extends GetView<LoginController> {
@@ -30,19 +31,15 @@ class CodigoEmpresaTextField extends GetView<LoginController> {
             focusNode: controller.codigoEmpresaFocusNode,
             textInputAction: TextInputAction.done,
             onChanged: (value) {
-              controller.codigoEmpresa.value = value.toUpperCase();
+              // Só ajusta o texto (maiúsculas) — quem dispara a verificação da
+              // empresa é o listener do controller (tem debounce + proteção
+              // contra resposta de rede fora de ordem). Chamar aqui TAMBÉM
+              // duplicava toda verificação, e em rede instável (iPhone/celular)
+              // uma resposta atrasada podia travar o botão de entrar pra sempre.
               controller.codigoEmpresaController.text = value.toUpperCase();
               controller.codigoEmpresaController.selection = TextSelection.fromPosition(
                 TextPosition(offset: controller.codigoEmpresaController.text.length),
               );
-              
-              // Verificar empresa automaticamente se tiver 4+ caracteres
-              if (value.length >= 4) {
-                controller.verificarEmpresa(value.toUpperCase());
-              } else {
-                controller.empresaInfo.value = null;
-                controller.empresaValida.value = false;
-              }
             },
             style: const TextStyle(
               color: Colors.white,
@@ -93,11 +90,17 @@ class CodigoEmpresaTextField extends GetView<LoginController> {
           
           // Informações da empresa
           if (controller.empresaInfo.value != null) _buildEmpresaInfo(),
-          
-          // Erro de empresa
-          if (controller.codigoEmpresa.value.isNotEmpty && 
-              controller.empresaInfo.value == null &&
-              !controller.verificandoEmpresa.value) _buildEmpresaError(),
+
+          // Empresa NÃO existe (servidor respondeu) → erro vermelho, bloqueia.
+          if (!controller.verificandoEmpresa.value &&
+              controller.statusEmpresa.value == ResultadoEmpresa.naoEncontrada)
+            _buildEmpresaError(),
+
+          // Não deu pra checar (rede) → aviso amarelo, NÃO bloqueia: o login
+          // valida a empresa de novo no servidor.
+          if (!controller.verificandoEmpresa.value &&
+              controller.statusEmpresa.value == ResultadoEmpresa.erroRede)
+            _buildEmpresaSemChecagem(),
         ],
       );
     });
@@ -126,7 +129,8 @@ class CodigoEmpresaTextField extends GetView<LoginController> {
       );
     }
 
-    if (controller.codigoEmpresa.value.isNotEmpty) {
+    // Vermelho SÓ quando o servidor confirmou que não existe.
+    if (controller.statusEmpresa.value == ResultadoEmpresa.naoEncontrada) {
       return Icon(
         Icons.error,
         color: Colors.red.shade400,
@@ -134,7 +138,43 @@ class CodigoEmpresaTextField extends GetView<LoginController> {
       );
     }
 
+    // Não deu pra checar (rede): aviso discreto, dá pra entrar mesmo assim.
+    if (controller.statusEmpresa.value == ResultadoEmpresa.erroRede) {
+      return Icon(
+        Icons.cloud_off_rounded,
+        color: Colors.amber.shade600,
+        size: 22,
+      );
+    }
+
   return const SizedBox.shrink();
+  }
+
+  /// Aviso (não é erro): não conseguimos confirmar a empresa, mas o técnico
+  /// pode tentar entrar — o servidor confere de novo no login.
+  Widget _buildEmpresaSemChecagem() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.amber.withOpacity(0.35), width: 1),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_rounded, color: Colors.amber.shade600, size: 20),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Não deu pra confirmar a empresa agora (sinal fraco). '
+              'Você pode tentar entrar mesmo assim.',
+              style: TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildEmpresaInfo() {

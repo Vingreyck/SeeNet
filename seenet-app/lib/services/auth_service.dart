@@ -2,6 +2,7 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:http/http.dart' as http;
 import 'api_service.dart';
 import 'notification_service.dart'; // ✅ NOVO
 import 'dart:convert';
@@ -9,6 +10,21 @@ import '../controllers/usuario_controller.dart';
 import '../models/usuario.dart';
 import '../login/loginview.controller.dart';
 import 'package:seenet/widgets/app_snackbar.dart';
+
+/// Resultado da checagem do código da empresa. Precisa distinguir "código
+/// ERRADO" de "não consegui checar (rede)": tratar os dois como inválido fazia
+/// o técnico ver "empresa não encontrada" quando na verdade era só o sinal
+/// ruim — e o botão de entrar ficava travado sem explicação.
+enum ResultadoEmpresa { valida, naoEncontrada, erroRede }
+
+class VerificacaoEmpresa {
+  final ResultadoEmpresa resultado;
+  final Map<String, dynamic>? empresa;
+
+  const VerificacaoEmpresa(this.resultado, [this.empresa]);
+
+  bool get ok => resultado == ResultadoEmpresa.valida;
+}
 
 class AuthService extends GetxService {
   ApiService get _api => Get.find<ApiService>();
@@ -146,20 +162,47 @@ class AuthService extends GetxService {
     }
   }
 
-  Future<Map<String, dynamic>?> verificarCodigoEmpresa(String codigo) async {
-    try {
-      final url = 'https://seenet-production.up.railway.app/api/tenant/verify/$codigo';
-      final connect = GetConnect();
-      connect.timeout = const Duration(seconds: 15);
-      final response = await connect.get(url);
-      if (response.statusCode == 200 && response.body?['success'] == true) {
-        return response.body['data']['empresa'];
+  /// Checa o código da empresa. Distingue "não existe" de "não deu pra checar"
+  /// (ver [ResultadoEmpresa]). Tenta 2x: numa rede de celular instável, uma
+  /// falha isolada é comum e não deve virar "empresa inválida" na cara do
+  /// técnico. Trocado GetConnect → http (mesmo cliente do resto do app, com
+  /// timeout previsível).
+  Future<VerificacaoEmpresa> verificarCodigoEmpresa(String codigo) async {
+    final url = Uri.parse(
+      'https://seenet-production.up.railway.app/api/tenant/verify/$codigo',
+    );
+
+    for (int tentativa = 1; tentativa <= 2; tentativa++) {
+      try {
+        final response = await http
+            .get(url)
+            .timeout(const Duration(seconds: 12));
+
+        if (response.statusCode == 200) {
+          final body = json.decode(response.body);
+          if (body['success'] == true) {
+            return VerificacaoEmpresa(
+              ResultadoEmpresa.valida,
+              (body['data']?['empresa'] as Map?)?.cast<String, dynamic>(),
+            );
+          }
+        }
+        // 404 (e qualquer 4xx) = o servidor RESPONDEU dizendo que não existe.
+        // Resposta definitiva: não adianta tentar de novo.
+        if (response.statusCode >= 400 && response.statusCode < 500) {
+          return const VerificacaoEmpresa(ResultadoEmpresa.naoEncontrada);
+        }
+        // 5xx cai no retry abaixo (problema do servidor, não do código).
+      } catch (e) {
+        print('💥 [AUTH] falha ao checar empresa (tentativa $tentativa): $e');
       }
-      return null;
-    } catch (e) {
-      print('💥 [AUTH] EXCEÇÃO: $e');
-      return null;
+
+      if (tentativa == 1) {
+        await Future.delayed(const Duration(milliseconds: 600));
+      }
     }
+
+    return const VerificacaoEmpresa(ResultadoEmpresa.erroRede);
   }
 
   // ========== AUTO-LOGIN ==========

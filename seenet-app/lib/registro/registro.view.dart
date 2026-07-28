@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'widgets/loginbutton.widget.dart';
+import '../services/auth_service.dart' show ResultadoEmpresa;
 import 'registroview.controller.dart';
 
 class RegistrarView extends GetView<RegistroController> {
@@ -361,13 +362,23 @@ class RegistrarView extends GetView<RegistroController> {
           cor: const Color(0xFF00FF88),
         );
       }
-      if (controller.tokenEmpresa.isNotEmpty &&
-          !controller.tokenValido.value) {
+      // Vermelho SÓ quando o servidor confirmou que não existe.
+      if (controller.statusToken.value == ResultadoEmpresa.naoEncontrada) {
         return _statusBanner(
           icon: const Icon(Icons.error_outline_rounded,
               color: Colors.red, size: 15),
           texto: 'Token inválido',
           cor: Colors.red,
+        );
+      }
+      // Falha de rede: avisa, mas NÃO trava o cadastro (o servidor confere
+      // o código de novo ao registrar).
+      if (controller.statusToken.value == ResultadoEmpresa.erroRede) {
+        return _statusBanner(
+          icon: Icon(Icons.cloud_off_rounded,
+              color: Colors.amber.shade600, size: 15),
+          texto: 'Sem sinal p/ confirmar — dá pra continuar',
+          cor: Colors.amber.shade600,
         );
       }
       return const SizedBox.shrink();

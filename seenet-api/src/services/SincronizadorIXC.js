@@ -242,7 +242,9 @@ class SincronizadorIXC {
             if (ossCanceladas > 0) {
               console.log(`   🗑️ ${ossCanceladas} OS(s) cancelada(s)`);
             }
+          }
 
+          {
             // 🔄 OSs em_execucao/em_deslocamento que SUMIRAM da lista de abertas
             // provavelmente foram finalizadas/canceladas MANUALMENTE no IXC
             // (buscarOSs exclui status F e C). Sem isso, elas travam pra sempre
@@ -254,6 +256,16 @@ class SincronizadorIXC {
             // reatribuída SUMIA da lista de abertas mas ficava presa no app pra
             // sempre — o status 'reaberta' (criado na feature de reabertura) não
             // estava aqui. Foi o bug do "David com OSs que não são dele".
+            //
+            // ⚠️ RODA MESMO COM A LISTA DE ABERTAS VAZIA (antes estava dentro do
+            // `if (idsExternosIXC.length > 0)`): quando o técnico finaliza a
+            // ÚLTIMA OS do dia, ele fica com ZERO OS abertas no IXC — e era
+            // justamente aí que a autocorreção não rodava, deixando a OS presa
+            // no app pra sempre. É seguro rodar sempre porque cada OS é
+            // conferida INDIVIDUALMENTE no IXC (`buscarDetalhesOS`) e só muda
+            // se o IXC confirmar; se o IXC estiver fora do ar, não mexe em nada.
+            // (O cancelamento em massa acima continua exigindo lista não-vazia,
+            // porque aquele age sem conferir OS por OS.)
             const ossTravadas = await trx('ordem_servico')
               .where('tenant_id', integracao.tenant_id)
               .where('tecnico_id', mapeamento.usuario_id)
@@ -639,7 +651,18 @@ class SincronizadorIXC {
         const reatribuido = String(osExistente.tecnico_id) !== String(tecnicoId);
         // (b) REABERTA: estava 'concluida' aqui mas voltou a status ABERTO no IXC
         //     (admin usou "Reabrir") → reativa como 'reaberta' pro técnico.
+        //
+        // ⏱️ CARÊNCIA de 10min após a conclusão: o `finalizarExecucao` marca a OS
+        // como concluída AQUI na hora, mas fecha no IXC em SEGUNDO PLANO — e
+        // ainda passa por `executarOS` (que coloca a OS em EXECUÇÃO no IXC)
+        // logo antes de fechar. Se um ciclo do sync caísse nessa janela, via
+        // "concluída aqui + aberta no IXC" e marcava REABERTA por engano — a OS
+        // voltava pro técnico mesmo tendo sido finalizada com sucesso.
+        // Reabertura de verdade pelo admin nunca acontece segundos depois.
+        const concluidaHaPouco = osExistente.data_conclusao != null &&
+          (Date.now() - new Date(osExistente.data_conclusao).getTime()) < 10 * 60 * 1000;
         const reaberta = osExistente.status === 'concluida' &&
+          !concluidaHaPouco &&
           ['pendente', 'em_execucao'].includes(dadosOS.status);
 
         const novoStatus = reaberta ? 'reaberta' : dadosOS.status;

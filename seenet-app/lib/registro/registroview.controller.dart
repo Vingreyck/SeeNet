@@ -1,4 +1,5 @@
 // lib/registro/registroview.controller.dart
+import 'dart:async';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../controllers/usuario_controller.dart';
@@ -29,6 +30,17 @@ class RegistroController extends GetxController {
   final RxInt almoxarifadoSelecionado = 0.obs;
   final RxString almoxarifadoNome = ''.obs;
   Rx<Map<String, dynamic>?> empresaInfo = Rx<Map<String, dynamic>?>(null);
+
+  // 🐛 FIX (mesmo bug do login — botão travado em rede ruim): sem debounce +
+  // proteção contra resposta fora de ordem, uma resposta atrasada de um
+  // código ainda incompleto podia sobrescrever `tokenValido` pra false depois
+  // da resposta certa já ter chegado. Ver loginview.controller.dart.
+  Timer? _debounceToken;
+  int _tokenCheckId = 0;
+
+  /// Estado detalhado da checagem (permite diferenciar "código errado" de
+  /// "não deu pra checar" — ver [ResultadoEmpresa]).
+  final Rx<ResultadoEmpresa?> statusToken = Rx<ResultadoEmpresa?>(null);
 
   // ========== DEPENDÊNCIAS ==========
   final UsuarioController usuarioController = Get.find<UsuarioController>();
@@ -62,11 +74,19 @@ class RegistroController extends GetxController {
       String codigo = tokenEmpresaController.text.toUpperCase();
       if (codigo != tokenEmpresa.value) {
         tokenEmpresa.value = codigo;
+        _debounceToken?.cancel();
         if (codigo.length >= 4) {
-          verificarCodigo(codigo);
+          verificandoToken.value = true; // feedback imediato
+          _debounceToken = Timer(
+            const Duration(milliseconds: 400),
+            () => verificarCodigo(codigo),
+          );
         } else {
+          _tokenCheckId++; // invalida qualquer verificação pendente
           empresaInfo.value = null;
           tokenValido.value = false;
+          statusToken.value = null;
+          verificandoToken.value = false;
         }
       }
     });
@@ -80,28 +100,38 @@ class RegistroController extends GetxController {
       return;
     }
 
+    final meuId = ++_tokenCheckId;
+
     try {
       verificandoToken.value = true;
 
-      final empresa = await authService.verificarCodigoEmpresa(codigo);
+      final r = await authService.verificarCodigoEmpresa(codigo);
 
-      if (empresa != null) {
-        empresaInfo.value = empresa;
+      if (meuId != _tokenCheckId) return; // resposta atrasada — descarta
+
+      statusToken.value = r.resultado;
+
+      if (r.ok && r.empresa != null) {
+        empresaInfo.value = r.empresa;
         tokenValido.value = true;
 
         _showInfo(
           '🏢 Empresa Encontrada',
-          '${empresa['nome']}\nPlano: ${empresa['plano']}\n\nVocê será cadastrado nesta empresa.',
+          '${r.empresa!['nome']}\nPlano: ${r.empresa!['plano']}\n\nVocê será cadastrado nesta empresa.',
         );
       } else {
         empresaInfo.value = null;
         tokenValido.value = false;
       }
     } catch (e) {
+      if (meuId != _tokenCheckId) return;
+      statusToken.value = ResultadoEmpresa.erroRede;
       empresaInfo.value = null;
       tokenValido.value = false;
     } finally {
-      verificandoToken.value = false;
+      if (meuId == _tokenCheckId) {
+        verificandoToken.value = false;
+      }
     }
   }
 
@@ -173,8 +203,12 @@ class RegistroController extends GetxController {
       return false;
     }
 
-    if (!tokenValido.value) {
-      _showError('Código da empresa inválido ou não verificado');
+    // Só bloqueia quando o servidor RESPONDEU que a empresa não existe. Se a
+    // checagem não rolou (rede ruim), deixa seguir — quem valida de verdade é
+    // o /auth/register, que recusa código errado. Travar aqui deixaria o
+    // técnico sem conseguir se cadastrar por causa de uma chamada opcional.
+    if (statusToken.value == ResultadoEmpresa.naoEncontrada) {
+      _showError('Código da empresa inválido');
       return false;
     }
 
@@ -185,18 +219,24 @@ class RegistroController extends GetxController {
     return true;
   }
 
+  /// Igual ao login: NÃO exige que a checagem da empresa tenha dado certo —
+  /// só bloqueia se o servidor disse que o código não existe. Ver
+  /// `LoginController.podeLogar` pro motivo.
   bool get podeRegistrar {
     return nome.value.trim().length >= 5 &&
         nome.value.trim().contains(' ') &&
         cpf.value.replaceAll(RegExp(r'\D'), '').length == 11 &&
         tokenEmpresa.value.length >= 4 &&
-        tokenValido.value &&
+        statusToken.value != ResultadoEmpresa.naoEncontrada &&
         almoxarifadoSelecionado.value != 0 &&
         !isLoading.value;
   }
 
   // ========== MÉTODOS AUXILIARES ==========
   void limparCampos() {
+    _debounceToken?.cancel();
+    _tokenCheckId++; // invalida qualquer verificação em andamento
+
     nomeInput.clear();
     cpfInput.clear();
     telefoneInput.clear();
@@ -212,6 +252,7 @@ class RegistroController extends GetxController {
     tokenEmpresa.value = '';
     empresaInfo.value = null;
     tokenValido.value = false;
+    statusToken.value = null;
     registroSucesso.value = false;
     almoxarifadoSelecionado.value = 0;
     almoxarifadoNome.value = '';
@@ -231,6 +272,7 @@ class RegistroController extends GetxController {
 
   @override
   void onClose() {
+    _debounceToken?.cancel();
     nomeInput.dispose();
     cpfInput.dispose();
     telefoneInput.dispose();

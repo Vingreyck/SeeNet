@@ -48,19 +48,15 @@ class TokenEmpresaTextField extends GetView<RegistroController> {
             textInputAction: TextInputAction.done,
             textCapitalization: TextCapitalization.characters,
             onChanged: (value) {
-              controller.tokenEmpresa.value = value.toUpperCase();
+              // Só ajusta o texto (maiúsculas) — quem dispara a verificação é
+              // o listener do controller (debounce + proteção contra resposta
+              // de rede fora de ordem). Ver loginview.controller.dart pro
+              // motivo (chamar aqui TAMBÉM duplicava a verificação e podia
+              // travar o botão em rede instável).
               controller.tokenEmpresaController.text = value.toUpperCase();
               controller.tokenEmpresaController.selection = TextSelection.fromPosition(
                 TextPosition(offset: controller.tokenEmpresaController.text.length),
               );
-
-              // Verificar token automaticamente se tiver 4+ caracteres
-              if (value.length >= 4) {
-                controller.verificarCodigo(value.toUpperCase());
-              } else {
-                controller.empresaInfo.value = null;
-                controller.tokenValido.value = false;
-              }
             },
             style: const TextStyle(
               color: Colors.white,

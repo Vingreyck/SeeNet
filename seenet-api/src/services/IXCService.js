@@ -152,8 +152,12 @@ class IXCService {
    * cada um numa casa/endereço diferente — no IXC isso fica na aba "Endereço"
    * do Login). Campos de endereço vazios = login não tem endereço próprio →
    * quem chama deve cair pro endereço do cliente/contrato (fallback).
+   * Também traz o STATUS DE CONEXÃO (`online` = 'S'/'N', igual mostrado no
+   * IXC) — de graça, é o mesmo registro já buscado, sem chamada extra.
+   * ⚠️ É uma FOTO de quando a OS foi sincronizada (o sync só busca isso na
+   * 1ª vez, ver `sn_enriquecido` no SincronizadorIXC) — não é ao vivo.
    * Retorna { login, senha, id_contrato, endereco, numero, bairro, cep,
-   * referencia, complemento, apartamento, cidade } ou null.
+   * referencia, complemento, apartamento, cidade, online, ultimaConexao } ou null.
    */
   async buscarDadosLogin(idLogin) {
     try {
@@ -180,6 +184,8 @@ class IXCService {
         complemento: reg.complemento || null,
         apartamento: reg.apartamento || null,
         cidade: reg.cidade || null,
+        online: reg.online === 'S',
+        ultimaConexao: reg.online === 'S' ? reg.ultima_conexao_inicial : reg.ultima_conexao_final,
       };
     } catch (e) {
       console.error(`❌ Erro ao buscar dados do login id ${idLogin}:`, e.message);

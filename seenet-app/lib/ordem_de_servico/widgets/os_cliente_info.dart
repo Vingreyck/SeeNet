@@ -111,6 +111,38 @@ class _OSClienteInfoState extends State<OSClienteInfo> {
     );
   }
 
+  // Status de conexão (Online/Offline) — FOTO de quando a OS foi sincronizada
+  // com o IXC, não é ao vivo (pode estar desatualizado se a OS estiver aberta
+  // há um tempo). Por isso o texto avisa "na sincronização".
+  Widget _linhaStatusConexao() {
+    final online = os.statusConexaoOnline!;
+    final cor = online ? _verde : Colors.red.shade300;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.wifi_rounded, color: Colors.white38, size: 14),
+          const SizedBox(width: 6),
+          const SizedBox(
+            width: 78,
+            child: Text('Conexão:',
+                style: TextStyle(color: Colors.white38, fontSize: 12)),
+          ),
+          Container(width: 7, height: 7,
+              margin: const EdgeInsets.only(top: 3, right: 5),
+              decoration: BoxDecoration(color: cor, shape: BoxShape.circle)),
+          Expanded(
+            child: Text(
+              online ? 'Online (na sincronização)' : 'Offline (na sincronização)',
+              style: TextStyle(color: cor, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -126,6 +158,7 @@ class _OSClienteInfoState extends State<OSClienteInfo> {
           _linha('Senha', os.senhaPppoe, copiavel: true, icone: Icons.key_rounded),
         if (os.plano != null)
           _linha('Plano', os.plano, icone: Icons.speed_rounded),
+        if (os.statusConexaoOnline != null) _linhaStatusConexao(),
         if (os.caixaFtth != null)
           _linha('CTO', os.caixaFtth, icone: Icons.hub_outlined),
         if (os.portaFtth != null)

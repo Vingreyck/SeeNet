@@ -521,6 +521,8 @@ class SincronizadorIXC {
       // do snapshot, ver injeção). Evita 3 chamadas ao IXC por OS a cada ciclo.
       let senhaPppoe = null;
       let planoNome = null;
+      let statusOnline = null; // true/false/null (null = não sabemos)
+      let ultimaConexao = null;
       if (!jaEnriquecido) {
         // LOGIN: o su_oss_chamado só traz `id_login` (numérico). Resolve a STRING
         // do login p/ o card e a busca de fibra, + SENHA PPPoE + id_contrato.
@@ -535,6 +537,8 @@ class SincronizadorIXC {
             if (!osIXC.login && rec.login) osIXC.login = rec.login;
             senhaPppoe = rec.senha || null;
             idContratoLogin = rec.id_contrato || null;
+            statusOnline = rec.online;
+            ultimaConexao = rec.ultimaConexao || null;
 
             // 🏠 Endereço PRÓPRIO do login tem prioridade sobre o do cliente/contrato:
             // um contrato pode ter mais de um login, cada um numa casa diferente
@@ -603,6 +607,8 @@ class SincronizadorIXC {
         osIXC.sn_apartamento = ixcAntigo.sn_apartamento || '';
         osIXC.sn_plano = ixcAntigo.sn_plano || '';
         osIXC.sn_senha = ixcAntigo.sn_senha || '';
+        osIXC.sn_online = ixcAntigo.sn_online ?? null;
+        osIXC.sn_ultima_conexao = ixcAntigo.sn_ultima_conexao || '';
       } else {
         osIXC.sn_cidade = clienteCidade || '';
         osIXC.sn_cep = clienteCep || '';
@@ -611,6 +617,10 @@ class SincronizadorIXC {
         osIXC.sn_apartamento = clienteApartamento || '';
         osIXC.sn_plano = planoNome || '';
         osIXC.sn_senha = senhaPppoe || '';
+        // status de conexão (Online/Offline) — FOTO de quando a OS foi
+        // sincronizada, não é ao vivo (ver comentário no IXCService).
+        osIXC.sn_online = statusOnline;
+        osIXC.sn_ultima_conexao = ultimaConexao || '';
       }
       // Marca como enriquecida → os próximos ciclos copiam daqui (não tocam o IXC).
       osIXC.sn_enriquecido = true;

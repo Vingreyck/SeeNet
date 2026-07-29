@@ -27,6 +27,10 @@ class OrdemServico {
   final String? idLogin;            // id numérico do login no IXC (p/ limpar MAC)
   final String? senhaPppoe;         // senha PPPoE do login (dados_ixc)
   final String? plano;              // nome do plano/contrato (dados_ixc)
+  // Status de conexão (Online/Offline) do login — FOTO de quando a OS foi
+  // sincronizada (não é ao vivo). null = não sabemos.
+  final bool? statusConexaoOnline;
+  final String? ultimaConexao;
   final String? caixaFtth; // CTO
   final String? portaFtth;
   final String? idAssunto; // assunto IXC (60 = instalação de internet FTTH)
@@ -81,6 +85,8 @@ class OrdemServico {
     this.idLogin,
     this.senhaPppoe,
     this.plano,
+    this.statusConexaoOnline,
+    this.ultimaConexao,
     this.caixaFtth,
     this.portaFtth,
     this.idAssunto,
@@ -120,6 +126,8 @@ class OrdemServico {
     String? senhaPppoe;
     String? plano;
     String? idLogin;
+    bool? statusConexaoOnline;
+    String? ultimaConexao;
     final dadosIxc = json['dados_ixc'];
     if (dadosIxc != null) {
       try {
@@ -142,6 +150,8 @@ class OrdemServico {
           senhaPppoe = limpo(d['sn_senha']);
           plano = limpo(d['sn_plano']);
           idLogin = limpo(d['id_login']);
+          statusConexaoOnline = d['sn_online'] is bool ? d['sn_online'] as bool : null;
+          ultimaConexao = limpo(d['sn_ultima_conexao']);
         }
       } catch (_) {}
     }
@@ -159,6 +169,8 @@ class OrdemServico {
       clienteCondominio: clienteCondominio,
       senhaPppoe: senhaPppoe,
       plano: plano,
+      statusConexaoOnline: statusConexaoOnline,
+      ultimaConexao: ultimaConexao,
       id: (json['id'] ?? 0).toString(),
       numeroOs: json['numero_os']?.toString() ??
           json['numero_os_ixc']?.toString() ??

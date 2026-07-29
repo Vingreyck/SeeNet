@@ -180,6 +180,37 @@ class OSCardWidget extends StatelessWidget {
               ],
             ),
 
+            // MENSAGEM DO CHAMADO (o que o atendente/IXC pediu pra fazer) — vem
+            // direto da OS no IXC. Antes só aparecia dentro do IXC; o técnico
+            // não tinha como ver "o que fazer" sem abrir o sistema deles.
+            if (os.observacoes != null && os.observacoes!.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: Colors.amber.shade400, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        os.observacoes!.trim(),
+                        style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.3),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // DADOS DO CLIENTE (login/senha copiáveis, plano, CTO, endereço
             // completo, Limpar MAC) — mesmo bloco usado na etapa de Localização.
             if (os.tipoOs != 'E') ...[

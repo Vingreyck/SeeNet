@@ -220,6 +220,44 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         children: [
           _buildTituloEtapa(icone: Icons.location_on_rounded, titulo: 'Localização', descricao: 'Confirme ou capture a localização do atendimento'),
           const SizedBox(height: 20),
+          // Mensagem do chamado (o que fazer) — vem direto da OS no IXC.
+          // Primeira coisa que o técnico precisa ler ao abrir a OS.
+          if (os.observacoes != null && os.observacoes!.trim().isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Colors.amber.shade400, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('O que fazer',
+                            style: TextStyle(
+                                color: Colors.amber.shade400,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(
+                          os.observacoes!.trim(),
+                          style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           // Mesmos dados do OS card (login/senha copiáveis, plano, CTO, endereço
           // completo, Limpar MAC).
           _buildCard(child: OSClienteInfo(os: os, mostrarNome: true)),

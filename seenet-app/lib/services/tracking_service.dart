@@ -1,5 +1,6 @@
 // lib/services/tracking_service.dart
 import 'dart:async';
+import 'app_info.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -32,6 +33,7 @@ class TrackingService extends GetxService {
       'Authorization': 'Bearer ${auth.token}',
       'X-Tenant-Code': auth.tenantCode ?? '',
       'Content-Type': 'application/json',
+      ...AppInfo.header,
     };
   }
 

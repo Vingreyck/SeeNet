@@ -260,7 +260,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           ],
           // Mesmos dados do OS card (login/senha copiáveis, plano, CTO, endereço
           // completo, Limpar MAC).
-          _buildCard(child: OSClienteInfo(os: os, mostrarNome: true)),
+          _buildCard(
+              child: OSClienteInfo(
+                  os: os, mostrarNome: true, permitirEditarEndereco: true)),
           // Atalhos: WhatsApp + Ligar + abrir a localização no Google Maps.
           if (_temTelefone || _temEndereco) ...[
             const SizedBox(height: 12),

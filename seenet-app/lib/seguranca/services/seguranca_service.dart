@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../services/app_info.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:seenet/services/auth_service.dart';
@@ -10,6 +11,7 @@ class SegurancaService extends GetxService {
     'Content-Type': 'application/json',
     'Authorization': 'Bearer ${_authService.token}',
     'X-Tenant-Code': _authService.tenantCode ?? '',
+    ...AppInfo.header,
   };
 
   String get _base => 'https://seenet-production.up.railway.app/api/seguranca';

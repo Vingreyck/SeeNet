@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'services/app_info.dart';
 import 'package:flutter/foundation.dart';
 import 'checklist/screen/checklist_items_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -77,6 +78,10 @@ void main() async {
   };
 
   await GetStorage.init();
+
+  // Lê a versão do app (vai no header X-App-Version de toda requisição, e o
+  // backend grava no login). Tem try/catch dentro — nunca segura o arranque.
+  await AppInfo.carregar();
 
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(

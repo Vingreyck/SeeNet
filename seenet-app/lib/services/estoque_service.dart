@@ -1,5 +1,6 @@
 // lib/services/estoque_service.dart
 import 'dart:convert';
+import 'app_info.dart';
 import 'package:http/http.dart' as http;
 import 'package:get/get.dart';
 import 'package:seenet/services/auth_service.dart';
@@ -216,6 +217,7 @@ class EstoqueService {
       'Authorization': 'Bearer $token',
       'X-Tenant-Code': tenantCode ?? '',
       'Content-Type': 'application/json',
+      ...AppInfo.header,
     };
   }
 

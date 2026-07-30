@@ -468,6 +468,20 @@ router.post('/login', loginLimiter, [
       }
     );
 
+    // 📱 Versão do app deste usuário (header X-App-Version). Best-effort e em
+    // background — nunca segura nem derruba o login. Serve pra saber, sem
+    // adivinhação, quem já atualizou o app (ver `usuarios.versao_app`).
+    const versaoApp = req.headers['x-app-version'];
+    if (versaoApp) {
+      db('usuarios')
+        .where('id', user.id)
+        .update({ versao_app: String(versaoApp).slice(0, 40), versao_app_em: db.fn.now() })
+        .then(() => console.log(`📱 ${user.nome}: app ${versaoApp}`))
+        .catch((e) => console.warn('⚠️ Não consegui gravar a versão do app:', e.message));
+    } else {
+      console.log(`📱 ${user.nome}: app SEM versão no header (build antigo, anterior a 30/jul)`);
+    }
+
 if (user.tipo_usuario === 'tecnico') {
   // Auto-mapeamento IXC roda em BACKGROUND: não bloqueia a resposta do login.
   // É best-effort e idempotente (protegido pela verificação de existência abaixo).

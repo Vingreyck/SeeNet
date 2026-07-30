@@ -545,7 +545,21 @@ class SincronizadorIXC {
             // (ex: contrato da mãe com 2 logins — "casa" e "casa da filha"). Se o
             // login não tiver endereço próprio (campos vazios), mantém o do cliente
             // já buscado acima (fallback).
-            if (rec.endereco) {
+            //
+            // ⚠️ SANIDADE (bug real, 29/jul): o endereço do LOGIN pode estar
+            // DESATUALIZADO no IXC (campo que ninguém mais mantém depois que o
+            // cliente mudou de endereço) — vimos um caso onde isso trocou o
+            // endereço certo de uma OS (Ribeirópolis) por um endereço de outra
+            // cidade (N.Sra.Aparecida) que só existia, obsoleto, no cadastro do
+            // login. A própria OS (`su_oss_chamado`) já carrega uma cidade
+            // (id_cidade) confirmada/atual — só aceita o endereço do login se a
+            // cidade dele BATER com a da OS (quando a OS tiver uma). Sem isso,
+            // ignora o endereço do login e mantém o do cliente (mais confiável).
+            const cidadeDaOsConhecida = osIXC.id_cidade && osIXC.id_cidade !== '0';
+            const cidadeBate = !cidadeDaOsConhecida ||
+              String(osIXC.id_cidade) === String(rec.cidade || '');
+
+            if (rec.endereco && cidadeBate) {
               clienteEndereco = rec.endereco;
               clienteNumero = rec.numero || clienteNumero;
               clienteBairro = rec.bairro || clienteBairro;
@@ -564,6 +578,9 @@ class SincronizadorIXC {
                   clienteCidade = cidLogin.uf ? `${cidLogin.nome} - ${cidLogin.uf}` : cidLogin.nome;
                 }
               }
+            } else if (rec.endereco && !cidadeBate) {
+              console.log(`   ⚠️ Endereço do login IGNORADO (cidade não bate: ` +
+                `OS id_cidade=${osIXC.id_cidade} vs login cidade=${rec.cidade}) — mantendo endereço do cliente`);
             }
           }
         }

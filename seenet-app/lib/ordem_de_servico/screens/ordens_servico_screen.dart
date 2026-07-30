@@ -303,7 +303,8 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
         'As OSs finalizadas por você aparecerão aqui.'],
     };
     final c = configs[status]!;
-    return _buildVazio(c[0] as IconData, c[1] as String, c[2] as String);
+    return _vazioAtualizavel(
+        _buildVazio(c[0] as IconData, c[1] as String, c[2] as String));
   }
 
   Widget _buildErrorState(String erro) {
@@ -335,6 +336,24 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
                     borderRadius: BorderRadius.circular(30)),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Tela vazia que AINDA aceita puxar pra baixo. Sem o ListView + physics
+  // "AlwaysScrollable" o RefreshIndicator não tem o que rolar e o gesto morre.
+  Widget _vazioAtualizavel(Widget filho) {
+    return RefreshIndicator(
+      onRefresh: _atualizarLista,
+      color: const Color(0xFF00FF88),
+      backgroundColor: const Color(0xFF1A1A1A),
+      child: LayoutBuilder(
+        builder: (context, constraints) => ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(height: constraints.maxHeight, child: filho),
           ],
         ),
       ),
@@ -450,11 +469,46 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
               ],
             ),
           ),
+          // Botão de ATUALIZAR sempre visível. Antes só dava pra atualizar
+          // puxando a lista pra baixo — e sem nenhuma OS não havia o que puxar,
+          // então o técnico ficava preso na tela vazia sem jeito de recarregar.
+          Obx(() {
+            final carregando = controller.isLoading.value ||
+                controller.isLoadingConcluidas.value;
+            if (carregando) {
+              return const Padding(
+                padding: EdgeInsets.only(left: 6),
+                child: SizedBox(
+                  width: 38,
+                  height: 38,
+                  child: Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Color(0xFF00FF88)),
+                    ),
+                  ),
+                ),
+              );
+            }
+            return _headerAction(Icons.refresh_rounded, Colors.white70,
+                'Atualizar OS', _atualizarLista);
+          }),
           const SizedBox(width: 6),
           _profileCircle(usuario),
         ],
       ),
     );
+  }
+
+  // Recarrega a aba que está aberta (concluídas tem endpoint/busca próprios).
+  Future<void> _atualizarLista() async {
+    if (_tabAtual.value == 2) {
+      await controller.carregarOSsConcluidas(busca: _termoBusca.value);
+    } else {
+      await controller.carregarMinhasOSs();
+    }
   }
 
   // Círculo de perfil: inicial + borda na cor do cargo

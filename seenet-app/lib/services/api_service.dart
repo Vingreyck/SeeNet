@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:get/get.dart';
 import '../config/api_config.dart';
 import '../config/environment.dart';
+import 'app_info.dart';
 
 class ApiService extends GetxService {
   static ApiService get instance => Get.find<ApiService>();
@@ -57,6 +58,7 @@ class ApiService extends GetxService {
       }
       
       final headers = ApiConfig.getAuthHeaders(_token!, _tenantCode!);
+      headers.addAll(AppInfo.header); // X-App-Version (some se não foi lida)
       print('✅ Headers com autenticação montados:');
       headers.forEach((key, value) {
         if (key == 'Authorization') {
@@ -68,7 +70,9 @@ class ApiService extends GetxService {
       return headers;
     } else {
       print('✅ Headers sem autenticação');
-      return ApiConfig.defaultHeaders;
+      // O LOGIN passa por aqui (requireAuth: false) — é onde o backend grava a
+      // versão que cada técnico está usando.
+      return {...ApiConfig.defaultHeaders, ...AppInfo.header};
     }
   }
   

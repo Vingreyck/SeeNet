@@ -11,12 +11,14 @@ class OSClienteInfo extends StatefulWidget {
   final OrdemServico os;
   final bool mostrarNome;         // mostra a linha "Cliente" (wizard sim; card não, já tem no topo)
   final bool permitirLimparMac;   // mostra o botão "Limpar MAC" (precisa de idLogin)
+  final bool permitirEditarEndereco; // técnico corrige o endereço em campo (só no wizard)
 
   const OSClienteInfo({
     super.key,
     required this.os,
     this.mostrarNome = false,
     this.permitirLimparMac = true,
+    this.permitirEditarEndereco = false,
   });
 
   @override
@@ -27,7 +29,15 @@ class _OSClienteInfoState extends State<OSClienteInfo> {
   static const _verde = Color(0xFF00FF88);
   bool _limpandoMac = false;
 
+  // Correções feitas aqui na tela. O objeto OrdemServico é imutável, então em
+  // vez de recarregar a OS inteira só pra mostrar o novo texto, guardamos o
+  // valor corrigido e ele tem prioridade na exibição.
+  final Map<String, String> _corrigidos = {};
+
   OrdemServico get os => widget.os;
+
+  String? _campo(String chave, String? original) =>
+      _corrigidos.containsKey(chave) ? _corrigidos[chave] : original;
 
   void _copiar(String rotulo, String valor) {
     Clipboard.setData(ClipboardData(text: valor));
@@ -71,6 +81,116 @@ class _OSClienteInfoState extends State<OSClienteInfo> {
     final res = await OrdemServicoService().limparMac(os.id);
     if (!mounted) return;
     setState(() => _limpandoMac = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(res['message']?.toString() ?? ''),
+      backgroundColor: res['ok'] == true ? _verde : Colors.red,
+    ));
+  }
+
+  // 🏠 Corrigir o endereço em campo. Salva no SeeNet E no cadastro do login no
+  // IXC — então a próxima OS deste cliente já vem certa.
+  Future<void> _editarEndereco() async {
+    final ctrls = <String, TextEditingController>{
+      'endereco':    TextEditingController(text: _campo('endereco', os.clienteEndereco) ?? ''),
+      'numero':      TextEditingController(text: _campo('numero', os.clienteNumero) ?? ''),
+      'bairro':      TextEditingController(text: _campo('bairro', os.clienteBairro) ?? ''),
+      'cep':         TextEditingController(text: _campo('cep', os.clienteCep) ?? ''),
+      'complemento': TextEditingController(text: _campo('complemento', os.clienteComplemento) ?? ''),
+      'referencia':  TextEditingController(text: _campo('referencia', os.clienteReferencia) ?? ''),
+    };
+    const rotulos = {
+      'endereco': 'Endereço (rua)', 'numero': 'Número', 'bairro': 'Bairro',
+      'cep': 'CEP', 'complemento': 'Complemento', 'referencia': 'Ponto de referência',
+    };
+
+    Widget campo(String chave) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: TextField(
+            controller: ctrls[chave],
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            keyboardType: (chave == 'numero' || chave == 'cep')
+                ? TextInputType.number : TextInputType.text,
+            maxLines: chave == 'referencia' ? 2 : 1,
+            decoration: InputDecoration(
+              labelText: rotulos[chave],
+              labelStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+              filled: true,
+              fillColor: const Color(0xFF111111),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            ),
+          ),
+        );
+
+    final salvar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Corrigir endereço',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Corrija o que estiver errado. Isso também atualiza o cadastro do '
+                'cliente no IXC, então as próximas OS já vêm certas.',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              const SizedBox(height: 14),
+              ...ctrls.keys.map(campo),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: _verde, foregroundColor: Colors.black),
+            child: const Text('Salvar', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (salvar != true) {
+      for (final c in ctrls.values) { c.dispose(); }
+      return;
+    }
+
+    // Manda só o que realmente mudou.
+    final atuais = {
+      'endereco':    _campo('endereco', os.clienteEndereco) ?? '',
+      'numero':      _campo('numero', os.clienteNumero) ?? '',
+      'bairro':      _campo('bairro', os.clienteBairro) ?? '',
+      'cep':         _campo('cep', os.clienteCep) ?? '',
+      'complemento': _campo('complemento', os.clienteComplemento) ?? '',
+      'referencia':  _campo('referencia', os.clienteReferencia) ?? '',
+    };
+    final mudou = <String, String>{};
+    ctrls.forEach((chave, ctrl) {
+      final novo = ctrl.text.trim();
+      if (novo != atuais[chave]) mudou[chave] = novo;
+    });
+    for (final c in ctrls.values) { c.dispose(); }
+
+    if (mudou.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Nada foi alterado'), backgroundColor: Colors.white24));
+      return;
+    }
+
+    final res = await OrdemServicoService().atualizarEndereco(os.id, mudou);
+    if (!mounted) return;
+    if (res['ok'] == true) setState(() => _corrigidos.addAll(mudou));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(res['message']?.toString() ?? ''),
       backgroundColor: res['ok'] == true ? _verde : Colors.red,
@@ -178,23 +298,39 @@ class _OSClienteInfoState extends State<OSClienteInfo> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                children: const [
-                  Icon(Icons.location_on_outlined, color: Colors.white70, size: 16),
-                  SizedBox(width: 6),
-                  Text('Endereço do cliente',
+                children: [
+                  const Icon(Icons.location_on_outlined, color: Colors.white70, size: 16),
+                  const SizedBox(width: 6),
+                  const Text('Endereço do cliente',
                       style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  // Corrigir em campo: o cliente às vezes informa uma referência
+                  // ou número que não bate com o que está no cadastro.
+                  if (widget.permitirEditarEndereco)
+                    GestureDetector(
+                      onTap: _editarEndereco,
+                      child: const Row(
+                        children: [
+                          Icon(Icons.edit_outlined, color: _verde, size: 14),
+                          SizedBox(width: 4),
+                          Text('Corrigir',
+                              style: TextStyle(color: _verde, fontSize: 12,
+                                  fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 6),
-              _linha('Endereço', os.clienteEndereco),
-              _linha('Número', os.clienteNumero),
-              _linha('Bairro', os.clienteBairro),
+              _linha('Endereço', _campo('endereco', os.clienteEndereco)),
+              _linha('Número', _campo('numero', os.clienteNumero)),
+              _linha('Bairro', _campo('bairro', os.clienteBairro)),
               _linha('Cidade', os.clienteCidade),
-              _linha('CEP', os.clienteCep),
+              _linha('CEP', _campo('cep', os.clienteCep)),
               _linha('Condomínio', os.clienteCondominio),
               _linha('Apartamento', os.clienteApartamento),
-              _linha('Complemento', os.clienteComplemento),
-              _linha('Referência', os.clienteReferencia),
+              _linha('Complemento', _campo('complemento', os.clienteComplemento)),
+              _linha('Referência', _campo('referencia', os.clienteReferencia)),
             ],
           ),
         ),

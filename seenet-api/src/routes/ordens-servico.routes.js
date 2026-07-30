@@ -53,6 +53,10 @@ router.delete('/:id/rascunho', OrdensServicoController.deletarRascunho.bind(Orde
 
 router.get('/:id/historico-endereco', OrdensServicoController.buscarHistoricoEndereco.bind(OrdensServicoController));
 
+// 🏠 Técnico corrige o endereço em campo (número/referência/complemento errados
+// no cadastro). Grava no SeeNet + no cadastro do login e na OS no IXC.
+router.put('/:id/endereco', OrdensServicoController.atualizarEnderecoOS.bind(OrdensServicoController));
+
 // 📷 Foto da fachada (frente da casa) do cliente — 1 por cliente, só no SeeNet
 router.get('/:id/fachada', OrdensServicoController.buscarFachada.bind(OrdensServicoController));
 router.post('/:id/fachada', OrdensServicoController.salvarFachada.bind(OrdensServicoController));

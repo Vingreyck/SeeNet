@@ -482,20 +482,40 @@ async reagendarOS(req, res) {
       // manda esses campos → simplesmente pula, sem quebrar nada.
       const temItens = Array.isArray(req.body.itens_estoque) && req.body.itens_estoque.length > 0;
       const temFotos = Array.isArray(req.body.fotos) && req.body.fotos.length > 0;
+      // 🔎 Log do que o app REALMENTE mandou. Sem isto, "não apareceu no IXC"
+      // fica indistinguível de "o app nem enviou" (versão antiga do app, que
+      // não tem esse recurso) — foi o que atrasou o diagnóstico em 29/jul.
+      console.log(`📦📸 Reagendamento da OS ${os.numero_os}: recebido do app → ` +
+        `${req.body.itens_estoque?.length || 0} item(ns) de estoque, ` +
+        `${req.body.fotos?.length || 0} foto(s) ` +
+        `[app ${req.headers['x-app-version'] || 'ANTIGO/sem versao'}]`);
       if (temItens || temFotos) {
         try {
           const integ = await db('integracao_ixc')
             .where('tenant_id', tenantId).where('ativo', true).first();
-          if (integ) {
+          if (!integ) {
+            console.warn('⚠️ Sem integração IXC ativa — material/fotos do reagendamento não registrados');
+          } else {
             const ixcReag = new IXCService(integ.url_api, integ.token_api);
+            // try/catch SEPARADO por etapa: uma falha no estoque não pode
+            // impedir o envio das fotos (e vice-versa). Antes as duas
+            // dividiam o mesmo try — a 1ª que estourasse cancelava a outra.
             if (temItens) {
-              await this.sincronizarItensEstoqueIXC(
-                os, { itens_estoque: req.body.itens_estoque, onu_mac: req.body.onu_mac },
-                ixcReag, tenantId
-              );
+              try {
+                await this.sincronizarItensEstoqueIXC(
+                  os, { itens_estoque: req.body.itens_estoque, onu_mac: req.body.onu_mac },
+                  ixcReag, tenantId
+                );
+              } catch (e) {
+                console.error('⚠️ Erro ao registrar material no reagendamento:', e.message);
+              }
             }
             if (temFotos) {
-              await this.sincronizarFotosIXC(os, req.body.fotos, ixcReag, tenantId);
+              try {
+                await this.sincronizarFotosIXC(os, req.body.fotos, ixcReag, tenantId);
+              } catch (e) {
+                console.error('⚠️ Erro ao registrar fotos no reagendamento:', e.message);
+              }
             }
           }
         } catch (e) {
@@ -587,10 +607,17 @@ async sincronizarItensEstoqueIXC(os, dados, ixcService, tenantId) {
   }
 
   // ── Contexto (almoxarifado, contrato, filial, login) ──────────────────
-  const mapeamentoEstoque = await db('mapeamento_tecnicos_ixc')
-    .where('usuario_id', os.tecnico_id)
-    .where('tenant_id', tenantId)
-    .first();
+  // Protegido: uma falha de banco aqui derrubava TODO o envio de estoque
+  // (testado). Sem o mapeamento, cai no fallback de almoxarifado abaixo.
+  let mapeamentoEstoque = null;
+  try {
+    mapeamentoEstoque = await db('mapeamento_tecnicos_ixc')
+      .where('usuario_id', os.tecnico_id)
+      .where('tenant_id', tenantId)
+      .first();
+  } catch (e) {
+    console.warn('⚠️ Não foi possível ler o mapeamento do técnico:', e.message);
+  }
 
   // Material/comodato da OS descontam da LOJA da cidade (id_almoxarifado_loja)
   // quando o admin mapeou; senão cai no almox pessoal do técnico (compat).
@@ -600,6 +627,11 @@ async sincronizarItensEstoqueIXC(os, dados, ixcService, tenantId) {
 
   const hoje = new Date();
   const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
+
+  // Números podem chegar como STRING no JSON (versões diferentes do app, ou
+  // um rascunho antigo restaurado). `.toFixed()` em string estoura e derrubava
+  // o item INTEIRO — testado: com valores em texto, os 4 itens falhavam.
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
   const ehPatrimonioItem = (i) => !!(i.id_patrimonio && i.id_patrimonio !== '' && i.id_patrimonio !== '0');
   const desejadosProduto  = itens.filter(i => !ehPatrimonioItem(i));
@@ -656,8 +688,8 @@ async sincronizarItensEstoqueIXC(os, dados, ixcService, tenantId) {
           id_produto:                  item.id_produto.toString(),
           descricao:                   item.descricao || jaLa.descricao || '',
           qtde_saida:                  qtde.toString(),
-          valor_unitario:              item.valor_unitario.toFixed(2),
-          valor_total:                 (qtde * item.valor_unitario).toFixed(2),
+          valor_unitario:              num(item.valor_unitario).toFixed(2),
+          valor_total:                 (qtde * num(item.valor_unitario)).toFixed(2),
           id_almox:                    jaLa.id_almox || idAlmox.toString(),
           id_unidade:                  jaLa.id_unidade || '1',
           unidade_sigla:               jaLa.unidade_sigla || 'UND',
@@ -686,8 +718,8 @@ async sincronizarItensEstoqueIXC(os, dados, ixcService, tenantId) {
           estoque:                     'S',
           unidade_sigla:               'UND',
           fator_conversao:             '1.000000000',
-          valor_unitario:              item.valor_unitario.toFixed(2),
-          valor_total:                 (qtde * item.valor_unitario).toFixed(2),
+          valor_unitario:              num(item.valor_unitario).toFixed(2),
+          valor_total:                 (qtde * num(item.valor_unitario)).toFixed(2),
           id_patrimonio:               '',
           patrimonio:                  '',
           numero_serie:                '',
@@ -727,25 +759,33 @@ async sincronizarItensEstoqueIXC(os, dados, ixcService, tenantId) {
     }
   }
 
-  // ── COMODATO (patrimônio): não edita/deleta → devolve o que saiu ───────
+  // ── COMODATO (patrimônio): não edita/deleta ────────────────────────────
   let comodatosAtivos = [];
   try {
     comodatosAtivos = await ixcService.listarComodatosOS(os.id_externo);
   } catch (_) {}
 
   const patrimoniosDesejados = new Set(desejadosComodato.map(i => String(i.id_patrimonio)));
+
+  // 🛑 DEVOLUÇÃO AUTOMÁTICA DESLIGADA (29/jul) — era DESTRUTIVA e nunca podia
+  // acertar. O raciocínio original ("o técnico tirou da lista → devolve") só
+  // valeria se a lista do app contivesse os comodatos que já estão na OS. Mas
+  // ela NUNCA contém: quando a OS volta (reaberta/reagendada), o app recarrega
+  // o material por `listarProdutosOS` (`/su_oss_mov_produto`), e esse endpoint
+  // NÃO devolve movimento de comodato (verificado ao vivo: a OS 290910 tem 2
+  // comodatos ativos e `listarProdutosOS` responde 0 registros).
+  // Consequência: qualquer comodato lançado por FORA do app (o gestor lançando
+  // à mão — caso real da OS 290910, patrimônios 17023 e 13689) era visto como
+  // "removido pelo técnico" e o equipamento do CLIENTE voltava pro estoque,
+  // em silêncio. Testado rodando esta função contra o IXC de produção em modo
+  // seco: ela devolveria os dois.
+  // Só registra pra alguém olhar. Pra ter troca de equipamento de verdade, o
+  // app precisa PRIMEIRO carregar os comodatos existentes na lista — aí tirar
+  // um da lista passa a ser um ato deliberado do técnico.
   for (const c of comodatosAtivos) {
     if (patrimoniosDesejados.has(String(c.id_patrimonio))) continue;
-    // Equipamento que o técnico tirou da lista → volta pro almoxarifado.
-    try {
-      const almoxDestino = c.id_almox || idAlmox;
-      await ixcService.devolverComodato(c.id, almoxDestino);
-      console.log(`   ↩️ comodato devolvido: patrimônio ${c.id_patrimonio}`);
-      resumo.devolvidos++;
-    } catch (e) {
-      console.error(`   ❌ Erro ao devolver comodato ${c.id}:`, e.message);
-      resumo.erros++;
-    }
+    console.warn(`   ⚠️ comodato NÃO enviado pelo app (patrimônio ${c.id_patrimonio}, ` +
+      `mov ${c.id}) — mantido como está. Se precisar devolver, faça no painel do IXC.`);
   }
 
   const patrimoniosNoIxc = new Set(comodatosAtivos.map(c => String(c.id_patrimonio)));
@@ -771,12 +811,12 @@ async sincronizarItensEstoqueIXC(os, dados, ixcService, tenantId) {
                                        ? item.id_almoxarifado.toString()
                                        : idAlmox.toString(),
         filial_id:                   (idFilialIxc || '1').toString(),
-        qtde_saida:                  item.quantidade.toString(),
-        valor_unitario:              item.valor_unitario.toFixed(2),
+        qtde_saida:                  num(item.quantidade).toString(),
+        valor_unitario:              num(item.valor_unitario).toFixed(2),
         pcomissao:                   '',
         pdesconto:                   '',
         vdesconto:                   '',
-        valor_total:                 item.valor_total.toFixed(2),
+        valor_total:                 num(item.valor_total).toFixed(2),
         patrimonio:                  item.id_patrimonio.toString(),
         mac:                         dados.onu_mac || item.mac || '',
         numero_serie:                item.numero_serie || '',
@@ -812,14 +852,21 @@ async sincronizarItensEstoqueIXC(os, dados, ixcService, tenantId) {
 /** OS de ESTRUTURA: endpoint próprio, sem auditoria/comodato → inserção direta
  *  (comportamento de sempre, extraído só pra manter o método principal limpo). */
 async _inserirItensEstruturaIXC(os, itens, ixcService, tenantId) {
-  const mapeamentoEstoque = await db('mapeamento_tecnicos_ixc')
-    .where('usuario_id', os.tecnico_id)
-    .where('tenant_id', tenantId)
-    .first();
+  let mapeamentoEstoque = null;
+  try {
+    mapeamentoEstoque = await db('mapeamento_tecnicos_ixc')
+      .where('usuario_id', os.tecnico_id)
+      .where('tenant_id', tenantId)
+      .first();
+  } catch (e) {
+    console.warn('⚠️ Não foi possível ler o mapeamento do técnico:', e.message);
+  }
   const idAlmox = mapeamentoEstoque?.id_almoxarifado_loja
     || mapeamentoEstoque?.id_almoxarifado || 22;
   const hoje = new Date();
   const dataFormatada = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()}`;
+  // Mesma proteção do método principal: número em string não pode derrubar o item.
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
   for (const item of itens) {
     try {
@@ -827,7 +874,7 @@ async _inserirItensEstruturaIXC(os, itens, ixcService, tenantId) {
         id_oss_chamado:              os.id_externo,
         id_produto:                  item.id_produto,
         descricao:                   item.descricao || '',
-        qtde_saida:                  item.quantidade.toString(),
+        qtde_saida:                  num(item.quantidade).toString(),
         data:                        dataFormatada,
         id_unidade:                  '1',
         id_almox:                    idAlmox.toString(),
@@ -836,8 +883,8 @@ async _inserirItensEstruturaIXC(os, itens, ixcService, tenantId) {
         estoque:                     'S',
         unidade_sigla:               'UND',
         fator_conversao:             '1.000000000',
-        valor_unitario:              item.valor_unitario.toFixed(2),
-        valor_total:                 item.valor_total.toFixed(2),
+        valor_unitario:              num(item.valor_unitario).toFixed(2),
+        valor_total:                 num(item.valor_total).toFixed(2),
         id_estrutura:                '',
         id_oss_mensagem:             '',
         id_saida:                    '',
@@ -1006,20 +1053,35 @@ async encaminharOS(req, res) {
       // receber pode ajustar depois, e nada se duplica ao finalizar).
       const temItens = Array.isArray(req.body.itens_estoque) && req.body.itens_estoque.length > 0;
       const temFotos = Array.isArray(req.body.fotos) && req.body.fotos.length > 0;
+      console.log(`📦📸 Encaminhamento da OS ${os.numero_os}: recebido do app → ` +
+        `${req.body.itens_estoque?.length || 0} item(ns) de estoque, ` +
+        `${req.body.fotos?.length || 0} foto(s) ` +
+        `[app ${req.headers['x-app-version'] || 'ANTIGO/sem versao'}]`);
       if (temItens || temFotos) {
         try {
           const integ = await db('integracao_ixc')
             .where('tenant_id', tenantId).where('ativo', true).first();
-          if (integ) {
+          if (!integ) {
+            console.warn('⚠️ Sem integração IXC ativa — material/fotos do encaminhamento não registrados');
+          } else {
             const ixcEnc = new IXCService(integ.url_api, integ.token_api);
+            // try/catch separado por etapa (ver comentário no reagendarOS).
             if (temItens) {
-              await this.sincronizarItensEstoqueIXC(
-                os, { itens_estoque: req.body.itens_estoque, onu_mac: req.body.onu_mac },
-                ixcEnc, tenantId
-              );
+              try {
+                await this.sincronizarItensEstoqueIXC(
+                  os, { itens_estoque: req.body.itens_estoque, onu_mac: req.body.onu_mac },
+                  ixcEnc, tenantId
+                );
+              } catch (e) {
+                console.error('⚠️ Erro ao registrar material no encaminhamento:', e.message);
+              }
             }
             if (temFotos) {
-              await this.sincronizarFotosIXC(os, req.body.fotos, ixcEnc, tenantId);
+              try {
+                await this.sincronizarFotosIXC(os, req.body.fotos, ixcEnc, tenantId);
+              } catch (e) {
+                console.error('⚠️ Erro ao registrar fotos no encaminhamento:', e.message);
+              }
             }
           }
         } catch (e) {
@@ -2211,6 +2273,122 @@ if (dados.fotos && dados.fotos.length > 0) {
         console.error('❌ Erro no job de SLA:', error.message);
       }
     }
+
+  /**
+   * 🏠 Técnico corrige o endereço da OS em campo (o cliente informou a
+   * referência/número errado no cadastro).
+   * PUT /api/ordens-servico/:id/endereco
+   * body: { endereco, numero, bairro, cep, complemento, referencia }
+   *
+   * Grava em 3 lugares, em ordem de importância:
+   *   1. banco local  → o app mostra certo na hora (e é o que o card lê);
+   *   2. cadastro do LOGIN no IXC (radusuarios) → conserta as OS FUTURAS;
+   *   3. a própria OS no IXC + uma mensagem de auditoria (quem mudou o quê).
+   * Os passos 2 e 3 são best-effort: se o IXC recusar, a correção local vale e
+   * o erro fica no log — nunca derruba a resposta pro técnico.
+   */
+  async atualizarEnderecoOS(req, res) {
+    try {
+      const { id } = req.params;
+      const tenantId = req.tenantId;
+      const userId = req.user.id;
+
+      const CAMPOS = ['endereco', 'numero', 'bairro', 'cep', 'complemento', 'referencia'];
+      const novos = {};
+      for (const c of CAMPOS) {
+        if (req.body[c] !== undefined && req.body[c] !== null) {
+          novos[c] = String(req.body[c]).trim();
+        }
+      }
+      if (Object.keys(novos).length === 0) {
+        return res.status(400).json({ success: false, error: 'Nenhum campo de endereço enviado' });
+      }
+
+      const os = await db('ordem_servico')
+        .where('id', id).where('tenant_id', tenantId).first();
+      if (!os) {
+        return res.status(404).json({ success: false, error: 'OS não encontrada' });
+      }
+      // Só quem está com a OS (ou um admin) corrige o endereço dela.
+      const ehAdmin = ['administrador', 'admin'].includes(req.user.tipo_usuario);
+      if (!ehAdmin && String(os.tecnico_id) !== String(userId)) {
+        return res.status(403).json({ success: false, error: 'Esta OS não é sua' });
+      }
+
+      // ── 1. banco local (o card/wizard leem daqui) ───────────────────────
+      const patch = { data_atualizacao: db.fn.now() };
+      if (novos.endereco !== undefined) patch.cliente_endereco = novos.endereco;
+      if (novos.numero !== undefined) patch.cliente_numero = novos.numero;
+      if (novos.bairro !== undefined) patch.cliente_bairro = novos.bairro;
+
+      // cep/complemento/referencia moram no snapshot dados_ixc (campos sn_*)
+      let dIxc = {};
+      try {
+        dIxc = os.dados_ixc
+          ? (typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc)
+          : {};
+      } catch (_) { dIxc = {}; }
+      if (novos.cep !== undefined) dIxc.sn_cep = novos.cep;
+      if (novos.complemento !== undefined) dIxc.sn_complemento = novos.complemento;
+      if (novos.referencia !== undefined) dIxc.sn_referencia = novos.referencia;
+      patch.dados_ixc = JSON.stringify(dIxc);
+
+      await db('ordem_servico').where('id', id).update(patch);
+      console.log(`🏠 Endereço da OS ${os.numero_os} corrigido no SeeNet por usuário ${userId}`);
+
+      // ── 2 e 3. IXC (best-effort) ────────────────────────────────────────
+      if (os.origem === 'IXC' && os.id_externo) {
+        try {
+          const integ = await db('integracao_ixc')
+            .where('tenant_id', tenantId).where('ativo', true).first();
+          if (!integ) {
+            console.warn('⚠️ Sem integração IXC ativa — correção ficou só no SeeNet');
+          } else {
+            const ixc = new IXCService(integ.url_api, integ.token_api);
+            const idLogin = dIxc.id_login;
+            const tecnico = await db('usuarios').where('id', userId).first();
+
+            // 2. cadastro do login → conserta as OS futuras deste login
+            if (idLogin && idLogin !== '0') {
+              try {
+                await ixc.atualizarEnderecoLogin(idLogin, novos);
+              } catch (e) {
+                console.error('⚠️ Não consegui corrigir o endereço do login no IXC:', e.message);
+              }
+            } else {
+              console.warn('⚠️ OS sem id_login — endereço do cadastro não foi corrigido');
+            }
+
+            // 3a. endereço na própria OS
+            try {
+              await ixc.atualizarEnderecoOS(os.id_externo, novos);
+            } catch (e) {
+              console.error('⚠️ Não consegui corrigir o endereço da OS no IXC:', e.message);
+            }
+
+            // 3b. rastro de auditoria — quem mudou, o quê e quando
+            try {
+              const linhas = Object.entries(novos)
+                .map(([k, v]) => `${k.toUpperCase()}: ${v || '(vazio)'}`).join('\n');
+              await ixc.adicionarMensagemOS(os.id_externo, {
+                mensagem: `📍 ENDEREÇO CORRIGIDO EM CAMPO (SeeNet)\n` +
+                  `Técnico: ${tecnico?.nome || userId}\n${linhas}`,
+              });
+            } catch (e) {
+              console.error('⚠️ Não consegui registrar a mensagem de auditoria:', e.message);
+            }
+          }
+        } catch (e) {
+          console.error('⚠️ Erro ao sincronizar endereço com o IXC:', e.message);
+        }
+      }
+
+      return res.json({ success: true, message: 'Endereço atualizado', endereco: novos });
+    } catch (error) {
+      console.error('❌ Erro ao atualizar endereço da OS:', error.message);
+      return res.status(500).json({ success: false, error: 'Erro ao atualizar endereço' });
+    }
+  }
 
   /**
    * 💾 Salvar o RASCUNHO do wizard no servidor (atrelado à OS). Chamado ao

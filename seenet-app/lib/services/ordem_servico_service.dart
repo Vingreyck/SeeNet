@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'app_info.dart';
 import 'dart:io' if (dart.library.html) '../utils/io_stub.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -18,6 +19,7 @@ class OrdemServicoService {
       'Authorization': 'Bearer $token',
       'X-Tenant-Code': tenantCode ?? '',
       'Content-Type': 'application/json',
+      ...AppInfo.header,
     };
   }
 
@@ -83,6 +85,31 @@ class OrdemServicoService {
     } catch (e) {
       print('❌ Erro ao limpar MAC: $e');
       return {'ok': false, 'message': 'Erro de conexão ao limpar MAC'};
+    }
+  }
+
+  /// 🏠 Corrige o endereço da OS em campo (o cliente informou referência/número
+  /// errado no cadastro). O backend grava no SeeNet, no cadastro do login no
+  /// IXC (conserta as OS futuras) e deixa um rastro na OS.
+  /// [campos]: endereco, numero, bairro, cep, complemento, referencia.
+  Future<Map<String, dynamic>> atualizarEndereco(
+      String osId, Map<String, String> campos) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/ordens-servico/$osId/endereco'),
+        headers: _headers,
+        body: json.encode(campos),
+      );
+      final body = response.body.isNotEmpty
+          ? json.decode(response.body) as Map<String, dynamic>
+          : <String, dynamic>{};
+      if (response.statusCode == 200 && body['success'] == true) {
+        return {'ok': true, 'message': body['message'] ?? 'Endereço atualizado'};
+      }
+      return {'ok': false, 'message': body['error'] ?? 'Falha ao salvar endereço'};
+    } catch (e) {
+      print('❌ Erro ao atualizar endereço: $e');
+      return {'ok': false, 'message': 'Erro de conexão ao salvar endereço'};
     }
   }
 

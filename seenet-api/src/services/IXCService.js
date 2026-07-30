@@ -1,6 +1,24 @@
 const axios = require('axios');
 
 class IXCService {
+  /**
+   * Situações de patrimônio que o técnico NÃO pode lançar numa OS.
+   *
+   * Regra NEGATIVA de propósito: qualquer situação que o IXC/estoquista use
+   * aparece pro técnico por padrão, em vez de sumir em silêncio. O filtro
+   * antigo era POSITIVO (`situacao = 1`) e escondeu 10 ONTs novas do almox 86
+   * (bug de 29/jul) — e escondia também uma situação `5` que nem sabíamos existir.
+   *
+   * Códigos confirmados ao vivo (30/jul):
+   *   1 = Em estoque            (usável)
+   *   4 = Em comodato com o cliente  ← ÚNICO bloqueado: já está na casa de alguém
+   *   5 = (2 itens no almox 86, uso raro — deixado visível)
+   *   7 = "Disponível Técnico"  (usável — é onde o equipamento cai depois de
+   *       devolvido; PROVADO no histórico: patrim 13780/19219/13689 foram
+   *       devolvidos e depois emprestados de novo, passando por aqui)
+   */
+  static SITUACOES_PATRIMONIO_BLOQUEADAS = new Set(['4']);
+
   constructor(urlApi, tokenApi) {
     this.baseUrl = urlApi;
     this.token = tokenApi;
@@ -191,6 +209,80 @@ class IXCService {
       console.error(`❌ Erro ao buscar dados do login id ${idLogin}:`, e.message);
       return null;
     }
+  }
+
+  /**
+   * 🏠 Corrige o endereço do LOGIN (radusuarios) — é de onde sai o endereço da
+   * instalação (o técnico em campo vê que a referência/número está errado).
+   *
+   * O PUT do IXC SUBSTITUI o registro, então o padrão obrigatório é: buscar o
+   * registro inteiro, trocar só os campos corrigidos e devolver tudo. Mandar um
+   * payload parcial APAGARIA os campos omitidos.
+   *
+   * ⚠️ Escreve no CADASTRO do cliente — testar num login de teste antes de usar
+   * valendo (ver nota no CLAUDE.md).
+   *
+   * @param {string|number} idLogin
+   * @param {object} campos  ex.: { numero, referencia, complemento, bairro, endereco, cep }
+   */
+  async atualizarEnderecoLogin(idLogin, campos) {
+    if (!idLogin || idLogin === '0') throw new Error('Login inválido');
+
+    const params = new URLSearchParams({
+      qtype: 'radusuarios.id', query: idLogin.toString(), oper: '=', page: '1', rp: '1'
+    });
+    const resp = await this.clientListar.post('/radusuarios', params.toString());
+    const registro = resp.data?.registros?.[0];
+    if (!registro) throw new Error(`Login ${idLogin} não encontrado no IXC`);
+
+    const payload = { ...registro };
+    const alterados = [];
+    for (const [chave, valor] of Object.entries(campos)) {
+      if (valor === undefined || valor === null) continue;
+      const novo = String(valor);
+      if (String(registro[chave] ?? '') === novo) continue; // não mudou
+      payload[chave] = novo;
+      alterados.push(`${chave}: "${registro[chave] ?? ''}" → "${novo}"`);
+    }
+    if (alterados.length === 0) {
+      console.log(`   ℹ️ endereço do login ${idLogin} já estava igual — nada a fazer`);
+      return { semMudanca: true };
+    }
+
+    console.log(`🏠 Corrigindo endereço do login ${idLogin}: ${alterados.join(' | ')}`);
+    const r = await this.clientAlterar.put(`/radusuarios/${idLogin}`, payload);
+    if (r.data?.type === 'error') {
+      throw new Error(r.data.message || 'Erro ao atualizar endereço do login');
+    }
+    return r.data;
+  }
+
+  /**
+   * 🏠 Corrige o endereço na PRÓPRIA OS (su_oss_chamado). Mesmo padrão do
+   * `atualizarStatusOS`: preserva os campos obrigatórios e muda só o endereço.
+   * Best-effort — o que vale pro app é o cadastro do login.
+   */
+  async atualizarEnderecoOS(osId, campos) {
+    const os = await this.buscarDetalhesOS(osId);
+    if (!os) throw new Error(`OS ${osId} não encontrada no IXC`);
+
+    const payload = { ...os };
+    const alterados = [];
+    for (const [chave, valor] of Object.entries(campos)) {
+      if (valor === undefined || valor === null) continue;
+      const novo = String(valor);
+      if (String(os[chave] ?? '') === novo) continue;
+      payload[chave] = novo;
+      alterados.push(`${chave}="${novo}"`);
+    }
+    if (alterados.length === 0) return { semMudanca: true };
+
+    console.log(`🏠 Corrigindo endereço da OS ${osId}: ${alterados.join(' | ')}`);
+    const r = await this.clientAlterar.put(`/su_oss_chamado/${osId}`, payload);
+    if (r.data?.type === 'error') {
+      throw new Error(r.data.message || 'Erro ao atualizar endereço da OS');
+    }
+    return r.data;
   }
 
   /**
@@ -1077,16 +1169,42 @@ async uploadFotoOS(osId, clienteId, fotoData) {
       if (idFilial) {
         gridParams.push({ TB: 'patrimonio.id_filial', OP: '=', P: idFilial.toString() });
       }
-      // Só patrimônios EM ESTOQUE (situacao=1). Sem isso, o picker mostrava
-      // equipamentos já em comodato (situacao=4) e o fechamento falhava com
-      // "Saldo do produto 0 no almoxarifado" — o técnico via ONT que não dá pra usar.
-      gridParams.push({ TB: 'patrimonio.situacao', OP: '=', P: '1' });
-      body.grid_param = JSON.stringify(gridParams);
+      // Situação: filtro NEGATIVO (ver SITUACOES_PATRIMONIO_BLOQUEADAS). Era
+      // `situacao = '1'` e escondia do técnico as ONTs "Disponível Técnico"
+      // (caso real 29/jul: patrimônio 19547, MAC 87554, no CAMPO DO BRITO).
+      // O `!=` é aplicado no IXC de propósito: sem ele os ~390 equipamentos em
+      // comodato do almoxarifado ocupam o limite de `rp` e ESCONDEM os usáveis
+      // (medido: sem o filtro vinham 32 de 103 em estoque; com ele, todos).
+      for (const situacao of IXCService.SITUACOES_PATRIMONIO_BLOQUEADAS) {
+        gridParams.push({ TB: 'patrimonio.situacao', OP: '!=', P: situacao });
+      }
+      if (gridParams.length > 0) body.grid_param = JSON.stringify(gridParams);
 
       const response = await this.clientAlterar.post('/patrimonio', body, {
         headers: { 'ixcsoft': 'listar' }
       });
-      return response.data;
+
+      const data = response.data || {};
+      const todos = data.registros || [];
+
+      // Log das situações que vieram → é assim que descobrimos o código de cada
+      // situação sem depender do painel (aparece no Railway).
+      const porSituacao = {};
+      todos.forEach(p => { porSituacao[p.situacao] = (porSituacao[p.situacao] || 0) + 1; });
+      if (todos.length) {
+        console.log(`   🏷️ patrimônios por situação: ${JSON.stringify(porSituacao)}`);
+      }
+      if (todos.length >= rp) {
+        console.warn(`   ⚠️ lista de patrimônios bateu o limite de ${rp} — pode haver mais`);
+      }
+
+      const registros = todos.filter(p => !IXCService.SITUACOES_PATRIMONIO_BLOQUEADAS.has(String(p.situacao)));
+      const escondidos = todos.length - registros.length;
+      if (escondidos > 0) {
+        console.log(`   🚫 ${escondidos} patrimônio(s) ocultado(s) (em comodato/devolvido)`);
+      }
+
+      return { ...data, registros, total: registros.length };
     } catch (error) {
       console.error('❌ Erro ao listar patrimônios IXC:', error.message);
       throw error;

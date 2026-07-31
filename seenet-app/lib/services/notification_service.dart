@@ -101,18 +101,35 @@ class NotificationService extends GetxService {
     }
   }
 
-  /// Enviar FCM token pro backend (chamar após login)
-  Future<void> sendTokenToBackend() async {
-    try {
-      final token = await getToken();
-      if (token == null) return;
-
-      final api = Get.find<ApiService>();
-      await api.put('/auth/fcm-token', {'fcm_token': token});
-      print('✅ FCM token enviado ao backend');
-    } catch (e) {
-      print('⚠️ Erro ao enviar FCM token: $e');
+  /// Enviar FCM token pro backend (chamar após login).
+  ///
+  /// ⚠️ COM TENTATIVAS, e o motivo importa: o `Firebase.initializeApp()` roda
+  /// em 2º plano no splash (mudança de 2/jul, que consertou o iPhone não entrar
+  /// sozinho). Como o envio era disparado 1s depois do login, o Firebase quase
+  /// sempre ainda NÃO estava pronto → `getToken()` falhava, o erro era engolido
+  /// e não havia nova tentativa. O `onTokenRefresh` também não salva: ele só
+  /// dispara quando o token MUDA, não na primeira obtenção.
+  /// Resultado: quase nenhum usuário tinha `fcm_token` no banco (31/jul).
+  Future<void> sendTokenToBackend({int tentativas = 4}) async {
+    for (var i = 1; i <= tentativas; i++) {
+      try {
+        final token = await getToken();
+        if (token != null) {
+          final api = Get.find<ApiService>();
+          await api.put('/auth/fcm-token', {'fcm_token': token});
+          print('✅ FCM token enviado ao backend (tentativa $i)');
+          return;
+        }
+        print('⏳ FCM token ainda não disponível (tentativa $i/$tentativas)');
+      } catch (e) {
+        print('⚠️ Erro ao enviar FCM token (tentativa $i/$tentativas): $e');
+      }
+      // 3s, 6s, 12s — cobre o tempo do Firebase/APNs ficar pronto.
+      if (i < tentativas) {
+        await Future.delayed(Duration(seconds: 3 * i));
+      }
     }
+    print('❌ FCM token NÃO foi enviado após $tentativas tentativas — sem push');
   }
 
   /// Listener: token atualizado (Firebase pode trocar o token)

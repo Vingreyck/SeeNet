@@ -135,6 +135,20 @@ class _SplashScreenState extends State<SplashScreen>
         Get.find<NotificationService>().init().then((_) {
           Get.find<NotificationService>().listenTokenRefresh();
           print('✅ NotificationService pronto');
+
+          // 🔑 Manda o token AGORA — este é o único momento em que temos
+          // certeza de que o Firebase está pronto. O envio disparado pelo
+          // login acontece 1s depois de logar e, com o Firebase iniciando em
+          // 2º plano, costumava chegar cedo demais e falhar em silêncio (por
+          // isso quase ninguém tinha fcm_token). Se o auto-login ainda não
+          // terminou, o envio do próprio login cobre (ele agora tem retry).
+          try {
+            if (Get.find<AuthService>().isLoggedIn) {
+              Get.find<NotificationService>().sendTokenToBackend();
+            }
+          } catch (e) {
+            print('⚠️ Não deu pra enviar o FCM token aqui: $e');
+          }
         });
       }).catchError((e) {
         print('⚠️ Firebase não iniciado: $e');

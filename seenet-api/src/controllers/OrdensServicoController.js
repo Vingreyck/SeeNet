@@ -2359,6 +2359,27 @@ if (dados.fotos && dados.fotos.length > 0) {
               console.warn('⚠️ OS sem id_login — endereço do cadastro não foi corrigido');
             }
 
+            // 2b. cadastro do CLIENTE (o endereço que aparece no contrato) —
+            // SÓ quando o cliente tem UM login. Com 2+ logins o contrato pode
+            // ter casas diferentes (caso real: contrato da mãe + login da
+            // filha) e corrigir o cadastro pelo endereço de uma delas seria
+            // errado. Em dúvida (falha na contagem), não mexe.
+            if (os.cliente_id_externo) {
+              try {
+                const qtdLogins = await ixc.contarLoginsDoCliente(os.cliente_id_externo);
+                if (qtdLogins === 1) {
+                  await ixc.atualizarEnderecoCliente(os.cliente_id_externo, novos);
+                } else if (qtdLogins > 1) {
+                  console.log(`   ℹ️ cliente ${os.cliente_id_externo} tem ${qtdLogins} logins ` +
+                    `(casas diferentes) — cadastro do cliente NÃO alterado, só o login`);
+                } else {
+                  console.warn('   ⚠️ não deu pra contar os logins — cadastro do cliente não alterado');
+                }
+              } catch (e) {
+                console.error('⚠️ Não consegui corrigir o endereço do cliente no IXC:', e.message);
+              }
+            }
+
             // 3a. endereço na própria OS
             try {
               await ixc.atualizarEnderecoOS(os.id_externo, novos);

@@ -28,6 +28,7 @@ class OSClienteInfo extends StatefulWidget {
 class _OSClienteInfoState extends State<OSClienteInfo> {
   static const _verde = Color(0xFF00FF88);
   bool _limpandoMac = false;
+  bool _salvandoEndereco = false;
 
   // Correções feitas aqui na tela. O objeto OrdemServico é imutável, então em
   // vez de recarregar a OS inteira só pra mostrar o novo texto, guardamos o
@@ -90,6 +91,10 @@ class _OSClienteInfoState extends State<OSClienteInfo> {
   // 🏠 Corrigir o endereço em campo. Salva no SeeNet E no cadastro do login no
   // IXC — então a próxima OS deste cliente já vem certa.
   Future<void> _editarEndereco() async {
+    // Trava anti-duplo-clique: no teste de 31/jul a correção chegou DUAS vezes
+    // no backend (2 mensagens de auditoria com 1s de diferença).
+    if (_salvandoEndereco) return;
+
     final ctrls = <String, TextEditingController>{
       'endereco':    TextEditingController(text: _campo('endereco', os.clienteEndereco) ?? ''),
       'numero':      TextEditingController(text: _campo('numero', os.clienteNumero) ?? ''),
@@ -151,7 +156,10 @@ class _OSClienteInfoState extends State<OSClienteInfo> {
             child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () {
+              // canPop evita que o 2º toque feche a TELA que está atrás.
+              if (Navigator.canPop(ctx)) Navigator.pop(ctx, true);
+            },
             style: ElevatedButton.styleFrom(
                 backgroundColor: _verde, foregroundColor: Colors.black),
             child: const Text('Salvar', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -188,8 +196,10 @@ class _OSClienteInfoState extends State<OSClienteInfo> {
       return;
     }
 
+    setState(() => _salvandoEndereco = true);
     final res = await OrdemServicoService().atualizarEndereco(os.id, mudou);
     if (!mounted) return;
+    setState(() => _salvandoEndereco = false);
     if (res['ok'] == true) setState(() => _corrigidos.addAll(mudou));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(res['message']?.toString() ?? ''),

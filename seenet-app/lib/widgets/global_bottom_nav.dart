@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../services/app_info.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/nav_controller.dart';
@@ -336,7 +337,13 @@ class GlobalBottomNav extends StatelessWidget {
                     // ── Rodapé ───────────────────────────────────
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: Text('SeeNet v1.0',
+                      // Versão REAL do pacote instalado (AppInfo), não mais um
+                      // "v1.0" escrito à mão que nunca era atualizado — é o que
+                      // o técnico lê quando perguntam se ele já atualizou.
+                      child: Text(
+                          AppInfo.versao.isEmpty
+                              ? 'SeeNet'
+                              : 'SeeNet v${AppInfo.versao}',
                           style: TextStyle(
                               color: Colors.white.withOpacity(0.15),
                               fontSize: 11)),

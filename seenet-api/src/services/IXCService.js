@@ -258,6 +258,67 @@ class IXCService {
   }
 
   /**
+   * Quantos logins (radusuarios) este cliente tem?
+   * Usado pra decidir se dá pra propagar a correção de endereço do login para o
+   * CADASTRO do cliente: com 1 login só, login e cadastro são o mesmo endereço.
+   * Com 2+ (contrato com casas diferentes — caso real da mãe + filha), corrigir
+   * o cadastro pelo endereço de UMA das casas estaria errado.
+   * Em caso de falha devolve -1 (o chamador então NÃO mexe no cliente).
+   */
+  async contarLoginsDoCliente(idCliente) {
+    try {
+      const params = new URLSearchParams({
+        qtype: 'radusuarios.id_cliente', query: idCliente.toString(), oper: '=',
+        page: '1', rp: '50', sortname: 'radusuarios.id', sortorder: 'asc'
+      });
+      const r = await this.clientListar.post('/radusuarios', params.toString());
+      return (r.data?.registros || []).length;
+    } catch (e) {
+      console.warn(`⚠️ Não consegui contar os logins do cliente ${idCliente}:`, e.message);
+      return -1;
+    }
+  }
+
+  /**
+   * 🏠 Corrige o endereço no CADASTRO DO CLIENTE (é o que aparece no contrato).
+   * Mesmo padrão do login: busca o registro inteiro, troca só o que mudou e
+   * devolve tudo (payload parcial apagaria os campos omitidos).
+   * ⚠️ Só deve ser chamado quando o cliente tem UM único login — ver
+   * [contarLoginsDoCliente].
+   */
+  async atualizarEnderecoCliente(idCliente, campos) {
+    if (!idCliente || idCliente === '0') throw new Error('Cliente inválido');
+
+    const params = new URLSearchParams({
+      qtype: 'cliente.id', query: idCliente.toString(), oper: '=', page: '1', rp: '1'
+    });
+    const resp = await this.clientListar.post('/cliente', params.toString());
+    const registro = resp.data?.registros?.[0];
+    if (!registro) throw new Error(`Cliente ${idCliente} não encontrado no IXC`);
+
+    const payload = { ...registro };
+    const alterados = [];
+    for (const [chave, valor] of Object.entries(campos)) {
+      if (valor === undefined || valor === null) continue;
+      const novo = String(valor);
+      if (String(registro[chave] ?? '') === novo) continue;
+      payload[chave] = novo;
+      alterados.push(`${chave}: "${registro[chave] ?? ''}" → "${novo}"`);
+    }
+    if (alterados.length === 0) {
+      console.log(`   ℹ️ endereço do cliente ${idCliente} já estava igual — nada a fazer`);
+      return { semMudanca: true };
+    }
+
+    console.log(`🏠 Corrigindo endereço do CLIENTE ${idCliente}: ${alterados.join(' | ')}`);
+    const r = await this.clientAlterar.put(`/cliente/${idCliente}`, payload);
+    if (r.data?.type === 'error') {
+      throw new Error(r.data.message || 'Erro ao atualizar endereço do cliente');
+    }
+    return r.data;
+  }
+
+  /**
    * 🏠 Corrige o endereço na PRÓPRIA OS (su_oss_chamado). Mesmo padrão do
    * `atualizarStatusOS`: preserva os campos obrigatórios e muda só o endereço.
    * Best-effort — o que vale pro app é o cadastro do login.

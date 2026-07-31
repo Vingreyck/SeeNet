@@ -53,7 +53,11 @@ const corsOptions = {
       ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Code']
+  // ⚠️ Header NOVO precisa entrar AQUI também, senão o navegador bloqueia a
+  // requisição inteira no preflight (o app mobile não passa por CORS, então o
+  // erro só aparece no WEB — foi o que quebrou o login em 31/jul ao adicionar
+  // o X-App-Version).
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Code', 'X-App-Version']
 };
 
 app.use(cors(corsOptions));

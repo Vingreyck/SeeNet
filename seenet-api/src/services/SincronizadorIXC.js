@@ -13,7 +13,11 @@ class SincronizadorIXC {
     this.cacheLogin = new Map(); // id_login → { login, senha, id_contrato, endereco... }
     this.cacheCidade = new Map(); // id_cidade → { nome, uf } (cidade não muda)
     this.cacheContrato = new Map(); // id_contrato → nome do plano
-    this.maxOSsPorSync = 10;
+    // Teto de OS processadas por técnico a cada ciclo (protege a transação de
+    // ficar longa demais). Subiu de 10 → 40 em 31/jul: o Danilo tinha 28 OS
+    // abertas e o teto de 10 deixava 18 de fora. Ver [_priorizarNaoSincronizadas],
+    // que garante que as OS NOVAS entrem primeiro mesmo se alguém passar de 40.
+    this.maxOSsPorSync = 40;
 
     // ⚡ Sync SOB DEMANDA (técnico abriu/atualizou a lista) — throttle por técnico
     // pra não martelar o IXC se ficar batendo "atualizar".
@@ -219,8 +223,9 @@ class SincronizadorIXC {
             console.log(`   📋 ${mapeamento.tecnico_seenet_nome}: ${ossIXC.length} OS(s) abertas no IXC`);
           }
 
-          const ossParaProcessar = ossIXC.slice(0, this.maxOSsPorSync);
           const idsExternosIXC = ossIXC.map(os => os.id.toString());
+          const ossParaProcessar =
+            await this._priorizarNaoSincronizadas(trx, integracao.tenant_id, ossIXC, idsExternosIXC);
 
           for (const osIXC of ossParaProcessar) {
             await this.sincronizarOS(trx, integracao.tenant_id, mapeamento.usuario_id, osIXC, ixc);
@@ -378,10 +383,13 @@ class SincronizadorIXC {
 
       const ixc = new IXCService(integracao.url_api, integracao.token_api);
       const ossIXC = await ixc.buscarOSs({ tecnicoId: mapeamento.tecnico_ixc_id });
-      const ossParaProcessar = ossIXC.slice(0, this.maxOSsPorSync);
 
+      // Declarado FORA do try: é usado no return lá embaixo.
+      let ossParaProcessar = [];
       const trx = await db.transaction();
       try {
+        ossParaProcessar = await this._priorizarNaoSincronizadas(
+          trx, tenantId, ossIXC, ossIXC.map(os => os.id.toString()));
         for (const osIXC of ossParaProcessar) {
           await this.sincronizarOS(trx, tenantId, usuarioId, osIXC, ixc);
         }
@@ -405,6 +413,48 @@ class SincronizadorIXC {
     } finally {
       this._cicloRodando = false;
     }
+  }
+
+  /**
+   * 🚨 Corrige a INANIÇÃO das OS novas (bug achado em 31/jul).
+   *
+   * O `buscarOSs` traz a lista do IXC em ordem CRESCENTE de id (mais antigas
+   * primeiro) e o corte era um `slice(0, maxOSsPorSync)` seco. Resultado: para
+   * um técnico com mais OS abertas do que o teto, o ciclo pegava SEMPRE as
+   * mesmas mais antigas e as novas NUNCA eram criadas no SeeNet — não era
+   * atraso, era permanente enquanto as antigas não fossem fechadas.
+   * Caso real: técnico com 28 OS abertas, 23 paradas desde 20/jul; as 4
+   * criadas depois simplesmente não existiam no app.
+   *
+   * Correção: as OS que ainda NÃO existem no SeeNet vão na FRENTE da fila —
+   * são exatamente as que o técnico está esperando. O teto continua valendo
+   * (a transação segue limitada), mas agora ele corta as já conhecidas, que
+   * o técnico já enxerga, em vez das novas.
+   */
+  async _priorizarNaoSincronizadas(trx, tenantId, ossIXC, idsExternosIXC) {
+    if (ossIXC.length <= this.maxOSsPorSync) return ossIXC;
+
+    let jaNoSeenet = new Set();
+    try {
+      const existentes = await trx('ordem_servico')
+        .where('tenant_id', tenantId)
+        .where('origem', 'IXC')
+        .whereIn('id_externo', idsExternosIXC)
+        .pluck('id_externo');
+      jaNoSeenet = new Set(existentes.map(String));
+    } catch (e) {
+      // Na dúvida mantém o comportamento antigo — nunca deixa o ciclo cair.
+      console.warn('⚠️ Não consegui priorizar OS novas:', e.message);
+      return ossIXC.slice(0, this.maxOSsPorSync);
+    }
+
+    const novas = ossIXC.filter(os => !jaNoSeenet.has(String(os.id)));
+    const conhecidas = ossIXC.filter(os => jaNoSeenet.has(String(os.id)));
+    if (novas.length > 0) {
+      console.log(`   🆕 ${novas.length} OS ainda não estão no SeeNet — entram primeiro ` +
+        `(${ossIXC.length} abertas, teto ${this.maxOSsPorSync}/ciclo)`);
+    }
+    return [...novas, ...conhecidas].slice(0, this.maxOSsPorSync);
   }
 
   async sincronizarOS(trx, tenantId, tecnicoId, osIXC, ixcService) {

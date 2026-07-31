@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
 import '../../controllers/usuario_controller.dart';
 import '../../widgets/pdf_viewer_screen.dart';
+import '../../services/app_info.dart';
 
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
@@ -32,6 +33,12 @@ class _PerfilScreenState extends State<PerfilScreen>
   int _mesSel = DateTime.now().month;
   String? _diaSelecionado;
   List<Map<String, dynamic>> _episNoDia = [];
+
+  // O histórico de EPI é a parte mais pesada da tela (seletor de ano, de mês,
+  // grade do calendário e detalhe do dia). Fica recolhido por padrão — o
+  // resumo continua visível e quem precisa do detalhe abre. É o padrão de
+  // "revelação progressiva" que apps de perfil usam pra não virar um paredão.
+  bool _historicoAberto = false;
 
   // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
 
@@ -342,61 +349,222 @@ class _PerfilScreenState extends State<PerfilScreen>
               ),
             ),
 
-            // ── Info ────────────────────────────────────────
+            // ── EPI: resumo em cards (mesmo padrão da tela inicial) ──
+            if (stats != null) ...[
+              _secao('EPI', 'Equipamentos de proteção'),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                  child: _buildResumoEpi(stats),
+                ),
+              ),
+            ],
+
+            // ── Conta ───────────────────────────────────────
+            _secao('Conta', null),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                 child: _buildInfoCard(perfil),
               ),
             ),
 
-            // ── Stats ────────────────────────────────────────
-            if (stats != null)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                  child: _buildStatsCard(stats, corTipo),
-                ),
-              ),
-
-            // ── Calendário de EPIs ────────────────────────────
+            // ── Histórico de EPI (recolhido por padrão) ──────
+            _secao('Histórico', null),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: _buildHeaderCalendario(corTipo),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: _buildHistorico(corTipo),
               ),
             ),
 
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: _buildSeletorMes(corTipo),
-              ),
-            ),
-
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: _buildCalendario(corTipo),
-              ),
-            ),
-
-            // ── Detalhe do dia selecionado ────────────────────
-            if (_diaSelecionado != null && _episNoDia.isNotEmpty)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: _buildDetalhesDia(corTipo),
-                ),
-              ),
-
-            const SliverToBoxAdapter(
-                child: SizedBox(height: 32)),
+            // ── Rodapé com a versão real do app ─────────────
+            SliverToBoxAdapter(child: _buildRodape()),
           ],
         );
       }),
     );
   }
+
+  // ── Blocos da tela ───────────────────────────────────────────
+
+  /// Cabeçalho de seção: dá hierarquia à página em vez de empilhar cards
+  /// soltos. É o mesmo recurso que apps de perfil usam pra guiar a leitura.
+  SliverToBoxAdapter _secao(String titulo, String? subtitulo) =>
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(titulo.toUpperCase(),
+                  style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.1)),
+              if (subtitulo != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(subtitulo,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white24, fontSize: 11)),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+
+  /// Resumo de EPI em 3 cards — mesmo formato dos cards da tela inicial,
+  /// pra tela de perfil não parecer de outro aplicativo.
+  Widget _buildResumoEpi(Map<String, dynamic> stats) {
+    final total = stats['total'] ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _cardResumo('Concluídas', '${stats['aprovadas'] ?? 0}',
+                Icons.check_circle_rounded, const Color(0xFF00FF88)),
+            const SizedBox(width: 10),
+            _cardResumo('Pendentes', '${stats['pendentes'] ?? 0}',
+                Icons.schedule_rounded, const Color(0xFFFFB020)),
+            const SizedBox(width: 10),
+            _cardResumo('Recusadas', '${stats['recusadas'] ?? 0}',
+                Icons.cancel_rounded, const Color(0xFFFF6B6B)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text('$total requisição(ões) no total',
+              style: const TextStyle(color: Colors.white38, fontSize: 11)),
+        ),
+      ],
+    );
+  }
+
+  Widget _cardResumo(String label, String valor, IconData icone, Color cor) =>
+      Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF181818),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: cor.withOpacity(0.22)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icone, color: cor, size: 18),
+              const SizedBox(height: 10),
+              Text(valor,
+                  style: TextStyle(
+                      color: cor, fontSize: 22, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 2),
+              Text(label,
+                  style: const TextStyle(color: Colors.white38, fontSize: 11)),
+            ],
+          ),
+        ),
+      );
+
+  /// Histórico recolhível: o resumo fica sempre visível e o calendário
+  /// (seletor de ano/mês, grade e detalhe do dia) abre ao tocar.
+  Widget _buildHistorico(Color cor) {
+    final total = _historicoRecebidos.length;
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF181818),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => setState(() => _historicoAberto = !_historicoAberto),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: cor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: cor.withOpacity(0.2)),
+                    ),
+                    child: Icon(Icons.calendar_month_rounded, color: cor, size: 17),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Entregas de EPI',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text(
+                            total == 0
+                                ? 'Nenhuma entrega registrada'
+                                : '$total entrega(s) • toque para ver o calendário',
+                            style: const TextStyle(
+                                color: Colors.white38, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _historicoAberto ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white38, size: 22),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_historicoAberto) ...[
+            Divider(color: Colors.white.withOpacity(0.05), height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+              child: Column(
+                children: [
+                  _buildHeaderCalendario(cor),
+                  const SizedBox(height: 10),
+                  _buildSeletorMes(cor),
+                  const SizedBox(height: 10),
+                  _buildCalendario(cor),
+                  if (_diaSelecionado != null && _episNoDia.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildDetalhesDia(cor),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Versão real do app (a mesma que vai pro backend). Discreta, no rodapé —
+  /// é onde o usuário procura quando perguntam "qual versão você está usando?".
+  Widget _buildRodape() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 28, 16, 36),
+        child: Center(
+          child: Text(
+            AppInfo.versao.isEmpty ? 'SeeNet' : 'SeeNet · versão ${AppInfo.versao}',
+            style: TextStyle(color: Colors.white.withOpacity(0.18), fontSize: 11),
+          ),
+        ),
+      );
 
   // ── Info card ────────────────────────────────────────────────
 
@@ -455,66 +623,6 @@ class _PerfilScreenState extends State<PerfilScreen>
   Widget _divider() => Divider(
       color: Colors.white.withOpacity(0.05),
       height: 1, indent: 44);
-
-  // ── Stats card ───────────────────────────────────────────────
-
-  Widget _buildStatsCard(Map<String, dynamic> stats, Color cor) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF181818),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.health_and_safety_outlined,
-                  color: Colors.white38, size: 15),
-              const SizedBox(width: 6),
-              const Text('Requisições de EPI',
-                  style: TextStyle(
-                      color: Colors.white54, fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _statItem('${stats['total'] ?? 0}', 'Total', Colors.white54),
-              _dividerStat(),
-              _statItem('${stats['aprovadas'] ?? 0}', 'Concluídas',
-                  const Color(0xFF00FF88)),
-              _dividerStat(),
-              _statItem('${stats['pendentes'] ?? 0}', 'Pendentes',
-                  Colors.orange),
-              _dividerStat(),
-              _statItem('${stats['recusadas'] ?? 0}', 'Recusadas',
-                  Colors.red),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statItem(String v, String l, Color c) => Expanded(
-    child: Column(
-      children: [
-        Text(v, style: TextStyle(color: c, fontSize: 22,
-            fontWeight: FontWeight.w800)),
-        const SizedBox(height: 2),
-        Text(l, style: const TextStyle(color: Colors.white38,
-            fontSize: 10)),
-      ],
-    ),
-  );
-
-  Widget _dividerStat() => Container(
-      width: 1, height: 30,
-      color: Colors.white.withOpacity(0.08));
 
   // ── Calendário ───────────────────────────────────────────────
 

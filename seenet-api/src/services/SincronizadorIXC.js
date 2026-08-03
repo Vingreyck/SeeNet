@@ -13,6 +13,17 @@ class SincronizadorIXC {
     this.cacheLogin = new Map(); // id_login → { login, senha, id_contrato, endereco... }
     this.cacheCidade = new Map(); // id_cidade → { nome, uf } (cidade não muda)
     this.cacheContrato = new Map(); // id_contrato → nome do plano
+    // 🗑️ OS APAGADA no IXC: some da listagem E o `buscarDetalhesOS` não acha.
+    // Não dá pra cancelar na primeira ausência — instabilidade do IXC devolve
+    // "não encontrada" do mesmo jeito, e cancelar OS boa seria grave. Então
+    // conta ciclos SEGUIDOS e só cancela depois de `ciclosParaCancelarSumida`.
+    // Fica na memória de propósito: reiniciou o servidor, a contagem zera
+    // (erra pro lado seguro). Achou a OS de novo → zera.
+    // Caso real (3/ago): 3 OS apagadas no IXC ficaram presas em "Em campo",
+    // uma delas desde 29/mai, gerando erro em TODO ciclo e sem forma de sair.
+    this._osSumidaContagem = new Map(); // "tenant:id_externo" → ciclos seguidos sem achar
+    this.ciclosParaCancelarSumida = 5;  // ~10 min com o ciclo de 2min
+
     // Teto de OS processadas por técnico a cada ciclo (protege a transação de
     // ficar longa demais). Subiu de 10 → 40 em 31/jul: o Danilo tinha 28 OS
     // abertas e o teto de 10 deixava 18 de fora. Ver [_priorizarNaoSincronizadas],
@@ -304,12 +315,34 @@ class SincronizadorIXC {
               .whereIn('status', ['pendente', 'reaberta', 'em_execucao', 'em_deslocamento'])
               .whereNotNull('id_externo')
               .whereNotIn('id_externo', idsExternosIXC)
-              .select('id', 'id_externo', 'numero_os');
+              .select('id', 'id_externo', 'numero_os', 'status');
 
             for (const osTravada of ossTravadas) {
               try {
+                const chaveSumida = `${integracao.tenant_id}:${osTravada.id_externo}`;
                 const osReal = await ixc.buscarDetalhesOS(osTravada.id_externo);
-                if (!osReal) continue; // não confirmou → não mexe (segurança)
+
+                if (!osReal) {
+                  // Pode ser OS apagada no IXC OU instabilidade momentânea.
+                  // Só cancela depois de N ciclos SEGUIDOS sem achar.
+                  const vezes = (this._osSumidaContagem.get(chaveSumida) || 0) + 1;
+                  this._osSumidaContagem.set(chaveSumida, vezes);
+                  if (vezes >= this.ciclosParaCancelarSumida) {
+                    await trx('ordem_servico').where('id', osTravada.id)
+                      .update({ status: 'cancelada', data_atualizacao: db.fn.now() });
+                    this._osSumidaContagem.delete(chaveSumida);
+                    console.warn(`   🗑️ OS ${osTravada.numero_os} cancelada: sumiu do IXC em ` +
+                      `${vezes} ciclos seguidos (apagada lá) — estava presa em "${osTravada.status || 'aberta'}"`);
+                  } else {
+                    console.log(`   ⏳ OS ${osTravada.numero_os} não encontrada no IXC ` +
+                      `(${vezes}/${this.ciclosParaCancelarSumida} — cancela se persistir)`);
+                  }
+                  continue;
+                }
+
+                // Achou → zera a contagem (foi instabilidade, não exclusão).
+                this._osSumidaContagem.delete(chaveSumida);
+
                 let novoStatus = null;
                 if (osReal.status === 'F') novoStatus = 'concluida';
                 else if (osReal.status === 'C') novoStatus = 'cancelada';

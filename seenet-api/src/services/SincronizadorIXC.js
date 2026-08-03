@@ -145,6 +145,8 @@ class SincronizadorIXC {
       return;
     }
     this._cicloRodando = true;
+    const inicioCiclo = Date.now();
+    this._recusasOnDemand = 0;
     try {
       console.log('\n🔄 === INICIANDO CICLO DE SINCRONIZAÇÃO ===');
       console.log(`⏰ ${new Date().toLocaleString('pt-BR')}`);
@@ -175,7 +177,17 @@ class SincronizadorIXC {
           .del();
       } catch (_) { /* tabela pode ainda não existir no 1º boot */ }
 
-      console.log('✅ Ciclo de sincronização concluído\n');
+      // ⏱️ A DURAÇÃO do ciclo importa: enquanto ele roda, o sync sob demanda
+      // (o "atualizar" do técnico) é recusado pelo MESMO mutex. Um ciclo de
+      // vários minutos faz a OS nova demorar muito mais que os 2min do
+      // intervalo — foi a queixa de 3/ago ("demorou uns 20 minutos").
+      const segsCiclo = (Date.now() - inicioCiclo) / 1000;
+      const recusas = this._recusasOnDemand || 0;
+      const aviso = segsCiclo > this.intervalo / 1000
+        ? ` ⚠️ MAIOR que o intervalo de ${this.intervalo / 1000}s — o app fica sem atualizar nesse meio tempo`
+        : '';
+      console.log(`✅ Ciclo concluído em ${segsCiclo.toFixed(1)}s${aviso}` +
+        (recusas > 0 ? ` — ${recusas} atualização(ões) do app recusada(s) por ciclo ocupado` : '') + '\n');
     } catch (error) {
       console.error('❌ Erro no ciclo de sincronização:', error.message);
     } finally {
@@ -376,7 +388,12 @@ class SincronizadorIXC {
     // Mutex único: se QUALQUER sync está rodando (ciclo de fundo ou outro
     // on-demand), desiste — os dados vêm do banco e o ciclo cobre logo.
     // check + set SEM await entre eles = atômico no event loop (sem corrida).
-    if (this._cicloRodando) return { ok: false, motivo: 'ocupado' };
+    if (this._cicloRodando) {
+      // Contado (e reportado no fim do ciclo) em vez de logado aqui: o app
+      // consulta a lista o tempo todo e uma linha por recusa afogaria o log.
+      this._recusasOnDemand = (this._recusasOnDemand || 0) + 1;
+      return { ok: false, motivo: 'ocupado' };
+    }
     this._cicloRodando = true;
     this._ultimoSyncTecnico.set(chave, agora);
 

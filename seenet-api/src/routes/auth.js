@@ -516,8 +516,18 @@ if (user.tipo_usuario === 'tecnico') {
           }
         );
 
-        const funcionarios = resp.data.registros || [];
-        console.log(`🔍 ${funcionarios.length} funcionários carregados do IXC`);
+        // ⚠️ SÓ funcionários ATIVOS. O IXC costuma ter ficha DUPLICADA da mesma
+        // pessoa: uma antiga inativa e a atual em uso. Como o match é por nome,
+        // a inativa (que às vezes tem o nome escrito CERTO) ganhava da ativa
+        // (com typo) — e o técnico ficava apontado pra uma ficha sem nenhuma OS,
+        // sem erro nenhum no log. Caso real (3/ago): Márcio tinha
+        // `funcionarios 66 "MARCIO VINICIUS..." ativo=N` e
+        // `funcionarios 43 "marciu vinicius..." ativo=S` (esta com as OS).
+        const todosFuncionarios = resp.data.registros || [];
+        const funcionarios = todosFuncionarios.filter(f => f.ativo !== 'N');
+        const descartados = todosFuncionarios.length - funcionarios.length;
+        console.log(`🔍 ${funcionarios.length} funcionários ATIVOS carregados do IXC` +
+          (descartados > 0 ? ` (${descartados} inativo(s) ignorado(s))` : ''));
 
         console.log('🔍 IXC /funcionario resposta:', {
           total: resp.data.total,
@@ -531,7 +541,15 @@ if (user.tipo_usuario === 'tecnico') {
 
         if (resultado) {
           const { funcionario: match, score } = resultado;
-          console.log(`✅ Auto-mapeamento: "${user.nome}" → "${match.funcionario}" (score: ${(score * 100).toFixed(0)}%)`);
+          // Match por APROXIMAÇÃO merece destaque: é onde nasce o técnico
+          // apontado pra pessoa errada (sobrenomes comuns tipo "dos Santos"
+          // passam fácil do corte de 60%). Com o aviso dá pra revisar depois.
+          if (score >= 0.999) {
+            console.log(`✅ Auto-mapeamento EXATO: "${user.nome}" → "${match.funcionario}" (IXC ${match.id})`);
+          } else {
+            console.warn(`⚠️ Auto-mapeamento por APROXIMAÇÃO (${(score * 100).toFixed(0)}%): ` +
+              `"${user.nome}" → "${match.funcionario}" (IXC ${match.id}). CONFERIR se é a pessoa certa.`);
+          }
           await db('mapeamento_tecnicos_ixc').insert({
             usuario_id: user.id,
             tecnico_ixc_id: match.id,

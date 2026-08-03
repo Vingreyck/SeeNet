@@ -227,9 +227,23 @@ class SincronizadorIXC {
           const ossParaProcessar =
             await this._priorizarNaoSincronizadas(trx, integracao.tenant_id, ossIXC, idsExternosIXC);
 
+          // Placar por técnico: sem isso, uma OS que o IXC devolve mas que NÃO
+          // vira linha no banco some sem deixar rastro no log — foi exatamente
+          // o que impediu de explicar a OS 291507 (3/ago). Se o total do IXC
+          // não fecha com o que foi criado/atualizado/inalterado, o aviso sai.
+          const placar = { criada: 0, atualizada: 0, inalterada: 0, erro: 0, ignorada: 0 };
           for (const osIXC of ossParaProcessar) {
-            await this.sincronizarOS(trx, integracao.tenant_id, mapeamento.usuario_id, osIXC, ixc);
+            const r = await this.sincronizarOS(trx, integracao.tenant_id, mapeamento.usuario_id, osIXC, ixc);
+            if (placar[r] !== undefined) placar[r]++;
             totalOSsSincronizadas++;
+          }
+          if (placar.erro > 0 || placar.ignorada > 0) {
+            console.warn(`   ⚠️ ${mapeamento.tecnico_seenet_nome}: ${ossParaProcessar.length} OS processada(s) → ` +
+              `${placar.criada} criada(s), ${placar.atualizada} atualizada(s), ` +
+              `${placar.inalterada} inalterada(s), ${placar.erro} ERRO(S), ${placar.ignorada} ignorada(s)`);
+          } else if (placar.criada > 0) {
+            console.log(`   📊 ${mapeamento.tecnico_seenet_nome}: ${placar.criada} criada(s), ` +
+              `${placar.atualizada} atualizada(s), ${placar.inalterada} inalterada(s)`);
           }
 
           // 🔒 SÓ cancela se o IXC retornou ALGUMA OS. Lista vazia pode ser
@@ -461,7 +475,7 @@ class SincronizadorIXC {
     try {
       if (!osIXC || !osIXC.id) {
         console.log('   ⚠️ OS do IXC sem dados, pulando');
-        return;
+        return 'ignorada';
       }
 
       const osExistente = await trx('ordem_servico')
@@ -772,7 +786,10 @@ class SincronizadorIXC {
             } catch (_) {}
           }
           if (reaberta) console.log(`   🔓 OS ${dadosOS.numero_os} REABERTA no IXC`);
+          return 'atualizada';
         }
+        // Caiu aqui = status protegido (em campo/concluída) e nada a fazer.
+        return 'inalterada';
       } else {
         await trx('ordem_servico').insert(dadosOS);
         console.log(`   ✨ Nova OS ${dadosOS.numero_os} criada`);
@@ -782,9 +799,11 @@ class SincronizadorIXC {
         } catch (notifErr) {
           console.warn('⚠️ Falha ao notificar técnico de nova OS:', notifErr.message);
         }
+        return 'criada';
       }
     } catch (error) {
       console.error(`   ❌ Erro ao sincronizar OS ${osIXC.id}:`, error.message);
+      return 'erro';
     }
   }
 

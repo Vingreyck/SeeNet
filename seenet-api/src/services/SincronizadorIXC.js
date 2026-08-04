@@ -521,6 +521,45 @@ class SincronizadorIXC {
     return [...novas, ...conhecidas].slice(0, this.maxOSsPorSync);
   }
 
+  /**
+   * 🛡️ GUARDA DE ENDEREÇO — a rede de segurança que faltava.
+   *
+   * A própria OS (`su_oss_chamado.endereco`) traz o endereço JÁ RESOLVIDO pelo
+   * IXC, com todas as regras dele aplicadas (padrão cliente, padrão contrato,
+   * manual, ponta A/B/C...). Então, qualquer que seja a origem que a gente
+   * escolha, o logradouro TEM que aparecer nesse texto. Se não aparecer,
+   * escolhemos errado — não importa o motivo.
+   *
+   * Isso vale mais do que corrigir flag por flag: em 27/jul o problema era o
+   * endereço do login sobrepondo o do cliente; em 29/jul achei que era a
+   * cidade; em 4/ago era a flag "Padrão cliente". Cada correção tratava UM
+   * sintoma. Esta guarda não depende de conhecer todas as regras do IXC —
+   * confere o RESULTADO contra o que o próprio IXC diz.
+   *
+   * Medido em 4/ago contra as 102 OS abertas: 97 aprovadas, 5 reprovadas — e
+   * as 5 estavam MESMO erradas (técnico ia pro lugar errado). Zero falso
+   * positivo depois de ignorar tipo de logradouro (o IXC abrevia "AVENIDA"
+   * como "AV" em um lugar e não em outro).
+   */
+  _enderecoConfere(escolhido, enderecoDaOS) {
+    const norm = (s) => (s || '').toString().toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // Tipo de logradouro e conectivos não distinguem endereço nenhum.
+    const IGNORAR = new Set(['RUA', 'R', 'AVENIDA', 'AV', 'AVN', 'TRAVESSA', 'TV', 'TRV',
+      'PRACA', 'PC', 'PCA', 'ALAMEDA', 'AL', 'RODOVIA', 'ROD', 'ESTRADA', 'EST', 'BECO',
+      'LOTEAMENTO', 'LOT', 'POVOADO', 'POV', 'CONJUNTO', 'CJ', 'CONJ', 'VILA', 'QUADRA',
+      'DE', 'DA', 'DO', 'DAS', 'DOS', 'E', 'SN']);
+
+    const alvo = norm(escolhido).split(' ').filter(p => p && !IGNORAR.has(p));
+    const texto = norm(enderecoDaOS);
+    // Sem o que comparar → não bloqueia (nunca piora o que já funciona).
+    if (alvo.length === 0 || !texto) return true;
+    const achadas = alvo.filter(p => texto.includes(p)).length;
+    return achadas / alvo.length >= 0.6;
+  }
+
   async sincronizarOS(trx, tenantId, tecnicoId, osIXC, ixcService) {
     try {
       if (!osIXC || !osIXC.id) {
@@ -686,6 +725,12 @@ class SincronizadorIXC {
             if (rec.enderecoPadraoCliente) {
               console.log(`   🏠 Login usa "Padrão cliente" — endereço do login ` +
                 `IGNORADO (mantendo o do cliente)`);
+            } else if (rec.endereco && cidadeBate &&
+                       !this._enderecoConfere(rec.endereco, osIXC.endereco)) {
+              // 🛡️ O endereço do login NÃO bate com o que a própria OS carrega
+              // → é dado velho/errado no cadastro do login. Mantém o do cliente.
+              console.warn(`   🛡️ Endereço do login DESCARTADO (não confere com o da OS): ` +
+                `login="${rec.endereco}" vs OS="${osIXC.endereco}"`);
             } else if (rec.endereco && cidadeBate) {
               clienteEndereco = rec.endereco;
               clienteNumero = rec.numero || clienteNumero;
@@ -710,6 +755,17 @@ class SincronizadorIXC {
                 `OS id_cidade=${osIXC.id_cidade} vs login cidade=${rec.cidade}) — mantendo endereço do cliente`);
             }
           }
+        }
+
+        // 🛡️ Conferência FINAL do endereço, seja qual for a origem escolhida.
+        // Se nem o endereço do cliente bate com o que a OS carrega, é problema
+        // de cadastro no IXC — não temos fonte melhor, então mantém e AVISA
+        // (fica no log pra alguém corrigir o cadastro).
+        if (clienteEndereco && osIXC.endereco &&
+            !this._enderecoConfere(clienteEndereco, osIXC.endereco)) {
+          console.warn(`   🛡️ ATENÇÃO OS ${osIXC.id}: o endereço que vamos mostrar NÃO confere ` +
+            `com o da OS no IXC → mostrando="${clienteEndereco}" | OS="${osIXC.endereco}". ` +
+            `Conferir o cadastro do cliente ${osIXC.id_cliente} no IXC.`);
         }
 
         // PLANO: nome legível vem do contrato do login (cache permanente).

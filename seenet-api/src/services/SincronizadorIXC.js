@@ -673,7 +673,20 @@ class SincronizadorIXC {
             const cidadeBate = !cidadeDaOsConhecida ||
               String(osIXC.id_cidade) === String(rec.cidade || '');
 
-            if (rec.endereco && cidadeBate) {
+            // 🚩 TRAVA PRINCIPAL (4/ago): o login pode estar marcado como
+            // "Padrão cliente" no IXC (`endereco_padrao_cliente = 'S'`). Nesse
+            // caso o endereço VÁLIDO é o do CLIENTE e os campos de endereço do
+            // login são LIXO ANTIGO que o próprio IXC ignora.
+            // Caso real: login `darcilenepj` (OS 291745) estava "Padrão
+            // cliente", com o cliente na AVENIDA JOSE CARLOS RIBEIRO DE
+            // ANDRADE, mas o campo do login guardava "Rua Maria Freire de Lima,
+            // 265" — e o app mandou o técnico para o endereço errado.
+            // A checagem de cidade (29/jul) NÃO pega esse caso: as duas ruas
+            // são da mesma cidade.
+            if (rec.enderecoPadraoCliente) {
+              console.log(`   🏠 Login usa "Padrão cliente" — endereço do login ` +
+                `IGNORADO (mantendo o do cliente)`);
+            } else if (rec.endereco && cidadeBate) {
               clienteEndereco = rec.endereco;
               clienteNumero = rec.numero || clienteNumero;
               clienteBairro = rec.bairro || clienteBairro;

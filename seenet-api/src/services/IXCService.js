@@ -194,6 +194,11 @@ class IXCService {
         login: reg.login || null,
         senha: reg.senha || null,
         id_contrato: reg.id_contrato || null,
+        // 🚩 "Padrão cliente" marcado no IXC = o endereço VÁLIDO é o do CLIENTE;
+        // os campos de endereço DESTE login ficam preenchidos com lixo antigo e
+        // o IXC os IGNORA. Quem consome precisa respeitar esta flag (ver o
+        // bloco de endereço no SincronizadorIXC).
+        enderecoPadraoCliente: reg.endereco_padrao_cliente === 'S',
         endereco: reg.endereco || null,
         numero: reg.numero || null,
         bairro: reg.bairro || null,

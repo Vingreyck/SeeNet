@@ -113,16 +113,22 @@ class _SplashScreenState extends State<SplashScreen>
       print('📦 14 ConnectivityService...');
       Get.put(ConnectivityService(), permanent: true);
       print('📦 15 NotificationService...');
-      // ⚠️ No WEB o NotificationService (Firebase Messaging + local notifications)
-      // estoura JÁ na criação e, sem proteção, esse erro ABORTAVA todo o arranque
-      // -> o app caía direto no /login SEM NUNCA tentar o auto-login. Protegido:
-      // se falhar, o app segue (push pode não funcionar no web, mas o auto-login
-      // volta a funcionar). No Android/iOS o Get.put roda normal (não cai no catch).
-      try {
-        Get.put(NotificationService(), permanent: true);
-      } catch (e) {
-        print('⚠️ NotificationService não registrado (web/plugin): $e');
-      }
+      // ⚠️ CAUSA RAIZ DE "QUASE NINGUÉM TEM FCM TOKEN" (achada 6/ago): o
+      // construtor do NotificationService inicializa o campo
+      // `_messaging = FirebaseMessaging.instance`, que chama Firebase.app()
+      // por baixo — e Firebase.app() EXIGE que Firebase.initializeApp() já
+      // tenha CONCLUÍDO (não basta o app nativo existir via
+      // google-services.json; o lado Dart do plugin também precisa do
+      // initializeApp()). Antes, o Get.put(NotificationService()) rodava
+      // AQUI — ANTES da linha que chama Firebase.initializeApp() (que só
+      // vem embaixo, e sem await de propósito). Ou seja: SEMPRE lançava
+      // "No Firebase App '[DEFAULT]' has been created", em QUALQUER
+      // plataforma (não só web, como o comentário antigo supunha). O
+      // try/catch escondia o erro; o NotificationService nunca chegava a
+      // existir no GetX; toda chamada seguinte (init, sendTokenToBackend)
+      // também falhava em silêncio. FIX: o Get.put + init do
+      // NotificationService entraram PRA DENTRO do
+      // Firebase.initializeApp().then(...) abaixo, na ordem certa.
       print('✅ Todos registrados!');
 
       // ⚠️ Firebase/push NÃO podem BLOQUEAR o arranque. No iPhone o
@@ -132,6 +138,15 @@ class _SplashScreenState extends State<SplashScreen>
       Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       ).then((_) {
+        // Só agora Firebase.app() existe de fato — é seguro construir o
+        // NotificationService (o field initializer usa FirebaseMessaging.instance).
+        try {
+          Get.put(NotificationService(), permanent: true);
+        } catch (e) {
+          print('⚠️ NotificationService não registrado (web/plugin): $e');
+          return;
+        }
+
         Get.find<NotificationService>().init().then((_) {
           Get.find<NotificationService>().listenTokenRefresh();
           print('✅ NotificationService pronto');

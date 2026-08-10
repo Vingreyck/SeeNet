@@ -80,8 +80,32 @@ async function initDatabase() {
     try {
       // Executar e logar migrações
       logger.info('\n=== 🔄 VERIFICANDO MIGRAÇÕES ===');
-      const [batchNo, migrationsList] = await db.migrate.latest();
-      
+
+      // ⏱️ Watchdog. O boot já ficou PENDURADO aqui (deploys de 10/ago), sem
+      // erro nenhum, até o healthcheck do Railway (120s) matar o container —
+      // e "silêncio" não diz se travou ou se morreu. O knex pega o lock com
+      // `UPDATE knex_migrations_lock SET is_locked=1 WHERE is_locked=0`; se
+      // uma conexão ZUMBI de um deploy anterior (morto no meio da migration)
+      // ainda segurar essa linha, o UPDATE espera pra sempre.
+      // Aqui a espera vira uma mensagem clara, com o comando pra destravar.
+      const TIMEOUT_MIGRACAO_MS = 60000;
+      let alarme;
+      const [batchNo, migrationsList] = await Promise.race([
+        db.migrate.latest(),
+        new Promise((_, reject) => {
+          alarme = setTimeout(() => reject(new Error(
+            `Migrações travadas há ${TIMEOUT_MIGRACAO_MS / 1000}s. Causa provável: ` +
+            'a linha de knex_migrations_lock está presa por uma conexão de um ' +
+            'deploy anterior que foi morto no meio da migração.\n' +
+            'Para destravar, no psql:\n' +
+            "  SELECT pg_terminate_backend(pid) FROM pg_stat_activity\n" +
+            "   WHERE datname='seenet_production' AND state='idle in transaction'\n" +
+            "     AND state_change < now() - interval '2 minutes';\n" +
+            '  UPDATE knex_migrations_lock SET is_locked = 0;'
+          )), TIMEOUT_MIGRACAO_MS);
+        }),
+      ]).finally(() => clearTimeout(alarme));
+
       if (migrationsList.length === 0) {
         logger.info('Nenhuma migração pendente', {
           currentBatch: batchNo,
@@ -96,6 +120,14 @@ async function initDatabase() {
         });
       }
     } catch (migrationError) {
+      // ⚠️ console.error ANTES do logger: o logger (winston) é assíncrono e o
+      // `throw` abaixo derruba o processo — a mensagem pode nunca chegar a ser
+      // gravada. Foi o que fez os deploys de 10/ago parecerem "travados sem
+      // erro". console.error é síncrono e sempre aparece no log do Railway.
+      console.error('❌ FALHA NAS MIGRAÇÕES:', migrationError.message);
+      if (migrationError.code) console.error('   código:', migrationError.code);
+      console.error(migrationError.stack);
+
       logger.error('Erro ao executar migrações', {
         error: {
           message: migrationError.message,

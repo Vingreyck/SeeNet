@@ -43,6 +43,15 @@ router.post('/:id/reagendar', OrdensServicoController.reagendarOS.bind(OrdensSer
 // 5️⃣ Encaminhar OS para outro técnico
 router.post('/:id/encaminhar', OrdensServicoController.encaminharOS.bind(OrdensServicoController));
 
+// 📦📸 Sincroniza material/patrimônio/fotos com o IXC DURANTE a execução (sem
+// esperar finalizar/reagendar/encaminhar) — gestor acompanha em tempo real e
+// não precisa reabrir a OS só pra corrigir foto/produto.
+router.post('/:id/sincronizar-materiais', OrdensServicoController.sincronizarMateriaisEmAndamento.bind(OrdensServicoController));
+
+// 📏 Ler a metragem do cabo drop nas fotos (IA de visão). Só LÊ e devolve —
+// quem confirma o número é o técnico, no app.
+router.post('/:id/calcular-drop', OrdensServicoController.calcularDrop.bind(OrdensServicoController));
+
 // 🧹 Limpar MAC do login do cliente (botão Limpar MAC do IXC)
 router.post('/:id/limpar-mac', OrdensServicoController.limparMac.bind(OrdensServicoController));
 

@@ -14,6 +14,7 @@ import '../../services/tracking_service.dart';
 import '../../services/estoque_service.dart';
 import 'dart:convert';
 import '../../controllers/ordem_servico_controller.dart';
+import '../../controllers/usuario_controller.dart';
 import '../../services/ordem_servico_service.dart';
 import '../../models/ordem_servico_model.dart';
 import '../widgets/localizacao_widget.dart';
@@ -67,6 +68,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
   double? latitudeFinal;  // ✅ localização capturada NA FINALIZAÇÃO (prova de conclusão no local)
   double? longitudeFinal;
   bool _capturandoFinal = false; // capturando a localização de finalização (botão único)
+
+  // 📏 Metragem do cabo drop lida das fotos pela IA e CONFIRMADA pelo técnico.
+  // ValueNotifier porque o MateriaisEstoqueWidget vive dentro do IndexedStack
+  // (não é reconstruído ao trocar de etapa), então é assim que o valor chega lá.
+  final ValueNotifier<double?> _dropMetros = ValueNotifier<double?>(null);
+  int? _dropMaior;   // marcação maior lida (ex: 1175) — vai pro IXC junto
+  int? _dropMenor;   // marcação menor lida (ex: 1075), pra auditoria refazer a conta
+  bool _calculandoDrop = false;
   List<AnexoComDescricao> fotosAnexadas = [];
   Uint8List? assinaturaBytes;
   bool osIniciada = false;
@@ -125,17 +134,16 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       }
 
       if (os.status == 'em_execucao' && _exigeApr) {
-        // ✅ Se o APR já foi CONCLUÍDO nesta OS (marca local), NÃO re-força ao reabrir —
-        // volta pro passo do wizard onde parou. Antes, o verificarAPR só olhava o
-        // SERVIDOR; um APR concluído OFFLINE (ainda não sincronizado) reabria o APR
-        // toda vez (e vazio, pois o rascunho é limpo ao concluir).
-        final aprLocalOk = GetStorage().read('apr_concluido_${os.id}') == true;
-        final aprOk = aprLocalOk || await controller.verificarAPR(os.id);
+        // ✅ APR já concluída nesta OS → NÃO re-força ao reabrir; volta pro
+        // passo do wizard onde parou. Mesma checagem da chegada ao local (as
+        // duas usam `_aprJaPreenchida`) — quando cada caminho tinha a sua, um
+        // deles ficou sem checar nada e a OS reaberta pedia APR de novo.
+        final aprOk = await _aprJaPreenchida();
         if (!aprOk && mounted) {
           final resultado = await Navigator.push<bool>(
               context, MaterialPageRoute(builder: (_) => AprScreen(os: os)));
           if (resultado == true && mounted) {
-            GetStorage().write('apr_concluido_${os.id}', true);
+            GetStorage().write(_aprMarcaKey, true);
             setState(() { _etapaAtual = 1; });
           }
         }
@@ -177,6 +185,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     relatoSolucaoController.dispose();
     materiaisController.dispose();
     observacoesController.dispose();
+    _dropMetros.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -196,7 +205,62 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
   // APR obrigatória só para estes assuntos (MESMA regra do backend em finalizarExecucao).
   // Nos demais assuntos a OS segue normal, sem passar pela tela da APR.
   static const Set<String> _assuntosComApr = {'60', '4', '32'};
-  bool get _exigeApr => _assuntosComApr.contains(os.idAssunto);
+
+  /// 📏 Assuntos em que o técnico passa cabo drop e fotografa as duas
+  /// marcações de metragem: 14 = Sem funcionar, 163 = Sinal alto,
+  /// 32 = Drop rompido, 60 = Instalação, 4 = Transferência.
+  /// (Mesma lista do backend, em OrdensServicoController.ASSUNTOS_COM_DROP.)
+  static const Set<String> _assuntosComDrop = {'14', '163', '32', '60', '4'};
+
+  /// 🔴 DESLIGADO por decisão do Vinícius (8/ago), até validar se o modelo de
+  /// visão realmente LÊ os números na foto de campo — o app reduz toda foto pra
+  /// 1920x1080 qualidade 80, e número pequeno impresso no cabo é o primeiro
+  /// detalhe que a compressão come.
+  ///
+  /// Com `false`, o botão "Calcular pelas fotos" nem aparece e nada é enviado
+  /// pro backend. O resto do fluxo de materiais segue igual (o técnico digita a
+  /// metragem do cabo na mão, como sempre fez).
+  ///
+  /// **Pra ligar:** trocar para `true` e gerar build do app.
+  /// Antes disso, rodar `scratchpad/testar_groq_visao.js` com FOTOS TIRADAS PELO
+  /// APP (não a original da galeria — senão o teste dá falso positivo).
+  static const bool _iaDropAtiva = false;
+
+  bool get _exigeDrop =>
+      _iaDropAtiva && _assuntosComDrop.contains(os.idAssunto);
+  // Admin escolhe, por técnico, se ele faz APR (Usuários → Editar). Quem não
+  // faz nunca vê essa tela, mesmo em OS de assunto que normalmente exige.
+  bool get _tecnicoFazApr =>
+      Get.find<UsuarioController>().usuarioLogado.value?.fazApr ?? true;
+  bool get _exigeApr => _assuntosComApr.contains(os.idAssunto) && _tecnicoFazApr;
+
+  /// Marca local de "APR concluída". Leva o id do TÉCNICO na chave: num
+  /// aparelho compartilhado, a marca de um não pode fazer o outro pular a APR
+  /// dele (o servidor já é por técnico; a chave só por OS abriria essa brecha).
+  String get _aprMarcaKey {
+    final uid = Get.find<UsuarioController>().usuarioLogado.value?.id;
+    return 'apr_concluido_${os.id}_$uid';
+  }
+
+  /// A APR desta OS JÁ foi preenchida POR ESTE TÉCNICO?
+  ///
+  /// Duas fontes, porque uma sozinha não cobre tudo:
+  ///  • marca local — cobre APR concluída OFFLINE, que ainda não subiu;
+  ///  • servidor (`/apr/status`) — cobre outro aparelho e a OS REABERTA: as
+  ///    `respostas_apr` ficam salvas pra sempre, então quem já respondeu antes
+  ///    de finalizar não responde de novo. O servidor filtra por técnico, então
+  ///    numa OS ENCAMINHADA o técnico que recebeu faz a APR DELE.
+  ///
+  /// `verificarAPR` devolve true quando dá erro de rede — de propósito: sem
+  /// sinal, é melhor não re-obrigar do que travar o atendimento.
+  Future<bool> _aprJaPreenchida() async {
+    final s = GetStorage();
+    // Chave antiga (só por OS): honrada como fallback pra não pedir APR de novo
+    // numa OS que já estava em andamento quando esta versão subiu.
+    if (s.read(_aprMarcaKey) == true ||
+        s.read('apr_concluido_${os.id}') == true) return true;
+    return controller.verificarAPR(os.id);
+  }
 
   String _getNomeEtapa(int etapa) {
     switch (etapa) {
@@ -455,9 +519,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         children: [
           _buildTituloEtapa(icone: Icons.build_rounded, titulo: 'Materiais Utilizados', descricao: 'Selecione os materiais e equipamentos do estoque'),
           const SizedBox(height: 20),
+          if (_exigeDrop) ...[
+            _buildBotaoCalcularDrop(),
+            const SizedBox(height: 12),
+          ],
           _buildCard(child: MateriaisEstoqueWidget(
             osIdExterno: os.idExterno ?? '',
             itensIniciais: itensEstoque,
+            metragemDrop: _dropMetros,
             onItensAlterados: (itens) {
               setState(() {
                 itensEstoque = itens;
@@ -470,6 +539,288 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         ],
       ),
     );
+  }
+
+  // ── 📏 METRAGEM DO CABO DROP ────────────────────────────────────────────
+  // O cabo drop tem a metragem impressa ("1175 M"). O técnico fotografa a
+  // marcação no começo e no fim do trecho; a diferença é o que ele gastou.
+  // A IA lê os dois números das fotos que ele JÁ tirou — e se a foto estiver
+  // ruim, usa o número que ele escreveu na descrição da foto.
+
+  Widget _buildBotaoCalcularDrop() {
+    final jaCalculado = _dropMetros.value != null;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: jaCalculado ? const Color(0xFF00FF88) : Colors.white12,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.straighten_rounded, color: Color(0xFF00FF88), size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Metragem do cabo drop',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+              ),
+              if (jaCalculado)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00FF88).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('${_dropMetros.value!.toStringAsFixed(0)} m',
+                      style: const TextStyle(
+                          color: Color(0xFF00FF88), fontSize: 13, fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            jaCalculado
+                ? 'Já lançado nos materiais abaixo. Toque para calcular de novo.'
+                : 'Leio as duas fotos da marcação do cabo e calculo quantos metros você usou.',
+            style: const TextStyle(color: Colors.white54, fontSize: 12.5),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _calculandoDrop ? null : _calcularDrop,
+              icon: _calculandoDrop
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54))
+                  : const Icon(Icons.auto_awesome_rounded, size: 18),
+              label: Text(_calculandoDrop
+                  ? 'Lendo as fotos...'
+                  : (jaCalculado ? 'Calcular de novo' : 'Calcular pelas fotos')),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF88),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _calcularDrop() async {
+    if (fotosAnexadas.length < 2) {
+      _mostrarErro('Tire pelo menos 2 fotos da marcação do drop (início e fim).');
+      return;
+    }
+
+    setState(() => _calculandoDrop = true);
+    Map<String, dynamic> r;
+    try {
+      r = await _osService.calcularDrop(
+        os.id,
+        fotosAnexadas
+            .map((a) => {'xfile': a.foto, 'descricao': a.descricao})
+            .toList(),
+      );
+    } finally {
+      if (mounted) setState(() => _calculandoDrop = false);
+    }
+    if (!mounted) return;
+
+    final metros = (r['metros'] as num?)?.toDouble();
+    // Mesmo quando a IA falha, abre o diálogo com o motivo e o campo em branco:
+    // o técnico digita os metros na mão e segue, em vez de ficar sem saída.
+    await _mostrarDialogDrop(
+      metrosSugeridos: r['ok'] == true ? metros : null,
+      maior: (r['maior'] as num?)?.toInt(),
+      menor: (r['menor'] as num?)?.toInt(),
+      confianca: r['confianca'] as String?,
+      fonte: r['fonte'] as String?,
+      aviso: r['aviso'] as String?,
+    );
+  }
+
+  Future<void> _mostrarDialogDrop({
+    double? metrosSugeridos,
+    int? maior,
+    int? menor,
+    String? confianca,
+    String? fonte,
+    String? aviso,
+  }) async {
+    final campo = TextEditingController(
+      text: metrosSugeridos != null ? metrosSugeridos.toStringAsFixed(0) : '',
+    );
+    String? erro;
+
+    final cores = {
+      'alta': const Color(0xFF00FF88),
+      'media': Colors.orange,
+      'baixa': Colors.redAccent,
+    };
+    final rotulos = {
+      'alta': 'Leitura nítida',
+      'media': 'Confira os números',
+      'baixa': 'Leitura duvidosa — confira',
+    };
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.straighten_rounded, color: Color(0xFF00FF88), size: 22),
+              SizedBox(width: 8),
+              Text('Metragem do drop', style: TextStyle(color: Colors.white, fontSize: 18)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // A CONTA na cara do técnico: ele confere contra o cabo sem
+              // precisar confiar cegamente no número final.
+              if (maior != null && menor != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF232323),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    children: [
+                      Text('$maior  −  $menor',
+                          style: const TextStyle(color: Colors.white70, fontSize: 16)),
+                      const SizedBox(height: 4),
+                      Text('${maior - menor} metros',
+                          style: const TextStyle(
+                              color: Color(0xFF00FF88), fontSize: 24, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (confianca != null)
+                Row(
+                  children: [
+                    Icon(Icons.circle, size: 10, color: cores[confianca] ?? Colors.white54),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${rotulos[confianca] ?? confianca}'
+                        '${fonte == 'descricao' ? ' (lido do que você escreveu)' : ''}',
+                        style: TextStyle(color: cores[confianca] ?? Colors.white54, fontSize: 12.5),
+                      ),
+                    ),
+                  ],
+                ),
+              if (aviso != null && aviso.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(aviso,
+                            style: const TextStyle(color: Colors.orange, fontSize: 12.5)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              TextField(
+                controller: campo,
+                autofocus: metrosSugeridos == null,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                decoration: InputDecoration(
+                  labelText: 'Metros de drop usados',
+                  labelStyle: const TextStyle(color: Colors.white54),
+                  helperText: 'Pode corrigir se a leitura estiver errada',
+                  helperStyle: const TextStyle(color: Colors.white38, fontSize: 11.5),
+                  errorText: erro,
+                  suffixText: 'm',
+                  suffixStyle: const TextStyle(color: Colors.white54),
+                  filled: true,
+                  fillColor: const Color(0xFF232323),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF88),
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () {
+                final v = double.tryParse(campo.text.trim().replaceAll(',', '.'));
+                if (v == null || v <= 0) {
+                  setDialog(() => erro = 'Digite quantos metros foram usados');
+                  return;
+                }
+                Navigator.pop(ctx);
+                setState(() {
+                  _dropMaior = maior;
+                  _dropMenor = menor;
+                  // Se o técnico corrigiu o número, a conta original deixa de
+                  // valer — não faz sentido mandar "100 (1175 - 1075)" pro IXC
+                  // quando ele digitou 85. Aí manda só o total.
+                  if (maior != null && menor != null && (maior - menor) != v.round()) {
+                    _dropMaior = null;
+                    _dropMenor = null;
+                  }
+                  // Dispara o widget de materiais a lançar o cabo drop. Fica
+                  // DENTRO do setState pro botão acima já reconstruir com a
+                  // metragem — senão o selo "100 m" dependeria da ordem em que
+                  // as duas linhas foram escritas, que é fácil de quebrar depois.
+                  _dropMetros.value = v;
+                });
+                _salvarProgresso();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Drop de ${v.toStringAsFixed(0)}m lançado nos materiais'),
+                    backgroundColor: const Color(0xFF00FF88),
+                  ),
+                );
+              },
+              child: const Text('Confirmar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    campo.dispose();
   }
 
   Widget _buildEtapaObservacoes() {
@@ -671,6 +1022,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       'longitude':     longitude,
       'latitudeFinal':  latitudeFinal,
       'longitudeFinal': longitudeFinal,
+      'dropMetros':    _dropMetros.value,
+      'dropMaior':     _dropMaior,
+      'dropMenor':     _dropMenor,
       'onuModelo':     onuModeloController.text,
       'onuSerial':     onuSerialController.text,
       'onuMac':        onuMacController.text,
@@ -757,6 +1111,15 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       if (dados['longitude'] != null) longitude = (dados['longitude'] as num).toDouble();
       if (dados['latitudeFinal'] != null) latitudeFinal = (dados['latitudeFinal'] as num).toDouble();
       if (dados['longitudeFinal'] != null) longitudeFinal = (dados['longitudeFinal'] as num).toDouble();
+      // 📏 Metragem do drop já confirmada antes de fechar o app. Restaurar é
+      // necessário pro botão voltar mostrando "100 m" em vez de fingir que
+      // nada foi calculado. Relançar o cabo não duplica: _aplicarMetragemDrop
+      // procura o item antes de inserir e só ajusta a quantidade se já existir.
+      _dropMaior = dados['dropMaior'] as int?;
+      _dropMenor = dados['dropMenor'] as int?;
+      if (dados['dropMetros'] != null) {
+        _dropMetros.value = (dados['dropMetros'] as num).toDouble();
+      }
     });
 
     print('✅ Progresso do wizard restaurado — etapa ${_etapaAtual + 1}');
@@ -775,7 +1138,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     final s = GetStorage();
     s.remove('wizard_progress_${os.id}');
     s.remove('apr_rascunho_${os.id}');
-    s.remove('apr_concluido_${os.id}');
+    s.remove(_aprMarcaKey);
+    s.remove('apr_concluido_${os.id}'); // chave antiga (versões anteriores)
   }
 
   // 💾 Salva TODO o estado do wizard no SERVIDOR (fotos em base64 pra funcionar
@@ -950,8 +1314,27 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     if (!_validarEtapaAtual()) return;
     if (_etapaAtual == 0 && !osIniciada) { _iniciarOS(); return; }
     if (_etapaAtual == _totalEtapas - 1) { _finalizarOS(); return; }
+    _sincronizarEmAndamentoSeNecessario(_etapaAtual);
     setState(() => _etapaAtual++);
     _salvarProgresso(); // ✅ Salva após cada avanço de etapa
+  }
+
+  /// Manda fotos/material pro IXC ao SAIR da etapa de Fotos (1) ou Materiais
+  /// (4) — pedido do Vinícius, pra o gestor acompanhar em tempo real e não
+  /// precisar reabrir a OS só pra corrigir. Fire-and-forget: não usa `await`
+  /// de propósito, não trava a navegação nem mostra erro (sem sinal aqui, o
+  /// próximo reagendar/finalizar tenta de novo — é reconciliação, não perde
+  /// nem duplica nada).
+  void _sincronizarEmAndamentoSeNecessario(int etapaQueEstaSaindo) {
+    if (etapaQueEstaSaindo == 1 && fotosAnexadas.isNotEmpty) {
+      _osService.sincronizarMateriaisEmAndamento(os.id, fotos: _payloadFotos());
+    } else if (etapaQueEstaSaindo == 4 && itensEstoque.isNotEmpty) {
+      _osService.sincronizarMateriaisEmAndamento(
+        os.id,
+        itensEstoque: _payloadItensEstoque(),
+        onuMac: onuMacController.text.trim(),
+      );
+    }
   }
 
   bool _validarEtapaAtual() {
@@ -1036,19 +1419,33 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           Get.find<TrackingService>().modoEconomico();
         }
         if (!mounted) return;
-        // APR só é obrigatória para alguns assuntos (mesma regra do backend). Nos
-        // demais, a chegada ao local vai DIRETO pra execução, sem abrir a APR.
-        if (!_exigeApr) {
+        // APR só é obrigatória para alguns assuntos (mesma regra do backend) e
+        // só pra técnico marcado como "faz APR". Nos demais, a chegada ao local
+        // vai DIRETO pra execução, sem abrir a APR.
+        //
+        // ⚠️ E se a APR JÁ foi preenchida nesta OS, também não pergunta de novo.
+        // Era exatamente o furo da OS REABERTA: este caminho abria a AprScreen
+        // SEM checar nada (o initState checava, mas ele só roda quando a OS já
+        // está 'em_execucao' — a reaberta passa por reaberta → em_deslocamento →
+        // chegada, então caía aqui). O técnico refazia a APR toda vez, e ainda
+        // por cima em branco: ao concluir, o rascunho local é apagado e a
+        // AprScreen não recarrega as respostas já salvas no servidor.
+        final aprJaFeita = _exigeApr && await _aprJaPreenchida();
+        if (!mounted) return;
+        if (!_exigeApr || aprJaFeita) {
           setState(() { statusAtual = 'em_execucao'; osIniciada = true; _etapaAtual = 1; });
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('✅ Chegada confirmada! Preencha os dados do atendimento.'),
-            backgroundColor: Color(0xFF00FF88), duration: Duration(seconds: 2),
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(aprJaFeita
+                ? '✅ Chegada confirmada! APR já preenchida nesta OS.'
+                : '✅ Chegada confirmada! Preencha os dados do atendimento.'),
+            backgroundColor: const Color(0xFF00FF88),
+            duration: const Duration(seconds: 2),
           ));
           return;
         }
         final aprConcluido = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => AprScreen(os: os)));
         if (aprConcluido == true) {
-          GetStorage().write('apr_concluido_${os.id}', true); // ✅ não re-força ao reabrir
+          GetStorage().write(_aprMarcaKey, true); // ✅ não re-força ao reabrir
           setState(() { statusAtual = 'em_execucao'; osIniciada = true; _etapaAtual = 1; });
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('✅ APR concluído! Preencha os dados do atendimento.'),
@@ -1887,6 +2284,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       final dados = {
         'latitude': latitude, 'longitude': longitude,
         'latitude_final': latitudeFinal, 'longitude_final': longitudeFinal,
+        // 📏 Metragem do drop confirmada pelo técnico → vira uma linha na
+        // descrição da OS no IXC (o cabo em si já foi lançado nos materiais).
+        if (_dropMetros.value != null) 'drop_metros': _dropMetros.value,
+        if (_dropMaior != null) 'drop_maior': _dropMaior,
+        if (_dropMenor != null) 'drop_menor': _dropMenor,
         'onu_modelo':    onuModeloController.text.trim(),
         'onu_serial':    onuSerialController.text.trim(),
         'onu_status':    onuStatusController.text.trim(),

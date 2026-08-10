@@ -2,8 +2,16 @@ const crypto = require('crypto');
 const { db } = require('../config/database');
 const IXCService = require('../services/IXCService');
 const notificationService = require('../services/NotificationService');
+const dropVisaoService = require('../services/DropVisaoService');
 
 class OrdensServicoController {
+  /**
+   * Assuntos de OS em que o técnico passa cabo drop e fotografa as duas
+   * marcações de metragem: 14 = Sem funcionar, 163 = Sinal alto,
+   * 32 = Drop rompido, 60 = Instalação, 4 = Transferência.
+   */
+  static ASSUNTOS_COM_DROP = new Set(['14', '163', '32', '60', '4']);
+
   /**
    * Buscar OSs do técnico logado (pendentes e em execução)
    * GET /api/ordens-servico/minhas
@@ -556,6 +564,82 @@ async reagendarOS(req, res) {
     try { await trx.rollback(); } catch (_) {}
     console.error('❌ Erro ao reagendar OS:', error);
     return res.status(500).json({ success: false, error: 'Erro ao reagendar OS' });
+  }
+}
+
+/**
+ * 📦📸 Sincroniza material/patrimônio/fotos com o IXC DURANTE a execução — sem
+ * esperar finalizar/reagendar/encaminhar. Pedido do Vinícius: o gestor
+ * acompanhava as fotos/produtos só depois do fechamento, e corrigir algo no
+ * meio do atendimento exigia reabrir a OS. Chamado pelo app ao avançar a
+ * etapa de Fotos ou a de Materiais no wizard — mesma reconciliação usada no
+ * reagendar/encaminhar/finalizar (idempotente: chamar de novo com a mesma
+ * lista não duplica nada), só que sem mudar o status da OS nem notificar.
+ * POST /api/ordens-servico/:id/sincronizar-materiais
+ */
+async sincronizarMateriaisEmAndamento(req, res) {
+  try {
+    const { id } = req.params;
+    const tenantId = req.tenantId;
+    const userId = req.user.id;
+
+    const os = await db('ordem_servico')
+      .where('id', id)
+      .where('tenant_id', tenantId)
+      .where('tecnico_id', userId)
+      .first();
+
+    if (!os) {
+      return res.status(404).json({ success: false, error: 'OS não encontrada' });
+    }
+
+    if (!['em_deslocamento', 'em_execucao'].includes(os.status)) {
+      return res.status(400).json({ success: false, error: 'OS não está em execução' });
+    }
+
+    const itensEstoque = Array.isArray(req.body.itens_estoque) ? req.body.itens_estoque : [];
+    const fotos = Array.isArray(req.body.fotos) ? req.body.fotos : [];
+
+    console.log(`📦📸 Sincronização em andamento da OS ${os.numero_os}: ` +
+      `${itensEstoque.length} item(ns), ${fotos.length} foto(s) ` +
+      `[app ${req.headers['x-app-version'] || 'ANTIGO/sem versao'}]`);
+
+    if (!(os.origem === 'IXC' && os.id_externo) || (itensEstoque.length === 0 && fotos.length === 0)) {
+      return res.json({ success: true, estoque: null, fotos: null });
+    }
+
+    const integ = await db('integracao_ixc')
+      .where('tenant_id', tenantId).where('ativo', true).first();
+    if (!integ) {
+      return res.json({ success: false, error: 'Sem integração IXC ativa' });
+    }
+    const ixc = new IXCService(integ.url_api, integ.token_api);
+
+    // try/catch SEPARADO por etapa — mesmo motivo do reagendar: uma falha no
+    // estoque não pode impedir a tentativa de subir as fotos (e vice-versa).
+    let resultadoEstoque = null;
+    if (itensEstoque.length > 0) {
+      try {
+        resultadoEstoque = await this.sincronizarItensEstoqueIXC(
+          os, { itens_estoque: itensEstoque, onu_mac: req.body.onu_mac }, ixc, tenantId
+        );
+      } catch (e) {
+        console.error('⚠️ Erro ao sincronizar material em andamento:', e.message);
+      }
+    }
+    let resultadoFotos = null;
+    if (fotos.length > 0) {
+      try {
+        resultadoFotos = await this.sincronizarFotosIXC(os, fotos, ixc, tenantId);
+      } catch (e) {
+        console.error('⚠️ Erro ao sincronizar fotos em andamento:', e.message);
+      }
+    }
+
+    return res.json({ success: true, estoque: resultadoEstoque, fotos: resultadoFotos });
+  } catch (error) {
+    console.error('❌ Erro ao sincronizar materiais/fotos em andamento:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao sincronizar' });
   }
 }
 
@@ -1235,7 +1319,9 @@ async finalizarExecucao(req, res) {
     const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
 
     // 📋 APR só para os assuntos que exigem Análise Preliminar de Risco:
-    // 60 (instalação FTTH), 4 e 32. Nos demais, finaliza sem APR.
+    // 60 (instalação FTTH), 4 e 32. Nos demais, finaliza sem APR. E só para
+    // técnico que o admin marcou como "faz APR" — quem não faz nunca vê a
+    // tela no app, então não tem resposta pra gerar PDF (geraria vazio).
     let assuntoIdOS = '';
     try {
       const dIxc = os.dados_ixc
@@ -1244,7 +1330,7 @@ async finalizarExecucao(req, res) {
       assuntoIdOS = String(dIxc.id_assunto || dados.id_assunto || '');
     } catch (_) { assuntoIdOS = String(dados.id_assunto || ''); }
     const ASSUNTOS_COM_APR = ['60', '4', '32'];
-    const geraApr = ASSUNTOS_COM_APR.includes(assuntoIdOS);
+    const geraApr = ASSUNTOS_COM_APR.includes(assuntoIdOS) && tecnico?.faz_apr !== false;
 
     const [aprResult, osResult] = await Promise.allSettled([
       (async () => {
@@ -1361,6 +1447,17 @@ async finalizarExecucao(req, res) {
             `SOLUÇÃO: ${dados.relato_solucao   || 'N/A'}\n` +
             `MATERIAIS: ${dados.materiais_utilizados || 'Nenhum'}\n` +
             `OBS: ${dados.observacoes || 'Nenhuma'}`;
+        }
+
+        // 📏 Metragem do cabo drop (lida das fotos pela IA e CONFIRMADA pelo
+        // técnico no app). Vai na descrição junto com os dois números lidos,
+        // pra quem auditar depois conseguir refazer a conta sem abrir as fotos.
+        const drop = dados.drop_metros;
+        if (drop !== undefined && drop !== null && Number(drop) > 0) {
+          const conta = (dados.drop_maior && dados.drop_menor)
+            ? ` (${dados.drop_maior} - ${dados.drop_menor})`
+            : '';
+          mensagemFinal += `\n\n📏 DROP UTILIZADO: ${Number(drop)} metros${conta}`;
         }
 
         // 📍 Localização de FINALIZAÇÃO (capturada no app, obrigatória) → vai na
@@ -2536,6 +2633,56 @@ if (dados.fotos && dados.fotos.length > 0) {
     } catch (error) {
       console.error('❌ Erro ao limpar MAC:', error.message);
       return res.status(500).json({ success: false, error: error.message || 'Erro ao limpar MAC' });
+    }
+  }
+
+  /**
+   * 📏 Lê a metragem do cabo drop nas fotos que o técnico já tirou.
+   *
+   * SÓ LÊ — não grava nada no banco nem no IXC. O app mostra o resultado, o
+   * técnico confirma ou corrige, e só então vira quantidade de material. Isso é
+   * de propósito: OCR em foto de campo erra, e metragem errada = baixa de
+   * estoque errada no IXC.
+   */
+  async calcularDrop(req, res) {
+    try {
+      const { id } = req.params;
+      const tenantId = req.tenantId;
+      const fotos = Array.isArray(req.body?.fotos) ? req.body.fotos : [];
+
+      const os = await db('ordem_servico')
+        .where('id', id).where('tenant_id', tenantId)
+        .select('id', 'tecnico_id', 'dados_ixc').first();
+      if (!os) {
+        return res.status(404).json({ success: false, error: 'OS não encontrada' });
+      }
+
+      // Mesma regra do atualizarEnderecoOS: só quem está com a OS, ou um admin.
+      const ehAdmin = ['administrador', 'admin'].includes(req.user.tipo_usuario);
+      if (!ehAdmin && String(os.tecnico_id) !== String(req.user.id)) {
+        return res.status(403).json({ success: false, error: 'Esta OS não é sua' });
+      }
+
+      let idAssunto = null;
+      try {
+        const d = typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc;
+        idAssunto = d?.id_assunto ? String(d.id_assunto) : null;
+      } catch (_) {}
+
+      if (idAssunto && !OrdensServicoController.ASSUNTOS_COM_DROP.has(idAssunto)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Este tipo de OS não usa cabo drop.',
+        });
+      }
+
+      console.log(`📏 [DROP] OS ${id}: analisando ${fotos.length} foto(s) — assunto ${idAssunto || '?'}`);
+
+      const resultado = await dropVisaoService.analisar(fotos);
+      return res.json({ success: true, ...resultado });
+    } catch (error) {
+      console.error('❌ Erro ao calcular drop:', error.message);
+      return res.status(500).json({ success: false, error: error.message || 'Erro ao calcular drop' });
     }
   }
 

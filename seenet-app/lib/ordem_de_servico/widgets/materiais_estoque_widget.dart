@@ -7,11 +7,22 @@ class MateriaisEstoqueWidget extends StatefulWidget {
   final Function(List<ItemOS>) onItensAlterados;
   final List<ItemOS>? itensIniciais; // restaura itens já adicionados
 
+  /// 📏 Canal opcional para o wizard mandar a metragem do cabo drop que a IA
+  /// leu das fotos (e que o técnico já confirmou). Quando o valor muda, o
+  /// widget lança/atualiza o CABO OPTICO DROP 01FO com essa metragem.
+  ///
+  /// É `ValueNotifier` (e não um parâmetro comum) porque o widget fica vivo
+  /// dentro do IndexedStack do wizard: trocar de etapa não o reconstrói, então
+  /// um parâmetro novo nunca chegaria até aqui. Quem não passa nada continua
+  /// funcionando exatamente como antes.
+  final ValueNotifier<double?>? metragemDrop;
+
   const MateriaisEstoqueWidget({
     super.key,
     this.osIdExterno,
     required this.onItensAlterados,
     this.itensIniciais,
+    this.metragemDrop,
   });
 
   @override
@@ -42,15 +53,74 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
       _itensAdicionados.addAll(widget.itensIniciais!);
       _idsRestaurados = widget.itensIniciais!.map((i) => i.produto.id).toSet();
     }
+    widget.metragemDrop?.addListener(_aplicarMetragemDrop);
     _carregarDados();
   }
 
   @override
   void dispose() {
+    widget.metragemDrop?.removeListener(_aplicarMetragemDrop);
     for (final c in _metragemControllers.values) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// 📏 Lança (ou corrige) o cabo drop com a metragem confirmada pelo técnico.
+  ///
+  /// Só é chamado pelo wizard depois que o técnico viu a conta e confirmou —
+  /// nunca direto pelo resultado da IA.
+  void _aplicarMetragemDrop() {
+    final metros = widget.metragemDrop?.value;
+    if (metros == null || metros <= 0 || !mounted) return;
+
+    // ⚠️ O estoque pode não ter chegado ainda (é o caso da RESTAURAÇÃO: o
+    // wizard repõe a metragem salva enquanto o _carregarDados ainda roda).
+    // Sem esta guarda o técnico levava um aviso falso de "cabo não está no
+    // estoque". Sai quieto — o _carregarDados chama este método de novo ao
+    // terminar.
+    if (_isLoading) return;
+
+    ProdutoEstoque? drop;
+    for (final p in _produtosEstoque) {
+      if (p.id == _idProdutoDrop) {
+        drop = p;
+        break;
+      }
+    }
+
+    if (drop == null) {
+      // Sem o produto no estoque da filial não dá pra lançar. Avisa em vez de
+      // falhar calado — o técnico ainda pode adicionar o cabo na mão.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Metragem calculada, mas o CABO OPTICO DROP 01FO não está no estoque desta OS. Adicione o cabo na mão.'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
+
+    final existente = _itensAdicionados
+        .indexWhere((i) => i.produto.id == _idProdutoDrop && !i.isPatrimonio);
+
+    setState(() {
+      if (existente >= 0) {
+        _itensAdicionados[existente].quantidade = metros;
+      } else {
+        _itensAdicionados.add(ItemOS(produto: drop!, quantidade: metros));
+      }
+      // Sem isso o campo de metragem continua mostrando o valor velho (ou
+      // vazio): o TextField tem controller próprio, não lê da lista.
+      _metragemControllers
+          .putIfAbsent(_idProdutoDrop, () => TextEditingController())
+          .text = metros.toStringAsFixed(0);
+      _idsRestaurados.add(_idProdutoDrop);
+    });
+
+    widget.onItensAlterados(List.from(_itensAdicionados));
   }
 
   Future<void> _carregarDados() async {
@@ -71,6 +141,10 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
       });
 
       print('✅ Estoque carregado: ${_produtosEstoque.length} produtos, ${_patrimoniosEstoque.length} patrimônios');
+
+      // Metragem do drop que chegou enquanto o estoque carregava (restauração
+      // do progresso) — agora dá pra achar o produto e lançar de verdade.
+      if (widget.metragemDrop?.value != null) _aplicarMetragemDrop();
     } catch (e) {
       setState(() {
         _erro = 'Erro ao carregar estoque: $e';
@@ -236,6 +310,9 @@ class _MateriaisEstoqueWidgetState extends State<MateriaisEstoqueWidget> {
   // Override manual: IDs de produto que devem ser metragem MESMO que a unidade
   // no IXC esteja errada (ex.: cadastrado como UND mas é cabo). Normalmente vazio.
   static const Set<String> _idsMetragemForcado = {};
+
+  // CABO OPTICO DROP 01FO — o cabo cuja metragem a IA lê nas fotos.
+  static const String _idProdutoDrop = '404';
 
   bool _ehMetragem(ProdutoEstoque produto) =>
       _unidadesMetro.contains(produto.unidade) ||

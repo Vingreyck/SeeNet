@@ -267,6 +267,18 @@ class OrdemServico {
     };
   }
 
+  /// Assuntos do IXC que são RETIRADA de equipamento (técnico vai buscar a
+  /// ONT/roteador no cliente, não instalar). Set pra facilitar incluir outro
+  /// assunto depois sem caçar `== '90'` espalhado pelo app.
+  static const Set<String> assuntosRetirada = {'90'};
+
+  bool get isRetirada => assuntosRetirada.contains(idAssunto);
+
+  /// Cor da categoria "retirada". Roxo de propósito: nenhum dos ESTADOS usa
+  /// roxo (pendente=amarelo, em campo=azul, concluída=verde), então bate o
+  /// olho e já se lê como "outro tipo de coisa", não como mais um status.
+  static const Color corRetirada = Color(0xFFA855F7);
+
   Color get corPrioridade {
     switch (prioridade) {
       case 'urgente': return const Color(0xFFFF0000);

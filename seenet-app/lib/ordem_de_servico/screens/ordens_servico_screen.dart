@@ -27,6 +27,9 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
   // Usada pra destacar o card de resumo correspondente.
   final RxInt _tabAtual = 0.obs;
 
+  // Filtro "só retiradas" (assunto 90) dentro da lista atual.
+  final RxBool _soRetiradas = false.obs;
+
   // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
 
   @override
@@ -202,19 +205,98 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
 
   Widget _buildListaOS(List<OrdemServico> ordens, String status) {
     if (ordens.isEmpty) return _buildEmptyState(status);
+
+    // 🔻 RETIRADA (assunto 90) é um TIPO de serviço, não um estado — por isso
+    // NÃO virou um 4º card lá em cima (aquela fileira é o ciclo de vida da OS:
+    // pendente → em campo → concluída). Entra aqui como recorte secundário:
+    // as retiradas sobem pro topo e um pill discreto deixa ver só elas.
+    final retiradas = ordens.where((o) => o.isRetirada).toList();
+    final temRetirada = retiradas.isNotEmpty;
+    // O filtro só vale numa lista que TEM retirada — senão, deixar ligado numa
+    // aba sem nenhuma deixaria a tela vazia e sem o pill pra desligar.
+    final filtrando = temRetirada && _soRetiradas.value;
+    final lista = filtrando
+        ? retiradas
+        : [...retiradas, ...ordens.where((o) => !o.isRetirada)];
+
     return RefreshIndicator(
       onRefresh: () => controller.carregarMinhasOSs(),
       color: const Color(0xFF00FF88),
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        itemCount: ordens.length,
-        itemBuilder: (context, index) {
-          final os = ordens[index];
-          return OSCardWidget(
-            os: os,
-            onTap: () => Get.to(() => const ExecutarOSWizardScreen(), arguments: os),
-          );
-        },
+      child: Column(
+        children: [
+          if (temRetirada) _buildFiltroRetirada(retiradas.length, ordens.length),
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.fromLTRB(16, temRetirada ? 4 : 12, 16, 16),
+              itemCount: lista.length,
+              itemBuilder: (context, index) {
+                final os = lista[index];
+                return OSCardWidget(
+                  os: os,
+                  onTap: () =>
+                      Get.to(() => const ExecutarOSWizardScreen(), arguments: os),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Linha de filtro das retiradas. De propósito é bem mais leve que os cards
+  // de estado do topo (pill pequeno, não card) pra não competir com eles nem
+  // parecer uma segunda barra de abas.
+  Widget _buildFiltroRetirada(int qtdRetiradas, int total) {
+    const cor = OrdemServico.corRetirada;
+    final ligado = _soRetiradas.value;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+      child: Row(
+        children: [
+          Text(
+            ligado
+                ? '$qtdRetiradas de $total ${total == 1 ? "ordem" : "ordens"}'
+                : '$total ${total == 1 ? "ordem" : "ordens"}',
+            style: const TextStyle(color: Colors.white38, fontSize: 12),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => _soRetiradas.value = !ligado,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+              decoration: BoxDecoration(
+                color: ligado ? cor.withOpacity(0.18) : const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: ligado ? cor : Colors.white.withOpacity(0.08),
+                  width: ligado ? 1.4 : 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.keyboard_return_rounded,
+                      size: 13, color: ligado ? cor : Colors.white38),
+                  const SizedBox(width: 5),
+                  Text(
+                    ligado ? 'Só retiradas' : 'Retiradas · $qtdRetiradas',
+                    style: TextStyle(
+                        color: ligado ? cor : Colors.white54,
+                        fontSize: 11.5,
+                        fontWeight:
+                            ligado ? FontWeight.bold : FontWeight.w500),
+                  ),
+                  if (ligado) ...[
+                    const SizedBox(width: 4),
+                    const Icon(Icons.close_rounded, size: 12, color: cor),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

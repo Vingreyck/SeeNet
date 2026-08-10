@@ -71,6 +71,35 @@ class OSCardWidget extends StatelessWidget {
 
             const SizedBox(height: 12),
 
+            // RETIRADA (assunto 90): o técnico vai BUSCAR equipamento, não
+            // instalar. Mesmo padrão dos badges REABERTA/ESTRUTURA que já
+            // existem aqui — só muda a cor (roxo, ver OrdemServico.corRetirada).
+            if (os.isRetirada) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: OrdemServico.corRetirada.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: OrdemServico.corRetirada.withOpacity(0.5)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.keyboard_return_rounded,
+                        color: OrdemServico.corRetirada, size: 13),
+                    SizedBox(width: 5),
+                    Text('RETIRADA',
+                        style: TextStyle(
+                            color: OrdemServico.corRetirada,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ],
+
             // REABERTA (admin reabriu a OS direto no IXC)
             if (os.status == 'reaberta') ...[
               Container(

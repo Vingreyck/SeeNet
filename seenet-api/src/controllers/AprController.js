@@ -1,6 +1,33 @@
 // src/controllers/AprController.js
 const { db } = require('../config/database');
 
+/**
+ * A coluna `respostas_apr.usuario_id` (quem respondeu a APR) existe?
+ *
+ * ⚠️ As migrations NÃO rodam sozinhas no deploy do Railway. Se este código
+ * subir antes de `npm run migrate:prod`, usar a coluna direto quebraria o
+ * INSERT — e o técnico ficaria SEM CONSEGUIR SALVAR A APR em campo. Com a
+ * guarda, o app segue funcionando no comportamento antigo (APR por OS) até a
+ * migration rodar, e só então passa a ser por técnico. Resultado cacheado:
+ * é uma consulta de schema, não precisa repetir a cada requisição.
+ */
+let _temColunaUsuario = null;
+async function temColunaUsuario() {
+  if (_temColunaUsuario === null) {
+    try {
+      _temColunaUsuario = await db.schema.hasColumn('respostas_apr', 'usuario_id');
+      if (!_temColunaUsuario) {
+        console.warn('⚠️ respostas_apr.usuario_id não existe — APR segue por OS ' +
+          '(rode a migration pra APR passar a ser por técnico)');
+      }
+    } catch (e) {
+      console.warn('⚠️ Não consegui checar respostas_apr.usuario_id:', e.message);
+      _temColunaUsuario = false;
+    }
+  }
+  return _temColunaUsuario;
+}
+
 class AprController {
 
   // =====================================================
@@ -101,6 +128,8 @@ class AprController {
   // =====================================================
   static async salvarRespostas(req, res) {
     const tenantId = req.user?.tenant_id;
+    const usuarioId = req.user?.id;
+    const comUsuario = await temColunaUsuario();
     const { os_id, respostas, epis_selecionados = [], latitude, longitude } = req.body;
 
     if (!os_id || !respostas || respostas.length === 0) {
@@ -139,19 +168,27 @@ class AprController {
         // Inserir novas respostas
         const idsInseridos = {};
         for (const resp of respostas) {
-          const insert = await trx.raw(`
-            INSERT INTO respostas_apr
-              (ordem_servico_id, pergunta_id, resposta, justificativa, latitude, longitude)
-            VALUES (?, ?, ?, ?, ?, ?)
-            RETURNING id
-          `, [
-            os_id,
-            resp.pergunta_id,
-            resp.resposta,
-            resp.justificativa || null,
-            latitude || null,
-            longitude || null
-          ]);
+          // `usuario_id` só entra se a coluna já existir (ver temColunaUsuario).
+          const insert = comUsuario
+            ? await trx.raw(`
+                INSERT INTO respostas_apr
+                  (ordem_servico_id, pergunta_id, resposta, justificativa, latitude, longitude, usuario_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                RETURNING id
+              `, [
+                os_id, resp.pergunta_id, resp.resposta,
+                resp.justificativa || null, latitude || null, longitude || null,
+                usuarioId || null
+              ])
+            : await trx.raw(`
+                INSERT INTO respostas_apr
+                  (ordem_servico_id, pergunta_id, resposta, justificativa, latitude, longitude)
+                VALUES (?, ?, ?, ?, ?, ?)
+                RETURNING id
+              `, [
+                os_id, resp.pergunta_id, resp.resposta,
+                resp.justificativa || null, latitude || null, longitude || null
+              ]);
           idsInseridos[resp.pergunta_id] = insert.rows[0].id;
         }
 
@@ -200,14 +237,30 @@ class AprController {
   static async getStatus(req, res) {
     const { osId } = req.params;
     const tenantId = req.user?.tenant_id;
+    const usuarioId = req.user?.id;
 
     try {
+      // "Preenchido" é POR TÉCNICO, não por OS: numa OS ENCAMINHADA, o técnico
+      // que recebeu precisa fazer a APR DELE — quem assina tem que ser quem
+      // avaliou o risco no local. (Reabertura pelo MESMO técnico continua
+      // pulando: as respostas dele seguem lá.)
+      // `usuario_id IS NULL` conta como do próprio: são respostas anteriores à
+      // migration; sem isso, um deploy sem a migration rodada obrigaria todo
+      // mundo a refazer APR já feita.
+      const comUsuario = await temColunaUsuario();
+      const filtroUsuario = comUsuario
+        ? 'AND (r.usuario_id = ? OR r.usuario_id IS NULL)'
+        : '';
+      const params = comUsuario
+        ? [osId, tenantId, usuarioId]
+        : [osId, tenantId];
+
       const result = await db.raw(`
         SELECT COUNT(r.id) as total
         FROM respostas_apr r
         INNER JOIN ordem_servico os ON os.id = r.ordem_servico_id
-        WHERE r.ordem_servico_id = ? AND os.tenant_id = ?
-      `, [osId, tenantId]);
+        WHERE r.ordem_servico_id = ? AND os.tenant_id = ? ${filtroUsuario}
+      `, params);
 
       const preenchido = parseInt(result.rows[0].total) > 0;
 

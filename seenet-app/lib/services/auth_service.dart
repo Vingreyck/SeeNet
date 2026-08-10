@@ -64,6 +64,7 @@ class AuthService extends GetxService {
           tipoUsuario: userData['tipo_usuario'],
           ativo: true,
           dataCriacao: DateTime.now(),
+          fazApr: userData['faz_apr'] != false,
         );
 
         _usuarioController.usuarioLogado.value = usuario;
@@ -73,6 +74,7 @@ class AuthService extends GetxService {
           'nome': userData['nome'],
           'email': userData['email'] ?? '',
           'tipo_usuario': userData['tipo_usuario'],
+          'faz_apr': userData['faz_apr'] != false,
         });
 
         // ✅ NOVO: Enviar FCM token pro backend após login
@@ -254,6 +256,7 @@ class AuthService extends GetxService {
         tipoUsuario: userData['tipo_usuario'],
         ativo: true,
         dataCriacao: DateTime.now(),
+        fazApr: userData['faz_apr'] != false,
       );
 
       // Enviar FCM token
@@ -284,7 +287,31 @@ class AuthService extends GetxService {
         _api.clearAuth();
         _usuarioController.usuarioLogado.value = null;
         Get.offAllNamed('/login');
+        return;
       }
+      // Token OK → aproveita pra atualizar 'faz APR' com o valor do servidor.
+      // Sem isso, o admin desmarcar/marcar um técnico só valeria depois de um
+      // login completo de novo (o JWT dura até 90 dias, e o auto-login usa o
+      // dado salvo localmente, que fica parado até aqui).
+      try {
+        final verifData = verif is Map ? verif['data'] : null;
+        final user = verifData is Map ? verifData['user'] : null;
+        final atual = _usuarioController.usuarioLogado.value;
+        if (user is Map && atual != null && user['faz_apr'] != null) {
+          final fazAprServidor = user['faz_apr'] != false;
+          if (fazAprServidor != atual.fazApr) {
+            _usuarioController.usuarioLogado.value = Usuario(
+              id: atual.id, nome: atual.nome, email: atual.email, senha: '',
+              tipoUsuario: atual.tipoUsuario, ativo: atual.ativo,
+              dataCriacao: atual.dataCriacao, fazApr: fazAprServidor,
+            );
+            final salvo = Map<String, dynamic>.from(
+                _storage.read(_keyUserData) ?? {});
+            salvo['faz_apr'] = fazAprServidor;
+            _storage.write(_keyUserData, salvo);
+          }
+        }
+      } catch (_) {}
     }).catchError((e) {
       print('📶 Verify em background falhou (rede) — sessão mantida: $e');
     });

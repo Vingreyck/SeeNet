@@ -596,6 +596,7 @@ if (user.tipo_usuario === 'tecnico') {
         nome: user.nome,
         email: user.email,
         tipo_usuario: user.tipo_usuario,
+        faz_apr: user.faz_apr !== false,
         tenant: {
           id: user.tenant_id,
           codigo: user.tenant_code,
@@ -634,6 +635,7 @@ router.get('/verify', async (req, res) => {
         'usuarios.nome',
         'usuarios.email',
         'usuarios.tipo_usuario',
+        'usuarios.faz_apr',
         'tenants.id as tenant_id',
         'tenants.codigo as tenant_code',
         'tenants.nome as tenant_name',
@@ -652,6 +654,7 @@ router.get('/verify', async (req, res) => {
         nome: user.nome,
         email: user.email,
         tipo_usuario: user.tipo_usuario,
+        faz_apr: user.faz_apr !== false,
         tenant: {
           id: user.tenant_id,
           codigo: user.tenant_code,
@@ -710,18 +713,19 @@ router.put('/usuarios/:id', [
   body('senha').optional().isLength({ min: 6, max: 128 }),
   body('tipo_usuario').optional().isIn(['tecnico', 'administrador', 'gestor_seguranca']),
   body('ativo').optional().isBoolean(),
+  body('faz_apr').optional().isBoolean(),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        error: 'Dados inválidos', 
-        details: errors.array() 
+      return res.status(400).json({
+        error: 'Dados inválidos',
+        details: errors.array()
       });
     }
 
     const { id } = req.params;
-    const { nome, email, senha, tipo_usuario, ativo } = req.body;
+    const { nome, email, senha, tipo_usuario, ativo, faz_apr } = req.body;
 
     // Verificar se usuário existe
     const user = await db('usuarios').where('id', id).first();
@@ -738,6 +742,9 @@ router.put('/usuarios/:id', [
     if (email) updateData.email = email.toLowerCase();
     if (tipo_usuario) updateData.tipo_usuario = tipo_usuario;
     if (typeof ativo === 'boolean') updateData.ativo = ativo;
+    // Admin escolhe quem faz APR. Quem não faz pula a tela mesmo em assunto
+    // que normalmente exige (checado no app e reforçado no finalizar).
+    if (typeof faz_apr === 'boolean') updateData.faz_apr = faz_apr;
     
     // Se senha fornecida, fazer hash
     if (senha) {

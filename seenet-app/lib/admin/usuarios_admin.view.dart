@@ -97,6 +97,7 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView>
             ativo: u['ativo'] == 1 || u['ativo'] == true,
             dataCriacao: DateTime.tryParse(u['data_criacao'] as String? ?? ''),
             temTokenNotificacao: (u['fcm_token'] as String?)?.isNotEmpty == true,
+            fazApr: u['faz_apr'] != false,
           ));
         } catch (_) {}
       }
@@ -1033,8 +1034,9 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView>
     final nomeCtrl  = TextEditingController(text: u.nome);
     final emailCtrl = TextEditingController(
         text: _emailReal(u.email) ? u.email : '');
-    String tipoSel  = u.tipoUsuario;
-    bool   ativoSel = u.ativo;
+    String tipoSel   = u.tipoUsuario;
+    bool   ativoSel  = u.ativo;
+    bool   fazAprSel = u.fazApr;
 
     _dialogDark(
       titulo: 'Editar Usuário',
@@ -1075,6 +1077,35 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView>
                 ),
               ],
             ),
+            // Só faz sentido pra técnico — quem não é técnico nunca vê a
+            // tela de execução de OS, então nunca veria APR de qualquer jeito.
+            if (tipoSel == 'tecnico') ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.shield_outlined, size: 14, color: Colors.white38),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text('Faz APR (Análise Preliminar de Risco)',
+                        style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  ),
+                  Switch(
+                    value: fazAprSel,
+                    activeColor: const Color(0xFF00FF88),
+                    onChanged: (v) => setD(() => fazAprSel = v),
+                  ),
+                ],
+              ),
+              if (!fazAprSel)
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Text(
+                    'Esse técnico não verá a tela de APR, mesmo em OS de '
+                    'assunto que normalmente exige.',
+                    style: TextStyle(color: Colors.white38, fontSize: 11, height: 1.3),
+                  ),
+                ),
+            ],
           ],
         ),
       ),
@@ -1084,16 +1115,18 @@ class _UsuariosAdminViewState extends State<UsuariosAdminView>
         _botaoDialog('Salvar', Colors.orange, () async {
           Navigator.pop(context);
           await _salvarEdicao(u.id!, nomeCtrl.text.trim(),
-              emailCtrl.text.trim(), tipoSel, ativoSel);
+              emailCtrl.text.trim(), tipoSel, ativoSel, fazAprSel);
         }),
       ],
     );
   }
 
-  Future<void> _salvarEdicao(
-      int id, String nome, String email, String tipo, bool ativo) async {
+  Future<void> _salvarEdicao(int id, String nome, String email, String tipo,
+      bool ativo, bool fazApr) async {
     try {
-      final payload = <String, dynamic>{'nome': nome, 'tipo_usuario': tipo, 'ativo': ativo};
+      final payload = <String, dynamic>{
+        'nome': nome, 'tipo_usuario': tipo, 'ativo': ativo, 'faz_apr': fazApr,
+      };
       if (email.isNotEmpty) payload['email'] = email.toLowerCase();
       final r = await _api.put('/auth/usuarios/$id', payload);
       if (r['success'] == true) {

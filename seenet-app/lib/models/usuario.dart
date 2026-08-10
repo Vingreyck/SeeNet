@@ -11,6 +11,10 @@ class Usuario {
   final DateTime? dataCriacao;
   final DateTime? dataAtualizacao;
   final bool temTokenNotificacao;
+  // Admin escolhe, por técnico, se ele faz APR. Quem não faz pula a tela
+  // mesmo em OS de assunto que normalmente exige (60/4/32). Default true —
+  // não muda nada pra ninguém até o admin desmarcar explicitamente.
+  final bool fazApr;
 
   Usuario({
     this.id,
@@ -22,6 +26,7 @@ class Usuario {
     this.dataCriacao,
     this.dataAtualizacao,
     this.temTokenNotificacao = true,
+    this.fazApr = true,
   });
 
   // Verificar se é administrador

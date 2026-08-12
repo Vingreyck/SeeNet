@@ -480,13 +480,76 @@ class SegurancaService extends GetxService {
     } catch (_) { return []; }
   }
 
-  Future<Map<String, dynamic>> atualizarProdutoEpi(int id, {String? ca, String? fornecedor}) async {
+  /// Atualiza o cadastro do EPI. Só manda o que foi passado — campo omitido
+  /// fica como está no banco. [tamanhos] vazio limpa os tamanhos (vira EPI
+  /// sem numeração).
+  Future<Map<String, dynamic>> atualizarProdutoEpi(
+    int id, {
+    String? nome,
+    String? idProdutoIxc,
+    String? descricaoIxc,
+    String? ca,
+    String? fornecedor,
+    List<String>? tamanhos,
+  }) async {
     final r = await _http('PUT', '$_base/produtos-epi-cadastro/$id', {
+      if (nome != null) 'nome': nome,
+      if (idProdutoIxc != null) 'id_produto_ixc': idProdutoIxc,
+      if (descricaoIxc != null) 'descricao_ixc': descricaoIxc,
       if (ca != null) 'ca': ca,
       if (fornecedor != null) 'fornecedor': fornecedor,
+      if (tamanhos != null) 'tamanhos': tamanhos,
     });
     if (r['status'] == 200) return {'success': true, 'message': r['body']?['message']};
     return {'success': false, 'message': r['body']?['error'] ?? 'Erro ao atualizar'};
+  }
+
+  /// 📏 Tamanhos cadastrados por EPI (nome → ['P','M','G'] ou ['39','40'...]).
+  ///
+  /// Usa `/produtos-epi` (liberado pra qualquer usuário logado), e não
+  /// `/produtos-epi-cadastro` (só gestor/admin), porque quem precisa disso é o
+  /// TÉCNICO na hora de pedir o EPI.
+  Future<Map<String, List<String>>> buscarTamanhosPorEpi() async {
+    try {
+      final response = await GetConnect().get('$_base/produtos-epi', headers: _headers);
+      if (response.statusCode != 200) return {};
+      final List lista = (response.body['data'] ?? response.body)['produtos'] ?? [];
+
+      final mapa = <String, List<String>>{};
+      for (final p in lista) {
+        final nome = p['nome']?.toString();
+        if (nome == null || nome.isEmpty) continue;
+        final tamanhos = parseTamanhos(p['tamanhos']);
+        if (tamanhos.isNotEmpty) mapa[nome] = tamanhos;
+      }
+      return mapa;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// A coluna `tamanhos` foi criada direto no banco (não há migration), então
+  /// pode voltar como LISTA (colunas json/jsonb) ou como STRING JSON (colunas
+  /// text) dependendo do tipo. Aceita os dois — e devolve vazio pro resto.
+  static List<String> parseTamanhos(dynamic bruto) {
+    if (bruto == null) return [];
+    if (bruto is List) {
+      return bruto.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    }
+    if (bruto is String) {
+      final texto = bruto.trim();
+      if (texto.isEmpty) return [];
+      try {
+        final decodificado = json.decode(texto);
+        if (decodificado is List) {
+          return decodificado.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+        }
+      } catch (_) {
+        // Não era JSON — trata como lista separada por vírgula ("P, M, G").
+        return texto.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+    }
+    return [];
   }
 
   Future<Map<String, dynamic>> criarProdutoEpi({
@@ -495,6 +558,7 @@ class SegurancaService extends GetxService {
     String? descricaoIxc,
     String? ca,
     String? fornecedor,
+    List<String>? tamanhos,
   }) async {
     final r = await _http('POST', '$_base/produtos-epi-cadastro', {
       'nome': nome,
@@ -502,6 +566,7 @@ class SegurancaService extends GetxService {
       if (descricaoIxc != null) 'descricao_ixc': descricaoIxc,
       'ca': ca ?? 'N/A',
       'fornecedor': fornecedor ?? '',
+      if (tamanhos != null && tamanhos.isNotEmpty) 'tamanhos': tamanhos,
     });
     if (r['status'] == 201) return {'success': true, 'message': r['body']?['message']};
     return {'success': false, 'message': r['body']?['error'] ?? 'Erro ao cadastrar'};

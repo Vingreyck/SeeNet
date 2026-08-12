@@ -12,6 +12,99 @@ class OrdensServicoController {
    */
   static ASSUNTOS_COM_DROP = new Set(['14', '163', '32', '60', '4']);
 
+  // ── 🛣️ Limpeza da trilha (rota percorrida no mapa do admin) ─────────────
+  //
+  // Os pontos vêm crus do celular e, sem tratamento, o mapa vira um risco
+  // atravessando casas e quarteirões. Três causas, todas tratadas abaixo.
+
+  /** Acima disso não é GPS: é fix de antena/WiFi, que salta centenas de metros. */
+  static TRILHA_PRECISAO_MAX_M = 100;
+  /** Salto que exigiria essa velocidade é fix errado, não deslocamento real. */
+  static TRILHA_VELOCIDADE_ABSURDA_KMH = 200;
+  /** Parado, o GPS oscila alguns metros e desenha um rabisco no mesmo lugar. */
+  static TRILHA_MOVIMENTO_MIN_M = 8;
+  /** Buraco maior que isso = outra visita/retomada: começa um trecho novo em
+   *  vez de ligar os dois pontos com uma reta. */
+  static TRILHA_GAP_NOVO_TRECHO_MIN = 5;
+
+  /** Distância em metros entre duas coordenadas (Haversine). */
+  static distanciaMetros(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const rad = (g) => (g * Math.PI) / 180;
+    const dLat = rad(lat2 - lat1);
+    const dLon = rad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  /**
+   * Tira o lixo da trilha e a divide em trechos contínuos.
+   * @returns {{pontos: Array, segmentos: Array<Array>, descartados: number}}
+   */
+  static limparTrilha(brutos) {
+    const C = OrdensServicoController;
+    const pontos = [];
+    const segmentos = [];
+    let atual = [];
+    let anterior = null;
+    let descartados = 0;
+
+    for (const p of brutos) {
+      const lat = Number(p.latitude);
+      const lon = Number(p.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) { descartados++; continue; }
+      // 0,0 é o "ilha nula" clássico de GPS sem fix.
+      if (lat === 0 && lon === 0) { descartados++; continue; }
+
+      // 1. Precisão ruim. Só descarta quando o app informou — ponto antigo sem
+      //    precisão gravada continua valendo (senão a trilha antiga sumiria).
+      const precisao = p.precisao == null ? null : Number(p.precisao);
+      if (precisao != null && Number.isFinite(precisao) && precisao > C.TRILHA_PRECISAO_MAX_M) {
+        descartados++;
+        continue;
+      }
+
+      const quando = new Date(p.criado_em).getTime();
+
+      if (anterior) {
+        const metros = C.distanciaMetros(anterior.lat, anterior.lon, lat, lon);
+        const segundos = (quando - anterior.quando) / 1000;
+
+        if (segundos >= C.TRILHA_GAP_NOVO_TRECHO_MIN * 60) {
+          // 2. Outra visita/retomada → fecha o trecho e abre outro.
+          if (atual.length >= 2) segmentos.push(atual);
+          atual = [];
+        } else {
+          // 3. Salto impossível → é fix errado, não movimento.
+          if (segundos > 0) {
+            const kmh = metros / 1000 / (segundos / 3600);
+            if (kmh > C.TRILHA_VELOCIDADE_ABSURDA_KMH) { descartados++; continue; }
+          }
+          // 4. Praticamente no mesmo lugar → rabisco de GPS parado.
+          //    O `anterior` NÃO avança aqui de propósito: assim a comparação
+          //    continua contra o ponto onde ele realmente está, e a oscilação
+          //    não vai somando de 7 em 7 metros.
+          if (metros < C.TRILHA_MOVIMENTO_MIN_M) { descartados++; continue; }
+        }
+      }
+
+      const limpo = {
+        latitude: lat,
+        longitude: lon,
+        velocidade: p.velocidade,
+        precisao: p.precisao,
+        criado_em: p.criado_em,
+      };
+      pontos.push(limpo);
+      atual.push(limpo);
+      anterior = { lat, lon, quando };
+    }
+
+    if (atual.length >= 2) segmentos.push(atual);
+    return { pontos, segmentos, descartados };
+  }
+
   /**
    * Buscar OSs do técnico logado (pendentes e em execução)
    * GET /api/ordens-servico/minhas
@@ -1843,24 +1936,48 @@ if (dados.fotos && dados.fotos.length > 0) {
            // ponto a cada ≥15s por OS. Best-effort — falha aqui NUNCA derruba o
            // tracking ao vivo acima.
            try {
-             const ultimo = await db('localizacao_trilha')
-               .where('ordem_servico_id', osId)
-               .orderBy('id', 'desc')
-               .select('criado_em')
-               .first();
-             const idadeMs = ultimo
-               ? Date.now() - new Date(ultimo.criado_em).getTime()
-               : Infinity;
-             if (idadeMs >= 15000) {
-               await db('localizacao_trilha').insert({
-                 tenant_id: tenantId,
-                 tecnico_id: userId,
-                 ordem_servico_id: osId,
-                 latitude,
-                 longitude,
-                 velocidade: velocidade || null,
-                 precisao: precisao || null,
-               });
+             // Precisão ruim é fix de antena/WiFi (salta centenas de metros).
+             // Barrar já na gravação evita encher a tabela de lixo que o
+             // consultarTrilha teria que filtrar depois, toda vez.
+             const precisaoNum = precisao == null ? null : Number(precisao);
+             const precisaoRuim = precisaoNum != null &&
+               Number.isFinite(precisaoNum) &&
+               precisaoNum > OrdensServicoController.TRILHA_PRECISAO_MAX_M;
+
+             // ⚠️ Nada de `return` aqui: este bloco fica DENTRO do
+             // atualizarLocalizacao, e sair da função puliria o broadcast do
+             // WebSocket e a resposta ao técnico logo abaixo. Por isso é `if`.
+             if (!precisaoRuim) {
+               const ultimo = await db('localizacao_trilha')
+                 .where('ordem_servico_id', osId)
+                 .orderBy('id', 'desc')
+                 .select('criado_em')
+                 .first();
+               const idadeMs = ultimo
+                 ? Date.now() - new Date(ultimo.criado_em).getTime()
+                 : Infinity;
+
+               // ⏱️ Intervalo ADAPTATIVO. Era fixo em 15s, e é isso que fazia a
+               // rota "cortar por cima das casas": a 60 km/h, 15s são ~250m em
+               // linha reta, atravessando quarteirão. Andando, grava de 5 em 5s
+               // (~80m, acompanha a rua); parado, de 60 em 60s — o que também
+               // deixa a tabela MENOR que antes, porque o técnico passa a maior
+               // parte do dia parado. `velocidade` vem em m/s do Geolocator.
+               const velocidadeNum = Number(velocidade);
+               const emMovimento = Number.isFinite(velocidadeNum) && velocidadeNum > 1.5; // ~5 km/h
+               const intervaloMs = emMovimento ? 5000 : 60000;
+
+               if (idadeMs >= intervaloMs) {
+                 await db('localizacao_trilha').insert({
+                   tenant_id: tenantId,
+                   tecnico_id: userId,
+                   ordem_servico_id: osId,
+                   latitude,
+                   longitude,
+                   velocidade: velocidade || null,
+                   precisao: precisao || null,
+                 });
+               }
              }
            } catch (trilhaErr) {
              console.warn('⚠️ Trilha não gravada:', trilhaErr.message);
@@ -1941,14 +2058,25 @@ if (dados.fotos && dados.fotos.length > 0) {
           return res.status(403).json({ success: false, error: 'Apenas administradores' });
         }
 
-        const pontos = await db('localizacao_trilha')
+        const brutos = await db('localizacao_trilha')
           .where('ordem_servico_id', id)
           .where('tenant_id', tenantId)
+          .orderBy('criado_em', 'asc')
           .orderBy('id', 'asc')
-          .limit(2000)
-          .select('latitude', 'longitude', 'velocidade', 'criado_em');
+          .limit(5000)
+          .select('latitude', 'longitude', 'velocidade', 'precisao', 'criado_em');
 
-        return res.json({ success: true, data: pontos });
+        const { pontos, segmentos, descartados } =
+          OrdensServicoController.limparTrilha(brutos);
+
+        if (descartados > 0) {
+          console.log(`🛣️ Trilha da OS ${id}: ${brutos.length} pontos → ${pontos.length} (${descartados} descartados), ${segmentos.length} trecho(s)`);
+        }
+
+        // `data` continua sendo a lista PLANA (app antigo desenha ela e já sai
+        // ganhando o filtro); `segmentos` é o que o app novo usa pra não ligar
+        // um trecho no outro com uma reta atravessando o mapa.
+        return res.json({ success: true, data: pontos, segmentos });
       } catch (error) {
         console.error('❌ Erro ao consultar trilha:', error.message);
         return res.status(500).json({ success: false, error: 'Erro ao consultar trilha' });

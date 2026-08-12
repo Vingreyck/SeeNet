@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/auth_service.dart';
 import '../../services/realtime_socket_service.dart';
 
@@ -35,7 +36,11 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
   Timer? _timer;
   Timer? _timerTrilha;
   LatLng? _posicaoAtual;
-  List<LatLng> _trilha = []; // rota percorrida (histórico do backend)
+  /// Rota percorrida, em TRECHOS. É uma lista de listas (e não uma linha só)
+  /// porque a trilha guarda 7 dias: se o técnico voltou à mesma OS noutro dia,
+  /// ligar o último ponto de um dia no primeiro do outro desenhava uma reta
+  /// atravessando o mapa inteiro. Cada trecho vira uma polyline separada.
+  List<List<LatLng>> _trechos = [];
   String _tempoAtualizado = '';
   double? _velocidade;
   bool _primeiraVez = true;
@@ -134,22 +139,66 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
         headers: _headers,
       );
       if (response.statusCode == 200) {
-        final List<dynamic> pontos = json.decode(response.body)['data'] ?? [];
-        if (mounted) {
-          setState(() {
-            _trilha = pontos
-                .map((p) => LatLng(
-                      (p['latitude'] as num).toDouble(),
-                      (p['longitude'] as num).toDouble(),
-                    ))
-                .toList();
-          });
+        final corpo = json.decode(response.body);
+
+        // O backend já manda os trechos prontos (limpos e separados). O ramo
+        // do `data` plano é o retrocompatível: app novo com backend antigo
+        // ainda desenha, só que como um trecho só.
+        final List<dynamic>? segmentos = corpo['segmentos'];
+        final List<List<LatLng>> trechos = [];
+
+        if (segmentos != null) {
+          for (final seg in segmentos) {
+            final pontos = _paraLatLng(seg as List<dynamic>);
+            if (pontos.length >= 2) trechos.add(pontos);
+          }
+        } else {
+          final pontos = _paraLatLng(corpo['data'] ?? []);
+          if (pontos.length >= 2) trechos.add(pontos);
         }
+
+        if (mounted) setState(() => _trechos = trechos);
       }
     } catch (e) {
       print('⚠️ Erro ao carregar trilha: $e');
     }
   }
+
+  /// 🧭 Abre a posição ATUAL do técnico no Google Maps (app no celular, aba no
+  /// navegador) — o admin usa pra traçar rota até ele ou ver a rua/bairro.
+  ///
+  /// Sem gate do `canLaunchUrl`: no Android 11+ ele falha por causa das
+  /// `<queries>` do Manifest mesmo quando o link abre normal (mesma lição do
+  /// botão de ligar pro cliente, no wizard).
+  Future<void> _abrirNoMaps() async {
+    final pos = _posicaoAtual;
+    if (pos == null) return;
+
+    final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${pos.latitude},${pos.longitude}');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      print('⚠️ Não deu pra abrir o Maps: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Não foi possível abrir o Maps'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
+  List<LatLng> _paraLatLng(List<dynamic> pontos) => pontos
+      .map((p) => LatLng(
+            (p['latitude'] as num).toDouble(),
+            (p['longitude'] as num).toDouble(),
+          ))
+      .toList();
+
+  /// Primeiro ponto da rota (bolinha de partida) — do trecho mais antigo.
+  LatLng? get _inicioDaRota =>
+      _trechos.isEmpty ? null : _trechos.first.first;
 
   Future<void> _carregarLocalizacao() async {
     try {
@@ -343,23 +392,25 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
                       'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.seenet.diagnostico',
                 ),
-                // 🛣️ Rota percorrida (trilha) — desenhada por baixo do marcador
-                if (_trilha.length >= 2)
+                // 🛣️ Rota percorrida — uma polyline POR TRECHO, pra não ligar
+                // uma visita na outra com uma reta cortando o mapa.
+                if (_trechos.isNotEmpty)
                   PolylineLayer(
                     polylines: [
-                      Polyline(
-                        points: _trilha,
-                        strokeWidth: 4,
-                        color: const Color(0xFF3B9EFF).withOpacity(0.85),
-                      ),
+                      for (final trecho in _trechos)
+                        Polyline(
+                          points: trecho,
+                          strokeWidth: 4,
+                          color: const Color(0xFF3B9EFF).withOpacity(0.85),
+                        ),
                     ],
                   ),
                 // Ponto de partida da trilha
-                if (_trilha.isNotEmpty)
+                if (_inicioDaRota != null)
                   MarkerLayer(
                     markers: [
                       Marker(
-                        point: _trilha.first,
+                        point: _inicioDaRota!,
                         width: 18,
                         height: 18,
                         child: Container(
@@ -398,21 +449,39 @@ class _RastreamentoMapaScreenState extends State<RastreamentoMapaScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               color: const Color(0xFF2A2A2A),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    _mapController.move(_posicaoAtual!, 16);
-                  },
-                  icon: const Icon(Icons.my_location, size: 18, color: Colors.black),
-                  label: const Text('Centralizar no Técnico',
-                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00FF88),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _mapController.move(_posicaoAtual!, 16);
+                      },
+                      icon: const Icon(Icons.my_location, size: 18, color: Colors.black),
+                      label: const Text('Centralizar',
+                          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00FF88),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _abrirNoMaps,
+                      icon: const Icon(Icons.navigation_rounded, size: 18),
+                      label: const Text('Abrir no Maps',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF3B9EFF),
+                        side: const BorderSide(color: Color(0xFF3B9EFF)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],

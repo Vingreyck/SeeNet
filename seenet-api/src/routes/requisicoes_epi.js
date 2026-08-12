@@ -963,13 +963,38 @@ router.get('/produtos-epi-cadastro', authMiddleware, async (req, res) => {
 router.put('/produtos-epi-cadastro/:id', authMiddleware, async (req, res) => {
   try {
     if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
-    const { ca, fornecedor, tamanhos } = req.body;
+    const { nome, id_produto_ixc, descricao_ixc, ca, fornecedor, tamanhos } = req.body;
     const produto = await db('produtos_epi').where('id', req.params.id).where('tenant_id', req.user.tenant_id).first();
     if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
     const updateData = { data_atualizacao: new Date() };
     if (ca !== undefined) updateData.ca = ca;
     if (fornecedor !== undefined) updateData.fornecedor = fornecedor;
-    if (tamanhos !== undefined) updateData.tamanhos = JSON.stringify(tamanhos);
+    // tamanhos: [] (lista vazia) grava NULL = "produto sem tamanho", que é como
+    // o app distingue quem mostra seletor de tamanho de quem não mostra.
+    if (tamanhos !== undefined) {
+      updateData.tamanhos = (Array.isArray(tamanhos) && tamanhos.length > 0)
+        ? JSON.stringify(tamanhos)
+        : null;
+    }
+    if (id_produto_ixc !== undefined) updateData.id_produto_ixc = id_produto_ixc || null;
+    if (descricao_ixc !== undefined) updateData.descricao_ixc = descricao_ixc || null;
+
+    // ⚠️ Renomear é o único campo com efeito colateral: as requisições guardam o
+    // NOME do EPI em texto, não o id. Requisições antigas ficam com o nome
+    // velho (histórico preservado, de propósito) e as novas usam o nome novo.
+    // Por isso o nome só muda quando vem preenchido, e não pode colidir com outro.
+    if (nome !== undefined && String(nome).trim() !== '') {
+      const nomeNovo = String(nome).trim();
+      if (nomeNovo !== produto.nome) {
+        const colide = await db('produtos_epi')
+          .where('tenant_id', req.user.tenant_id)
+          .where('nome', nomeNovo)
+          .whereNot('id', req.params.id)
+          .first();
+        if (colide) return res.status(400).json({ error: 'Já existe outro EPI com esse nome' });
+        updateData.nome = nomeNovo;
+      }
+    }
     await db('produtos_epi').where('id', req.params.id).update(updateData);
     res.json({ success: true, message: 'Produto atualizado!' });
   } catch (err) { console.error('❌ Erro atualizar produto:', err); res.status(500).json({ error: 'Erro ao atualizar' }); }
@@ -985,7 +1010,11 @@ router.post('/produtos-epi-cadastro', authMiddleware, async (req, res) => {
     const [inserted] = await db('produtos_epi').insert({
       tenant_id: req.user.tenant_id, nome, id_produto_ixc: id_produto_ixc || null,
       descricao_ixc: descricao_ixc || null, ca: ca || 'N/A', fornecedor: fornecedor || '',
-      tamanhos: tamanhos ? JSON.stringify(tamanhos) : null,
+      // ⚠️ `[] ? a : b` cai no `a` (array vazio é truthy em JS) e gravaria a
+      // string "[]", que o app leria como "tem tamanhos, mas nenhum".
+      tamanhos: (Array.isArray(tamanhos) && tamanhos.length > 0)
+        ? JSON.stringify(tamanhos)
+        : null,
     }).returning('*');
     res.status(201).json({ success: true, message: 'Produto cadastrado!', produto: inserted });
   } catch (err) { console.error('❌ Erro cadastrar produto:', err); res.status(500).json({ error: 'Erro ao cadastrar' }); }

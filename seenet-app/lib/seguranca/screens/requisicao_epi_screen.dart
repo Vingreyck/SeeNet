@@ -59,6 +59,17 @@ class _RequisicaoEpiScreenState
     controller.limparSelecao();
     controller.carregarEpis();
     _carregarDuplicados();
+    _carregarTamanhos();
+  }
+
+  /// 📏 Tamanhos vindos do CADASTRO do EPI (aba Produtos do gestor).
+  /// Sem isso, tamanho novo cadastrado pelo gestor não apareceria aqui — a
+  /// tela só conhecia os 3 EPIs do mapa fixo `_tamanhosPorEpi`.
+  Future<void> _carregarTamanhos() async {
+    final mapa = await _service.buscarTamanhosPorEpi();
+    if (mounted && mapa.isNotEmpty) {
+      setState(() => _tamanhosDoBanco = mapa);
+    }
   }
 
   Future<void> _carregarDuplicados() async {
@@ -77,11 +88,24 @@ class _RequisicaoEpiScreenState
     super.dispose();
   }
 
+  /// Tamanhos cadastrados pelo gestor (aba Produtos) — nome do EPI → tamanhos.
+  /// Preenchido pelo `_carregarTamanhos()`; tem prioridade sobre o mapa fixo.
+  Map<String, List<String>> _tamanhosDoBanco = {};
+
+  /// ⚠️ FALLBACK, não é a fonte da verdade. Vale só enquanto estes 3 EPIs não
+  /// tiverem tamanhos gravados no cadastro. Assim que o gestor salvar os
+  /// tamanhos na aba Produtos, o banco manda e este mapa deixa de ser usado
+  /// pra aquele EPI. Mantido pra nenhum técnico ficar sem seletor de tamanho
+  /// enquanto o cadastro não é preenchido.
   static const Map<String, List<String>> _tamanhosPorEpi = {
     'Bota de Segurança': ['39', '40', '41', '43'],
     'Calça Operacional': ['36', '38', '40', '41', '42', '46', '48'],
     'Camisa Manga Longa (Jaleco)': ['P', 'M', 'G', 'GG'],
   };
+
+  /// Tamanhos de um EPI: cadastro primeiro, mapa fixo como reserva.
+  List<String>? _tamanhosDe(String epi) =>
+      _tamanhosDoBanco[epi] ?? _tamanhosPorEpi[epi];
 
   void _abrirAssinaturaDevolucao(
       String epiNome, Map<String, dynamic> info) {
@@ -244,7 +268,7 @@ class _RequisicaoEpiScreenState
       return;
     }
     for (final epi in controller.episSelecionados) {
-      if (_tamanhosPorEpi.containsKey(epi) &&
+      if (_tamanhosDe(epi) != null &&
           controller.tamanhosSelecionados[epi] == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -530,7 +554,7 @@ class _RequisicaoEpiScreenState
   }
 
   Widget _buildEpiTile(String epi, bool selecionado) {
-    final tamanhos = _tamanhosPorEpi[epi];
+    final tamanhos = _tamanhosDe(epi);
     final temTamanho = tamanhos != null;
     final temDuplicado = _episDuplicados.containsKey(epi);
 

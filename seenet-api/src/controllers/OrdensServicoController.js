@@ -17,12 +17,26 @@ class OrdensServicoController {
   // Os pontos vêm crus do celular e, sem tratamento, o mapa vira um risco
   // atravessando casas e quarteirões. Três causas, todas tratadas abaixo.
 
-  /** Acima disso não é GPS: é fix de antena/WiFi, que salta centenas de metros. */
-  static TRILHA_PRECISAO_MAX_M = 100;
+  /**
+   * Acima disso não serve pra desenhar rota: é fix de antena/WiFi.
+   *
+   * ⚠️ Era 100m e NÃO bastava. Quando o técnico chega ao local, o app entra em
+   * modo econômico e passa a usar precisão MÉDIA de propósito (pra poupar
+   * bateria) — o que gera leituras com ~50-100m de erro, cada uma caindo num
+   * canto diferente. Elas passavam no filtro e viravam aquele rabisco em
+   * estrela em cima da casa do cliente. A posição AO VIVO não é afetada: ela
+   * vem de outra tabela (`localizacao_tecnico`), não daqui.
+   */
+  static TRILHA_PRECISAO_MAX_M = 50;
   /** Salto que exigiria essa velocidade é fix errado, não deslocamento real. */
   static TRILHA_VELOCIDADE_ABSURDA_KMH = 200;
-  /** Parado, o GPS oscila alguns metros e desenha um rabisco no mesmo lugar. */
-  static TRILHA_MOVIMENTO_MIN_M = 8;
+  /**
+   * Piso do que conta como "andou". O limite REAL é dinâmico: um ponto só
+   * conta como movimento se andou mais que a própria incerteza dele (ver
+   * `limparTrilha`). Comparar contra um número fixo era o erro: com fix de
+   * 65m de erro, "andar" 80m pode ser o técnico parado.
+   */
+  static TRILHA_MOVIMENTO_MIN_M = 15;
   /** Buraco maior que isso = outra visita/retomada: começa um trecho novo em
    *  vez de ligar os dois pontos com uma reta. */
   static TRILHA_GAP_NOVO_TRECHO_MIN = 5;
@@ -81,11 +95,19 @@ class OrdensServicoController {
             const kmh = metros / 1000 / (segundos / 3600);
             if (kmh > C.TRILHA_VELOCIDADE_ABSURDA_KMH) { descartados++; continue; }
           }
-          // 4. Praticamente no mesmo lugar → rabisco de GPS parado.
-          //    O `anterior` NÃO avança aqui de propósito: assim a comparação
-          //    continua contra o ponto onde ele realmente está, e a oscilação
-          //    não vai somando de 7 em 7 metros.
-          if (metros < C.TRILHA_MOVIMENTO_MIN_M) { descartados++; continue; }
+          // 4. Andou menos que a INCERTEZA da leitura → não dá pra afirmar que
+          //    andou; é ruído. O limite é dinâmico de propósito: com fix bom
+          //    (5m) qualquer passo de 15m conta; com fix ruim (45m) só conta
+          //    acima de ~45m. Comparar contra um número fixo desenhava o
+          //    rabisco em estrela em cima da casa do cliente.
+          //    O `anterior` NÃO avança aqui: assim a comparação segue contra o
+          //    ponto onde ele realmente está, e a oscilação não vai somando.
+          const incerteza = Math.max(
+            precisao ?? 0,
+            anterior.precisao ?? 0,
+          );
+          const minimoParaContar = Math.max(C.TRILHA_MOVIMENTO_MIN_M, incerteza);
+          if (metros < minimoParaContar) { descartados++; continue; }
         }
       }
 
@@ -98,7 +120,7 @@ class OrdensServicoController {
       };
       pontos.push(limpo);
       atual.push(limpo);
-      anterior = { lat, lon, quando };
+      anterior = { lat, lon, quando, precisao };
     }
 
     if (atual.length >= 2) segmentos.push(atual);
@@ -1967,7 +1989,17 @@ if (dados.fotos && dados.fotos.length > 0) {
                const emMovimento = Number.isFinite(velocidadeNum) && velocidadeNum > 1.5; // ~5 km/h
                const intervaloMs = emMovimento ? 5000 : 60000;
 
-               if (idadeMs >= intervaloMs) {
+               // 🅿️ Parado de verdade (velocidade ~0 informada) não entra na
+               // trilha: a trilha é a ROTA PERCORRIDA, e ponto de técnico
+               // estacionado só vira rabisco no destino. Onde ele está agora
+               // continua aparecendo — vem do marcador ao vivo, outra tabela.
+               // Só descarta quando o aparelho INFORMOU a velocidade: se vier
+               // null/NaN (aparelho que não reporta), grava, senão a trilha
+               // desses aparelhos sumiria por completo.
+               const paradoConfirmado =
+                 Number.isFinite(velocidadeNum) && velocidadeNum < 0.8; // ~3 km/h
+
+               if (!paradoConfirmado && idadeMs >= intervaloMs) {
                  await db('localizacao_trilha').insert({
                    tenant_id: tenantId,
                    tecnico_id: userId,

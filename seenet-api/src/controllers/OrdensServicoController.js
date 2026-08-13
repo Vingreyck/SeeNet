@@ -2073,10 +2073,28 @@ if (dados.fotos && dados.fotos.length > 0) {
           console.log(`🛣️ Trilha da OS ${id}: ${brutos.length} pontos → ${pontos.length} (${descartados} descartados), ${segmentos.length} trecho(s)`);
         }
 
+        // 🛣️ Cola a rota nas RUAS (snap-to-roads). Sem isto, o traçado é uma
+        // reta entre pontos de GPS e corta curva/passa por cima de casa.
+        // Best-effort: se o OSRM falhar, cair ou demorar, o trecho sai cru —
+        // exatamente como era antes. O mapa nunca fica sem trilha por isto.
+        let segmentosFinais = segmentos;
+        try {
+          const mapMatching = require('../services/MapMatchingService');
+          const casados = [];
+          for (const trecho of segmentos) {
+            const colado = await mapMatching.casar(trecho);
+            if (colado && colado.length) casados.push(...colado);
+            else casados.push(trecho);
+          }
+          if (casados.length) segmentosFinais = casados;
+        } catch (osrmErr) {
+          console.warn('⚠️ Map matching indisponível — trilha crua:', osrmErr.message);
+        }
+
         // `data` continua sendo a lista PLANA (app antigo desenha ela e já sai
         // ganhando o filtro); `segmentos` é o que o app novo usa pra não ligar
         // um trecho no outro com uma reta atravessando o mapa.
-        return res.json({ success: true, data: pontos, segmentos });
+        return res.json({ success: true, data: pontos, segmentos: segmentosFinais });
       } catch (error) {
         console.error('❌ Erro ao consultar trilha:', error.message);
         return res.status(500).json({ success: false, error: 'Erro ao consultar trilha' });

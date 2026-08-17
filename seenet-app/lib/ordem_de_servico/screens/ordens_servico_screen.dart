@@ -23,19 +23,43 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
   final TextEditingController _buscaController = TextEditingController();
   final RxString _termoBusca = ''.obs;
 
-  // Aba/seção ativa (0=Pendentes, 1=Em campo, 2=Concluídas).
+  // Índices das abas. Nomeados porque a aba Retirada entrou no MEIO e empurrou
+  // Concluídas de 2 pra 3 — número solto no código vira bug silencioso.
+  static const int _abaRetirada = 2;
+  static const int _abaConcluidas = 3;
+
+  // Aba/seção ativa (0=Pendentes, 1=Em campo, 2=Retirada, 3=Concluídas).
   // Usada pra destacar o card de resumo correspondente.
   final RxInt _tabAtual = 0.obs;
 
-  // Filtro "só retiradas" (assunto 90) dentro da lista atual.
-  final RxBool _soRetiradas = false.obs;
+  // ── 🔻 RETIRADA (assunto 90) tem ABA PRÓPRIA ────────────────────────────
+  // Pedido do Vinícius: retirada não pode se misturar com as outras OS. Por
+  // isso ela sai de "Pendentes"/"Em campo" e vive só na aba dela — senão a
+  // mesma OS apareceria em dois lugares, que é justamente o que incomodava.
+  // Retirada CONCLUÍDA continua em "Concluídas": aquela aba é histórico, e
+  // deixar as concluídas aqui faria esta lista crescer pra sempre.
+
+  /// Pendentes/reabertas, SEM as retiradas.
+  List<OrdemServico> get _pendentes =>
+      controller.osPendentes.where((o) => !o.isRetirada).toList();
+
+  /// Em deslocamento/execução, SEM as retiradas.
+  List<OrdemServico> get _emCampo =>
+      controller.osEmExecucao.where((o) => !o.isRetirada).toList();
+
+  /// Todas as retiradas ativas, em qualquer estágio (pendente ou em campo) —
+  /// a aba é por TIPO de serviço, não por estado.
+  List<OrdemServico> get _retiradas => [
+        ...controller.osPendentes.where((o) => o.isRetirada),
+        ...controller.osEmExecucao.where((o) => o.isRetirada),
+      ];
 
   // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     // Mantém os cards de resumo em sincronia quando o usuário desliza as listas.
     _tabController.addListener(() {
       if (_tabAtual.value != _tabController.index) {
@@ -206,97 +230,20 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
   Widget _buildListaOS(List<OrdemServico> ordens, String status) {
     if (ordens.isEmpty) return _buildEmptyState(status);
 
-    // 🔻 RETIRADA (assunto 90) é um TIPO de serviço, não um estado — por isso
-    // NÃO virou um 4º card lá em cima (aquela fileira é o ciclo de vida da OS:
-    // pendente → em campo → concluída). Entra aqui como recorte secundário:
-    // as retiradas sobem pro topo e um pill discreto deixa ver só elas.
-    final retiradas = ordens.where((o) => o.isRetirada).toList();
-    final temRetirada = retiradas.isNotEmpty;
-    // O filtro só vale numa lista que TEM retirada — senão, deixar ligado numa
-    // aba sem nenhuma deixaria a tela vazia e sem o pill pra desligar.
-    final filtrando = temRetirada && _soRetiradas.value;
-    final lista = filtrando
-        ? retiradas
-        : [...retiradas, ...ordens.where((o) => !o.isRetirada)];
-
     return RefreshIndicator(
       onRefresh: () => controller.carregarMinhasOSs(),
       color: const Color(0xFF00FF88),
-      child: Column(
-        children: [
-          if (temRetirada) _buildFiltroRetirada(retiradas.length, ordens.length),
-          Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.fromLTRB(16, temRetirada ? 4 : 12, 16, 16),
-              itemCount: lista.length,
-              itemBuilder: (context, index) {
-                final os = lista[index];
-                return OSCardWidget(
-                  os: os,
-                  onTap: () =>
-                      Get.to(() => const ExecutarOSWizardScreen(), arguments: os),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Linha de filtro das retiradas. De propósito é bem mais leve que os cards
-  // de estado do topo (pill pequeno, não card) pra não competir com eles nem
-  // parecer uma segunda barra de abas.
-  Widget _buildFiltroRetirada(int qtdRetiradas, int total) {
-    const cor = OrdemServico.corRetirada;
-    final ligado = _soRetiradas.value;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-      child: Row(
-        children: [
-          Text(
-            ligado
-                ? '$qtdRetiradas de $total ${total == 1 ? "ordem" : "ordens"}'
-                : '$total ${total == 1 ? "ordem" : "ordens"}',
-            style: const TextStyle(color: Colors.white38, fontSize: 12),
-          ),
-          const Spacer(),
-          GestureDetector(
-            onTap: () => _soRetiradas.value = !ligado,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-              decoration: BoxDecoration(
-                color: ligado ? cor.withOpacity(0.18) : const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: ligado ? cor : Colors.white.withOpacity(0.08),
-                  width: ligado ? 1.4 : 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.keyboard_return_rounded,
-                      size: 13, color: ligado ? cor : Colors.white38),
-                  const SizedBox(width: 5),
-                  Text(
-                    ligado ? 'Só retiradas' : 'Retiradas · $qtdRetiradas',
-                    style: TextStyle(
-                        color: ligado ? cor : Colors.white54,
-                        fontSize: 11.5,
-                        fontWeight:
-                            ligado ? FontWeight.bold : FontWeight.w500),
-                  ),
-                  if (ligado) ...[
-                    const SizedBox(width: 4),
-                    const Icon(Icons.close_rounded, size: 12, color: cor),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        itemCount: ordens.length,
+        itemBuilder: (context, index) {
+          final os = ordens[index];
+          return OSCardWidget(
+            os: os,
+            onTap: () =>
+                Get.to(() => const ExecutarOSWizardScreen(), arguments: os),
+          );
+        },
       ),
     );
   }
@@ -381,6 +328,8 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
         'Você não tem ordens de serviço pendentes.'],
       'em_execucao': [Icons.build_circle_outlined, 'Nenhuma OS em execução',
         'Você não está executando nenhuma OS.'],
+      'retirada': [Icons.keyboard_return_rounded, 'Nenhuma retirada',
+        'As OSs de retirada de equipamento aparecerão aqui.'],
       'concluida': [Icons.history_rounded, 'Nenhuma OS concluída',
         'As OSs finalizadas por você aparecerão aqui.'],
     };
@@ -488,8 +437,9 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
               return TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildListaOS(controller.osPendentes, 'pendente'),
-                  _buildListaOS(controller.osEmExecucao, 'em_execucao'),
+                  _buildListaOS(_pendentes, 'pendente'),
+                  _buildListaOS(_emCampo, 'em_execucao'),
+                  _buildListaOS(_retiradas, 'retirada'),
                   _buildListaConcluidas(),
                 ],
               );
@@ -585,8 +535,9 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
   }
 
   // Recarrega a aba que está aberta (concluídas tem endpoint/busca próprios).
+  // ⚠️ Concluídas é o índice 3 desde que a aba Retirada entrou no meio (era 2).
   Future<void> _atualizarLista() async {
-    if (_tabAtual.value == 2) {
+    if (_tabAtual.value == _abaConcluidas) {
       await controller.carregarOSsConcluidas(busca: _termoBusca.value);
     } else {
       await controller.carregarMinhasOSs();
@@ -626,20 +577,27 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Obx(() {
-        final p = controller.osPendentes.length;
-        final e = controller.osEmExecucao.length;
+        final p = _pendentes.length;
+        final e = _emCampo.length;
+        final r = _retiradas.length;
         final c = controller.osConcluidas.length;
         final ativa = _tabAtual.value;
+        // ⚠️ Com 4 cards o espaço fica curto no celular (~80px cada num 375px),
+        // por isso os vãos e o padding são menores que os de 3 cards. Os
+        // rótulos têm ellipsis, então nada estoura em tela estreita.
         return Row(
           children: [
             _statCard(0, 'Pendentes', p, Icons.pending_actions_rounded,
                 const Color(0xFFFFB020), ativa == 0),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             _statCard(1, 'Em campo', e, Icons.engineering_rounded,
                 const Color(0xFF3B9EFF), ativa == 1),
-            const SizedBox(width: 10),
-            _statCard(2, 'Concluídas', c, Icons.check_circle_rounded,
-                const Color(0xFF00FF88), ativa == 2),
+            const SizedBox(width: 8),
+            _statCard(_abaRetirada, 'Retirada', r, Icons.keyboard_return_rounded,
+                OrdemServico.corRetirada, ativa == _abaRetirada),
+            const SizedBox(width: 8),
+            _statCard(_abaConcluidas, 'Concluídas', c, Icons.check_circle_rounded,
+                const Color(0xFF00FF88), ativa == _abaConcluidas),
           ],
         );
       }),
@@ -677,7 +635,7 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
         onTap: () => _tabController.animateTo(index),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 9),
           decoration: BoxDecoration(
             color: ativa ? cor.withOpacity(0.16) : const Color(0xFF1A1A1A),
             borderRadius: BorderRadius.circular(16),
@@ -695,19 +653,24 @@ class _OrdensServicoScreenState extends State<OrdensServicoScreen>
                 '$count',
                 style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                     height: 1),
               ),
               const SizedBox(height: 2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500),
+              // FittedBox pra "Concluídas" caber num card de ~80px em vez de
+              // virar "Concl…" — encolhe a fonte só onde falta espaço.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),

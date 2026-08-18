@@ -27,6 +27,30 @@ function formatarDataBR(date, incluirHora = true) {
   return `${dia}/${mes}/${ano} ${hora}:${min}`;
 }
 
+/**
+ * Corrige o link do Meet que o gestor colou. Dois casos reais observados:
+ * (1) coló só "meet.google.com/xxx-yyyy-zzz", sem "https://" na frente — sem
+ *     esquema, nenhum app abre o link (o `Uri` fica sem `scheme`, e o
+ *     `launchUrl` do app não sabe que aplicativo chamar);
+ * (2) colou o bloco INTEIRO que o Google Meet oferece em "Copiar informações
+ *     de participação" (várias linhas, com telefone/PIN) — a URL de verdade
+ *     está no meio do texto.
+ * Sem isso, o técnico confirma presença e o app tenta abrir um link que não
+ * é uma URL válida — silenciosamente, sem erro nenhum.
+ */
+function normalizarLinkMeet(bruto) {
+  if (!bruto) return null;
+  const texto = String(bruto).trim();
+  if (!texto) return null;
+
+  const comEsquema = texto.match(/https?:\/\/\S+/i);
+  if (comEsquema) return comEsquema[0].replace(/[.,;:]+$/, '');
+
+  const primeiroToken = texto.split(/\s+/)[0];
+  if (!primeiroToken) return null;
+  return `https://${primeiroToken.replace(/^\/+/, '')}`;
+}
+
 // Expirar sessões antigas
 async function expirarSessoesAntigas() {
   await db('dds_sessoes')
@@ -140,7 +164,7 @@ router.post('/sessao', authMiddleware, async (req, res) => {
       tenant_id: req.user.tenant_id, gestor_id: req.user.id,
       tema: tema.trim(), local_dds: local_dds?.trim() || 'BBNet Up Provedor',
       duracao_minutos: minutos, expira_em: expiraEm, status: 'ativo',
-      link_meet: link_meet?.trim() || null,
+      link_meet: normalizarLinkMeet(link_meet),
     }).returning('*');
 
     console.log(`✅ DDS criado: "${tema}" — expira em ${minutos}min`);
@@ -356,6 +380,43 @@ router.put('/sessao/:id/encerrar', authMiddleware, async (req, res) => {
     res.json({ success: true, message: 'Sessão encerrada' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao encerrar sessão' });
+  }
+});
+
+// ================================================================
+// EXCLUIR SESSÃO (limpeza — muitos DDS do histórico são de teste)
+// ================================================================
+router.delete('/sessao/:id', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario))
+      return res.status(403).json({ error: 'Sem permissão' });
+
+    const sessaoId = parseInt(req.params.id);
+    const sessao = await db('dds_sessoes')
+      .where('id', sessaoId).where('tenant_id', req.user.tenant_id).first();
+    if (!sessao) return res.status(404).json({ error: 'Sessão não encontrada' });
+
+    // Sessão ainda ATIVA pode ter técnico assinando presença agora mesmo —
+    // não deixa excluir debaixo dos pés de alguém. O histórico só mostra
+    // sessões expiradas de qualquer forma, então isso é rede de segurança,
+    // não o caminho normal.
+    if (sessao.status === 'ativo') {
+      return res.status(400).json({ error: 'Encerre o DDS antes de excluir' });
+    }
+
+    // `dds_sessoes`/`dds_assinaturas` não têm migration (tabelas criadas na
+    // mão) — apagar as assinaturas primeiro funciona esteja a FK com CASCADE
+    // configurado ou não, então não depende de eu saber isso de antemão.
+    await db.transaction(async (trx) => {
+      await trx('dds_assinaturas').where('dds_sessao_id', sessaoId).del();
+      await trx('dds_sessoes').where('id', sessaoId).del();
+    });
+
+    console.log(`🗑️ DDS ${sessaoId} ("${sessao.tema}") excluído por ${req.user.nome || req.user.id}`);
+    res.json({ success: true, message: 'DDS excluído' });
+  } catch (err) {
+    console.error('❌ dds/sessao DELETE:', err);
+    res.status(500).json({ error: 'Erro ao excluir DDS' });
   }
 });
 

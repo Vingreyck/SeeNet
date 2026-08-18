@@ -41,6 +41,7 @@ class _DdsPopupDialogState extends State<_DdsPopupDialog>
   bool _assinado = false;
   bool _enviando = false;
   String? _erro;
+  String? _linkMeet; // capturado ao assinar, usado na tela de sucesso
 
   // Foto
   Uint8List? _fotoBytes;
@@ -133,23 +134,67 @@ class _DdsPopupDialogState extends State<_DdsPopupDialog>
 
     if (!mounted) return;
     if (result['success'] == true) {
-      // Presença registrada → abre o Meet (entrar = confirmar presença).
-      final link = sessao?['link_meet'] as String?;
-      if (link != null && link.isNotEmpty) {
-        final uri = Uri.tryParse(link);
-        if (uri != null && await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-      }
+      final link = (sessao?['link_meet'] as String?)?.trim();
+      _linkMeet = (link != null && link.isNotEmpty) ? link : null;
+
+      // Tenta abrir sozinho (presença já está registrada, isso é só
+      // conveniência). Best-effort: se falhar por qualquer motivo, o botão
+      // "Entrar no Meet" da tela de sucesso é a garantia — não trava nem
+      // esconde nada.
+      if (_linkMeet != null) await _abrirMeet(mostrarErro: false);
+
       if (!mounted) return;
       setState(() { _assinado = true; _enviando = false; });
-      await Future.delayed(const Duration(milliseconds: 1800));
-      if (mounted && Get.isDialogOpen == true) Get.back();
+
+      if (_linkMeet == null) {
+        // Sem link pra abrir: fecha sozinho como sempre fez.
+        await Future.delayed(const Duration(milliseconds: 1800));
+        if (mounted && Get.isDialogOpen == true) Get.back();
+      }
+      // Com link: a tela de sucesso fica aberta com o botão manual — sem
+      // fechar sozinho, senão o técnico não tem tempo de tocar.
     } else {
       setState(() {
         _enviando = false;
         _erro = result['error'] ?? result['message'] ?? 'Erro ao enviar';
       });
+    }
+  }
+
+  /// Abre o link do Meet. SEM o gate do `canLaunchUrl` de propósito — ele já
+  /// deu falso-negativo com link válido neste app várias vezes (mesmo motivo
+  /// já corrigido pro botão de ligar, o mapa e o rastreamento), e foi
+  /// exatamente esse silêncio que fez o técnico "confirmar presença" sem ser
+  /// levado pro Meet, sem erro nenhum aparecer.
+  ///
+  /// Também cobre sessão de DDS já criada ANTES da normalização do backend
+  /// (pode ter sido salva sem "https://" na frente) — tenta de novo com o
+  /// prefixo antes de desistir.
+  Future<void> _abrirMeet({bool mostrarErro = true}) async {
+    final bruto = _linkMeet;
+    if (bruto == null) return;
+
+    var uri = Uri.tryParse(bruto);
+    if (uri == null || uri.scheme.isEmpty) {
+      uri = Uri.tryParse('https://$bruto');
+    }
+    if (uri == null || uri.scheme.isEmpty) {
+      if (mostrarErro) {
+        Get.snackbar('Link inválido', 'O link do Meet não parece válido.',
+            backgroundColor: const Color(0xFF2A2A2A), colorText: Colors.white);
+      }
+      return;
+    }
+
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mostrarErro) {
+        Get.snackbar('Não abriu o Meet',
+            'Tente copiar o link manualmente: $bruto',
+            backgroundColor: const Color(0xFF2A2A2A), colorText: Colors.white,
+            duration: const Duration(seconds: 6));
+      }
     }
   }
 
@@ -384,6 +429,7 @@ class _DdsPopupDialogState extends State<_DdsPopupDialog>
   }
 
   Widget _buildSucesso() {
+    final temLink = _linkMeet != null;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 40),
       padding: const EdgeInsets.all(32),
@@ -392,20 +438,54 @@ class _DdsPopupDialogState extends State<_DdsPopupDialog>
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF00FF88).withOpacity(0.4)),
       ),
-      child: const Column(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.check_circle, color: Color(0xFF00FF88), size: 60),
-          SizedBox(height: 16),
-          Text('Presença registrada!',
+          const Icon(Icons.check_circle, color: Color(0xFF00FF88), size: 60),
+          const SizedBox(height: 16),
+          const Text('Presença registrada!',
               style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.bold)),
-          SizedBox(height: 8),
-          Text('Sua foto foi salva com sucesso.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, fontSize: 13)),
+          const SizedBox(height: 8),
+          Text(
+            temLink
+                ? 'Sua foto foi salva. Toque abaixo para entrar na reunião.'
+                : 'Sua foto foi salva com sucesso.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white54, fontSize: 13),
+          ),
+          if (temLink) ...[
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _abrirMeet(mostrarErro: true),
+                icon: const Icon(Icons.video_call,
+                    color: Colors.black, size: 20),
+                label: const Text('Entrar no Meet',
+                    style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00FF88),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () {
+                if (mounted && Get.isDialogOpen == true) Get.back();
+              },
+              child: const Text('Fechar',
+                  style: TextStyle(color: Colors.white38)),
+            ),
+          ],
         ],
       ),
     );

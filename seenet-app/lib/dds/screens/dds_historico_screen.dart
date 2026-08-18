@@ -165,9 +165,81 @@ class _DdsHistoricoScreenState extends State<DdsHistoricoScreen> {
         child: ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: _ctrl.historico.length,
-          itemBuilder: (_, i) => _buildCard(_ctrl.historico[i]),
+          // Chave pelo ID (não pelo índice): sem isso o Dismissible confunde
+          // itens ao reordenar a lista (ex.: depois de um desfazer).
+          itemBuilder: (_, i) => _buildDismissible(_ctrl.historico[i]),
         ),
       );
+    });
+  }
+
+  // ── 🗑️ Arrastar pra excluir, com "Desfazer" (limpeza de DDS de teste) ──
+  // Some da tela na hora (visual moderno), mas o DELETE de verdade no
+  // servidor só dispara depois que a janela de desfazer passa — assim
+  // "Desfazer" é instantâneo e nunca depende de tentar reconstruir o que
+  // já foi apagado (fotos/assinaturas não voltam de um INSERT novo).
+  static const _janelaDesfazer = Duration(seconds: 4);
+
+  Widget _buildDismissible(Map<String, dynamic> sessao) {
+    final id = sessao['id'] as int;
+    return Dismissible(
+      key: ValueKey(id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.85),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Icon(Icons.delete_outline, color: Colors.white, size: 26),
+      ),
+      confirmDismiss: (_) async => sessao['status'] != 'ativo',
+      onDismissed: (_) => _excluirComUndo(sessao),
+      child: _buildCard(sessao),
+    );
+  }
+
+  void _excluirComUndo(Map<String, dynamic> sessao) {
+    final id = sessao['id'] as int;
+    final tema = sessao['tema'] as String? ?? 'DDS';
+    final indice = _ctrl.historico.indexWhere((e) => e['id'] == id);
+    if (indice == -1) return; // já não está mais na lista (duplo swipe etc.)
+
+    _ctrl.historico.removeAt(indice);
+    var desfeito = false;
+
+    Get.snackbar(
+      'DDS excluído',
+      '"$tema" foi removido do histórico.',
+      backgroundColor: const Color(0xFF2A2A2A),
+      colorText: Colors.white,
+      duration: _janelaDesfazer,
+      margin: const EdgeInsets.all(12),
+      mainButton: TextButton(
+        onPressed: () {
+          desfeito = true;
+          _ctrl.historico.insert(indice.clamp(0, _ctrl.historico.length), sessao);
+          Get.closeCurrentSnackbar();
+        },
+        child: const Text('DESFAZER',
+            style: TextStyle(
+                color: Color(0xFF00FF88), fontWeight: FontWeight.bold)),
+      ),
+    );
+
+    Future.delayed(_janelaDesfazer, () async {
+      if (desfeito) return;
+      final result = await _service.excluirSessao(id);
+      if (result['success'] != true && mounted) {
+        // Falhou no servidor (rede caiu bem nessa hora, por ex.) — o item não
+        // pode sumir da tela sem sumir de verdade do banco, então volta.
+        final voltaIndice = indice.clamp(0, _ctrl.historico.length);
+        _ctrl.historico.insert(voltaIndice, sessao);
+        Get.snackbar('Erro', 'Não deu pra excluir "$tema" — tente de novo.',
+            backgroundColor: Colors.red, colorText: Colors.white);
+      }
     });
   }
 

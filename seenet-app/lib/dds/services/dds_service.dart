@@ -60,6 +60,16 @@ class DdsService extends GetxService {
     }
   }
 
+  /// Exclui um DDS do histórico (limpeza — muitos são de teste). Devolve
+  /// {success, error} — quem chama decide o que fazer se falhar.
+  Future<Map<String, dynamic>> excluirSessao(int sessaoId) async {
+    try {
+      return await _api.delete('/api/dds/sessao/$sessaoId');
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
   // ── Histórico ─────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> buscarHistorico({int? ano, int? mes}) async {

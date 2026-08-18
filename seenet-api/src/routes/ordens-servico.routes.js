@@ -28,6 +28,10 @@ router.get('/admins', OrdensServicoController.listarAdmins.bind(OrdensServicoCon
 // Listar técnicos da empresa (para encaminhar OS)
 router.get('/tecnicos', OrdensServicoController.listarTecnicos.bind(OrdensServicoController));
 
+// 🚩 Flags de feature ligadas por variável de ambiente no Railway (hoje só a
+// leitura de drop por IA) — o app consulta isso pra decidir mostrar o botão.
+router.get('/flags', OrdensServicoController.buscarFlags.bind(OrdensServicoController));
+
 // 1️⃣ Deslocamento (técnico saindo)
 router.post('/:id/deslocar', OrdensServicoController.deslocarParaOS.bind(OrdensServicoController));
 

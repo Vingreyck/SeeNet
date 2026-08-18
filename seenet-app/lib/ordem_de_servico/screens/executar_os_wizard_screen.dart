@@ -91,6 +91,17 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     super.initState();
     os = Get.arguments as OrdemServico;
     WidgetsBinding.instance.addObserver(this); // salva progresso ao minimizar/fechar
+
+    // 🚩 Só busca a flag se este assunto sequer usa drop — poupa uma chamada
+    // de rede à toa nas outras 90%+ das OS. Fire-and-forget: não atrasa nada
+    // da tela, e o botão só aparece quando (e se) a resposta chegar.
+    if (_assuntosComDrop.contains(os.idAssunto)) {
+      _osService.buscarFlags().then((flags) {
+        if (mounted && flags['drop_ia_ativa'] == true) {
+          setState(() => _dropIaAtiva = true);
+        }
+      });
+    }
     // Restaura fotos/assinatura/materiais AGORA (antes do 1º build) — o IndexedStack
     // cria os widgets no primeiro build, então precisam já ter o valor inicial.
     _restaurarBinarios();
@@ -212,22 +223,16 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
   /// (Mesma lista do backend, em OrdensServicoController.ASSUNTOS_COM_DROP.)
   static const Set<String> _assuntosComDrop = {'14', '163', '32', '60', '4'};
 
-  /// 🔴 DESLIGADO por decisão do Vinícius (8/ago), até validar se o modelo de
-  /// visão realmente LÊ os números na foto de campo — o app reduz toda foto pra
-  /// 1920x1080 qualidade 80, e número pequeno impresso no cabo é o primeiro
-  /// detalhe que a compressão come.
-  ///
-  /// Com `false`, o botão "Calcular pelas fotos" nem aparece e nada é enviado
-  /// pro backend. O resto do fluxo de materiais segue igual (o técnico digita a
-  /// metragem do cabo na mão, como sempre fez).
-  ///
-  /// **Pra ligar:** trocar para `true` e gerar build do app.
-  /// Antes disso, rodar `scratchpad/testar_groq_visao.js` com FOTOS TIRADAS PELO
-  /// APP (não a original da galeria — senão o teste dá falso positivo).
-  static const bool _iaDropAtiva = false;
+  /// 🚩 Vem do backend (`GET /ordens-servico/flags`, variável `DROP_IA_ATIVA`
+  /// no Railway) — NÃO é mais uma constante do app. Ligar/desligar não precisa
+  /// de build novo, só mudar a variável no Railway (efeito no próximo técnico
+  /// que abrir uma OS). Começa `false` (padrão seguro) até a resposta chegar —
+  /// se a rede falhar ou o backend não tiver essa rota ainda, fica `false`
+  /// pra sempre, que é exatamente o comportamento de antes de isso existir.
+  bool _dropIaAtiva = false;
 
   bool get _exigeDrop =>
-      _iaDropAtiva && _assuntosComDrop.contains(os.idAssunto);
+      _dropIaAtiva && _assuntosComDrop.contains(os.idAssunto);
   // Admin escolhe, por técnico, se ele faz APR (Usuários → Editar). Quem não
   // faz nunca vê essa tela, mesmo em OS de assunto que normalmente exige.
   bool get _tecnicoFazApr =>

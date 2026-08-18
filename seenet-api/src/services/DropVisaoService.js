@@ -108,15 +108,27 @@ Regras obrigatórias:
       const deslocamento = l * this.maxImagensPorChamada;
       let respostaLote = null;
 
-      // Um lote só precisa de UM modelo que funcione. Fixa o que deu certo no
-      // primeiro lote pra não ficar testando a cadeia inteira de novo.
+      // Um lote só precisa de UM modelo que funcione. Fixa o que deu certo em
+      // lote anterior pra não ficar testando a cadeia inteira de novo — mas só
+      // "fixa" um modelo que realmente ACHOU algo (ver comentário abaixo).
       const tentar = modeloUsado ? [modeloUsado] : this.modelos;
 
       for (const modelo of tentar) {
         try {
-          respostaLote = await this._chamarModelo(modelo, lotes[l], descricoes);
-          modeloUsado = modelo;
-          break;
+          const resultado = await this._chamarModelo(modelo, lotes[l], descricoes);
+          if (resultado.length > 0) {
+            respostaLote = resultado;
+            modeloUsado = modelo;
+            break;
+          }
+          // ⚠️ O modelo RESPONDEU (sem erro) mas não achou nenhuma marcação
+          // legível. Isso pode ser a foto mesmo estar ilegível — ou pode ser
+          // ESTE modelo que é ruim em OCR de números pequenos. Como não dá
+          // pra saber qual dos dois é, tenta o próximo modelo da cadeia antes
+          // de desistir do lote. Antes esse caso "travava" no 1º modelo pra
+          // sempre (o `break` rodava mesmo com `resultado: []`), desperdiçando
+          // os outros 2 modelos da lista de propósito.
+          console.warn(`⚠️ [DROP] modelo ${modelo} não achou marcação legível — tentando próximo`);
         } catch (e) {
           ultimoErro = e;
           const status = e.response?.status;

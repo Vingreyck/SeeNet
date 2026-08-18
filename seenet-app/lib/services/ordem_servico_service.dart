@@ -89,6 +89,23 @@ class OrdemServicoService {
     }
   }
 
+  /// 🚩 Flags de feature ligadas por variável de ambiente no Railway (hoje só
+  /// o "Calcular drop pelas fotos"). Falha de rede ou erro qualquer devolve
+  /// tudo desligado — mesmo comportamento de quando a feature nem existia.
+  Future<Map<String, bool>> buscarFlags() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/ordens-servico/flags'), headers: _headers)
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return {};
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      return {'drop_ia_ativa': body['drop_ia_ativa'] == true};
+    } catch (e) {
+      print('⚠️ Erro ao buscar flags: $e');
+      return {};
+    }
+  }
+
   /// 📏 Lê a metragem do cabo drop nas fotos que o técnico já tirou.
   ///
   /// O cabo tem a metragem impressa (ex.: "1175 M"); o técnico fotografa a

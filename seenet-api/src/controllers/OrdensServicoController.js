@@ -12,6 +12,25 @@ class OrdensServicoController {
    */
   static ASSUNTOS_COM_DROP = new Set(['14', '163', '32', '60', '4']);
 
+  /**
+   * 🚩 Flags de feature ligadas por variável de ambiente no Railway — hoje só
+   * o "Calcular drop pelas fotos" (leitura de metragem por IA de visão), que
+   * fica DESLIGADO por padrão até confirmar em produção que o modelo lê bem
+   * foto de campo comprimida pelo app (nunca testado com foto real de cabo).
+   *
+   * Sem env var setada = desligado (padrão seguro — o app trata `false` como
+   * "não mostra o botão", igual antes disso existir).
+   */
+  async buscarFlags(req, res) {
+    // Aceita "true"/"1"/"sim" em qualquer caixa — sem isso, digitar "True" ou
+    // "TRUE" no Railway (fácil de fazer sem querer) deixaria ligado "sem
+    // ligar", e o único jeito de descobrir seria comparando string char a
+    // char no código-fonte.
+    const bruto = (process.env.DROP_IA_ATIVA || '').trim().toLowerCase();
+    const dropIaAtiva = ['true', '1', 'sim'].includes(bruto);
+    return res.json({ success: true, drop_ia_ativa: dropIaAtiva });
+  }
+
   // ── 🛣️ Limpeza da trilha (rota percorrida no mapa do admin) ─────────────
   //
   // Os pontos vêm crus do celular e, sem tratamento, o mapa vira um risco

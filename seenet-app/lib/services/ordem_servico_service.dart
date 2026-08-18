@@ -4,7 +4,6 @@ import 'dart:io' if (dart.library.html) '../utils/io_stub.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart' show XFile;
 import '../models/ordem_servico_model.dart';
 import 'package:get/get.dart';
 import 'package:seenet/services/auth_service.dart';
@@ -86,92 +85,6 @@ class OrdemServicoService {
     } catch (e) {
       print('❌ Erro ao limpar MAC: $e');
       return {'ok': false, 'message': 'Erro de conexão ao limpar MAC'};
-    }
-  }
-
-  /// 🚩 Flags de feature ligadas por variável de ambiente no Railway (hoje só
-  /// o "Calcular drop pelas fotos"). Falha de rede ou erro qualquer devolve
-  /// tudo desligado — mesmo comportamento de quando a feature nem existia.
-  Future<Map<String, bool>> buscarFlags() async {
-    try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/ordens-servico/flags'), headers: _headers)
-          .timeout(const Duration(seconds: 8));
-      if (response.statusCode != 200) return {};
-      final body = json.decode(response.body) as Map<String, dynamic>;
-      return {'drop_ia_ativa': body['drop_ia_ativa'] == true};
-    } catch (e) {
-      print('⚠️ Erro ao buscar flags: $e');
-      return {};
-    }
-  }
-
-  /// 📏 Lê a metragem do cabo drop nas fotos que o técnico já tirou.
-  ///
-  /// O cabo tem a metragem impressa (ex.: "1175 M"); o técnico fotografa a
-  /// marcação no começo e no fim, e a diferença é o quanto gastou. A IA lê os
-  /// dois números; se a foto estiver ruim, usa o que o técnico escreveu na
-  /// descrição da foto.
-  ///
-  /// ⚠️ Só LÊ — nada é gravado. Quem confirma o número é o técnico, na tela.
-  /// Devolve {ok, metros, maior, menor, confianca, fonte, aviso}.
-  ///
-  /// [fotos]: lista de {'xfile': XFile, 'descricao': String}. Usa o XFile em vez
-  /// do caminho de arquivo de propósito: `_fotosParaBase64` depende de `dart:io`
-  /// e pula tudo no navegador (`if (kIsWeb) continue`), enquanto
-  /// `XFile.readAsBytes()` funciona no celular E no web — assim dá pra testar
-  /// esta tela no Chrome.
-  Future<Map<String, dynamic>> calcularDrop(
-      String osId, List<Map<String, dynamic>> fotos) async {
-    try {
-      final fotosB64 = <Map<String, String>>[];
-      for (final f in fotos) {
-        try {
-          final XFile? arquivo = f['xfile'] as XFile?;
-          if (arquivo == null) continue;
-          final bytes = await arquivo.readAsBytes();
-          if (bytes.isEmpty) continue;
-          fotosB64.add({
-            'base64': base64Encode(bytes),
-            'descricao': (f['descricao'] ?? '').toString(),
-          });
-        } catch (e) {
-          print('⚠️ Foto ignorada no cálculo do drop: $e');
-        }
-      }
-
-      if (fotosB64.length < 2) {
-        return {
-          'ok': false,
-          'aviso': 'Tire pelo menos 2 fotos da marcação do drop (início e fim).',
-        };
-      }
-
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/ordens-servico/$osId/calcular-drop'),
-            headers: _headers,
-            body: json.encode({'fotos': fotosB64}),
-          )
-          // A leitura de imagem é mais lenta que as chamadas normais (pode
-          // rodar em 2 ou 3 lotes de fotos), por isso o tempo maior aqui.
-          .timeout(const Duration(seconds: 90));
-
-      final body = response.body.isNotEmpty
-          ? json.decode(response.body) as Map<String, dynamic>
-          : <String, dynamic>{};
-
-      if (response.statusCode == 200) return body;
-      return {
-        'ok': false,
-        'aviso': body['error'] ?? 'Não deu pra calcular o drop agora.',
-      };
-    } catch (e) {
-      print('❌ Erro ao calcular drop: $e');
-      return {
-        'ok': false,
-        'aviso': 'Sem conexão para calcular o drop. Digite os metros na mão.',
-      };
     }
   }
 

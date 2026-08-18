@@ -28,10 +28,6 @@ router.get('/admins', OrdensServicoController.listarAdmins.bind(OrdensServicoCon
 // Listar técnicos da empresa (para encaminhar OS)
 router.get('/tecnicos', OrdensServicoController.listarTecnicos.bind(OrdensServicoController));
 
-// 🚩 Flags de feature ligadas por variável de ambiente no Railway (hoje só a
-// leitura de drop por IA) — o app consulta isso pra decidir mostrar o botão.
-router.get('/flags', OrdensServicoController.buscarFlags.bind(OrdensServicoController));
-
 // 1️⃣ Deslocamento (técnico saindo)
 router.post('/:id/deslocar', OrdensServicoController.deslocarParaOS.bind(OrdensServicoController));
 
@@ -51,10 +47,6 @@ router.post('/:id/encaminhar', OrdensServicoController.encaminharOS.bind(OrdensS
 // esperar finalizar/reagendar/encaminhar) — gestor acompanha em tempo real e
 // não precisa reabrir a OS só pra corrigir foto/produto.
 router.post('/:id/sincronizar-materiais', OrdensServicoController.sincronizarMateriaisEmAndamento.bind(OrdensServicoController));
-
-// 📏 Ler a metragem do cabo drop nas fotos (IA de visão). Só LÊ e devolve —
-// quem confirma o número é o técnico, no app.
-router.post('/:id/calcular-drop', OrdensServicoController.calcularDrop.bind(OrdensServicoController));
 
 // 🧹 Limpar MAC do login do cliente (botão Limpar MAC do IXC)
 router.post('/:id/limpar-mac', OrdensServicoController.limparMac.bind(OrdensServicoController));

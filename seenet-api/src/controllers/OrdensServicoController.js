@@ -2,35 +2,8 @@ const crypto = require('crypto');
 const { db } = require('../config/database');
 const IXCService = require('../services/IXCService');
 const notificationService = require('../services/NotificationService');
-const dropVisaoService = require('../services/DropVisaoService');
 
 class OrdensServicoController {
-  /**
-   * Assuntos de OS em que o técnico passa cabo drop e fotografa as duas
-   * marcações de metragem: 14 = Sem funcionar, 163 = Sinal alto,
-   * 32 = Drop rompido, 60 = Instalação, 4 = Transferência.
-   */
-  static ASSUNTOS_COM_DROP = new Set(['14', '163', '32', '60', '4']);
-
-  /**
-   * 🚩 Flags de feature ligadas por variável de ambiente no Railway — hoje só
-   * o "Calcular drop pelas fotos" (leitura de metragem por IA de visão), que
-   * fica DESLIGADO por padrão até confirmar em produção que o modelo lê bem
-   * foto de campo comprimida pelo app (nunca testado com foto real de cabo).
-   *
-   * Sem env var setada = desligado (padrão seguro — o app trata `false` como
-   * "não mostra o botão", igual antes disso existir).
-   */
-  async buscarFlags(req, res) {
-    // Aceita "true"/"1"/"sim" em qualquer caixa — sem isso, digitar "True" ou
-    // "TRUE" no Railway (fácil de fazer sem querer) deixaria ligado "sem
-    // ligar", e o único jeito de descobrir seria comparando string char a
-    // char no código-fonte.
-    const bruto = (process.env.DROP_IA_ATIVA || '').trim().toLowerCase();
-    const dropIaAtiva = ['true', '1', 'sim'].includes(bruto);
-    return res.json({ success: true, drop_ia_ativa: dropIaAtiva });
-  }
-
   // ── 🛣️ Limpeza da trilha (rota percorrida no mapa do admin) ─────────────
   //
   // Os pontos vêm crus do celular e, sem tratamento, o mapa vira um risco
@@ -1583,17 +1556,6 @@ async finalizarExecucao(req, res) {
             `OBS: ${dados.observacoes || 'Nenhuma'}`;
         }
 
-        // 📏 Metragem do cabo drop (lida das fotos pela IA e CONFIRMADA pelo
-        // técnico no app). Vai na descrição junto com os dois números lidos,
-        // pra quem auditar depois conseguir refazer a conta sem abrir as fotos.
-        const drop = dados.drop_metros;
-        if (drop !== undefined && drop !== null && Number(drop) > 0) {
-          const conta = (dados.drop_maior && dados.drop_menor)
-            ? ` (${dados.drop_maior} - ${dados.drop_menor})`
-            : '';
-          mensagemFinal += `\n\n📏 DROP UTILIZADO: ${Number(drop)} metros${conta}`;
-        }
-
         // 📍 Localização de FINALIZAÇÃO (capturada no app, obrigatória) → vai na
         // descrição da OS no IXC como prova de conclusão no local do cliente.
         if (dados.latitude_final && dados.longitude_final) {
@@ -2830,56 +2792,6 @@ if (dados.fotos && dados.fotos.length > 0) {
     } catch (error) {
       console.error('❌ Erro ao limpar MAC:', error.message);
       return res.status(500).json({ success: false, error: error.message || 'Erro ao limpar MAC' });
-    }
-  }
-
-  /**
-   * 📏 Lê a metragem do cabo drop nas fotos que o técnico já tirou.
-   *
-   * SÓ LÊ — não grava nada no banco nem no IXC. O app mostra o resultado, o
-   * técnico confirma ou corrige, e só então vira quantidade de material. Isso é
-   * de propósito: OCR em foto de campo erra, e metragem errada = baixa de
-   * estoque errada no IXC.
-   */
-  async calcularDrop(req, res) {
-    try {
-      const { id } = req.params;
-      const tenantId = req.tenantId;
-      const fotos = Array.isArray(req.body?.fotos) ? req.body.fotos : [];
-
-      const os = await db('ordem_servico')
-        .where('id', id).where('tenant_id', tenantId)
-        .select('id', 'tecnico_id', 'dados_ixc').first();
-      if (!os) {
-        return res.status(404).json({ success: false, error: 'OS não encontrada' });
-      }
-
-      // Mesma regra do atualizarEnderecoOS: só quem está com a OS, ou um admin.
-      const ehAdmin = ['administrador', 'admin'].includes(req.user.tipo_usuario);
-      if (!ehAdmin && String(os.tecnico_id) !== String(req.user.id)) {
-        return res.status(403).json({ success: false, error: 'Esta OS não é sua' });
-      }
-
-      let idAssunto = null;
-      try {
-        const d = typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc;
-        idAssunto = d?.id_assunto ? String(d.id_assunto) : null;
-      } catch (_) {}
-
-      if (idAssunto && !OrdensServicoController.ASSUNTOS_COM_DROP.has(idAssunto)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Este tipo de OS não usa cabo drop.',
-        });
-      }
-
-      console.log(`📏 [DROP] OS ${id}: analisando ${fotos.length} foto(s) — assunto ${idAssunto || '?'}`);
-
-      const resultado = await dropVisaoService.analisar(fotos);
-      return res.json({ success: true, ...resultado });
-    } catch (error) {
-      console.error('❌ Erro ao calcular drop:', error.message);
-      return res.status(500).json({ success: false, error: error.message || 'Erro ao calcular drop' });
     }
   }
 

@@ -217,6 +217,74 @@ class IXCService {
   }
 
   /**
+   * 🔌 Sessões de conexão (PPPoE) do login — quando conectou, quando caiu e
+   * POR QUÊ. Vem do RADIUS (`radacct`, 28 milhões de linhas).
+   *
+   * O campo que interessa é **`acctterminatecause`**:
+   *   Lost-Carrier   → o link caiu de verdade (fibra/energia/ONU)
+   *   User-Request   → encerrada "normalmente" — inclui a reautenticação
+   *                    programada do provedor, que NÃO é queda
+   *   Admin-Reset    → alguém derrubou pelo painel
+   *   NAS-Reboot     → equipamento do provedor reiniciou
+   *
+   * Não uso filtro de data no IXC de propósito: a data volta em DD/MM/YYYY e
+   * o filtro é frágil com esse formato. Como vem ordenado da mais recente pra
+   * mais antiga, pegar as N últimas e cortar por data no JS é mais seguro —
+   * e 200 sessões cobrem 10 dias com folga até pra quem cai muito.
+   */
+  async buscarSessoesConexao(login, dias = 10, limite = 200) {
+    try {
+      if (!login) return [];
+      const params = new URLSearchParams({
+        qtype: 'radacct.username',
+        query: login.toString(),
+        oper: '=',
+        page: '1',
+        rp: String(limite),
+        sortname: 'radacct.radacctid',
+        sortorder: 'desc',
+      });
+
+      const response = await this.clientListar.post('/radacct', params.toString());
+      if (typeof response.data !== 'object' || response.data === null) {
+        console.warn(`⚠️ [CONEXAO] o IXC recusou a consulta de sessões (${login})`);
+        return [];
+      }
+
+      const corte = Date.now() - dias * 864e5;
+      const sessoes = [];
+
+      for (const r of (response.data.registros || [])) {
+        const inicio = this._dataRadius(r.acctstarttime);
+        if (inicio === null) continue;
+        if (inicio < corte) break; // ordenado desc → daqui pra frente é tudo mais velho
+        sessoes.push({
+          inicio: r.acctstarttime,
+          fim: r.acctstoptime || null,
+          duracao: parseInt(r.acctsessiontime, 10) || 0,   // segundos
+          causa: r.acctterminatecause || null,             // null = sessão ATIVA
+          ip: r.framedipaddress || null,
+          mac: r.callingstationid || null,
+        });
+      }
+      return sessoes;
+    } catch (e) {
+      console.error(`❌ Erro nas sessões de conexão (${login}):`, e.message);
+      return [];
+    }
+  }
+
+  /** Converte "19/08/2026 10:35:48" (formato do radacct) em epoch, ou null. */
+  _dataRadius(s) {
+    if (!s) return null;
+    const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}):(\d{2}):(\d{2})/);
+    if (!m) return null;
+    const [, dia, mes, ano, h, min, seg] = m.map(Number);
+    // Horário de Brasília, como todo o resto do IXC (ver formatarDataIXC).
+    return Date.UTC(ano, mes - 1, dia, h + 3, min, seg);
+  }
+
+  /**
    * ✅ Resolver o LOGIN (string) a partir do id_login da OS.
    * O su_oss_chamado só traz `id_login` (numérico); o card e a busca de fibra
    * precisam da string do login (ex: "copadomundo2026"). Consulta radusuarios.id.

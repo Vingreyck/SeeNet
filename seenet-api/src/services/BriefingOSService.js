@@ -213,7 +213,7 @@ class BriefingOSService {
    * Extrai do registro da OS tudo que interessa, já normalizado.
    * Toda a "inteligência numérica" acontece aqui, não na IA.
    */
-  montarContexto(os, historico = [], historicoSinal = []) {
+  montarContexto(os, historico = [], historicoSinal = [], sessoes = []) {
     let d = {};
     try {
       d = typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : (os.dados_ixc || {});
@@ -238,6 +238,7 @@ class BriefingOSService {
       assunto: os.tipo_servico || null,
       natureza,
       historicoSinal: this.analisarHistoricoSinal(historicoSinal),
+      conexoes: this.analisarConexoes(sessoes),
       pedido: this._cortar(os.observacoes),
       cliente: os.cliente_nome || null,
       login: d.login || null,
@@ -293,6 +294,13 @@ class BriefingOSService {
       if (t) alertas.push(t);
     }
 
+    // Quedas de conexão. Fica FORA da retirada (não há conexão a diagnosticar)
+    // e é o dado que responde direto a "minha internet cai toda hora".
+    if (ctx.conexoes && ctx.natureza !== 'retirada') {
+      const t = this.textoConexoes(ctx.conexoes);
+      if (t) alertas.push(t);
+    }
+
     // "Offline" é sintoma quando o serviço é conserto; numa retirada/instalação
     // é o estado esperado, não um alerta.
     if (ctx.online === false && ctx.natureza === 'diagnostico') {
@@ -321,6 +329,7 @@ class BriefingOSService {
       historico_sinal: (ctx.historicoSinal && ctx.natureza !== 'retirada')
         ? ctx.historicoSinal
         : null,
+      conexoes: (ctx.conexoes && ctx.natureza !== 'retirada') ? ctx.conexoes : null,
       caixa: ctx.caixa || null,
       porta: ctx.porta || null,
     };
@@ -406,6 +415,85 @@ class BriefingOSService {
     };
   }
 
+  /**
+   * 🔌 ANÁLISE DAS QUEDAS DE CONEXÃO.
+   *
+   * ⚠️ A armadilha aqui é contar sessão encerrada como "queda". O provedor
+   * reautentica o PPPoE de tempos em tempos (visto em produção: sessões de
+   * exatamente 167h59m terminando em `User-Request` sempre no mesmo horário).
+   * Contar isso faria TODO cliente parecer que cai o tempo todo.
+   *
+   * Então só conta como queda o que é anormal:
+   *   - `Lost-Carrier` → o link caiu fisicamente, sempre conta
+   *   - sessão muito CURTA → caiu logo depois de conectar, seja qual for a causa
+   *
+   * Sessão longa terminando em User-Request é rotina e fica de fora.
+   */
+  static SESSAO_CURTA_SEG = 1800;   // 30 min — abaixo disso a sessão "não durou"
+  static FLAPPING_SEG = 600;        // 10 min — sessões assim seguidas = flapping
+  static FLAPPING_MINIMO = 3;       // quantas sessões curtas já indicam flapping
+
+  analisarConexoes(sessoes) {
+    if (!Array.isArray(sessoes) || sessoes.length === 0) return null;
+
+    const ativa = sessoes.find(s => !s.causa);
+    const encerradas = sessoes.filter(s => s.causa);
+
+    const porCausa = {};
+    for (const s of encerradas) {
+      porCausa[s.causa] = (porCausa[s.causa] || 0) + 1;
+    }
+
+    const perdaLink = encerradas.filter(s => /lost-?carrier/i.test(s.causa)).length;
+    const curtas = encerradas.filter(s => s.duracao > 0 && s.duracao < BriefingOSService.SESSAO_CURTA_SEG);
+    const muitoCurtas = encerradas.filter(s => s.duracao > 0 && s.duracao < BriefingOSService.FLAPPING_SEG);
+
+    // Quedas que MERECEM atenção (sem contar reautenticação de rotina).
+    const quedas = encerradas.filter(s =>
+      /lost-?carrier/i.test(s.causa) || (s.duracao > 0 && s.duracao < BriefingOSService.SESSAO_CURTA_SEG)
+    ).length;
+
+    const flapping = muitoCurtas.length >= BriefingOSService.FLAPPING_MINIMO;
+
+    let comportamento;
+    if (flapping) comportamento = 'flapping';
+    else if (perdaLink >= 3) comportamento = 'quedas_link';
+    else if (quedas > 0) comportamento = 'quedas_pontuais';
+    else comportamento = 'estavel';
+
+    return {
+      total_sessoes: sessoes.length,
+      quedas,
+      perda_link: perdaLink,
+      sessoes_curtas: muitoCurtas.length,
+      comportamento,
+      online: !!ativa,
+      conectado_desde: ativa ? ativa.inicio : null,
+      ultima_queda: encerradas[0] ? { quando: encerradas[0].fim, causa: encerradas[0].causa } : null,
+      causas: porCausa,
+    };
+  }
+
+  /** Frase pronta sobre as quedas de conexão. */
+  textoConexoes(c, dias = 10) {
+    if (!c) return null;
+    switch (c.comportamento) {
+      case 'flapping':
+        return `⚠️ Conexão INSTÁVEL: ${c.sessoes_curtas} sessões duraram menos de 10 min nos últimos ` +
+          `${dias} dias${c.perda_link > 0 ? ` (${c.perda_link} por perda de link)` : ''}. ` +
+          'Cliente conecta e cai logo em seguida — não é lentidão, é o link caindo.';
+      case 'quedas_link':
+        return `⚠️ ${c.perda_link} quedas por PERDA DE LINK nos últimos ${dias} dias. ` +
+          'É queda física: fibra, energia ou a própria ONU.';
+      case 'quedas_pontuais':
+        return `${c.quedas} queda(s) fora do normal nos últimos ${dias} dias ` +
+          '(sem contar as reautenticações de rotina).';
+      default:
+        return `Conexão sem quedas anormais nos últimos ${dias} dias ` +
+          '(as sessões encerradas são reautenticação de rotina).';
+    }
+  }
+
   /** Frase pronta sobre o comportamento do sinal ao longo dos dias. */
   textoHistorico(h) {
     if (!h) return null;
@@ -451,6 +539,8 @@ class BriefingOSService {
       // Só o VEREDITO e a amplitude entram no hash. A série inteira mudaria a
       // cada coleta de 3h e faria o cache nunca valer, sem mudar o diagnóstico.
       comportamento: ctx.historicoSinal ? ctx.historicoSinal.comportamento : null,
+      conexao: ctx.conexoes ? ctx.conexoes.comportamento : null,
+      quedas: ctx.conexoes ? ctx.conexoes.quedas : null,
       amplitude: ctx.historicoSinal ? ctx.historicoSinal.amplitude : null,
       online: ctx.online,
       caixa: ctx.caixa,
@@ -512,6 +602,21 @@ class BriefingOSService {
       if (h.temperatura_max && h.temperatura_max >= 60) {
         linhas.push(`TEMPERATURA DA ONU chegou a ${h.temperatura_max}°C no período (alta).`);
       }
+    }
+
+    const c = ctx.conexoes;
+    if (c && ctx.natureza !== 'retirada') {
+      const rot = {
+        flapping: 'INSTÁVEL (conecta e cai logo em seguida)',
+        quedas_link: 'com QUEDAS DE LINK repetidas',
+        quedas_pontuais: 'com quedas pontuais',
+        estavel: 'SEM quedas anormais',
+      }[c.comportamento];
+      linhas.push(`QUEDAS DE CONEXÃO (10 dias): ${rot}. ` +
+        `${c.quedas} queda(s) fora do normal, ${c.perda_link} por perda de link, ` +
+        `${c.sessoes_curtas} sessão(ões) com menos de 10 min. ` +
+        'IMPORTANTE: sessões longas encerradas como User-Request são reautenticação ' +
+        'de rotina do provedor, NÃO conte como queda.');
     }
 
     if (ctx.onu) linhas.push(`MODELO DA ONU: ${ctx.onu}`);
@@ -660,8 +765,8 @@ Responda APENAS com JSON válido, sem markdown, sem crase, neste formato exato:
    * Gera o briefing. NUNCA lança: se a IA falhar, devolve só a parte
    * determinística com `com_ia: false`.
    */
-  async gerar(os, historico = [], historicoSinal = []) {
-    const ctx = this.montarContexto(os, historico, historicoSinal);
+  async gerar(os, historico = [], historicoSinal = [], sessoes = []) {
+    const ctx = this.montarContexto(os, historico, historicoSinal, sessoes);
     const base = this.resumoDeterministico(ctx);
     base.contexto_hash = this.hashContexto(ctx);
 

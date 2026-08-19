@@ -2922,6 +2922,8 @@ class _HistoricoSinalSheetState extends State<_HistoricoSinalSheet> {
   bool _carregando = true;
   List<dynamic> _leituras = [];
   Map<String, dynamic>? _resumo;
+  List<dynamic> _sessoes = [];
+  Map<String, dynamic>? _resumoConexao;
   String? _onu;
   String? _login;
   String? _motivo;
@@ -2939,6 +2941,9 @@ class _HistoricoSinalSheetState extends State<_HistoricoSinalSheet> {
       _carregando = false;
       _leituras = (d?['leituras'] as List?) ?? [];
       _resumo = d?['resumo'] is Map ? Map<String, dynamic>.from(d!['resumo']) : null;
+      _sessoes = (d?['sessoes'] as List?) ?? [];
+      _resumoConexao =
+          d?['resumo_conexao'] is Map ? Map<String, dynamic>.from(d!['resumo_conexao']) : null;
       _onu = d?['onu'] as String?;
       _login = d?['login'] as String?;
       _motivo = d?['motivo'] as String?;
@@ -2956,6 +2961,105 @@ class _HistoricoSinalSheetState extends State<_HistoricoSinalSheet> {
     if (v == null) return '—';
     final d = v is num ? v.toDouble() : double.tryParse(v.toString());
     return d == null ? '—' : d.toStringAsFixed(casas).replaceAll('.', ',');
+  }
+
+  /// 🔌 Quedas de conexão no período (RADIUS).
+  ///
+  /// Mostra só as quedas que INTERESSAM: sessão curta ou perda de link. O
+  /// provedor reautentica o PPPoE periodicamente e essas sessões encerradas
+  /// não são queda — listá-las faria todo cliente parecer problemático.
+  Widget _blocoQuedas() {
+    final c = _resumoConexao;
+    if (c == null) return const SizedBox.shrink();
+
+    final Color cor = switch (c['comportamento']) {
+      'flapping' => Colors.red.shade300,
+      'quedas_link' => Colors.red.shade300,
+      'quedas_pontuais' => const Color(0xFFFFB800),
+      _ => const Color(0xFF00FF88),
+    };
+    final online = c['online'] == true;
+
+    // Só as anormais — mesma régua da análise no servidor.
+    final quedas = _sessoes.where((s) {
+      final m = s as Map;
+      final causa = (m['causa'] ?? '').toString();
+      final dur = (m['duracao'] as num?)?.toInt() ?? 0;
+      return causa.isNotEmpty &&
+          (RegExp('lost-?carrier', caseSensitive: false).hasMatch(causa) ||
+              (dur > 0 && dur < 1800));
+    }).take(6).toList();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: cor.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cor.withOpacity(0.3)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 8, height: 8,
+            decoration: BoxDecoration(
+                color: online ? const Color(0xFF00FF88) : Colors.red.shade300,
+                shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(online ? 'Online agora' : 'OFFLINE agora',
+              style: TextStyle(
+                  color: online ? const Color(0xFF00FF88) : Colors.red.shade300,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold)),
+          const Spacer(),
+          Text('${c['quedas']} queda(s) em 10 dias',
+              style: TextStyle(color: cor, fontSize: 11, fontWeight: FontWeight.w600)),
+        ]),
+        if (quedas.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          const Text('ÚLTIMAS QUEDAS',
+              style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5)),
+          const SizedBox(height: 3),
+          ...quedas.map((s) {
+            final m = s as Map;
+            final dur = (m['duracao'] as num?)?.toInt() ?? 0;
+            final min = (dur / 60).round();
+            return Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Row(children: [
+                SizedBox(
+                  width: 96,
+                  child: Text(_dataRadius(m['fim'] ?? m['inicio']),
+                      style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                ),
+                Expanded(
+                  child: Text('${m['causa']}',
+                      style: TextStyle(color: cor, fontSize: 11)),
+                ),
+                Text(min < 60 ? 'durou ${min}min' : 'durou ${(min / 60).round()}h',
+                    style: const TextStyle(color: Colors.white38, fontSize: 11)),
+              ]),
+            );
+          }),
+        ] else ...[
+          const SizedBox(height: 4),
+          const Text('Sem quedas anormais — as sessões encerradas são reautenticação de rotina.',
+              style: TextStyle(color: Colors.white38, fontSize: 11)),
+        ],
+      ]),
+    );
+  }
+
+  /// "19/08 10:27" a partir de "19/08/2026 10:27:43" (formato do radacct).
+  String _dataRadius(dynamic v) {
+    final s = v?.toString() ?? '';
+    final m = RegExp(r'^(\d{2})/(\d{2})/\d{4} (\d{2}):(\d{2})').firstMatch(s);
+    return m == null ? s : '${m[1]}/${m[2]} ${m[3]}:${m[4]}';
   }
 
   Widget _colTitulo(String t) => Expanded(
@@ -2993,7 +3097,7 @@ class _HistoricoSinalSheetState extends State<_HistoricoSinalSheet> {
               Icon(Icons.show_chart_rounded, color: cor, size: 20),
               const SizedBox(width: 8),
               const Expanded(
-                child: Text('Histórico do sinal',
+                child: Text('Histórico técnico',
                     style: TextStyle(
                         color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
@@ -3079,6 +3183,7 @@ class _HistoricoSinalSheetState extends State<_HistoricoSinalSheet> {
                     ),
                 ]),
               ),
+            _blocoQuedas(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               color: Colors.white.withOpacity(0.04),

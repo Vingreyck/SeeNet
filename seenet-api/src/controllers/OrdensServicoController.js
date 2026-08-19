@@ -2847,10 +2847,18 @@ if (dados.fotos && dados.fotos.length > 0) {
       }
 
       const leituras = await ixc.buscarHistoricoSinal(fibraId, dias);
+      // Quedas de conexão no mesmo período — a outra metade do diagnóstico:
+      // o sinal diz se o óptico está bom, as sessões dizem se o link cai.
+      const sessoes = dIxc.login
+        ? await ixc.buscarSessoesConexao(dIxc.login, dias)
+        : [];
+
       return res.json({
         success: true,
         leituras,                                            // mais recente primeiro
         resumo: briefingService.analisarHistoricoSinal(leituras),
+        sessoes,
+        resumo_conexao: briefingService.analisarConexoes(sessoes),
         onu: dIxc.sn_onu_tipo || null,
         login: dIxc.login || null,
       });
@@ -2915,6 +2923,7 @@ if (dados.fotos && dados.fotos.length > 0) {
       // sempre" de "algo se degradando" — muda a conduta no local.
       // Best-effort: sem isso o briefing continua saindo, só sem a tendência.
       let historicoSinal = [];
+      let sessoes = [];
       try {
         const dIxc = os.dados_ixc
           ? (typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc)
@@ -2935,13 +2944,18 @@ if (dados.fotos && dados.fotos.length > 0) {
           if (fibraId) {
             historicoSinal = await ixc.buscarHistoricoSinal(fibraId, 10);
           }
+          // 🔌 Quedas de conexão (RADIUS). Responde direto a "cai toda hora" —
+          // e distingue queda real de reautenticação de rotina.
+          if (dIxc.login) {
+            sessoes = await ixc.buscarSessoesConexao(dIxc.login, 10);
+          }
         }
       } catch (e) {
-        console.warn(`⚠️ [BRIEFING] histórico de sinal indisponível p/ OS ${id}: ${e.message}`);
+        console.warn(`⚠️ [BRIEFING] histórico de sinal/conexão indisponível p/ OS ${id}: ${e.message}`);
       }
 
       // Hash das entradas de agora — decide se o cache ainda vale.
-      const ctx = briefingService.montarContexto(os, historico, historicoSinal);
+      const ctx = briefingService.montarContexto(os, historico, historicoSinal, sessoes);
       const hashAtual = briefingService.hashContexto(ctx);
 
       let cacheOk = true;
@@ -2961,7 +2975,7 @@ if (dados.fotos && dados.fotos.length > 0) {
         }
       }
 
-      const briefing = await briefingService.gerar(os, historico, historicoSinal);
+      const briefing = await briefingService.gerar(os, historico, historicoSinal, sessoes);
 
       if (cacheOk) {
         try {

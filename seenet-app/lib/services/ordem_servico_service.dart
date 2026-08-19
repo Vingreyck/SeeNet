@@ -23,6 +23,26 @@ class OrdemServicoService {
     };
   }
 
+  /// 🤖 Briefing da OS — provável causa, ordem de verificação e material.
+  ///
+  /// Devolve null em QUALQUER problema (rota não existe no backend antigo, sem
+  /// rede, erro): quem chama simplesmente não mostra o card. É um extra em cima
+  /// da OS, nunca pode atrapalhar o atendimento.
+  Future<Map<String, dynamic>?> buscarBriefing(String osId) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/ordens-servico/$osId/briefing'), headers: _headers)
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) return null;
+      final body = json.decode(response.body);
+      final b = body['briefing'];
+      return b is Map ? Map<String, dynamic>.from(b) : null;
+    } catch (e) {
+      print('⚠️ Briefing indisponível: $e');
+      return null;
+    }
+  }
+
   // 💾 Rascunho do wizard no servidor (preserva tudo ao reagendar/encaminhar).
   Future<bool> salvarRascunho(String osId, Map<String, dynamic> dados) async {
     try {

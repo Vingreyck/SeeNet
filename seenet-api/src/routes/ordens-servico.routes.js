@@ -22,6 +22,10 @@ router.get('/:id/trilha', OrdensServicoController.consultarTrilha.bind(OrdensSer
 // Buscar detalhes de uma OS
 router.get('/:id/detalhes', OrdensServicoController.buscarDetalhesOS.bind(OrdensServicoController));
 
+// 🤖 Briefing da OS (o que o técnico precisa saber antes de chegar). Nunca
+// falha por causa da IA — sem ela, devolve só os fatos. ?refresh=1 força regerar.
+router.get('/:id/briefing', OrdensServicoController.buscarBriefing.bind(OrdensServicoController));
+
 // Listar admins para seleção
 router.get('/admins', OrdensServicoController.listarAdmins.bind(OrdensServicoController));
 

@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { db } = require('../config/database');
 const IXCService = require('../services/IXCService');
 const notificationService = require('../services/NotificationService');
+const briefingService = require('../services/BriefingOSService');
 
 class OrdensServicoController {
   // ── 🛣️ Limpeza da trilha (rota percorrida no mapa do admin) ─────────────
@@ -2792,6 +2793,107 @@ if (dados.fotos && dados.fotos.length > 0) {
     } catch (error) {
       console.error('❌ Erro ao limpar MAC:', error.message);
       return res.status(500).json({ success: false, error: error.message || 'Erro ao limpar MAC' });
+    }
+  }
+
+  /**
+   * 🤖 GET /ordens-servico/:id/briefing
+   *
+   * Análise da OS pro técnico ler ANTES de bater na porta: provável causa,
+   * ordem de verificação e material pra levar.
+   *
+   * Regras de projeto que valem a pena saber:
+   * - **Nunca devolve erro por falha de IA.** Se a Groq cair, volta só a parte
+   *   determinística (sinal, conexão, recorrência). O app mostra o que veio.
+   * - **Cache por hash das entradas** (tabela os_briefing): enquanto mensagem,
+   *   sinal e histórico não mudarem, reaproveita. `?refresh=1` força regerar.
+   * - Se a tabela de cache não existir (migração não rodada), gera na hora e
+   *   segue — a feature funciona, só sem cache.
+   */
+  async buscarBriefing(req, res) {
+    try {
+      const { id } = req.params;
+      const tenantId = req.tenantId;
+      const userId = req.user.id;
+
+      const os = await db('ordem_servico')
+        .where('id', id).where('tenant_id', tenantId).first();
+      if (!os) {
+        return res.status(404).json({ success: false, error: 'OS não encontrada' });
+      }
+
+      // Mesma regra do atualizarEnderecoOS: o dono da OS ou um admin.
+      const ehAdmin = ['administrador', 'admin'].includes(req.user.tipo_usuario);
+      if (!ehAdmin && String(os.tecnico_id) !== String(userId)) {
+        return res.status(403).json({ success: false, error: 'Esta OS não é sua' });
+      }
+
+      const forcar = req.query.refresh === '1' || req.query.refresh === 'true';
+
+      // Histórico do MESMO cliente (é o que transforma "mais uma OS" em
+      // "terceira visita pelo mesmo problema"). Sem cliente, vai sem histórico.
+      let historico = [];
+      if (os.cliente_id_externo) {
+        try {
+          historico = await db('ordem_servico')
+            .where('tenant_id', tenantId)
+            .where('cliente_id_externo', os.cliente_id_externo)
+            .whereNot('id', os.id)
+            .orderBy('data_abertura', 'desc')
+            .limit(8)
+            .select('id', 'tipo_servico', 'status', 'observacoes', 'data_abertura', 'data_conclusao');
+        } catch (e) {
+          console.warn(`⚠️ [BRIEFING] histórico indisponível p/ OS ${id}: ${e.message}`);
+        }
+      }
+
+      // Hash das entradas de agora — decide se o cache ainda vale.
+      const ctx = briefingService.montarContexto(os, historico);
+      const hashAtual = briefingService.hashContexto(ctx);
+
+      let cacheOk = true;
+      if (!forcar) {
+        try {
+          const cache = await db('os_briefing')
+            .where('tenant_id', tenantId).where('os_id', os.id).first();
+          if (cache && cache.contexto_hash === hashAtual) {
+            const resumo = typeof cache.resumo === 'string'
+              ? JSON.parse(cache.resumo) : cache.resumo;
+            return res.json({ success: true, briefing: resumo, cache: true });
+          }
+        } catch (e) {
+          // Tabela ainda não existe (migração não rodada) → segue sem cache.
+          cacheOk = false;
+          console.warn(`⚠️ [BRIEFING] cache indisponível (${e.message}) — gerando sem cache`);
+        }
+      }
+
+      const briefing = await briefingService.gerar(os, historico);
+
+      if (cacheOk) {
+        try {
+          await db('os_briefing')
+            .insert({
+              tenant_id: tenantId,
+              os_id: os.id,
+              resumo: JSON.stringify(briefing),
+              contexto_hash: briefing.contexto_hash || hashAtual,
+              com_ia: !!briefing.com_ia,
+              modelo: briefing.modelo || null,
+              gerado_em: db.fn.now(),
+            })
+            .onConflict(['tenant_id', 'os_id'])
+            .merge(['resumo', 'contexto_hash', 'com_ia', 'modelo', 'gerado_em']);
+        } catch (e) {
+          // Gravar o cache é otimização — nunca pode derrubar a resposta.
+          console.warn(`⚠️ [BRIEFING] não consegui gravar o cache: ${e.message}`);
+        }
+      }
+
+      return res.json({ success: true, briefing, cache: false });
+    } catch (error) {
+      console.error('❌ Erro ao gerar briefing:', error.message);
+      return res.status(500).json({ success: false, error: 'Erro ao gerar briefing' });
     }
   }
 

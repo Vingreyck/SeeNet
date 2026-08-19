@@ -49,6 +49,12 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
   // os widgets filhos no 1º build, então precisam já ter o valor certo).
   bool _carregandoRascunho = false;
 
+  /// 🤖 Análise da OS (provável causa / o que verificar / o que levar).
+  /// Carrega em segundo plano: se não vier, o card some e o resto da tela segue
+  /// normal — nunca segura o atendimento.
+  Map<String, dynamic>? _briefing;
+  bool _carregandoBriefing = false;
+
   int _etapaAtual = 0;
   final int _totalEtapas = 8;
 
@@ -95,6 +101,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     if (!temProgressoLocal && os.tipoOs != 'E') {
       _carregandoRascunho = true;
     }
+
+    _carregarBriefing();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final osAtualizada = controller.ordensServico
@@ -245,6 +253,183 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     }
   }
 
+  /// Busca a análise da OS sem segurar a tela. Falha em silêncio de propósito:
+  /// backend antigo (rota não existe), sem sinal de internet ou IA fora do ar
+  /// resultam em card ausente, não em erro na cara do técnico.
+  Future<void> _carregarBriefing() async {
+    if (!mounted) return;
+    setState(() => _carregandoBriefing = true);
+    final b = await OrdemServicoService().buscarBriefing(os.id);
+    if (!mounted) return;
+    setState(() {
+      _briefing = b;
+      _carregandoBriefing = false;
+    });
+  }
+
+  /// Card da análise. Duas partes, e a distinção importa:
+  ///  • ALERTAS  → calculados por regra no servidor (sinal, offline, retorno).
+  ///               São FATOS: aparecem mesmo se a IA estiver fora do ar.
+  ///  • O resto  → texto escrito pela IA em cima desses fatos.
+  /// Quando não há IA, o rodapé diz isso — o técnico precisa saber se está
+  /// lendo uma sugestão ou só os dados crus.
+  Widget _buildBriefing() {
+    if (_carregandoBriefing) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.blue.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.blue.withOpacity(0.2)),
+        ),
+        child: Row(children: [
+          const SizedBox(
+            width: 14, height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF64B5F6)),
+          ),
+          const SizedBox(width: 10),
+          Text('Analisando a OS...',
+              style: TextStyle(color: Colors.blue.shade200, fontSize: 12)),
+        ]),
+      );
+    }
+
+    final b = _briefing;
+    if (b == null) return const SizedBox.shrink();
+
+    final alertas = (b['alertas'] as List?)?.whereType<String>().toList() ?? [];
+    final verificar = (b['verificar'] as List?)?.whereType<String>().toList() ?? [];
+    final levar = (b['levar'] as List?)?.whereType<String>().toList() ?? [];
+    final causa = b['causa_provavel'] as String?;
+    final atencao = b['atencao'] as String?;
+    final comIa = b['com_ia'] == true;
+
+    // Nada útil? Não ocupa espaço na tela.
+    if (alertas.isEmpty && verificar.isEmpty && levar.isEmpty && causa == null) {
+      return const SizedBox.shrink();
+    }
+
+    // A cor do card segue a GRAVIDADE do sinal — o técnico bate o olho e já
+    // sabe se tem algo sério antes de ler.
+    final nivel = (b['sinal'] as Map?)?['nivel'] as String?;
+    final Color cor = switch (nivel) {
+      'critico' => Colors.red.shade300,
+      'atencao' => const Color(0xFFFFB800),
+      _ => const Color(0xFF64B5F6),
+    };
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cor.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cor.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(Icons.auto_awesome_rounded, color: cor, size: 18),
+            const SizedBox(width: 8),
+            Text('Análise da OS',
+                style: TextStyle(color: cor, fontSize: 12, fontWeight: FontWeight.bold)),
+          ]),
+
+          if (alertas.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ...alertas.map((a) => Padding(
+                  padding: const EdgeInsets.only(bottom: 5),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('• ', style: TextStyle(color: cor, fontSize: 13)),
+                    Expanded(
+                      child: Text(a,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 13, height: 1.35)),
+                    ),
+                  ]),
+                )),
+          ],
+
+          if (causa != null) ...[
+            const SizedBox(height: 10),
+            _tituloBriefing('PROVÁVEL CAUSA'),
+            const SizedBox(height: 3),
+            Text(causa,
+                style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35)),
+          ],
+
+          if (verificar.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _tituloBriefing('VERIFIQUE NESTA ORDEM'),
+            const SizedBox(height: 3),
+            ...verificar.asMap().entries.map((e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${e.key + 1}. ',
+                        style: TextStyle(
+                            color: cor, fontSize: 13, fontWeight: FontWeight.bold)),
+                    Expanded(
+                      child: Text(e.value,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 13, height: 1.35)),
+                    ),
+                  ]),
+                )),
+          ],
+
+          if (levar.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _tituloBriefing('LEVE'),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: levar
+                  .map((l) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: cor.withOpacity(0.14),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(l,
+                            style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      ))
+                  .toList(),
+            ),
+          ],
+
+          if (atencao != null) ...[
+            const SizedBox(height: 10),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.priority_high_rounded, color: cor, size: 15),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(atencao,
+                    style: TextStyle(
+                        color: cor, fontSize: 12, fontWeight: FontWeight.w600, height: 1.3)),
+              ),
+            ]),
+          ],
+
+          if (!comIa) ...[
+            const SizedBox(height: 8),
+            Text('Sugestão automática indisponível — acima estão só os dados do sistema.',
+                style: TextStyle(color: Colors.white38, fontSize: 11, height: 1.3)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _tituloBriefing(String texto) => Text(
+        texto,
+        style: const TextStyle(
+            color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+      );
+
   Widget _buildEtapaLocalizacao() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -291,6 +476,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
             ),
             const SizedBox(height: 16),
           ],
+          // 🤖 Análise da OS — logo abaixo do pedido do atendente, porque é a
+          // leitura dele que o briefing complementa.
+          _buildBriefing(),
           // Mesmos dados do OS card (login/senha copiáveis, plano, CTO, endereço
           // completo, Limpar MAC).
           _buildCard(

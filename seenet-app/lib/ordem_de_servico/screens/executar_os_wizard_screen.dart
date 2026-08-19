@@ -355,7 +355,14 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
           if (causa != null) ...[
             const SizedBox(height: 10),
-            _tituloBriefing('PROVÁVEL CAUSA'),
+            // "PROVÁVEL CAUSA" só faz sentido quando há defeito. Numa
+            // instalação/transferência ou retirada não existe causa a apurar —
+            // rotular assim daria a entender que algo está errado.
+            _tituloBriefing(switch (b['natureza']) {
+              'instalacao' => 'O QUE ESTE SERVIÇO ENVOLVE',
+              'retirada' => 'O QUE RECOLHER',
+              _ => 'PROVÁVEL CAUSA',
+            }),
             const SizedBox(height: 3),
             Text(causa,
                 style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.35)),
@@ -363,7 +370,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
           if (verificar.isNotEmpty) ...[
             const SizedBox(height: 10),
-            _tituloBriefing('VERIFIQUE NESTA ORDEM'),
+            _tituloBriefing(b['natureza'] == 'diagnostico'
+                ? 'VERIFIQUE NESTA ORDEM'
+                : 'PASSO A PASSO'),
             const SizedBox(height: 3),
             ...verificar.asMap().entries.map((e) => Padding(
                   padding: const EdgeInsets.only(bottom: 3),

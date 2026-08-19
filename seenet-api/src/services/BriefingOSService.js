@@ -213,7 +213,7 @@ class BriefingOSService {
    * Extrai do registro da OS tudo que interessa, já normalizado.
    * Toda a "inteligência numérica" acontece aqui, não na IA.
    */
-  montarContexto(os, historico = []) {
+  montarContexto(os, historico = [], historicoSinal = []) {
     let d = {};
     try {
       d = typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : (os.dados_ixc || {});
@@ -237,6 +237,7 @@ class BriefingOSService {
     return {
       assunto: os.tipo_servico || null,
       natureza,
+      historicoSinal: this.analisarHistoricoSinal(historicoSinal),
       pedido: this._cortar(os.observacoes),
       cliente: os.cliente_nome || null,
       login: d.login || null,
@@ -284,6 +285,14 @@ class BriefingOSService {
       );
     }
 
+    // Comportamento ao longo dos dias. Vem logo depois do valor atual porque é
+    // o que muda a conduta: mesmo -24 dBm pede ação diferente se está caindo,
+    // oscilando ou parado há semanas.
+    if (ctx.historicoSinal && ctx.natureza !== 'retirada') {
+      const t = this.textoHistorico(ctx.historicoSinal);
+      if (t) alertas.push(t);
+    }
+
     // "Offline" é sintoma quando o serviço é conserto; numa retirada/instalação
     // é o estado esperado, não um alerta.
     if (ctx.online === false && ctx.natureza === 'diagnostico') {
@@ -308,9 +317,116 @@ class BriefingOSService {
       sinal: ctx.sinal
         ? { rx: ctx.sinal.rx, nivel: ctx.sinal.nivel, idade: ctx.sinal.idade, velho: ctx.sinal.velho }
         : null,
+      // Vai inteiro pro app: ele desenha o gráfico e mostra melhor/pior/perda.
+      historico_sinal: (ctx.historicoSinal && ctx.natureza !== 'retirada')
+        ? ctx.historicoSinal
+        : null,
       caixa: ctx.caixa || null,
       porta: ctx.porta || null,
     };
+  }
+
+  /**
+   * 📈 ANÁLISE DO HISTÓRICO DE SINAL — o "diagnóstico" de verdade.
+   *
+   * O valor de agora diz pouco: -24 dBm estável há meses é um enlace longo
+   * normal; -24 que era -19 há 10 dias é algo se degradando e que vai falhar.
+   * A diferença entre esses dois casos muda o que o técnico faz no local, e só
+   * o histórico revela.
+   *
+   * Tudo aqui é ARITMÉTICA, sem IA — precisa dar o mesmo resultado sempre.
+   *
+   * Classifica em 4 comportamentos:
+   *   degradando  → piorou de forma consistente (conector oxidando, curva, infiltração)
+   *   instavel    → oscila muito (contato solto, problema mecânico/intermitente)
+   *   ruim_estavel→ sempre ruim, sem variar (perda fixa do enlace, não é defeito novo)
+   *   estavel     → comportado (o problema do cliente não é óptico)
+   */
+  static VARIACAO_INSTAVEL = 3.0;   // dB de amplitude que já indica oscilação
+  static QUEDA_RELEVANTE = 2.0;     // dB de piora que merece ser apontada
+  static MIN_PONTOS_TENDENCIA = 6;  // abaixo disso não dá pra falar em tendência
+
+  analisarHistoricoSinal(pontos) {
+    if (!Array.isArray(pontos) || pontos.length === 0) return null;
+
+    // Chega do mais recente pro mais antigo; para calcular tendência é mais
+    // natural ler na ordem do tempo.
+    const cron = [...pontos].reverse();
+    const rx = cron.map(p => p.rx);
+
+    const atual = rx[rx.length - 1];
+    const melhor = Math.max(...rx);   // menos negativo = melhor
+    const pior = Math.min(...rx);
+    const amplitude = melhor - pior;
+
+    const media = (a) => a.reduce((s, v) => s + v, 0) / a.length;
+
+    let tendencia = null;   // dB de variação entre a 1ª e a 2ª metade
+    if (rx.length >= BriefingOSService.MIN_PONTOS_TENDENCIA) {
+      const meio = Math.floor(rx.length / 2);
+      // Metades em vez de "primeiro vs último ponto": um único fix ruim não
+      // vira "degradação", e um único fix bom não esconde uma queda real.
+      tendencia = media(rx.slice(meio)) - media(rx.slice(0, meio));
+    }
+
+    let comportamento;
+    if (tendencia !== null && tendencia <= -BriefingOSService.QUEDA_RELEVANTE) {
+      comportamento = 'degradando';
+    } else if (amplitude >= BriefingOSService.VARIACAO_INSTAVEL) {
+      comportamento = 'instavel';
+    } else if (this.classificarSinal(atual) !== 'bom') {
+      comportamento = 'ruim_estavel';
+    } else {
+      comportamento = 'estavel';
+    }
+
+    // Quanto o sinal perdeu em relação ao melhor momento da janela.
+    // É a "perda" que interessa ao técnico: mensurável e sem depender de
+    // supor a potência de saída da OLT.
+    const perda = melhor - atual;
+
+    const dias = new Set(cron.map(p => String(p.data).slice(0, 10))).size;
+    const temps = cron.map(p => p.temperatura).filter(t => !Number.isNaN(t) && t !== 0);
+
+    return {
+      pontos: cron.length,
+      dias,
+      atual,
+      melhor,
+      pior,
+      amplitude: Number(amplitude.toFixed(2)),
+      perda: Number(perda.toFixed(2)),
+      tendencia: tendencia === null ? null : Number(tendencia.toFixed(2)),
+      comportamento,
+      temperatura_max: temps.length ? Math.max(...temps) : null,
+      inicio: cron[0].data,
+      fim: cron[cron.length - 1].data,
+      // série enxuta pro app desenhar (o gráfico não precisa de 80 casas decimais)
+      serie: cron.map(p => ({ v: Number(p.rx.toFixed(2)), d: p.data })),
+    };
+  }
+
+  /** Frase pronta sobre o comportamento do sinal ao longo dos dias. */
+  textoHistorico(h) {
+    if (!h) return null;
+    const j = `${h.dias} ${h.dias === 1 ? 'dia' : 'dias'}`;
+
+    switch (h.comportamento) {
+      case 'degradando':
+        return `⚠️ Sinal PIORANDO: caiu ${Math.abs(h.tendencia).toFixed(1)} dB ao longo de ${j} ` +
+          `(melhor ${this._dbm(h.melhor)}, agora ${this._dbm(h.atual)}). ` +
+          'Degradação progressiva é conector oxidando, curva forçada ou infiltração — tende a piorar.';
+      case 'instavel':
+        return `⚠️ Sinal INSTÁVEL: variou ${h.amplitude.toFixed(1)} dB em ${j} ` +
+          `(entre ${this._dbm(h.pior)} e ${this._dbm(h.melhor)}). ` +
+          'Oscilação assim é contato solto/mecânico, não perda fixa do enlace.';
+      case 'ruim_estavel':
+        return `Sinal ruim porém ESTÁVEL nos últimos ${j} (variou só ${h.amplitude.toFixed(1)} dB). ` +
+          'Perda fixa do enlace — refazer conector provavelmente não muda nada.';
+      default:
+        return `Sinal ESTÁVEL nos últimos ${j} (variou ${h.amplitude.toFixed(1)} dB). ` +
+          'Sem degradação no período.';
+    }
   }
 
   /**
@@ -332,6 +448,10 @@ class BriefingOSService {
       pedido: ctx.pedido,
       rx: ctx.sinal ? ctx.sinal.rx : null,
       nivel: ctx.sinal ? ctx.sinal.nivel : null,
+      // Só o VEREDITO e a amplitude entram no hash. A série inteira mudaria a
+      // cada coleta de 3h e faria o cache nunca valer, sem mudar o diagnóstico.
+      comportamento: ctx.historicoSinal ? ctx.historicoSinal.comportamento : null,
+      amplitude: ctx.historicoSinal ? ctx.historicoSinal.amplitude : null,
       online: ctx.online,
       caixa: ctx.caixa,
       porta: ctx.porta,
@@ -375,6 +495,25 @@ class BriefingOSService {
     } else {
       linhas.push('SINAL DA ONU: sem medição disponível');
     }
+    // O histórico é o que separa "enlace longo de sempre" de "algo quebrando".
+    // Entregamos JÁ CLASSIFICADO — a IA não recalcula nada, só escreve em cima.
+    const h = ctx.historicoSinal;
+    if (h && ctx.natureza !== 'retirada') {
+      const rotulo = {
+        degradando: 'PIORANDO de forma progressiva',
+        instavel: 'INSTÁVEL, oscilando',
+        ruim_estavel: 'ruim porém ESTÁVEL (perda fixa do enlace)',
+        estavel: 'ESTÁVEL',
+      }[h.comportamento];
+      linhas.push(`HISTÓRICO DO SINAL (${h.dias} dias, ${h.pontos} medições): ${rotulo}. ` +
+        `Melhor ${this._dbm(h.melhor)}, pior ${this._dbm(h.pior)}, ` +
+        `variação ${h.amplitude.toFixed(1)} dB` +
+        (h.tendencia !== null ? `, tendência ${h.tendencia.toFixed(1)} dB` : '') + '.');
+      if (h.temperatura_max && h.temperatura_max >= 60) {
+        linhas.push(`TEMPERATURA DA ONU chegou a ${h.temperatura_max}°C no período (alta).`);
+      }
+    }
+
     if (ctx.onu) linhas.push(`MODELO DA ONU: ${ctx.onu}`);
     if (ctx.online !== null) linhas.push(`CONEXÃO: ${ctx.online ? 'online' : 'OFFLINE'} na última sincronização`);
     if (ctx.caixa) linhas.push(`CAIXA FTTH: ${ctx.caixa}${ctx.porta ? ` / porta ${ctx.porta}` : ''}`);
@@ -521,8 +660,8 @@ Responda APENAS com JSON válido, sem markdown, sem crase, neste formato exato:
    * Gera o briefing. NUNCA lança: se a IA falhar, devolve só a parte
    * determinística com `com_ia: false`.
    */
-  async gerar(os, historico = []) {
-    const ctx = this.montarContexto(os, historico);
+  async gerar(os, historico = [], historicoSinal = []) {
+    const ctx = this.montarContexto(os, historico, historicoSinal);
     const base = this.resumoDeterministico(ctx);
     base.contexto_hash = this.hashContexto(ctx);
 

@@ -162,6 +162,61 @@ class IXCService {
   }
 
   /**
+   * 📈 Histórico de sinal da ONU dos últimos N dias.
+   *
+   * O IXC guarda tudo em `radpop_radio_cliente_fibra_historico` (21 milhões de
+   * linhas), ligado pelo **`id_cliente_fibra`**, que é o `id` do registro
+   * devolvido por `buscarClienteFibra`. Ele coleta a cada ~3h (≈8 leituras/dia),
+   * então 10 dias ≈ 80 pontos — e o filtro de data traz só o recorte pedido,
+   * numa única chamada (testado: 84 registros p/ 10 dias).
+   *
+   * Devolve do MAIS RECENTE pro mais antigo, já sem as leituras zeradas
+   * (0.00 = ONU sem resposta no momento da coleta, não é medição).
+   */
+  async buscarHistoricoSinal(idClienteFibra, dias = 10) {
+    try {
+      if (!idClienteFibra) return [];
+      const T = 'radpop_radio_cliente_fibra_historico';
+      const desde = new Date(Date.now() - dias * 864e5)
+        .toISOString().slice(0, 10) + ' 00:00:00';
+
+      const params = new URLSearchParams({
+        qtype: `${T}.id_cliente_fibra`,
+        query: idClienteFibra.toString(),
+        oper: '=',
+        page: '1',
+        // teto de segurança: se a coleta ficar mais densa, corta em vez de
+        // trazer milhares de linhas por OS.
+        rp: String(Math.min(dias * 24, 300)),
+        sortname: `${T}.data_sinal`,
+        sortorder: 'desc',
+        grid_param: JSON.stringify([{ TB: `${T}.data_sinal`, OP: '>=', P: desde }]),
+      });
+
+      const response = await this.clientListar.post(`/${T}`, params.toString());
+      if (typeof response.data !== 'object' || response.data === null) {
+        console.warn(`⚠️ [SINAL-HIST] o IXC recusou a consulta (fibra ${idClienteFibra})`);
+        return [];
+      }
+
+      return (response.data.registros || [])
+        .map(r => ({
+          rx: parseFloat(r.sinal_rx),
+          tx: parseFloat(r.sinal_tx),
+          temperatura: parseFloat(r.temperatura),
+          voltagem: parseFloat(r.voltagem),
+          data: r.data_sinal,
+        }))
+        // rx 0.00 = a ONU não respondeu naquela coleta. Manter viraria uma
+        // queda falsa de 20 dB no gráfico e estragaria toda a análise.
+        .filter(p => !Number.isNaN(p.rx) && p.rx !== 0);
+    } catch (e) {
+      console.error(`❌ Erro no histórico de sinal (fibra ${idClienteFibra}):`, e.message);
+      return [];
+    }
+  }
+
+  /**
    * ✅ Resolver o LOGIN (string) a partir do id_login da OS.
    * O su_oss_chamado só traz `id_login` (numérico); o card e a busca de fibra
    * precisam da string do login (ex: "copadomundo2026"). Consulta radusuarios.id.

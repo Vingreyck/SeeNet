@@ -2847,8 +2847,37 @@ if (dados.fotos && dados.fotos.length > 0) {
         }
       }
 
+      // 📈 Histórico de sinal da ONU (10 dias). É o que separa "enlace longo de
+      // sempre" de "algo se degradando" — muda a conduta no local.
+      // Best-effort: sem isso o briefing continua saindo, só sem a tendência.
+      let historicoSinal = [];
+      try {
+        const dIxc = os.dados_ixc
+          ? (typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc)
+          : {};
+        const integ = await db('integracao_ixc')
+          .where('tenant_id', tenantId).where('ativo', true).first();
+
+        if (integ) {
+          const ixc = new IXCService(integ.url_api, integ.token_api);
+          let fibraId = dIxc.sn_fibra_id || null;
+
+          // OS sincronizada ANTES desta feature não tem o id guardado — resolve
+          // na hora (1 chamada a mais, só nessas).
+          if (!fibraId && (dIxc.login || dIxc.id_login)) {
+            const fibra = await ixc.buscarClienteFibra(dIxc.login, dIxc.id_login);
+            fibraId = fibra?.id || null;
+          }
+          if (fibraId) {
+            historicoSinal = await ixc.buscarHistoricoSinal(fibraId, 10);
+          }
+        }
+      } catch (e) {
+        console.warn(`⚠️ [BRIEFING] histórico de sinal indisponível p/ OS ${id}: ${e.message}`);
+      }
+
       // Hash das entradas de agora — decide se o cache ainda vale.
-      const ctx = briefingService.montarContexto(os, historico);
+      const ctx = briefingService.montarContexto(os, historico, historicoSinal);
       const hashAtual = briefingService.hashContexto(ctx);
 
       let cacheOk = true;
@@ -2868,7 +2897,7 @@ if (dados.fotos && dados.fotos.length > 0) {
         }
       }
 
-      const briefing = await briefingService.gerar(os, historico);
+      const briefing = await briefingService.gerar(os, historico, historicoSinal);
 
       if (cacheOk) {
         try {

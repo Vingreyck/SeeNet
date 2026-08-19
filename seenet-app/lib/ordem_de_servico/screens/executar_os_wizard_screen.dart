@@ -353,6 +353,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
                 )),
           ],
 
+          _buildHistoricoSinal(b['historico_sinal'], cor),
+
           if (causa != null) ...[
             const SizedBox(height: 10),
             // "PROVÁVEL CAUSA" só faz sentido quando há defeito. Numa
@@ -428,6 +430,62 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
             Text('Sugestão automática indisponível — acima estão só os dados do sistema.',
                 style: TextStyle(color: Colors.white38, fontSize: 11, height: 1.3)),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// 📈 Histórico do sinal da ONU nos últimos dias, vindo do IXC (~8 medições
+  /// por dia). O texto do veredito já está nos alertas; aqui entra o desenho,
+  /// porque ver a linha caindo comunica em 1 segundo o que a frase leva 3.
+  Widget _buildHistoricoSinal(dynamic h, Color cor) {
+    if (h is! Map) return const SizedBox.shrink();
+
+    final serie = (h['serie'] as List?)
+            ?.map((e) => (e is Map ? (e['v'] as num?)?.toDouble() : null))
+            .whereType<double>()
+            .toList() ??
+        [];
+    // Com menos de 3 pontos não há forma pra mostrar — o texto do alerta basta.
+    if (serie.length < 3) return const SizedBox.shrink();
+
+    final melhor = (h['melhor'] as num?)?.toDouble();
+    final pior = (h['pior'] as num?)?.toDouble();
+    final perda = (h['perda'] as num?)?.toDouble() ?? 0;
+    final dias = h['dias'] ?? 0;
+    final comportamento = h['comportamento'] as String?;
+
+    // A cor do gráfico segue o COMPORTAMENTO, não o valor atual: um sinal ainda
+    // dentro da faixa mas caindo rápido precisa chamar atenção.
+    final corGrafico = switch (comportamento) {
+      'degradando' => Colors.red.shade300,
+      'instavel' => const Color(0xFFFFB800),
+      'ruim_estavel' => const Color(0xFFFFB800),
+      _ => const Color(0xFF00FF88),
+    };
+
+    String fmt(double? v) =>
+        v == null ? '—' : '${v.toStringAsFixed(1).replaceAll('.', ',')}';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _tituloBriefing('SINAL NOS ÚLTIMOS $dias ${dias == 1 ? 'DIA' : 'DIAS'}'),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 42,
+            width: double.infinity,
+            child: CustomPaint(painter: _SparklineSinal(serie, corGrafico)),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'melhor ${fmt(melhor)}  ·  pior ${fmt(pior)}'
+            '${perda > 0.5 ? '  ·  perdeu ${fmt(perda)} dB' : ''}'
+            '  ·  ${h['pontos']} medições',
+            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          ),
         ],
       ),
     );
@@ -2749,4 +2807,65 @@ class _FinalizacaoProgressDialogState
       ),
     );
   }
+}
+/// Mini-gráfico do sinal da ONU ao longo dos dias.
+///
+/// Escala pelo PRÓPRIO intervalo da série (não por uma faixa fixa de dBm):
+/// enlaces variam de -17 a -28 e uma escala fixa achataria a linha até parecer
+/// reta. Aqui uma queda de 3 dB aparece como queda, que é o ponto.
+class _SparklineSinal extends CustomPainter {
+  final List<double> valores;
+  final Color cor;
+
+  _SparklineSinal(this.valores, this.cor);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (valores.length < 2) return;
+
+    final menor = valores.reduce((a, b) => a < b ? a : b);
+    final maior = valores.reduce((a, b) => a > b ? a : b);
+    // Série praticamente reta: fixa uma faixa mínima de 1 dB, senão o ruído de
+    // 0,05 dB viraria uma montanha-russa visual e assustaria à toa.
+    final faixa = (maior - menor) < 1.0 ? 1.0 : (maior - menor);
+    final base = (maior - menor) < 1.0 ? (maior + menor) / 2 - 0.5 : menor;
+
+    final dx = size.width / (valores.length - 1);
+    // dBm é negativo: quanto MAIOR o valor, melhor → topo do gráfico.
+    double y(double v) => size.height - ((v - base) / faixa) * size.height;
+
+    final caminho = Path();
+    for (var i = 0; i < valores.length; i++) {
+      final px = i * dx;
+      final py = y(valores[i]).clamp(1.0, size.height - 1);
+      i == 0 ? caminho.moveTo(px, py) : caminho.lineTo(px, py);
+    }
+
+    // Preenchimento suave embaixo da linha, só pra dar corpo ao gráfico.
+    final area = Path.from(caminho)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(area, Paint()..color = cor.withOpacity(0.10));
+
+    canvas.drawPath(
+      caminho,
+      Paint()
+        ..color = cor
+        ..strokeWidth = 1.8
+        ..style = PaintingStyle.stroke
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    // Bolinha no ponto mais recente (o valor de agora).
+    canvas.drawCircle(
+      Offset(size.width, y(valores.last).clamp(1.0, size.height - 1)),
+      3,
+      Paint()..color = cor,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SparklineSinal old) =>
+      old.valores != valores || old.cor != cor;
 }

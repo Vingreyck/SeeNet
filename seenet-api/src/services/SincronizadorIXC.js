@@ -805,6 +805,10 @@ class SincronizadorIXC {
             osIXC.sn_onu_temp = this._numeroSinal(fibra.temperatura);
             osIXC.sn_sinal_data = this._dataSinalValida(fibra.data_sinal);
             osIXC.sn_onu_tipo = fibra.onu_tipo || '';
+            // Chave do HISTÓRICO de sinal (radpop_radio_cliente_fibra_historico
+            // liga por id_cliente_fibra = este id). Sem guardar aqui, o briefing
+            // teria que redescobrir o registro de fibra a cada consulta.
+            osIXC.sn_fibra_id = fibra.id || null;
           }
         }
       }
@@ -832,6 +836,7 @@ class SincronizadorIXC {
         osIXC.sn_onu_temp = ixcAntigo.sn_onu_temp ?? null;
         osIXC.sn_sinal_data = ixcAntigo.sn_sinal_data || '';
         osIXC.sn_onu_tipo = ixcAntigo.sn_onu_tipo || '';
+        osIXC.sn_fibra_id = ixcAntigo.sn_fibra_id || null;
       } else {
         osIXC.sn_cidade = clienteCidade || '';
         osIXC.sn_cep = clienteCep || '';

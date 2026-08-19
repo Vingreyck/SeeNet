@@ -117,12 +117,23 @@ class IXCService {
    * os nomes REAIS dos campos (a UI mostra "Caixa FTTH"/"Porta FTTH", a API usa
    * outros nomes). Retorna o 1º registro ou null.
    */
-  async buscarClienteFibra(login) {
+  async buscarClienteFibra(login, idLogin = null) {
     try {
-      if (!login) return null;
+      // ⚠️ ARMADILHA: o qtype `radpop_radio_cliente_fibra.login` NÃO EXISTE nessa
+      // tabela — o IXC responde uma PÁGINA DE ERRO em HTML, não um JSON vazio.
+      // Como o acesso era por `?.`, o erro virava `null` em silêncio e a fibra
+      // (caixa/porta/sinal) nunca chegava ao card. Ficou assim por semanas.
+      // Campos consultáveis de verdade: `id_login` (numérico) e `nome` (a string
+      // do login). Preferimos o id_login: é exato e imune a renome de login.
+      const usarId = idLogin !== null && idLogin !== undefined &&
+                     idLogin !== '' && String(idLogin) !== '0';
+      if (!usarId && !login) return null;
+
       const params = new URLSearchParams({
-        qtype: 'radpop_radio_cliente_fibra.login',
-        query: login.toString(),
+        qtype: usarId
+          ? 'radpop_radio_cliente_fibra.id_login'
+          : 'radpop_radio_cliente_fibra.nome',
+        query: (usarId ? idLogin : login).toString(),
         oper: '=',
         page: '1',
         rp: '1',
@@ -130,10 +141,20 @@ class IXCService {
         sortorder: 'desc'
       });
       const response = await this.clientListar.post('/radpop_radio_cliente_fibra', params.toString());
-      // (logs de descoberta removidos — o "[FIBRA] sem registro" repetia dezenas
-      // de vezes por ciclo de sync e só servia pra mapear os nomes dos campos)
-      const reg = response.data?.registros?.[0] || null;
-      return reg;
+
+      // Distinção CONFERIDA ao vivo, e é o que separa "não achou" de "quebrou":
+      //   sem resultado (normal) → OBJETO {"page":"1","total":"0"} (sem registros)
+      //   qtype inválido (bug)   → STRING com HTML de erro
+      // Só o segundo caso merece log; avisar no primeiro encheria o ciclo de sync
+      // de ruído (boa parte dos clientes não tem registro de fibra).
+      if (typeof response.data !== 'object' || response.data === null) {
+        console.warn(`⚠️ [FIBRA] o IXC recusou a consulta de ` +
+          `${usarId ? `id_login ${idLogin}` : `login ${login}`} ` +
+          `(resposta não é JSON) — qtype inválido ou recurso sem permissão.`);
+        return null;
+      }
+
+      return response.data.registros?.[0] || null;
     } catch (e) {
       console.error(`❌ Erro ao buscar fibra do login ${login}:`, e.message);
       return null;

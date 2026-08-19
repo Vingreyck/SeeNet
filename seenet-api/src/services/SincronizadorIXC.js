@@ -777,12 +777,17 @@ class SincronizadorIXC {
           }
         }
 
-        // FIBRA (Caixa FTTH / Porta FTTH) pro card — busca por login, com cache.
-        if (osIXC.login) {
-          let fibra = this.cacheFibra.get(osIXC.login);
+        // FIBRA (Caixa FTTH / Porta FTTH / sinal da ONU) pro card, com cache.
+        // Busca pelo id_login (numérico) quando existe — é exato; o login em
+        // string entra só como reserva. Ver a armadilha do qtype no IXCService.
+        if (osIXC.login || (osIXC.id_login && osIXC.id_login !== '0')) {
+          const chaveFibra = (osIXC.id_login && osIXC.id_login !== '0')
+              ? `id:${osIXC.id_login}`
+              : `login:${osIXC.login}`;
+          let fibra = this.cacheFibra.get(chaveFibra);
           if (fibra === undefined) {
-            fibra = await ixcService.buscarClienteFibra(osIXC.login);
-            this.cacheFibra.set(osIXC.login, fibra);
+            fibra = await ixcService.buscarClienteFibra(osIXC.login, osIXC.id_login);
+            this.cacheFibra.set(chaveFibra, fibra);
           }
           if (fibra) {
             osIXC.caixa_ftth = fibra.caixa_ftth || fibra.id_caixa_ftth ||

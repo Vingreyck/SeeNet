@@ -12,6 +12,9 @@ class OSClienteInfo extends StatefulWidget {
   final bool mostrarNome;         // mostra a linha "Cliente" (wizard sim; card não, já tem no topo)
   final bool permitirLimparMac;   // mostra o botão "Limpar MAC" (precisa de idLogin)
   final bool permitirEditarEndereco; // técnico corrige o endereço em campo (só no wizard)
+  /// Sinal da ONU com explicação do que o número significa (só no wizard — no
+  /// card da lista fica só a linha curta, senão cada card cresce demais).
+  final bool detalharSinal;
 
   const OSClienteInfo({
     super.key,
@@ -19,6 +22,7 @@ class OSClienteInfo extends StatefulWidget {
     this.mostrarNome = false,
     this.permitirLimparMac = true,
     this.permitirEditarEndereco = false,
+    this.detalharSinal = false,
   });
 
   @override
@@ -273,6 +277,94 @@ class _OSClienteInfoState extends State<OSClienteInfo> {
     );
   }
 
+  // 📡 Sinal óptico da ONU. Classificação por regra fixa (ver OrdemServico),
+  // não por IA — é aritmética e precisa dar sempre o mesmo resultado.
+  //
+  // A idade da medição fica SEMPRE visível: a fibra só é consultada na 1ª
+  // sincronização da OS, então uma OS parada há dias carrega leitura velha.
+  // Mostrar "-27,96 dBm" sem dizer "há 3 dias" faria o técnico tomar decisão
+  // com base em dado vencido.
+  Widget _linhaSinal() {
+    final Color cor;
+    final IconData icone;
+    switch (os.nivelSinal) {
+      case NivelSinal.bom:
+        cor = _verde;
+        icone = Icons.signal_cellular_alt_rounded;
+      case NivelSinal.atencao:
+        cor = const Color(0xFFFFB800);
+        icone = Icons.signal_cellular_alt_2_bar_rounded;
+      case NivelSinal.critico:
+        cor = Colors.red.shade300;
+        icone = Icons.signal_cellular_alt_1_bar_rounded;
+      case NivelSinal.desconhecido:
+        cor = Colors.white38;
+        icone = Icons.signal_cellular_off_rounded;
+    }
+
+    final velho = os.sinalDesatualizado;
+    // Medição vencida entra em cinza: o número continua à vista como
+    // referência, mas sem a cor de diagnóstico, que sugeriria "é agora".
+    final corValor = velho ? Colors.white54 : cor;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icone, color: Colors.white38, size: 14),
+              const SizedBox(width: 6),
+              const SizedBox(
+                width: 78,
+                child: Text('Sinal ONU:',
+                    style: TextStyle(color: Colors.white38, fontSize: 12)),
+              ),
+              Container(
+                width: 7, height: 7,
+                margin: const EdgeInsets.only(top: 3, right: 5),
+                decoration: BoxDecoration(color: corValor, shape: BoxShape.circle),
+              ),
+              Expanded(
+                child: Text(
+                  '${os.sinalFormatado} · ${os.sinalIdadeTexto}'
+                  '${velho ? ' (antigo)' : ''}',
+                  style: TextStyle(
+                    color: corValor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (widget.detalharSinal)
+            Padding(
+              padding: const EdgeInsets.only(left: 90, top: 2),
+              child: Text(
+                os.sinalExplicacao,
+                style: TextStyle(color: corValor.withOpacity(0.75), fontSize: 11),
+              ),
+            ),
+          if (widget.detalharSinal && (os.onuTemperatura != null || os.onuTipo != null))
+            Padding(
+              padding: const EdgeInsets.only(left: 90, top: 2),
+              child: Text(
+                [
+                  if (os.onuTipo != null) os.onuTipo!,
+                  if (os.onuTemperatura != null)
+                    '${os.onuTemperatura!.toStringAsFixed(0)}°C',
+                ].join(' · '),
+                style: const TextStyle(color: Colors.white38, fontSize: 11),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -289,6 +381,7 @@ class _OSClienteInfoState extends State<OSClienteInfo> {
         if (os.plano != null)
           _linha('Plano', os.plano, icone: Icons.speed_rounded),
         if (os.statusConexaoOnline != null) _linhaStatusConexao(),
+        if (os.temSinal) _linhaSinal(),
         if (os.caixaFtth != null)
           _linha('CTO', os.caixaFtth, icone: Icons.hub_outlined),
         if (os.portaFtth != null)

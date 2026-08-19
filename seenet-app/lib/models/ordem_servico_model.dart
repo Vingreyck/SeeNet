@@ -1,6 +1,24 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 
+/// 📡 Qualidade do sinal óptico da ONU, classificada por REGRA FIXA (não por IA).
+/// Os limites são de potência de recepção (RX) em dBm, padrão GPON.
+enum NivelSinal {
+  /// Acima de -25 dBm — dentro do esperado.
+  bom,
+
+  /// Entre -25 e -27 dBm — funciona, mas está na borda; costuma dar queda
+  /// intermitente e piora com chuva.
+  atencao,
+
+  /// Abaixo de -27 dBm (ou forte demais, acima de -8) — fora da faixa de
+  /// operação. Explica queda/lentidão sozinho.
+  critico,
+
+  /// Sem medição no IXC para este login.
+  desconhecido,
+}
+
 class OrdemServico {
   final String id;
   final String numeroOs;
@@ -34,6 +52,16 @@ class OrdemServico {
   final String? caixaFtth; // CTO
   final String? portaFtth;
   final String? idAssunto; // assunto IXC (60 = instalação de internet FTTH)
+
+  // 📡 Sinal da ONU — vem do mesmo registro de fibra que já traz caixa/porta,
+  // então não custa chamada extra ao IXC. Como a fibra só é consultada na 1ª
+  // sincronização da OS, `sinalMedidoEm` é obrigatório na tela: o técnico precisa
+  // saber se está vendo a leitura de agora ou a de 3 dias atrás.
+  final double? sinalRx;          // potência de recepção em dBm (o que importa)
+  final double? sinalTx;          // potência de transmissão em dBm
+  final double? onuTemperatura;   // °C
+  final DateTime? sinalMedidoEm;  // quando o IXC mediu
+  final String? onuTipo;          // modelo da ONU (ex: ZTEG-F670LV9)
 
   final String tipoServico;
   final String prioridade;
@@ -90,6 +118,11 @@ class OrdemServico {
     this.caixaFtth,
     this.portaFtth,
     this.idAssunto,
+    this.sinalRx,
+    this.sinalTx,
+    this.onuTemperatura,
+    this.sinalMedidoEm,
+    this.onuTipo,
     required this.tipoServico,
     this.prioridade = 'media',
     this.status = 'pendente',
@@ -128,6 +161,11 @@ class OrdemServico {
     String? idLogin;
     bool? statusConexaoOnline;
     String? ultimaConexao;
+    double? sinalRx;
+    double? sinalTx;
+    double? onuTemperatura;
+    DateTime? sinalMedidoEm;
+    String? onuTipo;
     final dadosIxc = json['dados_ixc'];
     if (dadosIxc != null) {
       try {
@@ -152,6 +190,34 @@ class OrdemServico {
           idLogin = limpo(d['id_login']);
           statusConexaoOnline = d['sn_online'] is bool ? d['sn_online'] as bool : null;
           ultimaConexao = limpo(d['sn_ultima_conexao']);
+
+          // 📡 Sinal da ONU. O backend já manda número (ou null), mas aceita
+          // string por segurança: o dados_ixc pode ter sido gravado por uma
+          // versão anterior do sincronizador.
+          double? paraDouble(dynamic v) {
+            if (v == null) return null;
+            if (v is num) return v == 0 ? null : v.toDouble();
+            final n = double.tryParse(v.toString().trim());
+            return (n == null || n == 0) ? null : n;
+          }
+
+          sinalRx = paraDouble(d['sn_sinal_rx']);
+          sinalTx = paraDouble(d['sn_sinal_tx']);
+          onuTemperatura = paraDouble(d['sn_onu_temp']);
+          onuTipo = limpo(d['sn_onu_tipo']);
+          final dataSinal = limpo(d['sn_sinal_data']);
+          if (dataSinal != null) {
+            // IXC manda "2026-08-18 16:40:41" (espaço, não T) — DateTime.tryParse
+            // aceita, mas normalizo pra não depender disso.
+            final parsed = DateTime.tryParse(dataSinal.replaceFirst(' ', 'T'));
+            // ⚠️ `tryParse` NÃO devolve null pra "0000-00-00 00:00:00" (que é como
+            // o IXC marca "nunca medido"): devolve ano -1. Sem esta guarda, a tela
+            // mostraria "há 740 mil dias". O backend já filtra, mas o dados_ixc
+            // pode ter sido gravado por uma versão anterior do sincronizador.
+            if (parsed != null && parsed.year >= 2000) {
+              sinalMedidoEm = parsed;
+            }
+          }
         }
       } catch (_) {}
     }
@@ -161,6 +227,11 @@ class OrdemServico {
       caixaFtth: caixaFtth,
       portaFtth: portaFtth,
       idAssunto: idAssunto,
+      sinalRx: sinalRx,
+      sinalTx: sinalTx,
+      onuTemperatura: onuTemperatura,
+      sinalMedidoEm: sinalMedidoEm,
+      onuTipo: onuTipo,
       clienteCidade: clienteCidade,
       clienteCep: clienteCep,
       clienteReferencia: clienteReferencia,
@@ -273,6 +344,81 @@ class OrdemServico {
   static const Set<String> assuntosRetirada = {'90'};
 
   bool get isRetirada => assuntosRetirada.contains(idAssunto);
+
+  // ─────────────────────────── 📡 SINAL DA ONU ───────────────────────────
+  // Classificação por REGRA FIXA. Fica no model (e não numa IA) de propósito:
+  // é aritmética simples, precisa dar sempre o mesmo resultado e não pode
+  // depender de rede nem de serviço externo pra funcionar.
+
+  /// Abaixo disto o sinal é crítico — a ONU costuma perder o link perto de -28.
+  static const double sinalCritico = -27.0;
+
+  /// Entre este valor e [sinalCritico] o link funciona, mas na borda:
+  /// dá queda intermitente e piora com chuva.
+  static const double sinalAtencao = -25.0;
+
+  /// Acima disto o sinal é forte DEMAIS (falta atenuador / ONU perto do OLT),
+  /// o que também é defeito e pode danificar o receptor.
+  static const double sinalForteDemais = -8.0;
+
+  /// Depois de quantas horas a medição deixa de valer como "de agora".
+  /// A fibra só é consultada na 1ª sincronização da OS, então uma OS que ficou
+  /// dias pendente carrega uma leitura velha — e o técnico precisa saber disso.
+  static const int horasSinalValido = 24;
+
+  bool get temSinal => sinalRx != null;
+
+  NivelSinal get nivelSinal {
+    final rx = sinalRx;
+    if (rx == null) return NivelSinal.desconhecido;
+    if (rx > sinalForteDemais) return NivelSinal.critico;
+    if (rx < sinalCritico) return NivelSinal.critico;
+    if (rx < sinalAtencao) return NivelSinal.atencao;
+    return NivelSinal.bom;
+  }
+
+  /// true quando a medição é mais velha que [horasSinalValido]. A tela usa isso
+  /// pra mostrar a leitura como referência e não como diagnóstico do momento.
+  bool get sinalDesatualizado {
+    final em = sinalMedidoEm;
+    if (em == null) return true;
+    return DateTime.now().difference(em).inHours >= horasSinalValido;
+  }
+
+  /// "-27,96 dBm" (vírgula, como o técnico lê). Vazio se não há medição.
+  String get sinalFormatado {
+    final rx = sinalRx;
+    if (rx == null) return '';
+    return '${rx.toStringAsFixed(2).replaceAll('.', ',')} dBm';
+  }
+
+  /// Idade da medição em texto curto: "agora", "há 3 h", "há 2 dias".
+  String get sinalIdadeTexto {
+    final em = sinalMedidoEm;
+    if (em == null) return 'sem data';
+    final d = DateTime.now().difference(em);
+    if (d.isNegative || d.inMinutes < 5) return 'agora';
+    if (d.inMinutes < 60) return 'há ${d.inMinutes} min';
+    if (d.inHours < 24) return 'há ${d.inHours} h';
+    return 'há ${d.inDays} ${d.inDays == 1 ? 'dia' : 'dias'}';
+  }
+
+  /// Frase curta explicando o que o número significa — o que o técnico
+  /// realmente precisa saber, sem ter que decorar os limites.
+  String get sinalExplicacao {
+    switch (nivelSinal) {
+      case NivelSinal.bom:
+        return 'Dentro do esperado';
+      case NivelSinal.atencao:
+        return 'Na borda — costuma cair de forma intermitente e piora com chuva';
+      case NivelSinal.critico:
+        return (sinalRx != null && sinalRx! > sinalForteDemais)
+            ? 'Forte demais — falta atenuação, pode danificar a ONU'
+            : 'Fora da faixa — explica queda e lentidão por si só';
+      case NivelSinal.desconhecido:
+        return 'Sem medição no IXC para este login';
+    }
+  }
 
   /// Cor da categoria "retirada". Roxo de propósito: nenhum dos ESTADOS usa
   /// roxo (pendente=amarelo, em campo=azul, concluída=verde), então bate o

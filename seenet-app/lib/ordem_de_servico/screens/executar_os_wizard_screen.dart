@@ -295,7 +295,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           // completo, Limpar MAC).
           _buildCard(
               child: OSClienteInfo(
-                  os: os, mostrarNome: true, permitirEditarEndereco: true)),
+                  os: os,
+                  mostrarNome: true,
+                  permitirEditarEndereco: true,
+                  detalharSinal: true)),
           // Atalhos: WhatsApp + Ligar + abrir a localização no Google Maps.
           if (_temTelefone || _temEndereco) ...[
             const SizedBox(height: 12),

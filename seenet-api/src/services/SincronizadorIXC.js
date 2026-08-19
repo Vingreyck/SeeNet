@@ -789,6 +789,17 @@ class SincronizadorIXC {
                 fibra.caixa || fibra.caixa_hermetica || fibra.nome_caixa || '';
             osIXC.porta_ftth = fibra.porta_ftth || fibra.porta ||
                 fibra.porta_ser || fibra.numero_porta || '';
+
+            // 📡 SINAL DA ONU — vem no MESMO registro que já buscamos acima, então
+            // não custa nenhuma chamada extra ao IXC. O IXC coleta sozinho e grava
+            // aqui (conferido: ~88% dos logins têm sinal, medido no mesmo dia).
+            // `data_sinal` é essencial: o app avisa quando a medição está velha,
+            // porque a fibra só é consultada na 1ª sincronização da OS (sn_enriquecido).
+            osIXC.sn_sinal_rx = this._numeroSinal(fibra.sinal_rx);
+            osIXC.sn_sinal_tx = this._numeroSinal(fibra.sinal_tx);
+            osIXC.sn_onu_temp = this._numeroSinal(fibra.temperatura);
+            osIXC.sn_sinal_data = this._dataSinalValida(fibra.data_sinal);
+            osIXC.sn_onu_tipo = fibra.onu_tipo || '';
           }
         }
       }
@@ -809,6 +820,13 @@ class SincronizadorIXC {
         osIXC.sn_senha = ixcAntigo.sn_senha || '';
         osIXC.sn_online = ixcAntigo.sn_online ?? null;
         osIXC.sn_ultima_conexao = ixcAntigo.sn_ultima_conexao || '';
+        // 📡 Sinal da ONU: mantém o do snapshot (junto com `sn_sinal_data`, que é
+        // o que permite ao app dizer "medido há X" em vez de fingir que é atual).
+        osIXC.sn_sinal_rx = ixcAntigo.sn_sinal_rx ?? null;
+        osIXC.sn_sinal_tx = ixcAntigo.sn_sinal_tx ?? null;
+        osIXC.sn_onu_temp = ixcAntigo.sn_onu_temp ?? null;
+        osIXC.sn_sinal_data = ixcAntigo.sn_sinal_data || '';
+        osIXC.sn_onu_tipo = ixcAntigo.sn_onu_tipo || '';
       } else {
         osIXC.sn_cidade = clienteCidade || '';
         osIXC.sn_cep = clienteCep || '';
@@ -956,6 +974,33 @@ class SincronizadorIXC {
   obterTipoServico(tipoIXC) {
     const tiposMap = { 'I': 'Instalação', 'M': 'Manutenção', 'R': 'Reparo', 'C': 'Comercial', 'V': 'Visita Técnica' };
     return tiposMap[tipoIXC] || 'Manutenção';
+  }
+
+  /**
+   * 📡 Converte um campo de sinal/temperatura da ONU em número, ou null.
+   *
+   * O IXC usa "0.00" como "nunca medido" (esses registros vêm com
+   * data_sinal = '0000-00-00 00:00:00'). Potência óptica real nunca é
+   * exatamente 0 dBm, então tratar 0 como ausente é seguro — e evita o app
+   * mostrar "0 dBm" como se fosse uma leitura boa.
+   */
+  _numeroSinal(valor) {
+    if (valor === null || valor === undefined || valor === '') return null;
+    const n = parseFloat(valor);
+    if (Number.isNaN(n) || n === 0) return null;
+    return n;
+  }
+
+  /**
+   * 📡 Data da medição do sinal, ou '' se o IXC nunca mediu.
+   * É o que permite ao app dizer "medido há 3 dias" em vez de dar a entender
+   * que o valor é de agora (a fibra só é consultada na 1ª sync da OS).
+   */
+  _dataSinalValida(dataString) {
+    if (!dataString) return '';
+    const s = String(dataString);
+    if (s.startsWith('0000')) return '';
+    return s;
   }
 }
 

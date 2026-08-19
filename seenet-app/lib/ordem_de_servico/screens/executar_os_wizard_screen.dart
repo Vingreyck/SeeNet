@@ -480,14 +480,50 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
             child: CustomPaint(painter: _SparklineSinal(serie, corGrafico)),
           ),
           const SizedBox(height: 4),
-          Text(
-            'melhor ${fmt(melhor)}  ·  pior ${fmt(pior)}'
-            '${perda > 0.5 ? '  ·  perdeu ${fmt(perda)} dB' : ''}'
-            '  ·  ${h['pontos']} medições',
-            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'melhor ${fmt(melhor)}  ·  pior ${fmt(pior)}'
+                  '${perda > 0.5 ? '  ·  perdeu ${fmt(perda)} dB' : ''}'
+                  '  ·  ${h['pontos']} medições',
+                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+              ),
+              // O gráfico mostra a TENDÊNCIA; quem quer conferir leitura por
+              // leitura (como na tela do IXC) abre aqui.
+              InkWell(
+                onTap: _abrirHistoricoSinal,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.list_alt_rounded, color: corGrafico, size: 13),
+                    const SizedBox(width: 3),
+                    Text('ver leituras',
+                        style: TextStyle(
+                            color: corGrafico, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  /// Abre a tabela completa de leituras do sinal (RX, TX, temperatura,
+  /// voltagem, data), buscada sob demanda — não vem junto do briefing.
+  Future<void> _abrirHistoricoSinal() async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _HistoricoSinalSheet(osId: os.id),
     );
   }
 
@@ -2868,4 +2904,267 @@ class _SparklineSinal extends CustomPainter {
   @override
   bool shouldRepaint(_SparklineSinal old) =>
       old.valores != valores || old.cor != cor;
+}
+
+/// Tabela completa do histórico de sinal da ONU — espelha a tela do IXC
+/// (RX, TX, temperatura, voltagem, data), com o resumo e o gráfico no topo.
+///
+/// Busca sob demanda: são ~84 linhas, não vale carregar em toda abertura de OS.
+class _HistoricoSinalSheet extends StatefulWidget {
+  final String osId;
+  const _HistoricoSinalSheet({required this.osId});
+
+  @override
+  State<_HistoricoSinalSheet> createState() => _HistoricoSinalSheetState();
+}
+
+class _HistoricoSinalSheetState extends State<_HistoricoSinalSheet> {
+  bool _carregando = true;
+  List<dynamic> _leituras = [];
+  Map<String, dynamic>? _resumo;
+  String? _onu;
+  String? _login;
+  String? _motivo;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregar();
+  }
+
+  Future<void> _carregar() async {
+    final d = await OrdemServicoService().buscarHistoricoSinal(widget.osId);
+    if (!mounted) return;
+    setState(() {
+      _carregando = false;
+      _leituras = (d?['leituras'] as List?) ?? [];
+      _resumo = d?['resumo'] is Map ? Map<String, dynamic>.from(d!['resumo']) : null;
+      _onu = d?['onu'] as String?;
+      _login = d?['login'] as String?;
+      _motivo = d?['motivo'] as String?;
+    });
+  }
+
+  /// "19/08 15:04" — dia e hora bastam; o ano só polui numa lista de 10 dias.
+  String _data(dynamic v) {
+    final s = v?.toString() ?? '';
+    if (s.length < 16) return s;
+    return '${s.substring(8, 10)}/${s.substring(5, 7)} ${s.substring(11, 16)}';
+  }
+
+  String _n(dynamic v, {int casas = 2}) {
+    if (v == null) return '—';
+    final d = v is num ? v.toDouble() : double.tryParse(v.toString());
+    return d == null ? '—' : d.toStringAsFixed(casas).replaceAll('.', ',');
+  }
+
+  Widget _colTitulo(String t) => Expanded(
+        child: Text(t,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+                color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _resumo;
+    // Cor pelo comportamento, igual ao card do briefing — o técnico já associou.
+    final cor = switch (r?['comportamento']) {
+      'degradando' => Colors.red.shade300,
+      'instavel' => const Color(0xFFFFB800),
+      'ruim_estavel' => const Color(0xFFFFB800),
+      _ => const Color(0xFF00FF88),
+    };
+
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.85,
+      child: Column(
+        children: [
+          Container(
+            width: 38,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+                color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: [
+              Icon(Icons.show_chart_rounded, color: cor, size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Histórico do sinal',
+                    style: TextStyle(
+                        color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ]),
+          ),
+          if (_login != null || _onu != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  [if (_login != null) _login!, if (_onu != null) _onu!].join('  ·  '),
+                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                ),
+              ),
+            ),
+          if (_carregando)
+            const Expanded(
+              child: Center(
+                  child: CircularProgressIndicator(
+                      color: Color(0xFF00FF88), strokeWidth: 2)),
+            )
+          else if (_leituras.isEmpty)
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    _motivo != null
+                        ? 'Sem histórico: $_motivo'
+                        : 'Nenhuma medição de sinal para este cliente nos últimos 10 dias.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white38, fontSize: 13),
+                  ),
+                ),
+              ),
+            )
+          else ...[
+            if (r != null)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: cor.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: cor.withOpacity(0.3)),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  SizedBox(
+                    height: 46,
+                    width: double.infinity,
+                    child: CustomPaint(
+                      painter: _SparklineSinal(
+                        (r['serie'] as List?)
+                                ?.map((e) =>
+                                    (e is Map ? (e['v'] as num?)?.toDouble() : null))
+                                .whereType<double>()
+                                .toList() ??
+                            [],
+                        cor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'atual ${_n(r['atual'])}  ·  melhor ${_n(r['melhor'])}  ·  '
+                    'pior ${_n(r['pior'])}  ·  perda ${_n(r['perda'])} dB',
+                    style:
+                        TextStyle(color: cor, fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  if (r['temperatura_max'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        'temperatura máxima ${_n(r['temperatura_max'], casas: 0)}°C'
+                        '${(r['temperatura_max'] as num) >= 60 ? '  ⚠️ alta' : ''}',
+                        style: const TextStyle(color: Colors.white38, fontSize: 11),
+                      ),
+                    ),
+                ]),
+              ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              color: Colors.white.withOpacity(0.04),
+              child: Row(children: [
+                const SizedBox(
+                  width: 84,
+                  child: Text('Data',
+                      style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold)),
+                ),
+                _colTitulo('RX'),
+                _colTitulo('TX'),
+                _colTitulo('Temp'),
+                _colTitulo('Volt'),
+              ]),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _leituras.length,
+                itemBuilder: (_, i) {
+                  final p = _leituras[i] as Map;
+                  final temp = (p['temperatura'] as num?)?.toDouble();
+                  // Temperatura alta é o dado que mais passa despercebido — já
+                  // achou uma ONU superaquecendo em produção, com sinal bom.
+                  final quente = temp != null && temp >= 60;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                    decoration: BoxDecoration(
+                      border: Border(
+                          bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
+                      color:
+                          i.isEven ? Colors.transparent : Colors.white.withOpacity(0.02),
+                    ),
+                    child: Row(children: [
+                      SizedBox(
+                        width: 84,
+                        child: Text(_data(p['data']),
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 12)),
+                      ),
+                      Expanded(
+                        child: Text(_n(p['rx']),
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                                color: cor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                      Expanded(
+                        child: Text(_n(p['tx']),
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                                color: Colors.white54, fontSize: 12)),
+                      ),
+                      Expanded(
+                        child: Text(_n(temp, casas: 0),
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                                color: quente
+                                    ? Colors.orange.shade300
+                                    : Colors.white54,
+                                fontSize: 12,
+                                fontWeight:
+                                    quente ? FontWeight.bold : FontWeight.normal)),
+                      ),
+                      Expanded(
+                        child: Text(_n(p['voltagem']),
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                                color: Colors.white38, fontSize: 12)),
+                      ),
+                    ]),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Text('${_leituras.length} medições · mais recente primeiro',
+                  style: const TextStyle(color: Colors.white24, fontSize: 11)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

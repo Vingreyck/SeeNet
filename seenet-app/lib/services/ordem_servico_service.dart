@@ -43,6 +43,26 @@ class OrdemServicoService {
     }
   }
 
+  /// 📈 Histórico do sinal da ONU, leitura por leitura (RX, TX, temperatura,
+  /// voltagem, data) — o mesmo que o IXC mostra na tela de histórico.
+  ///
+  /// Só é chamado quando o técnico toca em "ver histórico": são ~84 linhas e
+  /// não faz sentido baixar isso em toda abertura de OS.
+  Future<Map<String, dynamic>?> buscarHistoricoSinal(String osId, {int dias = 10}) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/ordens-servico/$osId/historico-sinal?dias=$dias'),
+              headers: _headers)
+          .timeout(const Duration(seconds: 45));
+      if (response.statusCode != 200) return null;
+      final body = json.decode(response.body);
+      return body is Map ? Map<String, dynamic>.from(body) : null;
+    } catch (e) {
+      print('⚠️ Histórico de sinal indisponível: $e');
+      return null;
+    }
+  }
+
   // 💾 Rascunho do wizard no servidor (preserva tudo ao reagendar/encaminhar).
   Future<bool> salvarRascunho(String osId, Map<String, dynamic> dados) async {
     try {

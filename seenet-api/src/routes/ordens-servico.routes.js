@@ -26,6 +26,10 @@ router.get('/:id/detalhes', OrdensServicoController.buscarDetalhesOS.bind(Ordens
 // falha por causa da IA — sem ela, devolve só os fatos. ?refresh=1 força regerar.
 router.get('/:id/briefing', OrdensServicoController.buscarBriefing.bind(OrdensServicoController));
 
+// 📈 Histórico do sinal da ONU, leitura por leitura (o que o IXC mostra na tela
+// de histórico). Separado do briefing pra não trafegar ~84 linhas em toda OS.
+router.get('/:id/historico-sinal', OrdensServicoController.buscarHistoricoSinal.bind(OrdensServicoController));
+
 // Listar admins para seleção
 router.get('/admins', OrdensServicoController.listarAdmins.bind(OrdensServicoController));
 

@@ -2797,6 +2797,70 @@ if (dados.fotos && dados.fotos.length > 0) {
   }
 
   /**
+   * 📈 GET /ordens-servico/:id/historico-sinal?dias=10
+   *
+   * Leitura por leitura do sinal da ONU — o mesmo que o IXC mostra na tela de
+   * histórico (RX, TX, temperatura, voltagem, data). O briefing já traz o
+   * resumo e o gráfico; isto é pra quando o técnico quer CONFERIR os números.
+   *
+   * Endpoint separado de propósito: são ~84 linhas por OS, e não faz sentido
+   * carregar isso em toda abertura de OS só porque às vezes alguém abre a tabela.
+   */
+  async buscarHistoricoSinal(req, res) {
+    try {
+      const { id } = req.params;
+      const tenantId = req.tenantId;
+      const userId = req.user.id;
+      const dias = Math.min(Math.max(parseInt(req.query.dias, 10) || 10, 1), 30);
+
+      const os = await db('ordem_servico')
+        .where('id', id).where('tenant_id', tenantId).first();
+      if (!os) {
+        return res.status(404).json({ success: false, error: 'OS não encontrada' });
+      }
+      const ehAdmin = ['administrador', 'admin'].includes(req.user.tipo_usuario);
+      if (!ehAdmin && String(os.tecnico_id) !== String(userId)) {
+        return res.status(403).json({ success: false, error: 'Esta OS não é sua' });
+      }
+
+      const integ = await db('integracao_ixc')
+        .where('tenant_id', tenantId).where('ativo', true).first();
+      if (!integ) {
+        return res.json({ success: true, leituras: [], resumo: null, motivo: 'sem integração IXC' });
+      }
+
+      let dIxc = {};
+      try {
+        dIxc = os.dados_ixc
+          ? (typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : os.dados_ixc)
+          : {};
+      } catch (_) { /* segue com objeto vazio */ }
+
+      const ixc = new IXCService(integ.url_api, integ.token_api);
+      let fibraId = dIxc.sn_fibra_id || null;
+      if (!fibraId && (dIxc.login || dIxc.id_login)) {
+        const fibra = await ixc.buscarClienteFibra(dIxc.login, dIxc.id_login);
+        fibraId = fibra?.id || null;
+      }
+      if (!fibraId) {
+        return res.json({ success: true, leituras: [], resumo: null, motivo: 'cliente sem registro de fibra' });
+      }
+
+      const leituras = await ixc.buscarHistoricoSinal(fibraId, dias);
+      return res.json({
+        success: true,
+        leituras,                                            // mais recente primeiro
+        resumo: briefingService.analisarHistoricoSinal(leituras),
+        onu: dIxc.sn_onu_tipo || null,
+        login: dIxc.login || null,
+      });
+    } catch (error) {
+      console.error('❌ Erro no histórico de sinal:', error.message);
+      return res.status(500).json({ success: false, error: 'Erro ao buscar histórico' });
+    }
+  }
+
+  /**
    * 🤖 GET /ordens-servico/:id/briefing
    *
    * Análise da OS pro técnico ler ANTES de bater na porta: provável causa,

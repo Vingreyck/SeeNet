@@ -4,7 +4,14 @@ const logger = require('../config/logger');
 class GeminiService {
   constructor() {
     this.apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-    this.model = 'llama-3.3-70b-versatile';
+    // ⚠️ Era `llama-3.3-70b-versatile`, que a Groq APOSENTOU — a conta passou a
+    // responder `model_not_found` e o diagnóstico do checklist ficou quebrado em
+    // SILÊNCIO (falhava as 3 tentativas e caía no catch). Descoberto em 19/ago,
+    // ao investigar por que o briefing da OS não gerava.
+    // Dos modelos que existem hoje nesta conta, o gpt-oss-120b é o que atende —
+    // testado com ESTE prompt, mantendo o formato estruturado com emojis.
+    // Se voltar a falhar: `GET https://api.groq.com/openai/v1/models` lista o que existe.
+    this.model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
     this.maxRetries = 3;
     this.retryDelay = 1000;
   }

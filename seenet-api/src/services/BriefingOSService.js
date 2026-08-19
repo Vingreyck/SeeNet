@@ -41,9 +41,13 @@ class BriefingOSService {
 
   constructor() {
     this.apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-    // Mesmo modelo do diagnóstico do checklist (geminiService). É de TEXTO —
-    // não repetir a aposta em visão, que já se provou não funcionar aqui.
-    this.model = process.env.GROQ_BRIEFING_MODEL || 'llama-3.3-70b-versatile';
+    // Modelo de TEXTO (não repetir a aposta em visão, que já se provou não
+    // funcionar aqui). ⚠️ A Groq APOSENTA modelo sem aviso: `llama-3.3-70b-versatile`
+    // sumiu da conta e derrubou este briefing E o diagnóstico do checklist, em
+    // silêncio. Dos que existem hoje, só o gpt-oss-120b aceita esta chamada —
+    // `qwen/qwen3.6-27b` e `openai/gpt-oss-20b` devolvem 400 (testado 19/ago).
+    // Se um dia parar: rodar `GET /openai/v1/models` pra ver o que existe.
+    this.model = process.env.GROQ_BRIEFING_MODEL || 'openai/gpt-oss-120b';
     this.timeoutMs = 20000;
     this.maxTexto = 400; // corta texto livre do IXC (alguns vêm gigantes)
   }
@@ -407,7 +411,9 @@ Responda APENAS com JSON válido, sem markdown, sem crase, neste formato exato:
         gerado_em: new Date().toISOString(),
       };
     } catch (e) {
-      console.warn(`⚠️ [BRIEFING] IA indisponível (${e.message}) — devolvendo só os fatos`);
+      // O nome do modelo vai no log DE PROPÓSITO: quando a Groq aposentar este
+      // também, a causa fica óbvia na primeira linha em vez de virar caçada.
+      console.warn(`⚠️ [BRIEFING] IA indisponível [${this.model}] (${e.message}) — devolvendo só os fatos`);
       return {
         ...base,
         causa_provavel: null,

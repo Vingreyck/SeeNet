@@ -102,9 +102,11 @@ class OrdemServicoController extends GetxController {
   }
 
   // ✅ MODIFICADO: Agora aceita adminId
-  Future<bool> deslocarParaOS(String osId, double lat, double lng, {int? adminId}) async {
+  Future<bool> deslocarParaOS(String osId, double lat, double lng,
+      {int? adminId, List<int>? adminsIds}) async {
     try {
-      final sucesso = await _service.deslocarParaOS(osId, lat, lng, adminId: adminId);
+      final sucesso = await _service.deslocarParaOS(osId, lat, lng,
+          adminId: adminId, adminsIds: adminsIds);
 
       if (sucesso) {
         await carregarMinhasOSs();

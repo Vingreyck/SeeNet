@@ -78,8 +78,33 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
   Uint8List? assinaturaBytes;
   bool osIniciada = false;
   String statusAtual = 'pendente';
-  int? adminSelecionadoId;
-  String? adminSelecionadoNome;
+  /// Admins que vão acompanhar este atendimento.
+  ///
+  /// Virou LISTA: o técnico pode marcar mais de um, e todos recebem as
+  /// notificações e enxergam a OS na tela de Acompanhamento. O primeiro da
+  /// lista continua sendo o "principal" (é o que o backend grava na coluna
+  /// antiga `admin_responsavel_id`).
+  List<int> adminsSelecionadosIds = [];
+  List<String> adminsSelecionadosNomes = [];
+
+  /// Derivados da lista, pra não existir duas fontes de verdade que possam
+  /// discordar. O resto da tela (snackbar, guarda do "já escolheu?") continua
+  /// lendo por aqui, igual antes de virar lista.
+  int? get adminSelecionadoId =>
+      adminsSelecionadosIds.isEmpty ? null : adminsSelecionadosIds.first;
+  String? get adminSelecionadoNome =>
+      adminsSelecionadosNomes.isEmpty ? null : adminsSelecionadosNomes.first;
+
+  /// "Fulano", "Fulano e Ciclano", "Fulano e mais 2" — pro aviso na tela.
+  String get _adminsResumo {
+    if (adminsSelecionadosNomes.isEmpty) return 'Ninguém';
+    if (adminsSelecionadosNomes.length == 1) return adminsSelecionadosNomes.first;
+    if (adminsSelecionadosNomes.length == 2) {
+      return '${adminsSelecionadosNomes[0]} e ${adminsSelecionadosNomes[1]}';
+    }
+    return '${adminsSelecionadosNomes.first} e mais ${adminsSelecionadosNomes.length - 1}';
+  }
+
   bool _isLoading = false;
 
   // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
@@ -992,8 +1017,12 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     GetStorage().write('wizard_progress_${os.id}', {
       'etapa':         _etapaAtual,
       'statusAtual':   statusAtual,
+      // `adminId`/`adminNome` continuam sendo gravados: é o que uma versão
+      // ANTERIOR do app sabe ler, caso o técnico volte pra ela.
       'adminId':       adminSelecionadoId,
       'adminNome':     adminSelecionadoNome,
+      'adminsIds':     adminsSelecionadosIds,
+      'adminsNomes':   adminsSelecionadosNomes,
       'latitude':      latitude,   // ✅ persiste a localização capturada (não perde ao reabrir)
       'longitude':     longitude,
       'latitudeFinal':  latitudeFinal,
@@ -1075,10 +1104,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       materiaisController.text     = dados['materiais']     ?? '';
       observacoesController.text   = dados['observacoes']   ?? '';
 
-      if (dados['adminId'] != null) {
-        adminSelecionadoId   = dados['adminId']   as int?;
-        adminSelecionadoNome = dados['adminNome'] as String?;
-      }
+      _restaurarAdmins(dados);
       // ✅ restaura a localização já capturada (mostra "Localização Capturada" ao voltar)
       if (dados['latitude'] != null) latitude = (dados['latitude'] as num).toDouble();
       if (dados['longitude'] != null) longitude = (dados['longitude'] as num).toDouble();
@@ -1126,6 +1152,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       'statusAtual': statusAtual,
       'adminId': adminSelecionadoId,
       'adminNome': adminSelecionadoNome,
+      'adminsIds': adminsSelecionadosIds,
+      'adminsNomes': adminsSelecionadosNomes,
       'latitude': latitude,
       'longitude': longitude,
       'latitudeFinal': latitudeFinal,
@@ -1215,10 +1243,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     materiaisController.text     = dados['materiais']     ?? '';
     observacoesController.text   = dados['observacoes']   ?? '';
 
-    if (dados['adminId'] != null) {
-      adminSelecionadoId   = dados['adminId']   as int?;
-      adminSelecionadoNome = dados['adminNome'] as String?;
-    }
+    _restaurarAdmins(dados);
     if (dados['latitude'] != null) latitude = (dados['latitude'] as num).toDouble();
     if (dados['longitude'] != null) longitude = (dados['longitude'] as num).toDouble();
     if (dados['latitudeFinal'] != null) latitudeFinal = (dados['latitudeFinal'] as num).toDouble();
@@ -1337,10 +1362,12 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         bool sucesso;
         if (connectivity.offline) {
           final sync = Get.find<SyncManager>();
-          await sync.enfileirarDeslocar(os.id, latitude!, longitude!, adminId: adminSelecionadoId);
+          await sync.enfileirarDeslocar(os.id, latitude!, longitude!,
+              adminId: adminSelecionadoId, adminsIds: adminsSelecionadosIds);
           sucesso = true;
         } else {
-          sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!, adminId: adminSelecionadoId);
+          sucesso = await controller.deslocarParaOS(os.id, latitude!, longitude!,
+              adminId: adminSelecionadoId, adminsIds: adminsSelecionadosIds);
         }
         if (sucesso) {
           // ✅ Atualiza os objeto local com dados frescos do controller
@@ -1355,7 +1382,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
           tracking.iniciar(os.id);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('🚗 Deslocamento iniciado! ${adminSelecionadoNome ?? "Admin"} será notificado.'),
+              content: Text(adminsSelecionadosNomes.isEmpty
+                  ? '🚗 Deslocamento iniciado!'
+                  : '🚗 Deslocamento iniciado! $_adminsResumo '
+                      '${adminsSelecionadosNomes.length > 1 ? "serão notificados" : "será notificado"}.'),
               backgroundColor: const Color(0xFF00FF88),
               duration: const Duration(seconds: 3),
             ));
@@ -1429,106 +1459,201 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     }
   }
 
+  /// Recupera os admins escolhidos a partir do progresso salvo.
+  ///
+  /// Progresso gravado por uma versão ANTERIOR do app só tem `adminId`/
+  /// `adminNome` (um único admin) — daí o fallback. Sem ele, quem atualizasse
+  /// o app no meio de uma OS perderia a escolha e o admin pararia de receber
+  /// as notificações daquele atendimento.
+  void _restaurarAdmins(Map dados) {
+    final ids = (dados['adminsIds'] as List?)
+        ?.map((e) => (e as num).toInt())
+        .toList();
+
+    if (ids != null && ids.isNotEmpty) {
+      adminsSelecionadosIds = ids;
+      adminsSelecionadosNomes = ((dados['adminsNomes'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList();
+      return;
+    }
+
+    if (dados['adminId'] != null) {
+      adminsSelecionadosIds = [(dados['adminId'] as num).toInt()];
+      adminsSelecionadosNomes = [(dados['adminNome'] ?? '').toString()];
+    }
+  }
+
+  /// Escolha de QUEM acompanha o atendimento — agora com múltipla seleção.
+  ///
+  /// Toca no card = marca/desmarca. Confirma no botão de baixo. Todos os
+  /// marcados recebem notificação (deslocamento, chegada, reagendamento,
+  /// finalização, SLA) e veem a OS na tela de Acompanhamento.
   Future<bool> _selecionarAdmin() async {
     await controller.carregarAdmins();
     final admins = controller.adminsDisponiveis;
     if (admins.isEmpty) return true;
-    final resultado = await showModalBottomSheet<Map<String, dynamic>>(
+
+    // Começa já marcando quem estiver escolhido (reabrir a OS não perde nada).
+    final marcados = <int>{...adminsSelecionadosIds};
+
+    final resultado = await showModalBottomSheet<List<Map<String, dynamic>>>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) => Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
-        decoration: const BoxDecoration(
-          color: Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(width: 36, height: 4,
-                    decoration: BoxDecoration(color: Colors.white24,
-                        borderRadius: BorderRadius.circular(2))),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    shape: BoxShape.circle,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Container(
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 36, height: 4,
+                      decoration: BoxDecoration(color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2))),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.admin_panel_settings_rounded,
+                        color: Colors.orange, size: 32),
                   ),
-                  child: const Icon(Icons.admin_panel_settings_rounded,
-                      color: Colors.orange, size: 32),
-                ),
-                const SizedBox(height: 12),
-                const Text('Selecione o Responsável',
-                    style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                const Text('Escolha qual administrador vai acompanhar este atendimento',
-                    style: TextStyle(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                ...admins.map((admin) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF181818),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: InkWell(
-                    onTap: () => Navigator.pop(context, admin),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40, height: 40,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.orange.withOpacity(0.12),
-                              border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                            ),
-                            child: const Icon(Icons.admin_panel_settings_rounded,
-                                color: Colors.orange, size: 20),
+                  const SizedBox(height: 12),
+                  const Text('Quem vai acompanhar?',
+                      style: TextStyle(color: Colors.white, fontSize: 17,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  const Text(
+                      'Marque um ou mais. Todos recebem as notificações e '
+                      'podem te acompanhar no mapa.',
+                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  ...admins.map((admin) {
+                    final id = admin['id'] as int?;
+                    final marcado = id != null && marcados.contains(id);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: marcado
+                            ? Colors.orange.withOpacity(0.10)
+                            : const Color(0xFF181818),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: marcado
+                                ? Colors.orange.withOpacity(0.6)
+                                : Colors.white12),
+                      ),
+                      child: InkWell(
+                        onTap: id == null ? null : () => setSheetState(() {
+                          if (!marcados.remove(id)) marcados.add(id);
+                        }),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40, height: 40,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.orange.withOpacity(0.12),
+                                  border: Border.all(
+                                      color: Colors.orange.withOpacity(0.3)),
+                                ),
+                                child: const Icon(
+                                    Icons.admin_panel_settings_rounded,
+                                    color: Colors.orange, size: 20),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(admin['nome'] ?? '',
+                                        style: const TextStyle(color: Colors.white,
+                                            fontSize: 14, fontWeight: FontWeight.w600)),
+                                    if (admin['email'] != null &&
+                                        !admin['email'].toString().endsWith('@seenet.local'))
+                                      Text(admin['email'],
+                                          style: const TextStyle(
+                                              color: Colors.white38, fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                marcado
+                                    ? Icons.check_circle_rounded
+                                    : Icons.circle_outlined,
+                                color: marcado ? Colors.orange : Colors.white24,
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(admin['nome'] ?? '',
-                                    style: const TextStyle(color: Colors.white,
-                                        fontSize: 14, fontWeight: FontWeight.w600)),
-                                if (admin['email'] != null &&
-                                    !admin['email'].toString().endsWith('@seenet.local'))
-                                  Text(admin['email'],
-                                      style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right_rounded, color: Colors.white24),
-                        ],
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: marcados.isEmpty
+                          ? null
+                          : () => Navigator.pop(
+                                context,
+                                // Devolve na ORDEM DA TELA, não na ordem de
+                                // clique: assim o "principal" é previsível.
+                                admins
+                                    .where((a) => marcados.contains(a['id']))
+                                    .toList(),
+                              ),
+                      icon: const Icon(Icons.check_rounded),
+                      label: Text(marcados.isEmpty
+                          ? 'Marque pelo menos um'
+                          : 'Confirmar (${marcados.length})'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00FF88),
+                        foregroundColor: Colors.black,
+                        disabledBackgroundColor: const Color(0xFF2A2A2A),
+                        disabledForegroundColor: Colors.white30,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ),
-                )),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, null),
-                  child: const Text('Pular (sem acompanhamento)',
-                      style: TextStyle(color: Colors.white38, fontSize: 13)),
-                ),
-              ],
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, null),
+                    child: const Text('Pular (sem acompanhamento)',
+                        style: TextStyle(color: Colors.white38, fontSize: 13)),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
-    if (resultado != null) {
-      adminSelecionadoId = resultado['id'];
-      adminSelecionadoNome = resultado['nome'];
+
+    if (resultado != null && resultado.isNotEmpty) {
+      setState(() {
+        adminsSelecionadosIds =
+            resultado.map((a) => a['id'] as int).toList();
+        adminsSelecionadosNomes =
+            resultado.map((a) => (a['nome'] ?? '').toString()).toList();
+      });
     }
     return true;
   }

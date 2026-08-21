@@ -275,6 +275,119 @@ class OrdensServicoController {
     }
   }
 
+// ── 👥 Admins que acompanham a OS ────────────────────────────────────────
+//
+// O técnico pode escolher MAIS DE UM admin ao iniciar o deslocamento. O
+// primeiro fica na coluna antiga `ordem_servico.admin_responsavel_id` (para
+// não quebrar nada que já lia de lá) e os demais vão pra tabela
+// `os_admins_responsaveis`. Estes dois helpers são o único lugar que precisa
+// saber disso — o resto do controller só pede "notifica quem acompanha".
+
+/**
+ * A tabela de admins extras existe?
+ *
+ * Memoizado porque `hasTable` consulta o catálogo do Postgres e isso rodaria
+ * a cada abertura da tela de acompanhamento. Um deploy reinicia o processo,
+ * então depois de rodar a migração o valor é recalculado sozinho.
+ */
+static _temTabelaAdmins = null;
+
+static async temTabelaAdmins() {
+  if (OrdensServicoController._temTabelaAdmins === null) {
+    try {
+      OrdensServicoController._temTabelaAdmins =
+        await db.schema.hasTable('os_admins_responsaveis');
+    } catch (_) {
+      OrdensServicoController._temTabelaAdmins = false;
+    }
+  }
+  return OrdensServicoController._temTabelaAdmins;
+}
+
+/**
+ * IDs de todos os admins que acompanham a OS, sem repetir.
+ *
+ * Se a tabela ainda não existir (migração não rodada), cai de volta no admin
+ * principal em vez de estourar — o comportamento vira exatamente o de antes.
+ */
+static async adminsDaOS(osId, tenantId, adminPrincipalId) {
+  const ids = [];
+  const principal = Number(adminPrincipalId);
+  if (principal) ids.push(principal);
+
+  try {
+    const extras = await db('os_admins_responsaveis')
+      .where('os_id', osId)
+      .where('tenant_id', tenantId)
+      .select('admin_id');
+
+    for (const linha of extras) {
+      const id = Number(linha.admin_id);
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+  } catch (err) {
+    console.warn(`⚠️ os_admins_responsaveis indisponível (${err.message}) — só o admin principal será avisado`);
+  }
+
+  return ids;
+}
+
+/**
+ * Manda a mesma notificação pra todos os admins que acompanham a OS.
+ *
+ * O try/catch é POR ADMIN de propósito: um token de push vencido não pode
+ * impedir que os outros recebam.
+ */
+static async notificarAdminsDaOS(osId, tenantId, adminPrincipalId, titulo, mensagem, extra) {
+  const ids = await OrdensServicoController.adminsDaOS(osId, tenantId, adminPrincipalId);
+
+  for (const adminId of ids) {
+    try {
+      await notificationService.enviarParaUsuario(db, adminId, titulo, mensagem, extra);
+    } catch (notifErr) {
+      console.warn(`⚠️ Falha ao notificar admin ${adminId}:`, notifErr.message);
+    }
+  }
+
+  return ids.length;
+}
+
+/**
+ * Grava os admins escolhidos pelo técnico.
+ *
+ * Devolve o id do PRIMEIRO (que vai pra coluna antiga). Best-effort na tabela
+ * nova: se ela falhar, o acompanhamento do admin principal continua de pé.
+ */
+static async salvarAdminsDaOS(osId, tenantId, listaIds, adminPrincipalId) {
+  const ids = [];
+  const principal = Number(adminPrincipalId);
+  if (principal) ids.push(principal);
+
+  for (const bruto of Array.isArray(listaIds) ? listaIds : []) {
+    const id = Number(bruto);
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+
+  if (ids.length === 0) return null;
+
+  try {
+    // Regrava do zero: se o técnico refizer a escolha, quem saiu da lista
+    // para de acompanhar (senão ficaria acumulando admin antigo).
+    await db('os_admins_responsaveis')
+      .where('os_id', osId)
+      .where('tenant_id', tenantId)
+      .delete();
+
+    await db('os_admins_responsaveis').insert(
+      ids.map((adminId) => ({ tenant_id: tenantId, os_id: osId, admin_id: adminId }))
+    );
+  } catch (err) {
+    console.warn(`⚠️ Não deu pra salvar os admins extras da OS ${osId} (${err.message}) — segue só com o principal`);
+  }
+
+  return ids[0];
+}
+
 /**
  * Técnico iniciou deslocamento para a OS
  * POST /api/ordens-servico/:id/deslocar
@@ -284,11 +397,20 @@ async deslocarParaOS(req, res) {
 
   try {
     const { id } = req.params;
-    const { latitude, longitude, admin_responsavel_id } = req.body;  // ✅ NOVO: admin_responsavel_id
+    // `admins_responsaveis_ids` (lista) é o caminho novo — o técnico pode
+    // escolher mais de um admin pra acompanhar. `admin_responsavel_id`
+    // continua aceito sozinho: é o que o app antigo manda.
+    const { latitude, longitude, admin_responsavel_id, admins_responsaveis_ids } = req.body;
     const userId = req.user.id;
     const tenantId = req.tenantId;
 
-    console.log(`🚗 Técnico deslocando para OS ${id} (admin responsável: ${admin_responsavel_id || 'nenhum'})`);
+    // O principal é o primeiro da lista (ou o campo único do app antigo).
+    const listaAdmins = Array.isArray(admins_responsaveis_ids) ? admins_responsaveis_ids : [];
+    const adminPrincipal = Number(admin_responsavel_id) || Number(listaAdmins[0]) || null;
+
+    console.log(`🚗 Técnico deslocando para OS ${id} (acompanham: ${
+      [adminPrincipal, ...listaAdmins].filter(Boolean).length ? [...new Set([adminPrincipal, ...listaAdmins].filter(Boolean))].join(', ') : 'ninguém'
+    })`);
 
     const os = await trx('ordem_servico')
       .where('id', id)
@@ -318,7 +440,7 @@ async deslocarParaOS(req, res) {
         status: 'em_deslocamento',
         latitude_inicio: latitude,
         longitude_inicio: longitude,
-        admin_responsavel_id: admin_responsavel_id || null,  // ✅ NOVO
+        admin_responsavel_id: adminPrincipal,  // primeiro da lista (os demais vão na tabela)
         data_inicio_deslocamento: db.fn.now(),
         data_atualizacao: db.fn.now()
       });
@@ -338,19 +460,22 @@ async deslocarParaOS(req, res) {
 
     console.log(`✅ OS ${os.numero_os} - Técnico em deslocamento`);
 
-    // ✅ NOTIFICAÇÃO: Avisar admin específico
-    if (admin_responsavel_id) {
+    // Guarda quem acompanha ANTES de notificar (a notificação lê essa lista).
+    await OrdensServicoController.salvarAdminsDaOS(id, tenantId, listaAdmins, adminPrincipal);
+
+    // ✅ NOTIFICAÇÃO: avisa TODOS os admins que o técnico escolheu
+    if (adminPrincipal) {
       try {
         const tecnico = await db('usuarios').where('id', userId).first();
-        await notificationService.enviarParaUsuario(
-          db,
-          admin_responsavel_id,
+        const avisados = await OrdensServicoController.notificarAdminsDaOS(
+          id, tenantId, adminPrincipal,
           '🚗 Técnico em Deslocamento',
           `${tecnico.nome} iniciou deslocamento para OS #${os.numero_os} - ${os.cliente_nome}`,
           { route: '/ordens-servico', tipo: 'os_deslocamento', referencia_id: String(id) }
         );
+        console.log(`🔔 ${avisados} admin(s) avisados do deslocamento da OS ${os.numero_os}`);
       } catch (notifErr) {
-        console.warn('⚠️ Falha ao notificar admin:', notifErr.message);
+        console.warn('⚠️ Falha ao notificar admins:', notifErr.message);
       }
     }
 
@@ -486,15 +611,14 @@ async chegarAoLocal(req, res) {
         if (os.admin_responsavel_id) {
           try {
             const tecnico = await db('usuarios').where('id', userId).first();
-            await notificationService.enviarParaUsuario(
-              db,
-              os.admin_responsavel_id,
+            await OrdensServicoController.notificarAdminsDaOS(
+              id, tenantId, os.admin_responsavel_id,
               '📍 Técnico Chegou ao Local',
               `${tecnico.nome} chegou no cliente - OS #${os.numero_os}`,
               { route: '/ordens-servico', tipo: 'os_chegada', referencia_id: String(id) }
             );
           } catch (notifErr) {
-            console.warn('⚠️ Falha ao notificar admin:', notifErr.message);
+            console.warn('⚠️ Falha ao notificar admins:', notifErr.message);
           }
         }
 
@@ -650,15 +774,14 @@ async reagendarOS(req, res) {
     if (os.admin_responsavel_id) {
       try {
         const tecnico = await db('usuarios').where('id', userId).first();
-        await notificationService.enviarParaUsuario(
-          db,
-          os.admin_responsavel_id,
+        await OrdensServicoController.notificarAdminsDaOS(
+          id, tenantId, os.admin_responsavel_id,
           '📅 OS Reagendada',
           `${tecnico.nome} reagendou a OS #${os.numero_os} (cliente ausente)`,
           { route: '/ordens-servico', tipo: 'os_reagendada', referencia_id: String(id) }
         );
       } catch (notifErr) {
-        console.warn('⚠️ Falha ao notificar admin:', notifErr.message);
+        console.warn('⚠️ Falha ao notificar admins:', notifErr.message);
       }
     }
 
@@ -1662,15 +1785,14 @@ async finalizarExecucao(req, res) {
             if (os.admin_responsavel_id) {
       try {
         const tecnico = await db('usuarios').where('id', os.tecnico_id).first();
-        await notificationService.enviarParaUsuario(
-          db,
-          os.admin_responsavel_id,
+        await OrdensServicoController.notificarAdminsDaOS(
+          id, tenantId, os.admin_responsavel_id,
           '✅ OS Finalizada',
           `${tecnico.nome} finalizou a OS #${os.numero_os} - ${os.cliente_nome}`,
           { route: '/ordens-servico', tipo: 'os_finalizada', referencia_id: String(id) }
         );
       } catch (notifErr) {
-        console.warn('⚠️ Falha ao notificar admin:', notifErr.message);
+        console.warn('⚠️ Falha ao notificar admins:', notifErr.message);
       }
     }
 
@@ -2128,14 +2250,31 @@ if (dados.fotos && dados.fotos.length > 0) {
           return res.status(403).json({ success: false, error: 'Apenas administradores' });
         }
 
+        // Se a migração ainda não rodou, a tela do admin não pode quebrar:
+        // sem a tabela, o filtro cai no comportamento antigo (só o principal).
+        const temTabelaAdmins = await OrdensServicoController.temTabelaAdmins();
+
         const oss = await db('ordem_servico as os')
           .join('usuarios as t', 't.id', 'os.tecnico_id')
           .leftJoin('localizacao_tecnico as l', function() {
             this.on('l.tecnico_id', 'os.tecnico_id')
                 .andOn('l.ordem_servico_id', 'os.id');
           })
-          .where('os.admin_responsavel_id', userId)
           .where('os.tenant_id', tenantId)
+          // Acompanha quem é o admin principal (coluna antiga) OU quem o
+          // técnico marcou junto (tabela nova). Sem o OR, os admins extras
+          // recebiam a notificação mas a OS não aparecia na tela deles.
+          .where(function () {
+            this.where('os.admin_responsavel_id', userId);
+            if (temTabelaAdmins) {
+              this.orWhereIn('os.id', function () {
+                this.select('os_id')
+                  .from('os_admins_responsaveis')
+                  .where('tenant_id', tenantId)
+                  .where('admin_id', userId);
+              });
+            }
+          })
           .whereIn('os.status', ['em_deslocamento', 'em_execucao'])
           .select(
             'os.id', 'os.numero_os', 'os.status', 'os.cliente_nome',
@@ -2491,6 +2630,9 @@ if (dados.fotos && dados.fotos.length > 0) {
           .select(
             'os.id', 'os.numero_os', 'os.cliente_nome',
             'os.data_agendamento', 'os.admin_responsavel_id',
+            // tenant_id é necessário aqui: esta rotina roda em background (sem
+            // req), então não existe req.tenantId pra buscar os admins extras.
+            'os.tenant_id',
             'os.tecnico_id', 't.nome as tecnico_nome'
           );
 
@@ -2503,8 +2645,8 @@ if (dados.fotos && dados.fotos.length > 0) {
             );
 
             if (os.admin_responsavel_id) {
-              await notificationService.enviarParaUsuario(
-                db, os.admin_responsavel_id,
+              await OrdensServicoController.notificarAdminsDaOS(
+                os.id, os.tenant_id, os.admin_responsavel_id,
                 '⚠️ SLA Próximo do Vencimento',
                 `OS #${os.numero_os} - ${os.cliente_nome} vence em ${minutos} minutos (${os.tecnico_nome})`,
                 { route: '/ordens-servico', tipo: 'sla_alerta', referencia_id: String(os.id) }

@@ -50,6 +50,12 @@ class SyncManager extends GetxService {
                 (payload['latitude'] as num).toDouble(),
                 (payload['longitude'] as num).toDouble(),
                 adminId: payload['admin_id'] as int?,
+                // `?? const []` cobre a fila gravada por versão ANTERIOR do
+                // app, que não tinha esse campo — sem isso, um deslocamento
+                // enfileirado offline antes da atualização daria erro de cast.
+                adminsIds: ((payload['admins_ids'] as List?) ?? const [])
+                    .map((e) => e as int)
+                    .toList(),
               );
               break;
             case 'CHEGAR_LOCAL':
@@ -103,7 +109,7 @@ class SyncManager extends GetxService {
   }
 
   Future<void> enfileirarDeslocar(String osId, double lat, double lng,
-      {int? adminId}) async {
+      {int? adminId, List<int>? adminsIds}) async {
     await LocalDatabase.enfileirar(
       'DESLOCAR',
       json.encode({
@@ -111,6 +117,7 @@ class SyncManager extends GetxService {
         'latitude': lat,
         'longitude': lng,
         'admin_id': adminId,
+        'admins_ids': adminsIds ?? const <int>[],
       }),
     );
     await _atualizarContador();

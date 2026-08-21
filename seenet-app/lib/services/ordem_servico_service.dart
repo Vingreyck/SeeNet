@@ -313,8 +313,14 @@ class OrdemServicoService {
     }
   }
 
-  // ✅ MODIFICADO: Agora aceita adminId
-  Future<bool> deslocarParaOS(String osId, double latitude, double longitude, {int? adminId}) async {
+  /// Inicia o deslocamento.
+  ///
+  /// [adminsIds] é a lista de admins que vão acompanhar (notificação + tela de
+  /// Acompanhamento). [adminId] continua indo junto com o primeiro da lista:
+  /// é o que backend antigo entende, então o app novo não quebra se o deploy
+  /// do Railway ainda não tiver subido.
+  Future<bool> deslocarParaOS(String osId, double latitude, double longitude,
+      {int? adminId, List<int>? adminsIds}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/ordens-servico/$osId/deslocar'),
@@ -322,7 +328,9 @@ class OrdemServicoService {
         body: json.encode({
           'latitude': latitude,
           'longitude': longitude,
-          if (adminId != null) 'admin_responsavel_id': adminId,  // ✅ NOVO
+          if (adminId != null) 'admin_responsavel_id': adminId,
+          if (adminsIds != null && adminsIds.isNotEmpty)
+            'admins_responsaveis_ids': adminsIds,
         }),
       );
 

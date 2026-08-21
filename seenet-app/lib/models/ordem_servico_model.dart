@@ -339,9 +339,22 @@ class OrdemServico {
   }
 
   /// Assuntos do IXC que são RETIRADA de equipamento (técnico vai buscar a
-  /// ONT/roteador no cliente, não instalar). Set pra facilitar incluir outro
-  /// assunto depois sem caçar `== '90'` espalhado pelo app.
-  static const Set<String> assuntosRetirada = {'90'};
+  /// ONT/roteador no cliente, não instalar).
+  ///
+  /// ⚠️ Esta lista tem que ser IGUAL à `ASSUNTOS_RETIRADA` do
+  /// `BriefingOSService.js` no backend. Elas ficaram divergentes por uma
+  /// semana (aqui só o '90', lá os 6) e o resultado foi esquisito: a OS de
+  /// assunto 86 vinha com o briefing de retirada ("O QUE RECOLHER", sem
+  /// sinal) mas era listada junto das de defeito. Eram 6 OS abertas assim.
+  /// Se incluir assunto novo, incluir NOS DOIS.
+  static const Set<String> assuntosRetirada = {
+    '34',  // RETIRAR ONU/CANCELAMENTO
+    '46',  // RETIRAR ROTEADOR DE TESTE
+    '50',  // RETIRAR ROTEADOR DE COMODATO
+    '86',  // RETIRAR EQUIPAMENTO
+    '90',  // RETIRADA DE EQUIPAMENTO POR INADIMPLENCIA
+    '141', // [OPC] RETIRAR EQUIPAMENTO SUSPENSÃO TEMPORÁRIA
+  };
 
   bool get isRetirada => assuntosRetirada.contains(idAssunto);
 

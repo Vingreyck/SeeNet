@@ -45,8 +45,8 @@ android {
         applicationId = "com.seenet.diagnostico"
         minSdk = flutter.minSdkVersion
         targetSdk = 35
-        versionCode = 79
-        versionName = "1.6.7"
+        versionCode = 80
+        versionName = "1.6.8"
         multiDexEnabled = true
     }
 

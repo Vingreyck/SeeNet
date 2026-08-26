@@ -3,7 +3,7 @@ description: Sistema de diagnóstico técnico com IA
 
 publish_to: 'none'
 
-version: 1.6.10+79
+version: 1.6.11+80
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

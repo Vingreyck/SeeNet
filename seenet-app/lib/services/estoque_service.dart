@@ -438,13 +438,45 @@ class EstoqueService {
   }
 
   // ═══════════════════════════════════════
-  // DEVOLVER COMODATO (pro almoxarifado/loja do técnico)
+  // LOJAS (almoxarifados) — destino da devolução
   // ═══════════════════════════════════════
-  Future<Map<String, dynamic>> devolverComodato(String idMovimento) async {
+  Future<List<Map<String, dynamic>>> buscarAlmoxarifados() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/estoque/almoxarifados'),
+        headers: _headers,
+      );
+      if (response.statusCode != 200) return [];
+      final data = json.decode(response.body);
+      if (data['success'] != true || data['data'] is! List) return [];
+      return (data['data'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    } catch (e) {
+      print('❌ Erro em buscarAlmoxarifados: $e');
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // DEVOLVER COMODATO
+  //
+  // [almoxarifadoId] = loja escolhida pelo técnico. Sem ela, o backend usa a
+  // loja mapeada do técnico (comportamento antigo).
+  // ═══════════════════════════════════════
+  Future<Map<String, dynamic>> devolverComodato(
+    String idMovimento, {
+    String? almoxarifadoId,
+    String? almoxarifadoNome,
+  }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/estoque/comodato/$idMovimento/devolver'),
         headers: _headers,
+        body: json.encode({
+          if (almoxarifadoId != null) 'almoxarifado_id': almoxarifadoId,
+          if (almoxarifadoNome != null) 'almoxarifado_nome': almoxarifadoNome,
+        }),
       );
       final data = json.decode(response.body);
       return {

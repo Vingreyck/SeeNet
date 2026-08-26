@@ -553,31 +553,51 @@ class EstoqueController {
   }
 
   // ═══════════════════════════════════════════════════
-  // DEVOLVER COMODATO (pro almox/loja do técnico)
+  // DEVOLVER COMODATO
   // POST /api/estoque/comodato/:idMovimento/devolver
+  //
+  // O técnico ESCOLHE a loja de destino (body `almoxarifado_id`) — numa
+  // retirada o equipamento nem sempre volta pra loja dele: pode ir pra loja
+  // da cidade do cliente, ou pra onde o gestor mandar.
+  //
+  // Sem `almoxarifado_id` cai na loja do próprio técnico, que era o
+  // comportamento antigo — app antigo continua funcionando igual.
+  //
+  // O IXC faz as DUAS pontas numa chamada só (`baixar_comodato_23069`):
+  // tira o patrimônio do contrato do cliente (situação 4 → 7) e o coloca no
+  // almoxarifado escolhido. Não existe "incrementar" separado a fazer aqui.
   // ═══════════════════════════════════════════════════
   async devolverComodato(req, res) {
     try {
       const tenantId = req.tenantId;
       const userId = req.user.id;
       const { idMovimento } = req.params;
+      const escolhido = req.body?.almoxarifado_id;
 
       const ixc = await this._getIXCService(tenantId);
-      const { almoxarifadoId, almoxarifadoNome } = await this._getAlmoxarifadoTecnico(userId, tenantId);
+
+      let almoxarifadoId = escolhido ? String(escolhido) : null;
+      let almoxarifadoNome = req.body?.almoxarifado_nome || '';
+
+      if (!almoxarifadoId) {
+        const doTecnico = await this._getAlmoxarifadoTecnico(userId, tenantId);
+        almoxarifadoId = doTecnico.almoxarifadoId;
+        almoxarifadoNome = doTecnico.almoxarifadoNome;
+      }
 
       if (!almoxarifadoId) {
         return res.status(400).json({
           success: false,
-          error: 'Almoxarifado (loja) não configurado para este técnico'
+          error: 'Escolha a loja de destino (ou peça ao admin pra mapear sua loja)'
         });
       }
 
-      console.log(`↩️ Devolvendo comodato (mov ${idMovimento}) → almox ${almoxarifadoId} (${almoxarifadoNome})`);
+      console.log(`↩️ Devolvendo comodato (mov ${idMovimento}) → almox ${almoxarifadoId} (${almoxarifadoNome})${escolhido ? ' [escolhido pelo técnico]' : ' [loja do técnico]'}`);
       await ixc.devolverComodato(idMovimento, almoxarifadoId);
 
       return res.json({
         success: true,
-        message: `Comodato devolvido para ${almoxarifadoNome || 'o almoxarifado'} com sucesso`
+        message: `Comodato devolvido para ${almoxarifadoNome || 'a loja'} com sucesso`
       });
     } catch (error) {
       console.error('❌ Erro ao devolver comodato:', error.message);

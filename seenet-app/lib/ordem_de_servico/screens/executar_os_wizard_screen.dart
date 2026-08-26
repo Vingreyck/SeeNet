@@ -107,6 +107,19 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
   bool _isLoading = false;
 
+  // ── 📦 Devolução (só OS de retirada) ────────────────────────────────────
+  final EstoqueService _estoqueService = EstoqueService();
+  List<ComodatoAtivo> _comodatos = [];
+  List<Map<String, dynamic>> _lojas = [];
+  bool _carregandoComodatos = false;
+  String? _lojaDestinoId;
+  String? _lojaDestinoNome;
+  final Set<String> _devolvendo = {};   // movimentos em voo (trava o botão)
+  /// "descrição|loja" do que JÁ foi devolvido nesta OS. Guardado no progresso
+  /// porque a devolução é IRREVERSÍVEL no IXC: se o técnico fechar e reabrir,
+  /// ele precisa ver o que já recolheu pra não achar que perdeu o trabalho.
+  final Set<String> _devolvidos = {};
+
   // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
 
   @override
@@ -157,6 +170,11 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         // anterior — busca lá também (só preenche se a lista estiver vazia).
         await _carregarMateriaisDoIXC();
       }
+
+      // Comodatos do contrato do cliente — só faz sentido em retirada, e só
+      // DEPOIS do restore (senão sobrescreveria a loja já escolhida).
+      // Fire-and-forget: se a rede falhar, o resto do atendimento segue.
+      if (os.isRetirada) _carregarDevolucao();
 
       if (os.status == 'em_execucao' && _exigeApr) {
         // ✅ APR já concluída nesta OS → NÃO re-força ao reabrir; volta pro
@@ -268,7 +286,8 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     switch (etapa) {
       case 0: return 'Localização';
       case 1: return 'Fotos';
-      case 2: return 'Dados ONU';
+      // Numa retirada não se instala nada — a etapa 2 vira o recolhimento.
+      case 2: return os.isRetirada ? 'Devolução' : 'Dados ONU';
       case 3: return 'Relatos';
       case 4: return 'Materiais';
       case 5: return 'Observações';
@@ -764,6 +783,326 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // 📦 ETAPA DEVOLUÇÃO (só em OS de RETIRADA)
+  //
+  // Substitui "Dados da ONU" — numa retirada não se instala nada, se RECOLHE.
+  // Puxa os comodatos ATIVOS do contrato do cliente (pelo login da OS), o
+  // técnico escolhe a loja de destino e devolve.
+  //
+  // A baixa e a entrada no estoque são a MESMA chamada no IXC
+  // (`baixar_comodato_23069`): o patrimônio sai do contrato do cliente
+  // (situação 4 → 7) e entra no almoxarifado escolhido. Não há duas etapas.
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Recupera a loja escolhida e o que já foi devolvido.
+  ///
+  /// Progresso gravado por versão anterior do app não tem esses campos — daí
+  /// os `?? `. Sem isso, reabrir uma OS de retirada perderia o registro do
+  /// que já foi recolhido (e a devolução no IXC não tem como ser desfeita).
+  void _restaurarDevolucao(Map dados) {
+    _lojaDestinoId = dados['lojaDestinoId'] as String?;
+    _lojaDestinoNome = dados['lojaDestinoNome'] as String?;
+    final feitos = (dados['devolvidos'] as List?) ?? const [];
+    _devolvidos
+      ..clear()
+      ..addAll(feitos.map((e) => e.toString()));
+  }
+
+  Future<void> _carregarDevolucao() async {
+    if (!os.isRetirada) return;
+    final idExterno = os.idExterno;
+    if (idExterno == null || idExterno.isEmpty) {
+      setState(() => _carregandoComodatos = false);
+      return;
+    }
+
+    setState(() => _carregandoComodatos = true);
+
+    // As duas em paralelo: a lista de lojas não depende dos comodatos.
+    final resultados = await Future.wait([
+      _estoqueService.buscarComodatoAtivoOS(idExterno),
+      _estoqueService.buscarAlmoxarifados(),
+    ]);
+
+    if (!mounted) return;
+    setState(() {
+      _comodatos = resultados[0] as List<ComodatoAtivo>;
+      _lojas = resultados[1] as List<Map<String, dynamic>>;
+      _carregandoComodatos = false;
+    });
+  }
+
+  Future<void> _devolverComodato(ComodatoAtivo c) async {
+    if (_lojaDestinoId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Escolha primeiro a loja de destino'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    setState(() => _devolvendo.add(c.idMovimento));
+
+    final res = await _estoqueService.devolverComodato(
+      c.idMovimento,
+      almoxarifadoId: _lojaDestinoId,
+      almoxarifadoNome: _lojaDestinoNome,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _devolvendo.remove(c.idMovimento);
+      if (res['success'] == true) {
+        // Sai da lista de pendentes e entra na de devolvidos — o técnico
+        // precisa ver o que JÁ recolheu (a OS pode ter vários equipamentos).
+        _comodatos.removeWhere((x) => x.idMovimento == c.idMovimento);
+        _devolvidos.add('${c.descricao}|$_lojaDestinoNome');
+      }
+    });
+    _salvarProgresso();
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(res['success'] == true
+          ? '✅ ${c.descricao} devolvido para $_lojaDestinoNome'
+          : '❌ ${res['message']}'),
+      backgroundColor:
+          res['success'] == true ? const Color(0xFF00FF88) : Colors.red,
+    ));
+  }
+
+  Widget _buildEtapaDevolucao() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildTituloEtapa(
+            icone: Icons.assignment_return_rounded,
+            titulo: 'Devolução',
+            descricao: 'Equipamentos em comodato no contrato deste cliente',
+          ),
+          const SizedBox(height: 20),
+
+          if (_carregandoComodatos)
+            _buildCard(child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator(
+                  color: Color(0xFF00FF88), strokeWidth: 2)),
+            ))
+          else ...[
+            _buildSeletorLoja(),
+            const SizedBox(height: 16),
+            if (_comodatos.isEmpty && _devolvidos.isEmpty)
+              _buildSemComodato()
+            else ...[
+              ..._comodatos.map(_buildCardComodato),
+              if (_devolvidos.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ..._devolvidos.map(_buildCardDevolvido),
+              ],
+            ],
+            const SizedBox(height: 12),
+            Center(
+              child: TextButton.icon(
+                onPressed: _carregandoComodatos ? null : _carregarDevolucao,
+                icon: const Icon(Icons.refresh_rounded,
+                    size: 16, color: Colors.white38),
+                label: const Text('Atualizar lista',
+                    style: TextStyle(color: Colors.white38, fontSize: 12)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeletorLoja() {
+    return _buildCard(child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.storefront_rounded, color: Color(0xFF00FF88), size: 18),
+            SizedBox(width: 8),
+            Text('Loja de destino',
+                style: TextStyle(color: Colors.white, fontSize: 14,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text('Para onde o equipamento recolhido vai',
+            style: TextStyle(color: Colors.white38, fontSize: 11)),
+        const SizedBox(height: 12),
+        if (_lojas.isEmpty)
+          const Text(
+              '⚠️ Não consegui carregar as lojas. Confira a internet e toque '
+              'em "Atualizar lista".',
+              style: TextStyle(color: Colors.orange, fontSize: 12))
+        else
+          // DropdownMenu com filtro: são dezenas de almoxarifados; rolar a
+          // lista inteira no celular é ruim (mesma escolha do dialog de EPI).
+          DropdownMenu<String>(
+            width: MediaQuery.of(context).size.width - 80,
+            enableFilter: true,
+            requestFocusOnTap: true,
+            initialSelection: _lojaDestinoId,
+            hintText: 'Toque e digite pra filtrar',
+            textStyle: const TextStyle(color: Colors.white, fontSize: 13),
+            menuStyle: const MenuStyle(
+              backgroundColor: WidgetStatePropertyAll(Color(0xFF1F1F1F)),
+            ),
+            inputDecorationTheme: const InputDecorationTheme(
+              filled: true,
+              fillColor: Color(0xFF111111),
+              hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+              border: OutlineInputBorder(),
+            ),
+            onSelected: (v) {
+              if (v == null) return;
+              final loja = _lojas.firstWhere((l) => l['id'].toString() == v);
+              setState(() {
+                _lojaDestinoId = v;
+                _lojaDestinoNome = (loja['descricao'] ?? '').toString();
+              });
+              _salvarProgresso();
+            },
+            dropdownMenuEntries: _lojas.map((l) => DropdownMenuEntry<String>(
+              value: l['id'].toString(),
+              label: '${l['id']} - ${l['descricao']}',
+            )).toList(),
+          ),
+      ],
+    ));
+  }
+
+  Widget _buildSemComodato() {
+    return _buildCard(child: const Padding(
+      padding: EdgeInsets.symmetric(vertical: 18),
+      child: Column(
+        children: [
+          Icon(Icons.inbox_rounded, color: Colors.white24, size: 36),
+          SizedBox(height: 10),
+          Text('Nenhum comodato ativo neste contrato',
+              style: TextStyle(color: Colors.white70, fontSize: 14,
+                  fontWeight: FontWeight.w600)),
+          SizedBox(height: 6),
+          Text(
+              'O cliente não tem equipamento da empresa registrado. Se ele '
+              'entregar algo mesmo assim, anote nas Observações.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white38, fontSize: 11)),
+        ],
+      ),
+    ));
+  }
+
+  Widget _buildCardComodato(ComodatoAtivo c) {
+    final devolvendo = _devolvendo.contains(c.idMovimento);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.router_rounded,
+                    color: Colors.orange, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(c.descricao.isEmpty ? 'Equipamento' : c.descricao,
+                        style: const TextStyle(color: Colors.white,
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                    if (c.numeroSerie.isNotEmpty)
+                      Text('Série: ${c.numeroSerie}',
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                    if (c.mac.isNotEmpty)
+                      Text('MAC: ${c.mac}',
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: devolvendo ? null : () => _devolverComodato(c),
+              icon: devolvendo
+                  ? const SizedBox(width: 14, height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.black38))
+                  : const Icon(Icons.assignment_return_rounded, size: 18),
+              label: Text(devolvendo ? 'Devolvendo...' : 'Devolver'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00FF88),
+                foregroundColor: Colors.black,
+                disabledBackgroundColor: const Color(0xFF2A2A2A),
+                disabledForegroundColor: Colors.white30,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardDevolvido(String registro) {
+    final partes = registro.split('|');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF00FF88).withOpacity(0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF00FF88).withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_rounded,
+              color: Color(0xFF00FF88), size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(partes.first,
+                    style: const TextStyle(color: Colors.white,
+                        fontSize: 12, fontWeight: FontWeight.w600)),
+                Text('Devolvido para ${partes.length > 1 ? partes[1] : "a loja"}',
+                    style: const TextStyle(
+                        color: Color(0xFF00FF88), fontSize: 11)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _abrirScanner() async {
     final serial = await Navigator.push<String>(
       context,
@@ -876,7 +1215,18 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
               conteudo: latitude != null ? 'Lat: ${latitude!.toStringAsFixed(6)}\nLng: ${longitude!.toStringAsFixed(6)}' : 'Não capturada', editarEtapa: 0),
           _buildResumoCard(titulo: 'Fotos', icone: Icons.camera_alt_rounded,
               conteudo: '${fotosAnexadas.length} foto(s) anexada(s)', editarEtapa: 1),
-          if (onuModeloController.text.isNotEmpty)
+          if (os.isRetirada)
+            _buildResumoCard(
+                titulo: 'Devolução',
+                icone: Icons.assignment_return_rounded,
+                conteudo: _devolvidos.isEmpty
+                    ? (_comodatos.isEmpty
+                        ? 'Nenhum comodato neste contrato'
+                        : '⚠️ ${_comodatos.length} equipamento(s) ainda NÃO devolvido(s)')
+                    : '${_devolvidos.length} devolvido(s) para ${_lojaDestinoNome ?? "a loja"}'
+                        '${_comodatos.isEmpty ? "" : " • ${_comodatos.length} pendente(s)"}',
+                editarEtapa: 2)
+          else if (onuModeloController.text.isNotEmpty)
             _buildResumoCard(titulo: 'Dados da ONU', icone: Icons.router_rounded,
                 conteudo: 'Modelo: ${onuModeloController.text}', editarEtapa: 2),
           _buildResumoCard(titulo: 'Relatos', icone: Icons.description_rounded,
@@ -1032,6 +1382,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       'onuMac':        onuMacController.text,
       'onuStatus':     onuStatusController.text,
       'onuSinal':      onuSinalController.text,
+      'lojaDestinoId':   _lojaDestinoId,
+      'lojaDestinoNome': _lojaDestinoNome,
+      'devolvidos':      _devolvidos.toList(),
       'relatoProblema': relatoProblemaController.text,
       'relatoSolucao':  relatoSolucaoController.text,
       'materiais':     materiaisController.text,
@@ -1099,6 +1452,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       onuMacController.text        = dados['onuMac']        ?? '';
       onuStatusController.text     = dados['onuStatus']     ?? '';
       onuSinalController.text      = dados['onuSinal']      ?? '';
+      _restaurarDevolucao(dados);
       relatoProblemaController.text = dados['relatoProblema'] ?? '';
       relatoSolucaoController.text  = dados['relatoSolucao']  ?? '';
       materiaisController.text     = dados['materiais']     ?? '';
@@ -1163,6 +1517,9 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
       'onuMac': onuMacController.text,
       'onuStatus': onuStatusController.text,
       'onuSinal': onuSinalController.text,
+      'lojaDestinoId': _lojaDestinoId,
+      'lojaDestinoNome': _lojaDestinoNome,
+      'devolvidos': _devolvidos.toList(),
       'relatoProblema': relatoProblemaController.text,
       'relatoSolucao': relatoSolucaoController.text,
       'materiais': materiaisController.text,
@@ -1238,6 +1595,7 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
     onuMacController.text        = dados['onuMac']        ?? '';
     onuStatusController.text     = dados['onuStatus']     ?? '';
     onuSinalController.text      = dados['onuSinal']      ?? '';
+    _restaurarDevolucao(dados);
     relatoProblemaController.text = dados['relatoProblema'] ?? '';
     relatoSolucaoController.text  = dados['relatoSolucao']  ?? '';
     materiaisController.text     = dados['materiais']     ?? '';
@@ -2481,7 +2839,10 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
               children: [
                 _buildEtapaLocalizacao(),
                 _buildEtapaAnexos(),
-                _buildEtapaDadosONU(),
+                // Mesma POSIÇÃO, conteúdo diferente: retirada mostra a
+                // Devolução no lugar dos Dados da ONU. Mantendo o índice, o
+                // total de 8 etapas e todo o save/restore continuam valendo.
+                os.isRetirada ? _buildEtapaDevolucao() : _buildEtapaDadosONU(),
                 _buildEtapaRelatos(),
                 _buildEtapaMateriais(),
                 _buildEtapaObservacoes(),

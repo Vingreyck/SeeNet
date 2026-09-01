@@ -511,17 +511,25 @@ class SegurancaService extends GetxService {
   /// TÉCNICO na hora de pedir o EPI.
   Future<Map<String, List<String>>> buscarTamanhosPorEpi() async {
     try {
-      final response = await GetConnect().get('$_base/produtos-epi', headers: _headers);
+      // ⚠️ Lê de `/epis`, NÃO de `/produtos-epi`. Duas razões:
+      //   1. `/produtos-epi` é restrita a gestor/admin → o TÉCNICO tomava 403
+      //      e ficava sempre sem os tamanhos cadastrados.
+      //   2. Aquela rota devolve `{mapeamento: [{epi, tamanhos}]}`, e o código
+      //      aqui procurava `{produtos: [{nome, ...}]}` — chave errada nos DOIS
+      //      níveis, então a lista vinha vazia MESMO para o admin. Era por isso
+      //      que tamanho novo (ex: bota 45) nunca aparecia: caía calado no mapa
+      //      fixo do app.
+      final response = await GetConnect().get('$_base/epis', headers: _headers);
       if (response.statusCode != 200) return {};
-      final List lista = (response.body['data'] ?? response.body)['produtos'] ?? [];
+      final corpo = response.body['data'] ?? response.body;
+      final bruto = corpo['tamanhos'];
+      if (bruto is! Map) return {}; // backend antigo: não manda esse campo
 
       final mapa = <String, List<String>>{};
-      for (final p in lista) {
-        final nome = p['nome']?.toString();
-        if (nome == null || nome.isEmpty) continue;
-        final tamanhos = parseTamanhos(p['tamanhos']);
-        if (tamanhos.isNotEmpty) mapa[nome] = tamanhos;
-      }
+      bruto.forEach((nome, valor) {
+        final tamanhos = parseTamanhos(valor);
+        if (tamanhos.isNotEmpty) mapa[nome.toString()] = tamanhos;
+      });
       return mapa;
     } catch (_) {
       return {};

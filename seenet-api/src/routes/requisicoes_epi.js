@@ -520,12 +520,45 @@ async function gerarFichaEPI(tecnico, requisicoes, produtosEpi, tenant) {
 // ROTAS
 // ================================================================
 
+// A coluna `tamanhos` foi criada direto no banco (não há migration), então o
+// knex pode devolver LISTA (json/jsonb) ou STRING JSON (text) dependendo do
+// tipo que ficou lá. Aceita os dois — mesma regra do `parseTamanhos` do app.
+function lerTamanhos(bruto) {
+  if (!bruto) return [];
+  if (Array.isArray(bruto)) {
+    return bruto.map(t => String(t).trim()).filter(Boolean);
+  }
+  if (typeof bruto === 'string') {
+    try {
+      const v = JSON.parse(bruto);
+      return Array.isArray(v) ? v.map(t => String(t).trim()).filter(Boolean) : [];
+    } catch (_) {
+      // "P, M, G" digitado à mão também vale
+      return bruto.split(',').map(t => t.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 router.get('/epis', authMiddleware, async (req, res) => {
   try {
     const produtos = await db('produtos_epi').where('tenant_id', req.user.tenant_id).where('ativo', true).orderBy('nome', 'asc');
-    if (produtos.length > 0) return res.json({ epis: ordenarPt(produtos, 'nome').map(p => p.nome) });
-    res.json({ epis: ordenarPt(EPIS_PADRAO) });
-  } catch (err) { res.json({ epis: ordenarPt(EPIS_PADRAO) }); }
+    if (produtos.length > 0) {
+      const ordenados = ordenarPt(produtos, 'nome');
+      // ⚠️ `tamanhos` vai JUNTO aqui de propósito. A rota /produtos-epi (de
+      // onde o app buscava) é restrita a gestor/admin — o TÉCNICO tomava 403
+      // e ficava sem os tamanhos cadastrados, caindo no mapa fixo do app.
+      // Aqui, além de ser aberta, o nome vem da MESMA linha que gera a lista
+      // de EPIs, então a chave do mapa casa sempre.
+      const tamanhos = {};
+      for (const p of ordenados) {
+        const lista = lerTamanhos(p.tamanhos);
+        if (lista.length > 0) tamanhos[p.nome] = lista;
+      }
+      return res.json({ epis: ordenados.map(p => p.nome), tamanhos });
+    }
+    res.json({ epis: ordenarPt(EPIS_PADRAO), tamanhos: {} });
+  } catch (err) { res.json({ epis: ordenarPt(EPIS_PADRAO), tamanhos: {} }); }
 });
 
 router.post('/requisicoes', authMiddleware, async (req, res) => {

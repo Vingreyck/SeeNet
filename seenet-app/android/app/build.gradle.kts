@@ -44,9 +44,13 @@ android {
     defaultConfig {
         applicationId = "com.seenet.diagnostico"
         minSdk = flutter.minSdkVersion
-        targetSdk = 35
-        versionCode = 81
-        versionName = "1.6.9"
+        // A Play passou a EXIGIR 36 (Android 16). O compileSdk já estava em 36,
+        // e o serviço de localização já declara FOREGROUND_SERVICE_LOCATION +
+        // foregroundServiceType="location" (obrigatórios desde o 34), então
+        // subir aqui não pede nenhuma outra mudança.
+        targetSdk = 36
+        versionCode = 82
+        versionName = "1.6.10"
         multiDexEnabled = true
     }
 

@@ -49,8 +49,8 @@ android {
         // foregroundServiceType="location" (obrigatórios desde o 34), então
         // subir aqui não pede nenhuma outra mudança.
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.6.10"
+        versionCode = 83
+        versionName = "1.6.11"
         multiDexEnabled = true
     }
 

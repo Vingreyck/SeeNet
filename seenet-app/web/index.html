@@ -32,6 +32,24 @@
 
   <title>SeeNet</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Visualizador de PDF (relatório de EPI, APR, ficha da OS).
+
+    No WEB o pacote `printing` renderiza com PDF.js, que ele baixa sozinho de
+    unpkg.com em tempo de execução. Isso quebrava o relatório de EPI: navegador
+    com bloqueio de rastreadores (Brave, uBlock) barra CDN de terceiros e a tela
+    mostrava só "Unable to display the document" — sem erro nenhum, porque o PDF
+    em si chegava certo do servidor.
+
+    Servindo os arquivos junto com o app, não existe mais terceiro pra bloquear
+    (e também não depende do unpkg estar no ar, o que importa pro técnico em
+    rede ruim). A pasta é `pdfjs/` e não `assets/` de propósito: `assets/` é
+    onde o Flutter põe os assets dele.
+  -->
+  <script>
+    var dartPdfJsBaseUrl = "pdfjs/3.2.146/";
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

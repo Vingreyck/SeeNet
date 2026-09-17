@@ -24,6 +24,13 @@ class IXCService {
     this.token = tokenApi;
 
     // Cliente para requisições de LISTAGEM (POST com header ixcsoft: listar)
+    //
+    // ⏱️ 20s, NÃO 60s. Na queda do IXC de 17/set (502/530 do Cloudflare) cada
+    // chamada morta segurava 60 SEGUNDOS; com 38 técnicos no ciclo isso vira
+    // dezenas de minutos de transação aberta, o mutex trava todos os ciclos
+    // seguintes e o pool do banco estoura — foi assim que o app inteiro caiu
+    // ("Timeout acquiring a connection"). Listagem que passa de 20s está morta
+    // de qualquer jeito, e o ciclo seguinte (2min) tenta de novo.
     this.clientListar = axios.create({
       baseURL: this.baseUrl,
       headers: {
@@ -31,10 +38,15 @@ class IXCService {
         'Content-Type': 'application/x-www-form-urlencoded',
         'ixcsoft': 'listar'
       },
-      timeout: 60000,
+      timeout: 20000,
     });
 
     // Cliente para requisições de ALTERAÇÃO (PUT com JSON)
+    //
+    // ⚠️ Este CONTINUA em 60s de propósito. Baixar o timeout de escrita é
+    // perigoso: a gente desistiria no meio enquanto o IXC ainda processa, e aí
+    // não dá pra saber se a OS foi fechada/o comodato baixado ou não. Leitura
+    // pode desistir cedo (o ciclo repete); escrita, não.
     this.clientAlterar = axios.create({
       baseURL: this.baseUrl,
       headers: {

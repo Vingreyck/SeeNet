@@ -39,6 +39,26 @@ class SincronizadorIXC {
     this.falhasConsecutivas = new Map(); // tenant_id → { count, pausadoAte }
     this.maxFalhas = 3;
     this.pausaDuracao = 10 * 60 * 1000; // 10 minutos
+
+    // 🚨 Desistir cedo quando o IXC está FORA (incidente de 17/set).
+    //
+    // O circuit breaker acima existia mas NUNCA abria: o catch de cada técnico
+    // engolia o erro ("erro por técnico não abre o circuit breaker"), então com
+    // o IXC caído o ciclo percorria os 38 técnicos inteiros, cada chamada
+    // esperando o timeout. Resultado: transação aberta por horas, mutex travado
+    // (`⏭️` infinito) e o pool do banco estourado — o app inteiro parou de
+    // logar, não só o sync.
+    //
+    // Agora N técnicos SEGUIDOS falhando por INDISPONIBILIDADE (timeout/5xx/
+    // conexão) abortam a empresa na hora, o que aciona o circuit breaker de
+    // verdade e dá 10min de descanso. Erro de DADOS de um técnico específico
+    // não conta — só quebra de comunicação.
+    this.maxFalhasIxcSeguidas = 3;
+
+    // Teto de tempo do ciclo. Protege o caso "IXC responde, mas devagar demais"
+    // — que não conta como falha e mesmo assim seguraria a transação. O ciclo
+    // normal leva ~31s; 4min é 2x o intervalo, folga grande sem virar horas.
+    this.tempoMaxEmpresaMs = 4 * 60 * 1000;
   }
 
   // ── Circuit Breaker ──────────────────────────────────────────
@@ -60,6 +80,37 @@ class SincronizadorIXC {
     }
 
     return false;
+  }
+
+  /**
+   * O erro é "IXC fora do ar" ou é problema de dados daquele técnico/OS?
+   *
+   * Só indisponibilidade deve abortar o ciclo inteiro. Um erro de dados de UM
+   * técnico não pode impedir os outros 37 de sincronizar — foi por isso que o
+   * catch por técnico existe.
+   *
+   * O que a queda de 17/set produziu: `timeout of 60000ms exceeded`,
+   * `status code 502` e `status code 530` (Cloudflare: origem inacessível).
+   */
+  static _ixcIndisponivel(error) {
+    if (!error) return false;
+
+    // axios: timeout de request e erros de socket vêm em `code`
+    const code = error.code || '';
+    if (['ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED',
+         'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'EPIPE'].includes(code)) {
+      return true;
+    }
+
+    // 5xx = problema do servidor/borda, não da nossa consulta.
+    // (4xx fica de FORA: 401/403 é credencial, 400 é consulta errada — repetir
+    // ou abortar não muda nada, e abortar esconderia o erro real.)
+    const status = error.response?.status;
+    if (typeof status === 'number' && status >= 500) return true;
+
+    const msg = String(error.message || '').toLowerCase();
+    return msg.includes('timeout') || msg.includes('socket hang up') ||
+           msg.includes('network error');
   }
 
   _registrarFalha(tenantId, empresaNome) {
@@ -235,10 +286,22 @@ class SincronizadorIXC {
       }
 
       let totalOSsSincronizadas = 0;
+      let falhasIxcSeguidas = 0;
+      const prazoEmpresa = Date.now() + this.tempoMaxEmpresaMs;
 
       for (const mapeamento of mapeamentos) {
+        // Estourou o teto de tempo? Aborta e deixa o próximo ciclo continuar.
+        // Melhor perder um ciclo do que segurar a transação (e o mutex) aberta.
+        if (Date.now() > prazoEmpresa) {
+          throw new Error(
+            `Ciclo passou de ${this.tempoMaxEmpresaMs / 1000}s (IXC lento) — ` +
+            `abortado em ${totalOSsSincronizadas} OS(s); o próximo ciclo retoma`
+          );
+        }
+
         try {
           const ossIXC = await ixc.buscarOSs({ tecnicoId: mapeamento.tecnico_ixc_id });
+          falhasIxcSeguidas = 0; // respondeu → o IXC está de pé
 
           // Só loga técnicos COM OS — antes eram 3 linhas × 33 técnicos × ciclo
           // de 2min (a maioria "0 OS"), o que afogava o log do Railway.
@@ -368,7 +431,23 @@ class SincronizadorIXC {
 
         } catch (error) {
           console.error(`   ❌ Erro ao sincronizar técnico ${mapeamento.tecnico_seenet_nome}:`, error.message);
-          // Erro por técnico não abre o circuit breaker — só erros de empresa inteira
+
+          // Erro de DADOS de um técnico continua isolado (os outros seguem).
+          // Mas INDISPONIBILIDADE do IXC repetida significa que insistir nos
+          // demais só queima tempo com a transação aberta — aborta a empresa,
+          // o que aciona o circuit breaker e pausa 10min.
+          if (SincronizadorIXC._ixcIndisponivel(error)) {
+            falhasIxcSeguidas++;
+            if (falhasIxcSeguidas >= this.maxFalhasIxcSeguidas) {
+              throw new Error(
+                `IXC indisponível: ${falhasIxcSeguidas} técnicos seguidos falharam ` +
+                `(último: ${error.message}). Abortando o ciclo em vez de percorrer ` +
+                `os ${mapeamentos.length} técnicos com o IXC fora.`
+              );
+            }
+          } else {
+            falhasIxcSeguidas = 0; // erro de dados não conta pro circuit breaker
+          }
         }
       }
 

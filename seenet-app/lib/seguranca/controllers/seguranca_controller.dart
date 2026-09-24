@@ -244,6 +244,21 @@ class SegurancaController extends GetxController {
     }
   }
 
+  /// ✏️ Gestor ajusta os itens (tirar o que faltou no estoque, corrigir
+  /// tamanho/quantidade) em vez de recusar o pedido inteiro.
+  Future<Map<String, dynamic>> editarItens(int id,
+      {required List<String> epis, String? motivo}) async {
+    isSending.value = true;
+    try {
+      final result = await _service.editarItens(id, epis: epis, motivo: motivo);
+      // Recarrega os pendentes pro card mostrar a lista nova na hora.
+      if (result['success'] == true) carregarPendentes();
+      return result;
+    } finally {
+      isSending.value = false;
+    }
+  }
+
   Future<Map<String, dynamic>> recusar(int id, {required String observacao}) async {
     isSending.value = true;
     try {

@@ -51,6 +51,32 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
     );
   }
 
+  /// ✏️ Abre a folha pro gestor ajustar os itens do pedido.
+  void _editarPedido(Map<String, dynamic> req) {
+    final bruto = req['epis_solicitados'];
+    final List<String> textos = bruto is List ? bruto.cast<String>() : [];
+
+    if (textos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Este pedido não tem itens para ajustar'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _EditarPedidoSheet(
+        requisicaoId: req['id'] as int,
+        tecnicoNome: (req['tecnico_nome'] ?? 'Técnico').toString(),
+        itensOriginais: textos,
+        controller: controller,
+      ),
+    );
+  }
+
   void _confirmarRecusa(int id) {
     final obsController = TextEditingController();
     showDialog(
@@ -480,6 +506,27 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
                           style: const TextStyle(
                               color: Colors.white38, fontSize: 11)),
                     ],
+                  ),
+                ),
+                // ✏️ Ajustar o pedido sem precisar recusar. Faltando um item
+                // no estoque, o gestor tira só ele (ou troca tamanho/qtde) e
+                // aprova o resto — antes o técnico tinha que refazer tudo.
+                Tooltip(
+                  message: 'Ajustar itens do pedido',
+                  child: InkWell(
+                    onTap: () => _editarPedido(req),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.withOpacity(0.35)),
+                      ),
+                      child: const Icon(Icons.edit_rounded,
+                          color: Colors.blue, size: 16),
+                    ),
                   ),
                 ),
                 Container(
@@ -1097,4 +1144,385 @@ class _GestaoRequisicoesScreenState extends State<GestaoRequisicoesScreen>
       ),
     );
   }
+}
+
+// ── ✏️ Folha de edição do pedido de EPI (gestor) ───────────────────────────
+//
+// Existe porque o gestor só tinha "Aprovar" e "Recusar": faltando UM item no
+// estoque, ele recusava e o técnico refazia o pedido inteiro. Aqui ele tira o
+// item que faltou, corrige tamanho ou quantidade, e aprova o resto.
+//
+// Os itens vêm como TEXTO ("Bota de Segurança (Tam. 45) x2"). A folha
+// desmonta com `parseItemEpi`, edita as partes e monta de volta com
+// `montarItemEpi` — mesmo formato que o app do técnico gera, senão o PDF da
+// ficha e o histórico saem errados.
+class _EditarPedidoSheet extends StatefulWidget {
+  final int requisicaoId;
+  final String tecnicoNome;
+  final List<String> itensOriginais;
+  final SegurancaController controller;
+
+  const _EditarPedidoSheet({
+    required this.requisicaoId,
+    required this.tecnicoNome,
+    required this.itensOriginais,
+    required this.controller,
+  });
+
+  @override
+  State<_EditarPedidoSheet> createState() => _EditarPedidoSheetState();
+}
+
+class _EditarPedidoSheetState extends State<_EditarPedidoSheet> {
+  late List<ItemEpi> _itens;
+  final _motivoCtrl = TextEditingController();
+  Map<String, List<String>> _tamanhosPorEpi = {};
+  bool _salvando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _itens = widget.itensOriginais.map(SegurancaService.parseItemEpi).toList();
+    _carregarTamanhos();
+  }
+
+  /// Tamanhos vêm do CADASTRO (aba Produtos). Sem isso o gestor não teria como
+  /// trocar 45 → 44. Se falhar, a folha segue funcionando: só não oferece a
+  /// troca de tamanho (remover e mudar quantidade continuam valendo).
+  Future<void> _carregarTamanhos() async {
+    final mapa = await SegurancaService().buscarTamanhosPorEpi();
+    if (mounted && mapa.isNotEmpty) setState(() => _tamanhosPorEpi = mapa);
+  }
+
+  @override
+  void dispose() {
+    _motivoCtrl.dispose();
+    super.dispose();
+  }
+
+  bool get _mudou {
+    final agora = _itens.map(SegurancaService.montarItemEpi).toList();
+    if (agora.length != widget.itensOriginais.length) return true;
+    for (var i = 0; i < agora.length; i++) {
+      if (agora[i] != widget.itensOriginais[i]) return true;
+    }
+    return false;
+  }
+
+  Future<void> _salvar() async {
+    if (_itens.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('O pedido ficaria vazio. Para negar tudo, use Recusar.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    setState(() => _salvando = true);
+    final res = await widget.controller.editarItens(
+      widget.requisicaoId,
+      epis: _itens.map(SegurancaService.montarItemEpi).toList(),
+      motivo: _motivoCtrl.text,
+    );
+    if (!mounted) return;
+    setState(() => _salvando = false);
+
+    if (res['success'] == true) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('✅ ${res['message'] ?? 'Pedido ajustado'} — '
+            '${widget.tecnicoNome} foi avisado'),
+        backgroundColor: const Color(0xFF00FF88),
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('❌ ${res['message']}'),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          // Sobe junto com o teclado quando o gestor escreve o motivo.
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit_rounded, color: Colors.blue, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Ajustar pedido',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold)),
+                          Text(widget.tecnicoNome,
+                              style: const TextStyle(
+                                  color: Colors.white38, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                      'Tire o que faltou no estoque ou corrija tamanho e '
+                      'quantidade. O técnico é avisado do que mudou.',
+                      style: TextStyle(color: Colors.white38, fontSize: 11)),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  children: [
+                    if (_itens.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border:
+                              Border.all(color: Colors.orange.withOpacity(0.3)),
+                        ),
+                        child: const Text(
+                            'Você tirou todos os itens. Para negar o pedido '
+                            'inteiro, feche aqui e use o botão Recusar.',
+                            style:
+                                TextStyle(color: Colors.orange, fontSize: 12)),
+                      )
+                    else
+                      ..._itens
+                          .asMap()
+                          .entries
+                          .map((e) => _linhaItem(e.key, e.value)),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _motivoCtrl,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: InputDecoration(
+                        labelText: 'Motivo (opcional)',
+                        hintText: 'Ex: bota 45 em falta, enviando 44',
+                        labelStyle: const TextStyle(
+                            color: Colors.white38, fontSize: 12),
+                        hintStyle: const TextStyle(
+                            color: Colors.white24, fontSize: 12),
+                        filled: true,
+                        fillColor: const Color(0xFF111111),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none),
+                      ),
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed:
+                            _salvando ? null : () => Navigator.pop(context),
+                        child: const Text('Cancelar',
+                            style: TextStyle(color: Colors.white38)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        // Travado enquanto nada mudou: evita gravar "editou"
+                        // no histórico à toa e notificar o técnico sem motivo.
+                        onPressed: (_salvando || !_mudou) ? null : _salvar,
+                        icon: _salvando
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.black38))
+                            : const Icon(Icons.check_rounded, size: 18),
+                        label: Text(_salvando
+                            ? 'Salvando...'
+                            : (_mudou ? 'Salvar ajuste' : 'Nada mudou')),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: const Color(0xFF2A2A2A),
+                          disabledForegroundColor: Colors.white30,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _linhaItem(int i, ItemEpi item) {
+    final tamanhos = _tamanhosPorEpi[item.nome] ?? const <String>[];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(item.nome,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+              ),
+              InkWell(
+                onTap: () => setState(() => _itens.removeAt(i)),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  child: const Icon(Icons.delete_outline,
+                      color: Colors.red, size: 18),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Text('Qtd',
+                  style: TextStyle(color: Colors.white38, fontSize: 11)),
+              const SizedBox(width: 8),
+              _botaoQtd(
+                  Icons.remove,
+                  item.quantidade > 1
+                      ? () => setState(() => _itens[i] =
+                          item.copyWith(quantidade: item.quantidade - 1))
+                      : null),
+              Container(
+                width: 34,
+                alignment: Alignment.center,
+                child: Text('${item.quantidade}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold)),
+              ),
+              _botaoQtd(
+                  Icons.add,
+                  item.quantidade < 99
+                      ? () => setState(() => _itens[i] =
+                          item.copyWith(quantidade: item.quantidade + 1))
+                      : null),
+            ],
+          ),
+          // Tamanho só aparece se o EPI tiver tamanhos no cadastro, ou se o
+          // técnico já tinha escolhido um.
+          if (tamanhos.isNotEmpty || item.tamanho != null) ...[
+            const SizedBox(height: 10),
+            const Text('Tamanho',
+                style: TextStyle(color: Colors.white38, fontSize: 11)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              // Se o tamanho que o técnico pediu saiu do cadastro, ele aparece
+              // assim mesmo — senão sumiria da tela sem o gestor entender.
+              children: <String>{
+                ...tamanhos,
+                if (item.tamanho != null) item.tamanho!,
+              }.map((t) {
+                final ativo = item.tamanho == t;
+                return InkWell(
+                  onTap: () => setState(() => _itens[i] = ativo
+                      ? item.copyWith(limparTamanho: true)
+                      : item.copyWith(tamanho: t)),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: ativo
+                          ? Colors.blue.withOpacity(0.18)
+                          : const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: ativo ? Colors.blue : Colors.white12),
+                    ),
+                    child: Text(t,
+                        style: TextStyle(
+                            color: ativo ? Colors.blue : Colors.white54,
+                            fontSize: 12,
+                            fontWeight: ativo ? FontWeight.bold : null)),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _botaoQtd(IconData icone, VoidCallback? onTap) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Icon(icone,
+              size: 15, color: onTap == null ? Colors.white12 : Colors.white54),
+        ),
+      );
 }

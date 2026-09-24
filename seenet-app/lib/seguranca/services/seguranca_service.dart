@@ -274,6 +274,23 @@ class SegurancaService extends GetxService {
   }
 
   // ── Recusar ───────────────────────────────────────────────────
+  /// ✏️ Gestor ajusta os itens em vez de recusar o pedido inteiro.
+  /// Só funciona enquanto a requisição está 'pendente' (o backend confere).
+  Future<Map<String, dynamic>> editarItens(
+    int id, {
+    required List<String> epis,
+    String? motivo,
+  }) async {
+    final r = await _http('PUT', '$_base/requisicoes/$id/itens', {
+      'epis_solicitados': epis,
+      if (motivo != null && motivo.trim().isNotEmpty) 'motivo': motivo.trim(),
+    });
+    return {
+      'success': r['status'] == 200,
+      'message': r['body']?['message'] ?? r['body']?['error'] ?? 'Erro ao editar o pedido',
+    };
+  }
+
   Future<Map<String, dynamic>> recusar(int id, {required String observacao}) async {
     try {
       // ✅ http (NÃO GetConnect): no WEB o GetConnect tenta setar 'content-length'
@@ -539,6 +556,59 @@ class SegurancaService extends GetxService {
   /// A coluna `tamanhos` foi criada direto no banco (não há migration), então
   /// pode voltar como LISTA (colunas json/jsonb) ou como STRING JSON (colunas
   /// text) dependendo do tipo. Aceita os dois — e devolve vazio pro resto.
+  // ── ✏️ Itens do pedido: texto ⇄ partes ────────────────────────────────
+  //
+  // `epis_solicitados` é uma lista de STRINGS já montadas pelo app do técnico
+  // (`seguranca_controller.enviarRequisicao`), no formato:
+  //
+  //     "<nome>"  +  " (Tam. <tamanho>)" se tiver  +  " x<qtd>" se > 1
+  //
+  // Pro gestor poder editar, precisa desmontar e montar de volta EXATAMENTE
+  // no mesmo formato — o PDF da ficha, o histórico e o mapeamento pro IXC
+  // leem esse texto. Um espaço a mais aqui quebra tudo lá na frente, calado.
+
+  /// Quantidade no fim do texto: " x3". Exige o `x` colado no número e no FIM,
+  /// pra não confundir com nome que tenha "x" no meio ("Luva x2 Camadas").
+  static final RegExp _reQtd = RegExp(r'\s+x(\d+)$');
+
+  /// Tamanho: " (Tam. 45)".
+  ///
+  /// ⚠️ O "Tam. " é OBRIGATÓRIO no padrão de propósito. Sem ele, um EPI real
+  /// do cadastro — "Camisa Manga Longa (Jaleco)" — teria o "(Jaleco)" lido
+  /// como se fosse o tamanho, e o nome viraria "Camisa Manga Longa".
+  static final RegExp _reTam = RegExp(r'\s+\(Tam\.\s*(.+?)\)$');
+
+  /// Desmonta "Bota de Segurança (Tam. 45) x2" em nome/tamanho/quantidade.
+  static ItemEpi parseItemEpi(String texto) {
+    var resto = texto.trim();
+    var qtd = 1;
+    String? tam;
+
+    final mQtd = _reQtd.firstMatch(resto);
+    if (mQtd != null) {
+      qtd = int.tryParse(mQtd.group(1)!) ?? 1;
+      resto = resto.substring(0, mQtd.start);
+    }
+
+    final mTam = _reTam.firstMatch(resto);
+    if (mTam != null) {
+      tam = mTam.group(1)!.trim();
+      resto = resto.substring(0, mTam.start);
+    }
+
+    return ItemEpi(nome: resto.trim(), tamanho: tam, quantidade: qtd < 1 ? 1 : qtd);
+  }
+
+  /// Monta de volta. Tem que bater byte a byte com o que o app do técnico gera.
+  static String montarItemEpi(ItemEpi item) {
+    var texto = item.nome.trim();
+    if (item.tamanho != null && item.tamanho!.trim().isNotEmpty) {
+      texto += ' (Tam. ${item.tamanho!.trim()})';
+    }
+    if (item.quantidade > 1) texto += ' x${item.quantidade}';
+    return texto;
+  }
+
   static List<String> parseTamanhos(dynamic bruto) {
     if (bruto == null) return [];
     if (bruto is List) {
@@ -586,4 +656,26 @@ class SegurancaService extends GetxService {
     return {'success': false};
   }
 
+}
+/// Um item do pedido de EPI, desmontado do texto que fica em
+/// `epis_solicitados` (ver `SegurancaService.parseItemEpi`).
+///
+/// Imutável de propósito: a edição do gestor cria itens novos em vez de
+/// alterar os existentes, então não dá pra mexer na lista sem querer.
+class ItemEpi {
+  final String nome;
+  final String? tamanho;
+  final int quantidade;
+
+  const ItemEpi({required this.nome, this.tamanho, this.quantidade = 1});
+
+  ItemEpi copyWith({String? tamanho, int? quantidade, bool limparTamanho = false}) =>
+      ItemEpi(
+        nome: nome,
+        tamanho: limparTamanho ? null : (tamanho ?? this.tamanho),
+        quantidade: quantidade ?? this.quantidade,
+      );
+
+  @override
+  String toString() => SegurancaService.montarItemEpi(this);
 }

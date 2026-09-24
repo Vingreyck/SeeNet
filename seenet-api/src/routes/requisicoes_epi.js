@@ -824,6 +824,116 @@ router.post('/requisicoes/:id/recusar', authMiddleware, async (req, res) => {
       } catch (err) { console.error('❌ Erro ao recusar:', err); res.status(500).json({ error: 'Erro ao recusar' }); }
 });
 
+/**
+ * ✏️ Gestor AJUSTA os itens da requisição em vez de recusar.
+ * PUT /seguranca/requisicoes/:id/itens
+ *
+ * Antes, faltando UM item no estoque, o gestor só tinha "Recusar" — e o
+ * técnico refazia o pedido inteiro. Agora dá pra tirar o item que faltou,
+ * corrigir tamanho ou quantidade, e aprovar o resto na sequência.
+ *
+ * ⚠️ SÓ enquanto 'pendente'. Depois de aprovada o estoque já foi baixado no
+ * IXC; mexer na lista aqui faria o registro divergir do que saiu do
+ * almoxarifado, sem nada pra reconciliar.
+ *
+ * O técnico É AVISADO — ele pediu uma coisa e vai receber outra. O que mudou
+ * fica escrito em `observacao_gestor`, que a tela "Minhas Requisições" já mostra.
+ */
+router.put('/requisicoes/:id/itens', authMiddleware, async (req, res) => {
+  try {
+    if (!isGestorOuAdmin(req.user.tipo_usuario)) {
+      return res.status(403).json({ error: 'Sem permissão' });
+    }
+
+    const { epis_solicitados, motivo } = req.body;
+
+    if (!Array.isArray(epis_solicitados)) {
+      return res.status(400).json({ error: 'Lista de itens inválida' });
+    }
+
+    // Lista vazia seria uma recusa disfarçada — e sem o motivo obrigatório que
+    // a recusa exige. Quem quer zerar tudo usa o botão Recusar.
+    const itens = epis_solicitados
+      .map(e => String(e).trim())
+      .filter(e => e.length > 0);
+
+    if (itens.length === 0) {
+      return res.status(400).json({
+        error: 'A requisição ficaria vazia. Para negar tudo, use Recusar.'
+      });
+    }
+
+    const requisicao = await db('requisicoes_epi')
+      .where('id', req.params.id)
+      .where('tenant_id', req.user.tenant_id)
+      .first();
+
+    if (!requisicao) return res.status(404).json({ error: 'Não encontrada' });
+
+    if (requisicao.status !== 'pendente') {
+      return res.status(400).json({
+        error: `Só dá para editar enquanto está pendente (esta está: ${requisicao.status}).`
+      });
+    }
+
+    // O que o técnico tinha pedido (pra registrar a diferença)
+    let antes = [];
+    try {
+      antes = typeof requisicao.epis_solicitados === 'string'
+        ? JSON.parse(requisicao.epis_solicitados)
+        : (requisicao.epis_solicitados || []);
+    } catch (_) { antes = []; }
+    if (!Array.isArray(antes)) antes = [];
+
+    const removidos = antes.filter(a => !itens.includes(a));
+    const adicionados = itens.filter(i => !antes.includes(i));
+
+    if (removidos.length === 0 && adicionados.length === 0) {
+      return res.json({ success: true, message: 'Nada mudou na lista.', alterado: false });
+    }
+
+    // Histórico legível, acumulando sobre o que já houver (o gestor pode
+    // ajustar mais de uma vez antes de aprovar).
+    const partes = [];
+    if (removidos.length) partes.push(`retirado: ${removidos.join(', ')}`);
+    if (adicionados.length) partes.push(`ajustado para: ${adicionados.join(', ')}`);
+    if (motivo?.trim()) partes.push(`motivo: ${motivo.trim()}`);
+
+    const registro = `✏️ Gestor editou o pedido (${partes.join(' · ')})`;
+    const observacao = requisicao.observacao_gestor
+      ? `${requisicao.observacao_gestor}\n${registro}`
+      : registro;
+
+    await db('requisicoes_epi')
+      .where('id', req.params.id)
+      .where('status', 'pendente') // trava: não edita se aprovaram no meio tempo
+      .update({
+        epis_solicitados: JSON.stringify(itens),
+        observacao_gestor: observacao,
+        gestor_id: req.user.id,
+      });
+
+    console.log(`✏️ Requisição ${req.params.id} editada pelo gestor ${req.user.id}: ${partes.join(' · ')}`);
+
+    res.json({ success: true, message: 'Pedido ajustado.', alterado: true, epis_solicitados: itens });
+
+    // Avisar o técnico — ele vai receber diferente do que pediu.
+    try {
+      await notificationService.enviarParaUsuario(
+        db, requisicao.tecnico_id,
+        '✏️ Seu pedido de EPI foi ajustado',
+        partes.join(' · '),
+        { route: '/seguranca/minhas', tipo: 'requisicao_editada', referencia_id: String(req.params.id) }
+      );
+    } catch (notifErr) {
+      console.warn('⚠️ Falha ao notificar técnico da edição:', notifErr.message);
+    }
+  } catch (err) {
+    console.error('❌ Erro ao editar itens da requisição:', err);
+    res.status(500).json({ error: 'Erro ao editar o pedido' });
+  }
+});
+
 router.get('/requisicoes/:id/pdf', authMiddleware, async (req, res) => {
   try {
     const requisicao = await db('requisicoes_epi').where('id', req.params.id).first();

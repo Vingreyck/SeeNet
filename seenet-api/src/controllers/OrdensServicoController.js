@@ -1496,7 +1496,36 @@ async finalizarExecucao(req, res) {
     }
 
     if (os.status !== 'em_execucao') {
-      return res.status(400).json({ success: false, error: 'OS não está em execução' });
+      // Mensagem ESPECÍFICA por status (25/set). O texto genérico anterior
+      // virava, no app, um "Erro ao finalizar OS" vermelho sem nenhuma pista —
+      // o técnico não tinha como saber o que fazer e ia fechar a OS pelo IXC
+      // (foi o que o Márcio fez na 296639, que estava em `em_deslocamento`
+      // aqui e AG no IXC).
+      const comoResolver = {
+        em_deslocamento:
+          'Você ainda não registrou a chegada. Toque em "Cheguei ao local" antes de finalizar.',
+        pendente:
+          'Esta OS ainda não foi iniciada. Inicie o deslocamento e registre a chegada primeiro.',
+        reaberta:
+          'Esta OS foi reaberta. Inicie o deslocamento e registre a chegada antes de finalizar.',
+        reagendada:
+          'Esta OS está marcada como reagendada. Peça para reabrirem no IXC antes de finalizar.',
+        concluida:
+          'Esta OS já foi finalizada. Atualize a lista para ela sair da sua tela.',
+        cancelada:
+          'Esta OS foi cancelada no IXC e não pode ser finalizada.',
+      };
+
+      const detalhe = comoResolver[os.status] ||
+        `A OS está com status "${os.status}" e só dá para finalizar quando está em execução.`;
+
+      console.warn(`⚠️ Finalização recusada: OS ${id} está em '${os.status}' (esperado 'em_execucao')`);
+
+      return res.status(400).json({
+        success: false,
+        error: detalhe,
+        status_atual: os.status,
+      });
     }
 
     // 2. Atualizar dados da OS no banco

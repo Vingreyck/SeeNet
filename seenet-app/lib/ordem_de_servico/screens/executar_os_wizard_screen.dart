@@ -2761,13 +2761,16 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
 
       final connectivity = Get.find<ConnectivityService>();
       bool sucesso;
+      String? motivoRecusa;
 
       if (connectivity.offline) {
         final sync = Get.find<SyncManager>();
         await sync.enfileirarFinalizarOS(os.id, dados);
         sucesso = true;
       } else {
-        sucesso = await controller.finalizarExecucao(os.id, dados);
+        final r = await controller.finalizarExecucao(os.id, dados);
+        sucesso = r['sucesso'] == true;
+        motivoRecusa = r['mensagem'] as String?;
       }
 
       // ✅ Fechar dialog de progresso
@@ -2789,8 +2792,13 @@ class _ExecutarOSWizardScreenState extends State<ExecutarOSWizardScreen>
         ));
         Navigator.pop(context, true);
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Erro ao finalizar OS'), backgroundColor: Colors.red,
+        // Mostra o MOTIVO que o backend mandou (ex: "você ainda não registrou
+        // a chegada"). O texto genérico de antes deixava o técnico sem saída —
+        // ele acabava finalizando pelo IXC, e aí a OS não saía daqui.
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(motivoRecusa ?? 'Erro ao finalizar OS'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 6), // tempo de ler e agir
         ));
       }
     } catch (e) {

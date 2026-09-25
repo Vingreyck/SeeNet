@@ -203,11 +203,14 @@ class OrdemServicoController extends GetxController {
     }
   }
 
-  Future<bool> finalizarExecucao(String osId, Map<String, dynamic> dados) async {
+  /// Devolve `{sucesso, mensagem}` pra tela poder mostrar o MOTIVO da recusa
+  /// (ex: "você ainda não registrou a chegada") em vez de um erro genérico.
+  Future<Map<String, dynamic>> finalizarExecucao(
+      String osId, Map<String, dynamic> dados) async {
     try {
-      final sucesso = await _service.finalizarOS(osId, dados);
+      final r = await _service.finalizarOS(osId, dados);
 
-      if (sucesso) {
+      if (r['sucesso'] == true) {
         await carregarMinhasOSs();
         await carregarOSsConcluidas();
         AppSnackbar.show(
@@ -218,11 +221,11 @@ class OrdemServicoController extends GetxController {
         );
       }
 
-      return sucesso;
+      return r;
     } catch (e) {
       AppSnackbar.show('Erro', 'Falha ao finalizar: $e',
           backgroundColor: Colors.red, colorText: Colors.white);
-      return false;
+      return {'sucesso': false, 'mensagem': 'Falha ao finalizar: $e'};
     }
   }
 

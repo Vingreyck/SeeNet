@@ -490,7 +490,12 @@ class OrdemServicoService {
     return fotosComMetadados;
   }
 
-  Future<bool> finalizarOS(String osId, Map<String, dynamic> dados) async {
+  /// Finaliza a OS.
+  ///
+  /// Devolve `{sucesso: bool, mensagem: String?}` — e NÃO um bool — porque o
+  /// motivo da recusa é a informação mais útil pro técnico em campo.
+  Future<Map<String, dynamic>> finalizarOS(
+      String osId, Map<String, dynamic> dados) async {
     try {
       print('🏁 Finalizando OS $osId');
 
@@ -508,10 +513,29 @@ class OrdemServicoService {
       );
 
       print('✅ Resposta: ${response.statusCode}');
-      return response.statusCode == 200;
+
+      if (response.statusCode == 200) {
+        return {'sucesso': true};
+      }
+
+      // ⚠️ A MENSAGEM DO BACKEND É O PRODUTO AQUI.
+      // Antes este método devolvia só `true/false` e a tela mostrava um
+      // "Erro ao finalizar OS" vermelho, sem pista nenhuma. O backend já
+      // explicava o motivo ("você ainda não registrou a chegada"), mas isso
+      // era jogado fora — o técnico ficava sem saber o que fazer e ia
+      // finalizar pelo IXC (caso do Márcio, 25/set).
+      String mensagem = 'Erro ao finalizar OS (${response.statusCode})';
+      try {
+        final corpo = json.decode(response.body);
+        if (corpo is Map && corpo['error'] != null) {
+          mensagem = corpo['error'].toString();
+        }
+      } catch (_) { /* resposta sem JSON — fica a mensagem genérica */ }
+
+      return {'sucesso': false, 'mensagem': mensagem};
     } catch (e) {
       print('❌ Erro ao finalizar OS: $e');
-      return false;
+      return {'sucesso': false, 'mensagem': 'Sem conexão com o servidor'};
     }
   }
 }

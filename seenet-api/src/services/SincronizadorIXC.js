@@ -375,7 +375,24 @@ class SincronizadorIXC {
               .where('tenant_id', integracao.tenant_id)
               .where('tecnico_id', mapeamento.usuario_id)
               .where('origem', 'IXC')
-              .whereIn('status', ['pendente', 'reaberta', 'em_execucao', 'em_deslocamento'])
+              // ⚠️ `reagendada` PRECISA estar aqui (achado 25/set).
+              //
+              // Ela era um buraco negro: OS marcada como reagendada vira RAG no
+              // IXC, e RAG não está no filtro do `buscarOSs` (A/AG/EA/EX/EN) —
+              // então ela nunca mais volta na lista. Ficando também de fora
+              // DAQUI, nada no sistema voltava a olhar pra ela: quando o IXC
+              // fechava (F), o SeeNet nunca ficava sabendo.
+              //
+              // Resultado medido: 22 OS do Márcio presas em `reagendada`, a mais
+              // antiga de 14/ago — uma delas (296482) finalizada no IXC e ainda
+              // aparecendo aqui. Incluir o status resolve todas de uma vez,
+              // porque este bloco confere cada OS INDIVIDUALMENTE no IXC e só
+              // mexe se o IXC confirmar F/C/RAG.
+              //
+              // 📌 LIÇÃO (é a 2ª vez): status novo de OS exige revisar TODAS as
+              // queries do Sincronizador. Aconteceu igual com `reaberta` em 13/ago.
+              .whereIn('status',
+                ['pendente', 'reaberta', 'reagendada', 'em_execucao', 'em_deslocamento'])
               .whereNotNull('id_externo')
               .whereNotIn('id_externo', idsExternosIXC)
               .select('id', 'id_externo', 'numero_os', 'status');

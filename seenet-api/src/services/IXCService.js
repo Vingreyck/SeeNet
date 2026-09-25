@@ -355,6 +355,16 @@ class IXCService {
         // o IXC os IGNORA. Quem consome precisa respeitar esta flag (ver o
         // bloco de endereço no SincronizadorIXC).
         enderecoPadraoCliente: reg.endereco_padrao_cliente === 'S',
+
+        // ⚠️ A flag tem TRÊS valores, não dois (descoberto 25/set na OS 296638):
+        //   'S' = usa o endereço do CLIENTE
+        //   'C' = usa o endereço do CONTRATO   ← este faltava
+        //   'N' = o login tem endereço próprio
+        // Tratar 'C' como "tem endereço próprio" mandava o técnico pro endereço
+        // errado: o login do trailer (`ttrailerr`) tem os campos VAZIOS, então
+        // caía no endereço residencial do cliente em vez do local do serviço.
+        // Guardado CRU porque o booleano acima perde essa distinção.
+        enderecoPadrao: reg.endereco_padrao_cliente || '',
         endereco: reg.endereco || null,
         numero: reg.numero || null,
         bairro: reg.bairro || null,
@@ -546,6 +556,22 @@ class IXCService {
    * - 69,90 - BBNET"). Retorna a string ou null.
    */
   async buscarPlanoContrato(idContrato) {
+    const dados = await this.buscarDadosContrato(idContrato);
+    return dados?.plano || null;
+  }
+
+  /**
+   * Contrato COMPLETO: plano + endereço próprio.
+   *
+   * O contrato pode ter endereço próprio (`endereco_padrao_cliente = 'N'`), que
+   * é o LOCAL DO SERVIÇO — diferente do endereço residencial do cliente. Caso
+   * real (OS 296638): cliente mora na "RUA F, 42, SAN LORENZO" e o contrato é
+   * de um trailer na "Rua Robustiano Menezes, Tabocas". O técnico tem que ir
+   * ao trailer.
+   *
+   * Mesma consulta que o plano já fazia — sem chamada extra ao IXC.
+   */
+  async buscarDadosContrato(idContrato) {
     try {
       if (!idContrato || idContrato === '0') return null;
       const params = new URLSearchParams({
@@ -556,9 +582,31 @@ class IXCService {
         rp: '1'
       });
       const response = await this.clientListar.post('/cliente_contrato', params.toString());
-      return response.data?.registros?.[0]?.contrato || null;
+
+      // Guarda de formato: qtype recusado devolve HTML (string), não objeto —
+      // e aí o `?.` transformaria a falha em null silencioso (lição de 19/ago).
+      if (typeof response.data !== 'object' || response.data === null) {
+        console.warn(`⚠️ [CONTRATO ${idContrato}] resposta do IXC não é objeto — consulta recusada?`);
+        return null;
+      }
+
+      const reg = response.data.registros?.[0];
+      if (!reg) return null;
+
+      return {
+        plano: reg.contrato || null,
+        // 'N' = o contrato tem endereço PRÓPRIO; 'S' = usa o do cliente
+        temEnderecoProprio: reg.endereco_padrao_cliente === 'N' && !!reg.endereco,
+        endereco: reg.endereco || null,
+        numero: reg.numero || null,
+        bairro: reg.bairro || null,
+        cep: reg.cep || null,
+        cidade: reg.cidade || null,
+        complemento: reg.complemento || null,
+        referencia: reg.referencia || null,
+      };
     } catch (e) {
-      console.error(`❌ Erro ao buscar plano do contrato ${idContrato}:`, e.message);
+      console.error(`❌ Erro ao buscar contrato ${idContrato}:`, e.message);
       return null;
     }
   }

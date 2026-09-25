@@ -12,7 +12,7 @@ class SincronizadorIXC {
     this.cacheFibra = new Map(); // login → dados de fibra (Caixa FTTH / Porta FTTH)
     this.cacheLogin = new Map(); // id_login → { login, senha, id_contrato, endereco... }
     this.cacheCidade = new Map(); // id_cidade → { nome, uf } (cidade não muda)
-    this.cacheContrato = new Map(); // id_contrato → nome do plano
+    this.cacheContrato = new Map(); // id_contrato → { plano, endereco... } (25/set)
     // 🗑️ OS APAGADA no IXC: some da listagem E o `buscarDetalhesOS` não acha.
     // Não dá pra cancelar na primeira ausência — instabilidade do IXC devolve
     // "não encontrada" do mesmo jeito, e cancelar OS boa seria grave. Então
@@ -818,7 +818,49 @@ class SincronizadorIXC {
             // 265" — e o app mandou o técnico para o endereço errado.
             // A checagem de cidade (29/jul) NÃO pega esse caso: as duas ruas
             // são da mesma cidade.
-            if (rec.enderecoPadraoCliente) {
+            // 🚩 'C' = "Padrão CONTRATO" (descoberto 25/set, OS 296638).
+            //
+            // O contrato pode ter endereço próprio, que é o LOCAL DO SERVIÇO —
+            // diferente de onde o cliente mora. Caso real: Mateus mora na
+            // "RUA F, 42, SAN LORENZO" e o contrato é de um TRAILER na "Rua
+            // Robustiano Menezes, Tabocas". O técnico tinha que ir ao trailer e
+            // o app mandava pra casa dele.
+            //
+            // Antes só existia o tratamento do 'S'. Como o login marcado 'C'
+            // tem os campos de endereço VAZIOS, ele caía no ramo do fallback e
+            // o endereço do CLIENTE prevalecia — errado.
+            if (rec.enderecoPadrao === 'C' && idContratoLogin) {
+              let ct = this.cacheContrato.get(idContratoLogin);
+              if (ct === undefined) {
+                ct = await ixcService.buscarDadosContrato(idContratoLogin);
+                this.cacheContrato.set(idContratoLogin, ct);
+              }
+
+              if (ct && ct.temEnderecoProprio) {
+                clienteEndereco   = ct.endereco;
+                clienteNumero     = ct.numero || clienteNumero;
+                clienteBairro     = ct.bairro || clienteBairro;
+                clienteCep        = ct.cep || clienteCep;
+                clienteComplemento = ct.complemento || clienteComplemento;
+                clienteReferencia = ct.referencia || clienteReferencia;
+
+                if (ct.cidade && ct.cidade !== '0') {
+                  let cidCt = this.cacheCidade.get(ct.cidade);
+                  if (cidCt === undefined) {
+                    cidCt = await ixcService.buscarCidade(ct.cidade);
+                    this.cacheCidade.set(ct.cidade, cidCt);
+                  }
+                  if (cidCt && cidCt.nome) {
+                    clienteCidade = cidCt.uf ? `${cidCt.nome} - ${cidCt.uf}` : cidCt.nome;
+                  }
+                }
+                console.log(`   🏠 Login usa "Padrão contrato" — endereço do CONTRATO ` +
+                  `${idContratoLogin}: "${ct.endereco}"`);
+              } else {
+                console.log(`   🏠 Login marcado "Padrão contrato" mas o contrato ` +
+                  `${idContratoLogin} não tem endereço próprio — mantendo o do cliente`);
+              }
+            } else if (rec.enderecoPadraoCliente) {
               console.log(`   🏠 Login usa "Padrão cliente" — endereço do login ` +
                 `IGNORADO (mantendo o do cliente)`);
             } else if (rec.endereco && cidadeBate &&
@@ -865,12 +907,17 @@ class SincronizadorIXC {
         }
 
         // PLANO: nome legível vem do contrato do login (cache permanente).
+        //
+        // ⚠️ O `cacheContrato` guarda o CONTRATO INTEIRO (não só o nome do
+        // plano) desde 25/set — o bloco de endereço acima usa o mesmo registro
+        // pra resolver o "Padrão contrato". Uma consulta serve às duas coisas.
         if (idContratoLogin) {
-          planoNome = this.cacheContrato.get(idContratoLogin);
-          if (planoNome === undefined) {
-            planoNome = await ixcService.buscarPlanoContrato(idContratoLogin);
-            this.cacheContrato.set(idContratoLogin, planoNome);
+          let ct = this.cacheContrato.get(idContratoLogin);
+          if (ct === undefined) {
+            ct = await ixcService.buscarDadosContrato(idContratoLogin);
+            this.cacheContrato.set(idContratoLogin, ct);
           }
+          planoNome = ct?.plano || null;
         }
 
         // FIBRA (Caixa FTTH / Porta FTTH / sinal da ONU) pro card, com cache.

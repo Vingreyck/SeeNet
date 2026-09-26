@@ -13,6 +13,10 @@ class SincronizadorIXC {
     this.cacheLogin = new Map(); // id_login → { login, senha, id_contrato, endereco... }
     this.cacheCidade = new Map(); // id_cidade → { nome, uf } (cidade não muda)
     this.cacheContrato = new Map(); // id_contrato → { plano, endereco... } (25/set)
+    // id_caixa_ftth → { id, nome } — nome de caixa não muda, e a MESMA caixa
+    // atende dezenas de clientes; por isso este cache NÃO é limpo por ciclo
+    // (igual cacheCidade): 1 consulta serve pro bairro inteiro.
+    this.cacheCaixa = new Map();
     // 🗑️ OS APAGADA no IXC: some da listagem E o `buscarDetalhesOS` não acha.
     // Não dá pra cancelar na primeira ausência — instabilidade do IXC devolve
     // "não encontrada" do mesmo jeito, e cancelar OS boa seria grave. Então
@@ -933,8 +937,26 @@ class SincronizadorIXC {
             this.cacheFibra.set(chaveFibra, fibra);
           }
           if (fibra) {
-            osIXC.caixa_ftth = fibra.caixa_ftth || fibra.id_caixa_ftth ||
+            // CTO: o registro de fibra só tem o ID da caixa (ex. 5839). O
+            // técnico procura a caixa pela plaquinha, então buscamos o NOME
+            // (ex. "PN-05-04") no recurso das caixas. Não achou o nome →
+            // mostra o id, que é o comportamento de antes (nunca fica vazio).
+            const idCaixa = String(fibra.id_caixa_ftth || fibra.caixa_ftth || '').trim();
+            let nomeCaixa = '';
+            if (idCaixa && idCaixa !== '0') {
+              let caixa = this.cacheCaixa.get(idCaixa);
+              if (caixa === undefined) {
+                caixa = await ixcService.buscarCaixaFtth(idCaixa);
+                this.cacheCaixa.set(idCaixa, caixa);
+              }
+              nomeCaixa = caixa?.nome || '';
+            }
+            osIXC.caixa_ftth = nomeCaixa || idCaixa ||
                 fibra.caixa || fibra.caixa_hermetica || fibra.nome_caixa || '';
+            // Guarda o id junto: quando o nome aparece, o número se perderia do
+            // snapshot — e é por ele que a fase 3 (radar de CTO) vai agrupar OS
+            // da mesma caixa. Nome é pra ler, id é pra comparar.
+            osIXC.sn_caixa_id = idCaixa || '';
             osIXC.porta_ftth = fibra.porta_ftth || fibra.porta ||
                 fibra.porta_ser || fibra.numero_porta || '';
 
@@ -962,6 +984,7 @@ class SincronizadorIXC {
         // Copia do snapshot anterior (sem tocar o IXC).
         if (!osIXC.login && ixcAntigo.login) osIXC.login = ixcAntigo.login;
         osIXC.caixa_ftth = ixcAntigo.caixa_ftth || '';
+        osIXC.sn_caixa_id = ixcAntigo.sn_caixa_id || '';
         osIXC.porta_ftth = ixcAntigo.porta_ftth || '';
         osIXC.sn_cidade = ixcAntigo.sn_cidade || '';
         osIXC.sn_cep = ixcAntigo.sn_cep || '';

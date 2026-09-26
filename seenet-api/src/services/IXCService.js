@@ -174,6 +174,75 @@ class IXCService {
   }
 
   /**
+   * 🔌 Nome da CAIXA FTTH (a "CTO" do card) a partir do id.
+   *
+   * O registro de fibra do cliente só traz `id_caixa_ftth` (um número, tipo
+   * 5839) — e número não serve pra nada em campo: o técnico procura a caixa
+   * pela plaquinha ("PN-05-04"). O nome mora em OUTRO recurso, do InMap:
+   * **`rad_caixa_ftth`** (Elementos > Caixas de atendimento > Caixas).
+   *
+   * ⚠️ O nome do recurso já custou tempo: em 19/ago tentei `radpop_caixa_ftth`,
+   * `caixa_ftth`, `radpop_fibra_caixa` e `radpop_radio_caixa_ftth`, todos
+   * responderam "Recurso não está disponível", e ficou anotado que faltava
+   * LIBERAR permissão no token. Era chute de nome — o certo está na coleção
+   * oficial do Postman e é `rad_caixa_ftth`.
+   *
+   * Devolve `{ id, nome }` ou null (null = segue mostrando o id, como antes).
+   */
+  async buscarCaixaFtth(idCaixa) {
+    try {
+      if (!idCaixa || String(idCaixa) === '0') return null;
+
+      const params = new URLSearchParams({
+        qtype: 'rad_caixa_ftth.id',
+        query: String(idCaixa),
+        oper: '=',
+        page: '1',
+        rp: '1',
+        sortname: 'rad_caixa_ftth.id',
+        sortorder: 'desc'
+      });
+      const response = await this.clientListar.post('/rad_caixa_ftth', params.toString());
+
+      // Mesma distinção do buscarClienteFibra, pela mesma razão: consulta
+      // recusada volta como STRING de HTML, não como JSON vazio. Sem checar o
+      // formato, um `?.` transforma "o recurso está bloqueado" em "essa caixa
+      // não tem nome" — que é exatamente o erro silencioso de 19/ago.
+      if (typeof response.data !== 'object' || response.data === null) {
+        console.warn(`⚠️ [CAIXA] o IXC recusou a consulta da caixa ${idCaixa} ` +
+          `(resposta não é JSON) — recurso rad_caixa_ftth sem permissão no token.`);
+        return null;
+      }
+      // O IXC também recusa em JSON ({"type":"error","message":"Seu IP não está
+      // liberado..."}). Sem isto, "recusado" e "não achei" ficam iguais.
+      if (response.data.type === 'error') {
+        console.warn(`⚠️ [CAIXA] o IXC recusou a caixa ${idCaixa}: ${response.data.message}`);
+        return null;
+      }
+
+      const reg = response.data.registros?.[0];
+      if (!reg) return null;
+
+      const nome = ['caixa', 'nome', 'descricao', 'identificacao', 'codigo', 'titulo']
+        .map((c) => (reg[c] === undefined || reg[c] === null ? '' : String(reg[c]).trim()))
+        .find((v) => v !== '');
+
+      if (!nome) {
+        // Achou a caixa mas nenhum campo conhecido tem o nome: mostra as chaves
+        // pra corrigir a lista acima sem ter que adivinhar de novo.
+        console.warn(`⚠️ [CAIXA] caixa ${idCaixa} veio sem campo de nome. ` +
+          `Campos disponíveis: ${Object.keys(reg).join(', ')}`);
+        return null;
+      }
+
+      return { id: String(reg.id || idCaixa), nome };
+    } catch (e) {
+      console.error(`❌ Erro ao buscar a caixa FTTH ${idCaixa}:`, e.message);
+      return null;
+    }
+  }
+
+  /**
    * 📈 Histórico de sinal da ONU dos últimos N dias.
    *
    * O IXC guarda tudo em `radpop_radio_cliente_fibra_historico` (21 milhões de

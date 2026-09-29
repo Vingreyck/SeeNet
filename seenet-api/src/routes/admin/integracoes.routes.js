@@ -48,9 +48,17 @@ router.post('/ixc/configurar', async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Criptografar token (simples - você pode usar um método mais robusto)
-    const tokenCriptografado = Buffer.from(token_api).toString('base64');
-
+    // ⚠️ NÃO re-codificar o token em base64 aqui. `token_api` é gravado CRU
+    // (é assim que TODO o resto do sistema — SincronizadorIXC, IXCService,
+    // EstoqueAlertaService, TelegramBotService, OrdensServicoController etc.
+    // — lê e usa direto, fazendo o Buffer.from(token).toString('base64')
+    // SÓ na hora de montar o header `Authorization: Basic`). A versão antiga
+    // desta rota fazia `Buffer.from(token_api).toString('base64')` ANTES de
+    // salvar, o que dava um token DUAS VEZES codificado — passaria pelo teste
+    // de conexão (feito com o token cru, req.body.token_api) e só quebraria
+    // depois, silenciosamente, em TODA chamada real ao IXC (401). Achado em
+    // 29/set antes de chegar a salvar, ao corrigir o bug de coluna abaixo.
+    //
     // ⚠️ Coluna correta é `tenant_id` (era `empresa_id` — nome antigo, de antes
     // da tabela virar multi-tenant; o resto do sistema, ex. SincronizadorIXC,
     // já usa `tenant_id`). Com o nome errado, o INSERT/ON CONFLICT dava erro
@@ -58,6 +66,8 @@ router.post('/ixc/configurar', async (req, res) => {
     // verdade (achado em 29/set, ao usar esta rota por trás de um script pela
     // 1ª vez). Faço existe→UPDATE / senão→INSERT em vez de ON CONFLICT porque
     // não há garantia de índice único em `tenant_id` nesta tabela sem migração.
+    // `updated_at` também não existe nesta tabela (o campo de data real é
+    // `ultima_sincronizacao`, gravado só pelo próprio sincronizador) — removido.
     const existente = await client.query(
       'SELECT id FROM integracao_ixc WHERE tenant_id = $1',
       [tenantId]
@@ -66,14 +76,14 @@ router.post('/ixc/configurar', async (req, res) => {
     if (existente.rows.length > 0) {
       await client.query(`
         UPDATE integracao_ixc
-        SET url_api = $1, token_api = $2, ativo = true, updated_at = NOW()
+        SET url_api = $1, token_api = $2, ativo = true
         WHERE tenant_id = $3
-      `, [url_api, tokenCriptografado, tenantId]);
+      `, [url_api, token_api, tenantId]);
     } else {
       await client.query(`
         INSERT INTO integracao_ixc (tenant_id, url_api, token_api, ativo)
         VALUES ($1, $2, $3, true)
-      `, [tenantId, url_api, tokenCriptografado]);
+      `, [tenantId, url_api, token_api]);
     }
 
     await client.query('COMMIT');

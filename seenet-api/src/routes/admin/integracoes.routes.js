@@ -51,17 +51,30 @@ router.post('/ixc/configurar', async (req, res) => {
     // Criptografar token (simples - você pode usar um método mais robusto)
     const tokenCriptografado = Buffer.from(token_api).toString('base64');
 
-    // Inserir ou atualizar configuração
-    await client.query(`
-      INSERT INTO integracao_ixc (empresa_id, url_api, token_api, ativo)
-      VALUES ($1, $2, $3, true)
-      ON CONFLICT (empresa_id)
-      DO UPDATE SET
-        url_api = EXCLUDED.url_api,
-        token_api = EXCLUDED.token_api,
-        ativo = true,
-        updated_at = NOW()
-    `, [tenantId, url_api, tokenCriptografado]);
+    // ⚠️ Coluna correta é `tenant_id` (era `empresa_id` — nome antigo, de antes
+    // da tabela virar multi-tenant; o resto do sistema, ex. SincronizadorIXC,
+    // já usa `tenant_id`). Com o nome errado, o INSERT/ON CONFLICT dava erro
+    // de coluna inexistente e a rota nunca tinha chegado a salvar nada de
+    // verdade (achado em 29/set, ao usar esta rota por trás de um script pela
+    // 1ª vez). Faço existe→UPDATE / senão→INSERT em vez de ON CONFLICT porque
+    // não há garantia de índice único em `tenant_id` nesta tabela sem migração.
+    const existente = await client.query(
+      'SELECT id FROM integracao_ixc WHERE tenant_id = $1',
+      [tenantId]
+    );
+
+    if (existente.rows.length > 0) {
+      await client.query(`
+        UPDATE integracao_ixc
+        SET url_api = $1, token_api = $2, ativo = true, updated_at = NOW()
+        WHERE tenant_id = $3
+      `, [url_api, tokenCriptografado, tenantId]);
+    } else {
+      await client.query(`
+        INSERT INTO integracao_ixc (tenant_id, url_api, token_api, ativo)
+        VALUES ($1, $2, $3, true)
+      `, [tenantId, url_api, tokenCriptografado]);
+    }
 
     await client.query('COMMIT');
 

@@ -2411,10 +2411,93 @@ if (dados.fotos && dados.fotos.length > 0) {
     }
 
     /**
+     * 📍 Coordenada da foto da FACHADA → "Marcar coordenadas" do LOGIN no IXC.
+     *
+     * O app já captura o GPS na hora em que o técnico tira a foto da frente da
+     * casa — é o melhor dado de localização do cliente que existe: foi medido
+     * EM FRENTE à casa, por alguém que estava lá. Antes ficava só no SeeNet;
+     * agora vai também pro login da OS no IXC (o mesmo que se faz à mão
+     * colando "lat lng" no Marcar coordenadas).
+     *
+     * É o LOGIN da OS (id_login), não o cliente: um contrato pode ter logins em
+     * casas diferentes (caso mãe + filha), e cada um tem a sua coordenada.
+     *
+     * Travas — só grava quando dá pra confiar que a foto foi tirada lá:
+     *   - OS em execução (técnico já marcou "cheguei"), e quem mandou a foto é o
+     *     técnico DA OS — foto subida do escritório levaria o GPS do escritório;
+     *   - coordenada válida (não nula, não 0,0, dentro do globo);
+     *   - a até 500m de onde ele marcou a chegada — barra foto da GALERIA tirada
+     *     em outro lugar (o widget aceita galeria) e GPS maluco.
+     *
+     * Devolve um texto curto do que aconteceu (pro log e pros testes).
+     */
+    static async coordenadaFachadaParaLoginIXC(osId, tenantId, userId, latitude, longitude) {
+      const DISTANCIA_MAX_M = 500;
+
+      // Number(null) é 0, não NaN — por isso o teste de null vem antes.
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+      if (latitude == null || longitude == null ||
+          !Number.isFinite(lat) || !Number.isFinite(lng) ||
+          Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat === 0 && lng === 0)) {
+        return 'ignorado: coordenada inválida';
+      }
+
+      const os = await db('ordem_servico')
+        .where('id', osId).where('tenant_id', tenantId)
+        .select('id', 'status', 'origem', 'tipo_os', 'tecnico_id', 'dados_ixc',
+          'latitude_execucao', 'longitude_execucao')
+        .first();
+      if (!os) return 'ignorado: OS não encontrada';
+      if (os.origem !== 'IXC') return 'ignorado: OS não veio do IXC';
+      if (os.tipo_os === 'E') return 'ignorado: OS de estrutura (sem login de cliente)';
+      if (os.status !== 'em_execucao') {
+        return `ignorado: OS está "${os.status}" (só grava com o técnico no local)`;
+      }
+      if (String(os.tecnico_id) !== String(userId)) {
+        return 'ignorado: foto enviada por quem não é o técnico da OS';
+      }
+
+      let dIxc = {};
+      try {
+        dIxc = typeof os.dados_ixc === 'string' ? JSON.parse(os.dados_ixc) : (os.dados_ixc || {});
+      } catch (_) {}
+      const idLogin = dIxc.id_login;
+      if (!idLogin || String(idLogin) === '0') return 'ignorado: OS sem login';
+
+      // Sem ponto de chegada gravado (OS antiga) não há com o que comparar —
+      // segue, porque o status já garante que ele está em campo.
+      const latC = Number(os.latitude_execucao);
+      const lngC = Number(os.longitude_execucao);
+      if (os.latitude_execucao != null && os.longitude_execucao != null &&
+          Number.isFinite(latC) && Number.isFinite(lngC) && !(latC === 0 && lngC === 0)) {
+        const dist = OrdensServicoController.distanciaMetros(latC, lngC, lat, lng);
+        if (dist > DISTANCIA_MAX_M) {
+          return `ignorado: foto a ${Math.round(dist)}m de onde marcou a chegada (máx ${DISTANCIA_MAX_M}m)`;
+        }
+      }
+
+      const integ = await db('integracao_ixc')
+        .where('tenant_id', tenantId).where('ativo', true).first();
+      if (!integ) return 'ignorado: sem integração IXC ativa';
+
+      // 11 casas: é como o próprio IXC guarda (ex. "-10.55049633888").
+      const ixc = new IXCService(integ.url_api, integ.token_api);
+      const r = await ixc.atualizarEnderecoLogin(idLogin, {
+        latitude: lat.toFixed(11),
+        longitude: lng.toFixed(11),
+      });
+      return r?.semMudanca
+        ? `login ${idLogin} já estava com essa coordenada`
+        : `login ${idLogin} → ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
+
+    /**
      * Salvar/atualizar a foto da FACHADA (frente da casa) do cliente da OS.
      * Chave = cliente_id_externo (1 foto por cliente, igual ao histórico de endereço).
-     * Fica só no SeeNet — não sobe pro IXC.
-     * POST /api/ordens-servico/:id/fachada  body: { foto_base64, mime? }
+     * A FOTO fica só no SeeNet; a COORDENADA dela vai também pro login no IXC
+     * (ver [coordenadaFachadaParaLoginIXC]).
+     * POST /api/ordens-servico/:id/fachada  body: { foto_base64, mime?, latitude?, longitude? }
      */
     async salvarFachada(req, res) {
       try {
@@ -2471,6 +2554,15 @@ if (dados.fotos && dados.fotos.length > 0) {
         }
 
         console.log(`📷 Foto da fachada salva (cliente ${os.cliente_id_externo}, OS ${id})`);
+
+        // 📍 Coordenada da foto → login no IXC, em 2º plano: o técnico não fica
+        // esperando o IXC, e falha lá não estraga a foto, que já foi salva.
+        if (latitude != null && longitude != null) {
+          OrdensServicoController.coordenadaFachadaParaLoginIXC(id, tenantId, userId, latitude, longitude)
+            .then((r) => console.log(`📍 Fachada → login IXC (OS ${id}): ${r}`))
+            .catch((e) => console.warn(`⚠️ Fachada → login IXC (OS ${id}) falhou: ${e.message}`));
+        }
+
         return res.json({ success: true, message: 'Foto da fachada salva' });
       } catch (error) {
         console.error('❌ Erro ao salvar foto da fachada:', error);

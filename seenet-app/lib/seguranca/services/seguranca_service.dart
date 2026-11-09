@@ -150,11 +150,15 @@ class SegurancaService extends GetxService {
     DateTime? dataEntrega,
     String? fotoDocumentoBase64,
     bool ehFichario = false,
+    // Primeira ficha: em vez de salvar como entregue, fica aguardando o
+    // TÉCNICO assinar o recebimento no app dele (ele é notificado).
+    bool enviarParaAssinatura = false,
   }) async {
     try {
       final body = {
         'tecnico_id': tecnicoId,
         'epis_solicitados': episSolicitados,
+        if (enviarParaAssinatura) 'enviar_para_assinatura': true,
         if (assinaturaBase64 != null) 'assinatura_base64': assinaturaBase64,
         if (fotoBase64 != null) 'foto_base64': fotoBase64,
         if (observacao != null) 'observacao_gestor': observacao,

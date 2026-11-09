@@ -341,6 +341,30 @@ class _PerfilTecnicoGestorScreenState
               ),
             ),
           ),
+          const SizedBox(height: 10),
+          // Primeira ficha: o gestor lança o kit entregue e o TÉCNICO assina
+          // o recebimento no app dele (recebe notificação).
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                await Get.to(() => RegistroManualEpiScreen(
+                  tecnicoIdFixo:   widget.tecnicoId,
+                  tecnicoNomeFixo: widget.tecnicoNome,
+                  enviarParaAssinatura: true,
+                ));
+                _carregarPerfil();
+              },
+              icon: const Icon(Icons.draw_outlined, color: Color(0xFF00FF88), size: 20),
+              label: const Text('Lançar Primeira Ficha (técnico assina)',
+                  style: TextStyle(color: Color(0xFF00FF88), fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF00FF88)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
           _buildListaRequisicoes(cor),
         ],

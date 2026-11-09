@@ -6,6 +6,7 @@ import '../../models/ordem_servico_model.dart';
 import 'package:get_storage/get_storage.dart';
 import '../../services/connectivity_service.dart';
 import '../../services/sync_manager.dart';
+import '../../controllers/usuario_controller.dart';
 
 // ── Modelos (inalterados) ────────────────────────────────────────
 
@@ -83,6 +84,10 @@ class _AprScreenState extends State<AprScreen>
   final Map<int, TextEditingController> _respostasTexto = {};
   final Set<int> _episSelecionados = {};
   bool _termoConcordo = false;
+
+  /// Nome do colega de quem as respostas foram trazidas (OS encaminhada).
+  /// Null = formulário começou vazio ou do rascunho do próprio técnico.
+  String? _reaproveitadoDe;
 
   // ── FUNÇÕES INALTERADAS ──────────────────────────────────────
 
@@ -175,13 +180,99 @@ class _AprScreenState extends State<AprScreen>
             _justificativas[perg.id] = TextEditingController();
           }
         }
+        final temRascunho = GetStorage().read(_rascunhoKey) != null;
         _restaurarRascunho(); // ✅ traz de volta o que o técnico já preencheu
         setState(() { _categorias = lista; _carregando = false; });
+        // Rascunho do próprio técnico vence: só busca o do colega se não há.
+        if (!temRascunho) _preencherComAprDoColega();
       } else {
         _carregarDoCache();
       }
     } catch (e) {
       _carregarDoCache();
+    }
+  }
+
+  PerguntaApr? _pergunta(int id) {
+    for (final cat in _categorias) {
+      for (final p in cat.perguntas) {
+        if (p.id == id) return p;
+      }
+    }
+    return null;
+  }
+
+  /// OS ENCAMINHADA: o colega já fez a APR desta OS (caso comum — encaminham
+  /// só pra lançar material do estoque do outro, os dois no mesmo local).
+  /// Em vez de o técnico responder TUDO de novo, as respostas do colega vêm
+  /// preenchidas; ele confere, muda o que for diferente e aceita o termo.
+  ///
+  /// A APR continua sendo DELE (salva no nome dele) — o termo de
+  /// responsabilidade NÃO vem marcado de propósito: aceitar é o ato de quem
+  /// assina. Qualquer falha aqui só deixa o formulário vazio, como antes.
+  Future<void> _preencherComAprDoColega() async {
+    try {
+      final resp = await _api.get('/apr/respostas/${os.id}');
+      if (resp is! Map || resp['success'] != true) return;
+      final data = resp['data'];
+      if (data is! Map) return;
+      final linhas = (data['respostas'] as List?) ?? const [];
+      if (linhas.isEmpty) return;
+
+      final meuId = Get.find<UsuarioController>().usuarioLogado.value?.id;
+
+      // Agrupa por quem respondeu e fica com o colega mais recente.
+      final porUsuario = <String, List<Map>>{};
+      for (final l in linhas) {
+        if (l is! Map) continue;
+        porUsuario.putIfAbsent('${l['usuario_id']}', () => []).add(l);
+      }
+      porUsuario.remove('$meuId');
+      if (porUsuario.isEmpty) return;
+
+      int ultimoId(List<Map> ls) => ls
+          .map((l) => int.tryParse('${l['id']}') ?? 0)
+          .fold(0, (a, b) => a > b ? a : b);
+      final escolhido = porUsuario.values
+          .reduce((a, b) => ultimoId(a) >= ultimoId(b) ? a : b);
+      final idsEscolhidos = escolhido.map((l) => '${l['id']}').toSet();
+
+      if (!mounted) return;
+      // Se ele já começou a responder enquanto isto carregava, não atropela.
+      if (_respostasSN.isNotEmpty || _episSelecionados.isNotEmpty) return;
+
+      setState(() {
+        for (final l in escolhido) {
+          final pid = int.tryParse('${l['pergunta_id']}');
+          final perg = pid == null ? null : _pergunta(pid);
+          if (perg == null) continue;
+          final resposta = (l['resposta'] ?? '').toString();
+          final just = (l['justificativa'] ?? '').toString();
+          if (perg.tipoResposta == 'sim_nao' && resposta.isNotEmpty) {
+            _respostasSN[perg.id] = resposta;
+          } else if (perg.tipoResposta == 'texto') {
+            _respostasTexto[perg.id]?.text = resposta;
+          } else if (perg.tipoResposta == 'multipla_escolha') {
+            for (final p in resposta.split(',')) {
+              final id = int.tryParse(p.trim());
+              if (id != null) _episSelecionados.add(id);
+            }
+          }
+          if (just.isNotEmpty) _justificativas[perg.id]?.text = just;
+        }
+        // EPIs também ficam numa tabela própria — junta os dessa APR.
+        for (final e in (data['epis'] as List?) ?? const []) {
+          if (e is Map && idsEscolhidos.contains('${e['resposta_apr_id']}')) {
+            final id = int.tryParse('${e['opcao_id']}');
+            if (id != null) _episSelecionados.add(id);
+          }
+        }
+        _termoConcordo = false;
+        final nome = (escolhido.first['usuario_nome'] ?? '').toString().trim();
+        _reaproveitadoDe = nome.isEmpty ? 'um colega' : nome;
+      });
+    } catch (_) {
+      // Sem rede / backend antigo: formulário fica vazio, como sempre foi.
     }
   }
 
@@ -530,6 +621,34 @@ class _AprScreenState extends State<AprScreen>
             ),
           ),
           const SizedBox(height: 16),
+
+          if (_reaproveitadoDe != null) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.copy_rounded,
+                      color: Colors.lightBlueAccent, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Respostas trazidas da APR de $_reaproveitadoDe nesta OS. '
+                      'Confira, ajuste o que for diferente no seu trabalho e '
+                      'aceite o termo no final.',
+                      style: const TextStyle(
+                          color: Colors.lightBlueAccent, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           ..._categorias.map((cat) => _buildCategoria(cat)),
 

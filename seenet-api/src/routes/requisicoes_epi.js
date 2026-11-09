@@ -588,26 +588,58 @@ router.post('/requisicoes', authMiddleware, async (req, res) => {
 router.post('/requisicoes/manual', authMiddleware, async (req, res) => {
   try {
     if (!isGestorOuAdmin(req.user.tipo_usuario)) return res.status(403).json({ error: 'Sem permissão' });
-    const { tecnico_id, epis_solicitados, assinatura_base64, foto_base64, observacao_gestor, data_entrega, foto_documento_base64, eh_fichario } = req.body;
+    const { tecnico_id, epis_solicitados, assinatura_base64, foto_base64, observacao_gestor, data_entrega, foto_documento_base64, eh_fichario, enviar_para_assinatura } = req.body;
     if (!tecnico_id) return res.status(400).json({ error: 'Técnico obrigatório' });
     if (!epis_solicitados?.length) return res.status(400).json({ error: 'Selecione ao menos um EPI' });
-    const tecnico = await db('usuarios').where('id', tecnico_id).first();
+    const tecnico = await db('usuarios').where('id', tecnico_id).where('tenant_id', req.user.tenant_id).first();
     if (!tecnico) return res.status(404).json({ error: 'Técnico não encontrado' });
     const dataEntregaFinal = data_entrega ? new Date(data_entrega) : new Date();
+
+    // 📝 PRIMEIRA FICHA: o gestor lança o que entregou e quem ASSINA é o
+    // técnico, no app dele. Fica em 'aguardando_confirmacao' — o mesmo status
+    // de uma requisição aprovada —, então o técnico usa a tela de confirmar
+    // recebimento que já existe (assinatura + foto) e, ao assinar, vira
+    // 'concluida' com o PDF regerado. Sem isso, o registro manual só aceitava
+    // a assinatura colhida no aparelho do gestor.
+    const paraAssinar = enviar_para_assinatura === true;
+
     const [inserted] = await db('requisicoes_epi').insert({
-      tenant_id: req.user.tenant_id, tecnico_id, gestor_id: req.user.id, status: 'aprovada',
-      epis_solicitados: JSON.stringify(epis_solicitados), assinatura_base64: assinatura_base64 || null,
-      foto_base64: foto_base64 || null, observacao_gestor: observacao_gestor || 'Registro manual pelo gestor de segurança.',
+      tenant_id: req.user.tenant_id, tecnico_id, gestor_id: req.user.id,
+      status: paraAssinar ? 'aguardando_confirmacao' : 'aprovada',
+      epis_solicitados: JSON.stringify(epis_solicitados),
+      assinatura_base64: paraAssinar ? null : (assinatura_base64 || null),
+      foto_base64: paraAssinar ? null : (foto_base64 || null),
+      observacao_gestor: observacao_gestor || (paraAssinar
+        ? 'Primeira ficha — lançada pelo gestor de segurança para o técnico assinar o recebimento.'
+        : 'Registro manual pelo gestor de segurança.'),
       data_resposta: new Date(), data_entrega: dataEntregaFinal, registro_manual: true, criado_por_gestor_id: req.user.id,
-      foto_documento_base64: foto_documento_base64 || null,
-      eh_fichario: eh_fichario === true,
+      foto_documento_base64: paraAssinar ? null : (foto_documento_base64 || null),
+      eh_fichario: paraAssinar ? false : eh_fichario === true,
     }).returning('*');
     try {
       const gestor = await db('usuarios').where('id', req.user.id).first();
       const pdfBuffer = await gerarPDF(inserted, tecnico, gestor);
       await db('requisicoes_epi').where('id', inserted.id).update({ pdf_base64: `data:application/pdf;base64,${pdfBuffer.toString('base64')}` });
     } catch (e) { console.error('Erro ao gerar PDF no registro manual:', e); }
-    res.status(201).json({ success: true, message: 'Registro manual criado com sucesso!', id: inserted.id });
+    res.status(201).json({
+      success: true,
+      message: paraAssinar
+        ? `Enviado! ${tecnico.nome} vai receber uma notificação para assinar o recebimento.`
+        : 'Registro manual criado com sucesso!',
+      id: inserted.id,
+      aguardando_assinatura: paraAssinar,
+    });
+
+    if (paraAssinar) {
+      try {
+        await notificationService.enviarParaUsuario(
+          db, tecnico_id,
+          '📝 EPIs para assinar',
+          'O gestor de segurança lançou seus EPIs. Confira e assine o recebimento.',
+          { route: '/seguranca', tipo: 'requisicao_aprovada', referencia_id: String(inserted.id) }
+        );
+      } catch (notifErr) { console.warn('⚠️ Falha ao notificar técnico da primeira ficha:', notifErr.message); }
+    }
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao criar registro manual' }); }
 });
 

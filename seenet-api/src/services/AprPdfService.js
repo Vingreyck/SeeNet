@@ -17,6 +17,35 @@ const LARGURA        = 495;
 
 class AprPdfService {
 
+  /**
+   * Qual APR vai no PDF quando a OS tem mais de um respondente.
+   * Devolve um trecho de WHERE (`r.`) + params. Qualquer falha → sem filtro
+   * (comportamento antigo): melhor um PDF com tudo do que nenhum PDF.
+   */
+  static async _respondente(osId, donoId) {
+    const semFiltro = { filtro: '', params: [] };
+    try {
+      if (!(await db.schema.hasColumn('respostas_apr', 'usuario_id'))) return semFiltro;
+      const grupos = await db('respostas_apr')
+        .where('ordem_servico_id', osId)
+        .select('usuario_id')
+        .max('id as ultimo')
+        .groupBy('usuario_id');
+      if (grupos.length <= 1) return semFiltro;
+
+      const escolhido =
+        grupos.find((g) => g.usuario_id != null && String(g.usuario_id) === String(donoId)) ||
+        [...grupos].sort((a, b) => Number(b.ultimo) - Number(a.ultimo))[0];
+
+      return escolhido.usuario_id == null
+        ? { filtro: ' AND r.usuario_id IS NULL', params: [] }
+        : { filtro: ' AND r.usuario_id = ?', params: [escolhido.usuario_id] };
+    } catch (e) {
+      console.warn('⚠️ APR PDF: não deu pra escolher o respondente, vai tudo:', e.message);
+      return semFiltro;
+    }
+  }
+
   static async gerarPdfApr(osId, tenantId) {
     try {
       const os = await db('ordem_servico as o')
@@ -27,6 +56,12 @@ class AprPdfService {
         .first();
 
       if (!os) throw new Error('OS não encontrada');
+
+      // Numa OS ENCAMINHADA pode haver APR de mais de um técnico (cada um
+      // guarda a sua). O PDF é UMA APR: a do técnico dono da OS (é o nome que
+      // vai no cabeçalho); se ele não tiver, a mais recente. Com um respondente
+      // só — o caso normal — não filtra nada, igual sempre foi.
+      const { filtro, params: paramsFiltro } = await AprPdfService._respondente(osId, os.tecnico_id);
 
       const respostas = await db.raw(`
         SELECT
@@ -41,9 +76,9 @@ class AprPdfService {
         FROM respostas_apr r
         INNER JOIN checklist_perguntas_apr p ON p.id = r.pergunta_id
         INNER JOIN checklist_categorias_apr c ON c.id = p.categoria_id
-        WHERE r.ordem_servico_id = ?
+        WHERE r.ordem_servico_id = ?${filtro}
         ORDER BY c.ordem, p.ordem
-      `, [osId]);
+      `, [osId, ...paramsFiltro]);
 
       if (respostas.rows.length === 0)
         throw new Error('APR não preenchido para esta OS');
@@ -53,9 +88,9 @@ class AprPdfService {
         FROM respostas_apr_epis re
         INNER JOIN checklist_opcoes_apr o ON o.id = re.opcao_id
         INNER JOIN respostas_apr r       ON r.id  = re.resposta_apr_id
-        WHERE r.ordem_servico_id = ?
+        WHERE r.ordem_servico_id = ?${filtro}
         ORDER BY o.ordem
-      `, [osId]);
+      `, [osId, ...paramsFiltro]);
 
       const assinaturaRow = await db('ordem_servico')
         .where('id', osId)

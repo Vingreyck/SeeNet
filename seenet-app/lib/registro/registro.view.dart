@@ -299,8 +299,11 @@ class RegistrarView extends GetView<RegistroController> {
           inputFormatters: [UpperCaseTextFormatter()],
           style: const TextStyle(
               color: Colors.white, fontSize: 15, letterSpacing: 1.5),
+          // ⚠️ NÃO usar o código real como exemplo: "Ex: BBNET123" era o token
+          // VERDADEIRO da BBnet aparecendo pra qualquer um que abrisse o
+          // cadastro — dava pra se registrar na empresa sem ninguém passar o código.
           decoration: _inputDecoration(
-              hint: 'Ex: BBNET123',
+              hint: 'Código fornecido pela empresa',
               prefixIcon: Icons.vpn_key_outlined),
         ),
       ],

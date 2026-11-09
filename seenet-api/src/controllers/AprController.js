@@ -92,10 +92,16 @@ class AprController {
     const tenantId = req.user?.tenant_id;
 
     try {
+      // Quem respondeu vai junto: numa OS ENCAMINHADA o app usa isso pra
+      // oferecer as respostas do colega como ponto de partida (o técnico que
+      // recebeu confere e confirma, em vez de preencher tudo de novo).
+      const comUsuario = await temColunaUsuario();
       const result = await db.raw(`
         SELECT r.id, r.pergunta_id, r.resposta, r.justificativa, r.data_resposta
+          ${comUsuario ? ', r.usuario_id, u.nome AS usuario_nome' : ''}
         FROM respostas_apr r
         INNER JOIN ordem_servico os ON os.id = r.ordem_servico_id
+        ${comUsuario ? 'LEFT JOIN usuarios u ON u.id = r.usuario_id' : ''}
         WHERE r.ordem_servico_id = ? AND os.tenant_id = ?
         ORDER BY r.pergunta_id ASC
       `, [osId, tenantId]);
@@ -148,10 +154,18 @@ class AprController {
           throw new Error('OS_NOT_FOUND');
         }
 
-        // Deletar respostas anteriores (permite re-preenchimento)
+        // Apaga as respostas anteriores DESTE técnico (permite re-preenchimento).
+        //
+        // ⚠️ Era por OS inteira: numa OS ENCAMINHADA, quando o 2º técnico
+        // salvava a APR dele, a do 1º era APAGADA — sumia o registro de quem
+        // avaliou o risco primeiro. Agora cada um só substitui a própria.
+        // `usuario_id IS NULL` entra junto: são respostas de antes da migration,
+        // que o /status já trata como do técnico (sem isso ficariam duplicadas).
+        const filtroDono = comUsuario ? ' AND (usuario_id = ? OR usuario_id IS NULL)' : '';
+        const paramsDono = comUsuario ? [os_id, usuarioId] : [os_id];
         const respostasAntigas = await trx.raw(
-          'SELECT id FROM respostas_apr WHERE ordem_servico_id = ?',
-          [os_id]
+          `SELECT id FROM respostas_apr WHERE ordem_servico_id = ?${filtroDono}`,
+          paramsDono
         );
         if (respostasAntigas.rows.length > 0) {
           const idsAntigos = respostasAntigas.rows.map(r => r.id);
@@ -160,8 +174,8 @@ class AprController {
             [idsAntigos]
           );
           await trx.raw(
-            'DELETE FROM respostas_apr WHERE ordem_servico_id = ?',
-            [os_id]
+            'DELETE FROM respostas_apr WHERE id = ANY(?)',
+            [idsAntigos]
           );
         }
 

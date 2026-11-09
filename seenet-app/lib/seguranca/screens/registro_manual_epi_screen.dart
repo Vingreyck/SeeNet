@@ -14,10 +14,14 @@ class RegistroManualEpiScreen extends StatefulWidget {
   final int? tecnicoIdFixo;
   final String? tecnicoNomeFixo;
 
+  /// Abre já no modo "primeira ficha" (o técnico assina no app dele).
+  final bool enviarParaAssinatura;
+
   const RegistroManualEpiScreen({
     super.key,
     this.tecnicoIdFixo,
     this.tecnicoNomeFixo,
+    this.enviarParaAssinatura = false,
   });
 
   @override
@@ -44,6 +48,11 @@ class _RegistroManualEpiScreenState
   DateTime dataEntrega = DateTime.now();
   final obsController = TextEditingController();
   bool isSending = false;
+
+  /// Primeira ficha: o gestor lança o que entregou e o TÉCNICO assina o
+  /// recebimento no app dele (recebe notificação). Desligado = registro manual
+  /// de sempre, com assinatura colhida aqui no aparelho do gestor.
+  late bool _paraAssinar = widget.enviarParaAssinatura;
 
   final SignatureController _signatureController = SignatureController(
     penStrokeWidth: 2.5,
@@ -122,7 +131,8 @@ class _RegistroManualEpiScreenState
     setState(() => isSending = true);
     try {
       String? sigBase64;
-      if (_signatureController.isNotEmpty) {
+      // No modo primeira ficha quem assina é o técnico — nada colhido aqui vai.
+      if (!_paraAssinar && _signatureController.isNotEmpty) {
         final Uint8List? sigBytes =
         await _signatureController.toPngBytes();
         if (sigBytes != null) {
@@ -134,13 +144,14 @@ class _RegistroManualEpiScreenState
         tecnicoId: tecnicoSelecionadoId!,
         episSolicitados: episSelecionados.toList(),
         assinaturaBase64: sigBase64,
-        fotoBase64: fotoBase64,
+        fotoBase64: _paraAssinar ? null : fotoBase64,
         observacao: obsController.text.trim().isNotEmpty
             ? obsController.text.trim()
             : null,
         dataEntrega: dataEntrega,
-        fotoDocumentoBase64: fotoDocumentoBase64,
-        ehFichario: ehFichario,
+        fotoDocumentoBase64: _paraAssinar ? null : fotoDocumentoBase64,
+        ehFichario: _paraAssinar ? false : ehFichario,
+        enviarParaAssinatura: _paraAssinar,
       );
       if (result['success'] == true) {
         if (mounted) {
@@ -166,14 +177,17 @@ class _RegistroManualEpiScreenState
                         color: Color(0xFF00FF88), size: 32),
                   ),
                   const SizedBox(height: 14),
-                  const Text('Registro Salvo!',
-                      style: TextStyle(
+                  Text(_paraAssinar ? 'Enviado pro técnico!' : 'Registro Salvo!',
+                      style: const TextStyle(
                           color: Colors.white,
                           fontSize: 17,
                           fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Text(
-                    'O histórico de EPIs de $tecnicoSelecionadoNome foi atualizado.',
+                    _paraAssinar
+                        ? '$tecnicoSelecionadoNome vai receber uma notificação para '
+                          'conferir os EPIs e assinar o recebimento no app.'
+                        : 'O histórico de EPIs de $tecnicoSelecionadoNome foi atualizado.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                         color: Colors.white54, fontSize: 13),
@@ -255,18 +269,21 @@ class _RegistroManualEpiScreenState
                       color: Color(0xFF00FF88), size: 18),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Registro Manual de EPI',
-                          style: TextStyle(
+                      Text(_paraAssinar ? 'Lançar Primeira Ficha' : 'Registro Manual de EPI',
+                          style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                               letterSpacing: -0.3)),
-                      Text('Entrega fora do fluxo padrão',
-                          style: TextStyle(
+                      Text(
+                          _paraAssinar
+                              ? 'O técnico assina o recebimento no app dele'
+                              : 'Entrega fora do fluxo padrão',
+                          style: const TextStyle(
                               color: Colors.white38, fontSize: 11)),
                     ],
                   ),
@@ -294,16 +311,56 @@ class _RegistroManualEpiScreenState
                       border: Border.all(
                           color: Colors.blue.withOpacity(0.2)),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.info_outline_rounded,
+                        const Icon(Icons.info_outline_rounded,
                             color: Colors.blue, size: 16),
-                        SizedBox(width: 10),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Use para registrar entregas anteriores ou fora do app. O registro será salvo como aprovado.',
-                            style: TextStyle(
+                            _paraAssinar
+                                ? 'Escolha o técnico e os EPIs que você entregou. Ele recebe uma notificação e assina o recebimento (assinatura + foto) no app dele.'
+                                : 'Use para registrar entregas anteriores ou fora do app. O registro será salvo como aprovado.',
+                            style: const TextStyle(
                                 color: Colors.blue, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Quem assina ──────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00FF88).withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: const Color(0xFF00FF88).withOpacity(0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        Switch(
+                          value: _paraAssinar,
+                          activeColor: const Color(0xFF00FF88),
+                          onChanged: (v) => setState(() => _paraAssinar = v),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('O técnico assina no app dele',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                  'Primeira ficha de técnico novo — ele recebe a notificação pra assinar',
+                                  style: TextStyle(
+                                      color: Colors.white54, fontSize: 11)),
+                            ],
                           ),
                         ),
                       ],
@@ -366,6 +423,9 @@ class _RegistroManualEpiScreenState
                   ),
                   const SizedBox(height: 18),
 
+                  // Foto, assinatura e fichário são do gestor colhendo na hora.
+                  // Na primeira ficha quem colhe é o próprio técnico, no app dele.
+                  if (!_paraAssinar) ...[
                   // ── Foto ─────────────────────────────────────
                   _sectionLabel('Foto de Comprovação (opcional)'),
                   const SizedBox(height: 8),
@@ -475,6 +535,7 @@ class _RegistroManualEpiScreenState
                     const SizedBox(height: 8),
                     _buildFotoDocumentoSection(),
                   ],
+                  ], // fim do bloco "só no registro manual"
 
                   const SizedBox(height: 24),
 
@@ -491,7 +552,11 @@ class _RegistroManualEpiScreenState
                           : const Icon(Icons.save_alt_rounded,
                           color: Colors.black),
                       label: Text(
-                        isSending ? 'Salvando...' : 'Salvar Registro Manual',
+                        isSending
+                            ? 'Salvando...'
+                            : (_paraAssinar
+                                ? 'Enviar para o técnico assinar'
+                                : 'Salvar Registro Manual'),
                         style: const TextStyle(
                             color: Colors.black,
                             fontSize: 15,

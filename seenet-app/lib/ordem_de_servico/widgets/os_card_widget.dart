@@ -34,22 +34,34 @@ class OSCardWidget extends StatelessWidget {
           children: [
             // HEADER: Número da OS + Prioridade
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(os.iconeStatus, color: os.corPrioridade, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'OS #${os.numeroOs}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                // O número da OS do IXC é comprido (ex. #20261105153729628048)
+                // e empurrava o selo de prioridade pra fora do card em tela de
+                // celular. Ele encolhe pra caber; o selo fica sempre inteiro.
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(os.iconeStatus, color: os.corPrioridade, size: 20),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'OS #${os.numeroOs}',
+                            maxLines: 1,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
